@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -17,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Sparkles, Clock, Calculator, Info, History, ArrowRight, AlertCircle } from 'lucide-react';
+import { Loader2, Save, Sparkles, Clock, Calculator, Info, History, ArrowRight, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -62,6 +61,7 @@ export default function NewLeaveRequestPage() {
     const [passportReceived, setPassportReceived] = useState(false);
     
     const [lastLeaveInfo, setLastLeaveInfo] = useState<LeaveRequest | null>(null);
+    const [overlapError, setOverlapError] = useState<string | null>(null);
     const [loadingContext, setLoadingContext] = useState(false);
     const [hasCheckedContext, setHasCheckedContext] = useState(false);
 
@@ -86,6 +86,8 @@ export default function NewLeaveRequestPage() {
                 description: 'تاريخ النهاية يجب أن يكون لاحقاً لتاريخ البداية.',
             });
         }
+        // Clear overlap error when dates change to allow re-checking
+        setOverlapError(null);
     }, [startDate, endDate, toast]);
 
     useEffect(() => {
@@ -170,6 +172,7 @@ export default function NewLeaveRequestPage() {
 
         savingRef.current = true;
         setIsSaving(true);
+        setOverlapError(null);
 
         try {
             const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
@@ -196,10 +199,12 @@ export default function NewLeaveRequestPage() {
             });
 
             if (hasOverlap) {
+                const errorMsg = "لديك اجازة بالفعل في هذا التوقيت لايسمح بعمل اكثر من اجازة في نفس الوقت";
+                setOverlapError(errorMsg);
                 toast({ 
                     variant: 'destructive', 
-                    title: 'تداخل في التواريخ', 
-                    description: '⚠️ يوجد بالفعل إجازة أخرى (مقبولة أو معلقة) لهذا الموظف في نفس هذه الفترة الزمنية.' 
+                    title: 'منع تداخل الإجازات', 
+                    description: errorMsg 
                 });
                 setIsSaving(false);
                 savingRef.current = false;
@@ -242,6 +247,17 @@ export default function NewLeaveRequestPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-8 space-y-6">
+                    {/* 🛡️ التنبيه السيادي في أعلى الشاشة 🛡️ */}
+                    {overlapError && (
+                        <Alert variant="destructive" className="rounded-3xl border-2 border-red-500 bg-red-50 shadow-red-100 animate-in slide-in-from-top-4 duration-500 py-6 mb-4">
+                            <ShieldAlert className="h-6 w-6 text-red-600" />
+                            <AlertTitle className="text-lg font-black text-red-800">تنبيه رقابي حرج</AlertTitle>
+                            <AlertDescription className="text-sm font-bold text-red-700 mt-1 leading-relaxed">
+                                {overlapError}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                      {(currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer') && (
                       <div className="grid gap-2">
                         <Label htmlFor="employee" className="font-black text-gray-700 pr-1">الموظف المعني *</Label>

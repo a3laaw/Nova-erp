@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -10,15 +9,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Upload, Info, User, AlertCircle } from 'lucide-react';
+import { Loader2, Save, Upload, Info, User, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
-import { calculateWorkingDays } from '@/services/leave-calculator';
+import { calculateWorkingDays, calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getTenantPath } from '@/lib/utils';
+import { startOfDay, endOfDay, isSameDay, isBefore } from 'date-fns';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
   const { user: currentUser } = useAuth();
   const { branding, loading: brandingLoading } = useBranding();
   const { toast } = useToast();
+  const tenantId = currentUser?.currentCompanyId;
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [publicHolidays, setPublicHolidays] = useState<Holiday[]>([]);
@@ -43,6 +45,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [notes, setNotes] = useState('');
+  const [overlapError, setOverlapError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   
   const isEditing = !!leaveRequestToEdit;
@@ -67,6 +70,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
             setEndDate(undefined);
             setNotes('');
         }
+        setOverlapError(null);
     }
   }, [isOpen, isEditing, leaveRequestToEdit, currentUser, isAdmin]);
 
@@ -100,15 +104,53 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
+    if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate || !tenantId) {
       toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
       return;
     }
     
     setIsSaving(true);
+    setOverlapError(null);
+
     try {
       const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || (selectedEmployeeId === currentUser?.employeeId ? { fullName: currentUser.fullName } : null);
       if (!selectedEmployee) throw new Error('لم يتم العثور على الموظف المختار.');
+
+      const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
+      
+      // 🛡️ الدرع الرقابي: فحص التداخل السيادي 🛡️
+      const overlapQuery = query(
+          collection(firestore, leaveCollectionPath),
+          where('employeeId', '==', selectedEmployeeId),
+          where('status', 'in', ['pending', 'approved', 'on-leave'])
+      );
+      const overlapSnap = await getDocs(overlapQuery);
+      const hasOverlap = overlapSnap.docs.some(docSnap => {
+          if (isEditing && docSnap.id === leaveRequestToEdit?.id) return false;
+          const existing = docSnap.data() as LeaveRequest;
+          const exStart = toFirestoreDate(existing.startDate);
+          const exEnd = toFirestoreDate(existing.endDate);
+          if (!exStart || !exEnd) return false;
+          
+          const requestedStart = startOfDay(startDate);
+          const requestedEnd = endOfDay(endDate);
+          const currentStart = startOfDay(exStart);
+          const currentEnd = endOfDay(exEnd);
+
+          return (requestedStart <= currentEnd && requestedEnd >= currentStart);
+      });
+
+      if (hasOverlap) {
+          const errorMsg = "لديك اجازة بالفعل في هذا التوقيت لايسمح بعمل اكثر من اجازة في نفس الوقت";
+          setOverlapError(errorMsg);
+          toast({ 
+              variant: 'destructive', 
+              title: 'منع تداخل الإجازات', 
+              description: errorMsg 
+          });
+          setIsSaving(false);
+          return;
+      }
 
       const dataToSave = {
         employeeId: selectedEmployeeId,
@@ -130,6 +172,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
             ...dataToSave,
             status: 'pending' as const,
             createdAt: serverTimestamp(),
+            companyId: tenantId
         };
         await addDoc(collection(firestore, 'leaveRequests'), newRequest);
         toast({ title: 'نجاح', description: 'تم إرسال طلب الإجازة بنجاح.' });
@@ -159,6 +202,17 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 p-8">
+            {/* 🛡️ التنبيه السيادي في أعلى الشاشة داخل الـ Dialog 🛡️ */}
+            {overlapError && (
+                <Alert variant="destructive" className="rounded-2xl border-2 border-red-500 bg-red-50 shadow-sm animate-in zoom-in-95 py-4">
+                    <ShieldAlert className="h-5 w-5 text-red-600" />
+                    <AlertTitle className="text-sm font-black text-red-800">تنبيه تداخل</AlertTitle>
+                    <AlertDescription className="text-xs font-bold text-red-700 mt-1">
+                        {overlapError}
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <div className="grid gap-2">
                 <Label htmlFor="employee" className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
                 {isAdmin ? (
@@ -190,16 +244,15 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
                     </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2" />
             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="startDate" className="font-bold mr-1">من تاريخ *</Label>
-                <DateInput value={startDate} onChange={setStartDate} className="h-11 rounded-xl border-2" disabled={isSaving} />
+                <DateInput value={startDate} onChange={(d) => { setStartDate(d); setOverlapError(null); }} className="h-11 rounded-xl border-2" disabled={isSaving} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="endDate" className="font-bold mr-1">إلى تاريخ *</Label>
-                <DateInput value={endDate} onChange={setEndDate} className="h-11 rounded-xl border-2" disabled={isSaving} />
+                <DateInput value={endDate} onChange={(d) => { setEndDate(d); setOverlapError(null); }} className="h-11 rounded-xl border-2" disabled={isSaving} />
               </div>
             </div>
             {leaveDuration.totalDays > 0 && (
@@ -208,16 +261,6 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
                     <p>إجمالي الأيام: <span className="text-lg">{leaveDuration.totalDays}</span></p>
                     <p>أيام العمل: <span className="text-lg">{leaveDuration.workingDays}</span></p>
                 </div>
-
-                {leaveType === 'Annual' && leaveDuration.totalDays > 0 && leaveDuration.totalDays < 30 && (
-                    <Alert className="bg-amber-50 border-amber-200 rounded-2xl animate-in slide-in-from-top-2">
-                        <AlertCircle className="h-4 w-4 text-amber-600" />
-                        <AlertTitle className="text-amber-800 font-black text-xs">تنبيه ودي</AlertTitle>
-                        <AlertDescription className="text-[10px] font-bold text-amber-700 leading-relaxed">
-                            الإجازة السنوية مخصصة للفترات الطويلة (شهر فأكثر). إذا كانت المدة قصيرة، يرجى مراجعة النوع المختار.
-                        </AlertDescription>
-                    </Alert>
-                )}
               </div>
             )}
              <div className="grid gap-2">

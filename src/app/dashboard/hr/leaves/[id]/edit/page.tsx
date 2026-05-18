@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -18,18 +17,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, X, AlertCircle } from 'lucide-react';
+import { Loader2, Save, X, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
 import { calculateWorkingDays } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
-import { isBefore, startOfDay } from 'date-fns';
+import { isBefore, startOfDay, endOfDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getTenantPath } from '@/lib/utils';
 
 export default function EditLeaveRequestPage() {
     const { firestore } = useFirebase();
@@ -38,8 +38,9 @@ export default function EditLeaveRequestPage() {
     const router = useRouter();
     const params = useParams();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
+    const tenantId = currentUser?.currentCompanyId;
 
-    const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
+    const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
     const { data: publicHolidays, loading: holidaysLoading } = useSubscription<Holiday>(firestore, 'holidays');
     const { branding, loading: brandingLoading } = useBranding();
     
@@ -52,6 +53,7 @@ export default function EditLeaveRequestPage() {
     const [endDate, setEndDate] = useState<Date | undefined>();
     const [notes, setNotes] = useState('');
     const [passportReceived, setPassportReceived] = useState(false);
+    const [overlapError, setOverlapError] = useState<string | null>(null);
     
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
@@ -76,6 +78,7 @@ export default function EditLeaveRequestPage() {
                 description: 'تاريخ النهاية يجب أن يكون لاحقاً لتاريخ البداية.',
             });
         }
+        setOverlapError(null);
     }, [startDate, endDate, toast]);
 
     const loading = employeesLoading || holidaysLoading || brandingLoading || leaveLoading;
@@ -91,7 +94,7 @@ export default function EditLeaveRequestPage() {
         e.preventDefault();
         if (savingRef.current) return;
 
-        if (!firestore || !currentUser || !id || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
+        if (!firestore || !currentUser || !id || !selectedEmployeeId || !leaveType || !startDate || !endDate || !tenantId) {
             toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
             return;
         }
@@ -104,8 +107,46 @@ export default function EditLeaveRequestPage() {
 
         savingRef.current = true;
         setIsSaving(true);
+        setOverlapError(null);
         
         try {
+            const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
+            
+            // 🛡️ الدرع الرقابي: فحص التداخل (استبعاد الطلب الحالي) 🛡️
+            const overlapQuery = query(
+                collection(firestore, leaveCollectionPath),
+                where('employeeId', '==', selectedEmployeeId),
+                where('status', 'in', ['pending', 'approved', 'on-leave'])
+            );
+            const overlapSnap = await getDocs(overlapQuery);
+            const hasOverlap = overlapSnap.docs.some(docSnap => {
+                if (docSnap.id === id) return false; // Skip the current record we are editing
+                const existing = docSnap.data() as LeaveRequest;
+                const exStart = toFirestoreDate(existing.startDate);
+                const exEnd = toFirestoreDate(existing.endDate);
+                if (!exStart || !exEnd) return false;
+                
+                const requestedStart = startOfDay(startDate);
+                const requestedEnd = endOfDay(endDate);
+                const currentStart = startOfDay(exStart);
+                const currentEnd = endOfDay(exEnd);
+
+                return (requestedStart <= currentEnd && requestedEnd >= currentStart);
+            });
+
+            if (hasOverlap) {
+                const errorMsg = "لديك اجازة بالفعل في هذا التوقيت لايسمح بعمل اكثر من اجازة في نفس الوقت";
+                setOverlapError(errorMsg);
+                toast({ 
+                    variant: 'destructive', 
+                    title: 'منع تداخل الإجازات', 
+                    description: errorMsg 
+                });
+                setIsSaving(false);
+                savingRef.current = false;
+                return;
+            }
+
             const leaveRef = doc(firestore, 'leaveRequests', id);
             await updateDoc(leaveRef, {
                 employeeId: selectedEmployeeId,
@@ -141,6 +182,17 @@ export default function EditLeaveRequestPage() {
                     <CardDescription className="text-base font-medium">تعديل بيانات طلب الإجازة للموظف: {leaveRequest?.employeeName}.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8 space-y-6">
+                    {/* 🛡️ التنبيه السيادي في أعلى الشاشة 🛡️ */}
+                    {overlapError && (
+                        <Alert variant="destructive" className="rounded-3xl border-2 border-red-500 bg-red-50 shadow-red-100 animate-in slide-in-from-top-4 duration-500 py-6 mb-4">
+                            <ShieldAlert className="h-6 w-6 text-red-600" />
+                            <AlertTitle className="text-lg font-black text-red-800">تنبيه رقابي حرج</AlertTitle>
+                            <AlertDescription className="text-sm font-bold text-red-700 mt-1 leading-relaxed">
+                                {overlapError}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     <div className="grid gap-2">
                         <Label className="font-bold text-gray-700 pr-1">الموظف المعني *</Label>
                         <InlineSearchList
@@ -154,7 +206,7 @@ export default function EditLeaveRequestPage() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label className="font-bold text-gray-700 pr-1">نوع الإجازة *</Label>
+                        <Label htmlFor="leaveType" className="font-bold text-gray-700 pr-1">نوع الإجازة *</Label>
                         <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
                             <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
                             <SelectContent dir="rtl">
@@ -168,11 +220,11 @@ export default function EditLeaveRequestPage() {
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label className="font-bold text-gray-700 pr-1">من تاريخ *</Label>
+                        <Label htmlFor="startDate" className="font-bold text-gray-700 pr-1">من تاريخ *</Label>
                         <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                       <div className="grid gap-2">
-                        <Label className="font-bold text-gray-700 pr-1">إلى تاريخ *</Label>
+                        <Label htmlFor="endDate" className="font-bold text-gray-700 pr-1">إلى تاريخ *</Label>
                         <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                     </div>
