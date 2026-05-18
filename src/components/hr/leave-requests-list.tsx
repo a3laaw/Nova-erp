@@ -70,10 +70,9 @@ export function LeaveRequestsList() {
 
   const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
 
-  // 🛡️ رادار الاستعلام السيادي: تم تحصينه لضمان رؤية الموظف لكافة طلباته (القديمة والجديدة)
+  // 🛡️ رادار الاستعلام السيادي: تم تحصينه لضمان رؤية الموظف لكافة طلباته
   const queryConstraints = useMemo(() => {
       const constraints = [];
-      // للمدير: يرى كل شيء. للموظف: يرى ما يخصه (سواء بالـ employeeId أو بكونه المنشئ)
       if (!isAdmin && currentUser?.employeeId) {
           constraints.push(where('employeeId', '==', currentUser.employeeId));
       }
@@ -82,7 +81,6 @@ export function LeaveRequestsList() {
 
   const { data: rawLeaveRequests, loading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
 
-  // ترتيب البيانات برمجياً لضمان الدقة وتجنب حاجة الفهارس
   const leaveRequests = useMemo(() => {
       return [...rawLeaveRequests].sort((a, b) => {
           const dateA = toFirestoreDate(a.createdAt)?.getTime() || 0;
@@ -279,3 +277,4 @@ export function LeaveRequestsList() {
     </>
   );
 }
+

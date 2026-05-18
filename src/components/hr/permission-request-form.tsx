@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, PermissionRequest, LeaveRequest } from '@/lib/types';
-import { Loader2, Save, User, AlertCircle, Clock, CalendarCheck, CheckCircle2 } from 'lucide-react';
+import { Loader2, Save, User, AlertCircle, Clock, CalendarCheck } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -48,7 +48,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
   
   const isAdmin = ['Admin', 'HR', 'Developer'].includes(currentUser?.role || '');
 
-  // 🛡️ تصفير الحالة لضمان عدم تعليق الأزرار أو الرسائل القديمة
+  // 🛡️ تصفير الحالة لضمان عدم تعليق الأزرار أو الرسائل القديمة عند الفتح
   useEffect(() => {
     if (isOpen) {
         setIsSaving(false);
@@ -69,7 +69,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     }
   }, [isOpen, permissionToEdit, currentUser, isAdmin]);
 
-  // 🛡️ فحص الرصيد الشهري بفلترة برمجية لتجنب خطأ الفهارس
+  // 🛡️ فحص الرصيد والتحقق من التداخل عند تغيير البيانات
   useEffect(() => {
     setOverlapError(null);
     if (!isOpen || !firestore || !selectedEmployeeId || !date || !tenantId) {
@@ -77,41 +77,53 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
         return;
     }
 
-    const checkMonthlyQuota = async () => {
+    const checkMonthlyQuotaAndOverlaps = async () => {
         setLoadingQuota(true);
         try {
             const monthStart = startOfMonth(date);
             const monthEnd = endOfMonth(date);
             const permissionsPath = getTenantPath('permissionRequests', tenantId);
             
+            // جلب الطلبات للموظف المعني للمراجعة البرمجية (لتجنب أخطاء الفهارس)
             const q = query(
                 collection(firestore, permissionsPath),
                 where('employeeId', '==', selectedEmployeeId)
             );
             
             const snap = await getDocs(q);
-            let total = 0;
+            let totalHours = 0;
             snap.forEach(docSnap => {
                 const data = docSnap.data() as PermissionRequest;
                 if (permissionToEdit && docSnap.id === permissionToEdit.id) return;
                 
                 const pDate = toFirestoreDate(data.date);
-                if (
-                    pDate && 
-                    pDate >= monthStart && 
-                    pDate <= monthEnd && 
-                    ['pending', 'approved'].includes(data.status)
-                ) {
-                    total += (data.durationHours || 0);
+                if (pDate && pDate >= monthStart && pDate <= monthEnd && ['pending', 'approved'].includes(data.status)) {
+                    totalHours += (data.durationHours || 0);
                 }
             });
-            setMonthlyTotalHours(total);
+            setMonthlyTotalHours(totalHours);
+
+            // فحص التداخل مع الإجازات
+            const leavesPath = getTenantPath('leaveRequests', tenantId);
+            const checkDateStart = startOfDay(date);
+            const leavesSnap = await getDocs(query(collection(firestore, leavesPath), where('employeeId', '==', selectedEmployeeId)));
+            const hasLeave = leavesSnap.docs.some(d => {
+                const l = d.data() as LeaveRequest;
+                if (!['approved', 'on-leave', 'returned'].includes(l.status)) return false;
+                const s = toFirestoreDate(l.startDate);
+                const e = toFirestoreDate(l.endDate);
+                return s && e && checkDateStart >= startOfDay(s) && checkDateStart <= endOfDay(e);
+            });
+
+            if (hasLeave) {
+                setOverlapError("عذراً، الموظف لديه إجازة معتمدة في هذا التاريخ؛ لا يمكن طلب استئذان في يوم إجازة.");
+            }
         } catch (e) {
-            console.error("Quota check failed:", e);
+            console.error(e);
         } finally { setLoadingQuota(false); }
     };
 
-    checkMonthlyQuota();
+    checkMonthlyQuotaAndOverlaps();
   }, [isOpen, selectedEmployeeId, date, firestore, tenantId, permissionToEdit]);
 
   const employeeOptions = useMemo(() => employees.filter(e => e.status === 'active').map(e => ({ value: e.id!, label: e.fullName })), [employees]);
@@ -127,34 +139,12 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     }
 
     if ((monthlyTotalHours + duration) > 12) {
-        const msg = `عذراً، سيؤدي هذا الطلب لتجاوز سقف الاستئذانات المسموح به شهرياً (12 ساعة). المتبقي لك حالياً: ${Math.max(0, 12 - monthlyTotalHours)} ساعة.`;
-        setOverlapError(msg);
-        toast({ variant: 'destructive', title: 'تجاوز الحد الشهري', description: msg });
+        toast({ variant: 'destructive', title: 'تجاوز الحد الشهري', description: 'هذا الطلب يتجاوز سقف الـ 12 ساعة المسموح بها شهرياً.' });
         return;
     }
     
     setIsSaving(true);
-    setOverlapError(null);
-
     try {
-      const checkDateStart = startOfDay(date);
-      const leavesPath = getTenantPath('leaveRequests', tenantId);
-      
-      const leavesQuery = query(collection(firestore, leavesPath), where('employeeId', '==', selectedEmployeeId));
-      const leavesSnapshot = await getDocs(leavesQuery);
-      const hasOverlappingLeave = leavesSnapshot.docs.some(docSnap => {
-          const l = docSnap.data() as LeaveRequest;
-          if (!['approved', 'on-leave', 'returned'].includes(l.status)) return false;
-          const start = toFirestoreDate(l.startDate);
-          const end = toFirestoreDate(l.endDate);
-          return start && end && checkDateStart >= startOfDay(start) && checkDateStart <= endOfDay(end);
-      });
-
-      if (hasOverlappingLeave) {
-          setOverlapError("عذراً، الموظف لديه إجازة معتمدة في هذا التاريخ؛ لا يمكن طلب استئذان في يوم الإجازة الرسمية.");
-          setIsSaving(false); return;
-      }
-
       const permissionsPath = getTenantPath('permissionRequests', tenantId);
       const dataToSave = {
         employeeId: selectedEmployeeId,
@@ -182,13 +172,18 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
                 <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Clock className="h-6 w-6" /></div>
                 <div>
                     <DialogTitle className="text-xl font-black text-[#1e1b4b]">{permissionToEdit ? 'تعديل الاستئذان' : 'طلب استئذان جديد'}</DialogTitle>
-                    <DialogDescription className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">تنظيم الحضور للانصراف بمرونة إدارية.</DialogDescription>
                 </div>
             </div>
           </DialogHeader>
 
           <div className="p-8 space-y-6">
-            {overlapError && <Alert variant="destructive" className="rounded-2xl border-2 border-red-500 bg-red-50 shadow-sm animate-in zoom-in-95 py-6"><AlertCircle className="h-6 w-6 text-red-600" /><AlertTitle className="text-lg font-black text-red-800">تنبيه تداخل مواعيد</AlertTitle><AlertDescription className="text-sm font-bold text-red-700 mt-2">{overlapError}</AlertDescription></Alert>}
+            {overlapError && (
+                <Alert variant="destructive" className="rounded-2xl border-2 border-red-500 bg-red-50 py-6 mb-2 animate-in zoom-in-95">
+                    <AlertCircle className="h-6 w-6 text-red-600" />
+                    <AlertTitle className="text-lg font-black text-red-800">تنبيه تداخل مواعيد</AlertTitle>
+                    <AlertDescription className="text-sm font-bold text-red-700 mt-2">{overlapError}</AlertDescription>
+                </Alert>
+            )}
 
             <div className="p-5 bg-indigo-50 border-2 border-indigo-200 rounded-[2rem] flex items-center justify-between shadow-inner">
                 <div className="space-y-1">

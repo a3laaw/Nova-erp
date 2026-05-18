@@ -5,12 +5,13 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
-import { AlertCircle, RefreshCcw, LogOut } from 'lucide-react';
+import { AlertCircle, RefreshCcw, LogOut, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
+import Image from 'next/image';
 
 export default function DashboardLayout({
   children,
@@ -37,21 +38,16 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 🎨 شاشة التحميل الذهبية الموحدة مع شعار NOVA 🎨
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* هالة التوهج الذهبي-البرتقالي */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/20 rounded-full blur-[100px] animate-pulse" />
         
         <div className="relative z-10 flex flex-col items-center gap-6">
             <div className="relative">
-                {/* مؤشر الدوران الخارجي */}
                 <div className="h-32 w-32 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)]" />
-                {/* شعار NOVA في المركز */}
                 <div className="absolute inset-0 m-auto flex flex-col items-center justify-center animate-pulse">
                     <span className="text-3xl font-black tracking-tighter text-primary">NOVA</span>
-                    <span className="text-[7px] font-black tracking-[0.4em] text-[#1e1b4b] opacity-40">ENTERPRISE</span>
                 </div>
             </div>
             <div className="text-center space-y-4">
@@ -79,7 +75,7 @@ export default function DashboardLayout({
   if (!user) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]" dir="rtl">
-        <div className="p-6 bg-red-500/10 rounded-full border-2 border-red-500/20 mb-4">
+        <div className="p-6 bg-red-50/10 rounded-full border-2 border-red-500/20 mb-4">
             <AlertCircle className="h-12 w-12 text-red-600 animate-bounce" />
         </div>
         <h2 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">انتهت جلسة العمل</h2>

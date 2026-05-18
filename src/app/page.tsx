@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
     Loader2, 
-    ShieldCheck, 
     LogIn, 
     AlertCircle, 
     Send,
@@ -84,14 +83,12 @@ export default function LoginPage() {
       } finally { setIsSubmitting(false); }
   };
 
-  // 🎨 شاشة التحميل الذهبية الموحدة مع شعار NOVA 🎨
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-[#FFFDF0]" dir="rtl">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/20 rounded-full blur-[100px] animate-pulse" />
           <div className="relative">
               <div className="h-24 w-24 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)]" />
-              {/* شعار NOVA في المركز */}
               <div className="absolute inset-0 m-auto flex flex-col items-center justify-center animate-pulse">
                   <span className="text-2xl font-black tracking-tighter text-primary">NOVA</span>
               </div>
