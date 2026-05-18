@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -263,7 +262,6 @@ export default function RoomBookingCalendar() {
                             {slots.map(time => {
                                 const booking = bookingsGrid[room]?.[time];
                                 const appointmentDate = booking ? toFirestoreDate(booking.appointmentDate) : null;
-                                // ✨ فحص تعارض الإجازة للمهندس المسؤول عن القاعة (إن وجد)
                                 const activeLeave = (booking && booking.engineerId && date) ? getEmployeeLeaveForDate(booking.engineerId, date) : null;
                                 const isOnLeave = !!activeLeave;
 
@@ -273,7 +271,7 @@ export default function RoomBookingCalendar() {
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <div className="flex flex-col items-center justify-center text-center p-1 sm:p-2 rounded-md cursor-pointer transition-all hover:brightness-95 shadow-sm h-full relative" style={{ ...(departmentStyles[booking.department || 'أخرى'] || {}) }}>
-                                                        {isOnLeave && <Badge variant="destructive" className="absolute top-0.5 right-0.5 text-[6px] h-3 px-1 font-black">مجاز</Badge>}
+                                                        {isOnLeave && <Badge variant="destructive" className="absolute top-0.5 right-0.5 text-[6px] h-3 px-1 font-black">في إجازة</Badge>}
                                                         <p className="font-bold text-[10px] sm:text-xs leading-tight">{booking.title}</p>
                                                         <p className="text-[9px] sm:text-[10px] mt-1">{booking.clientName}</p>
                                                     </div>
@@ -369,7 +367,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
         }
     }, [isOpen, dialogData]);
     
-    // ✨ فحص تداخل الإجازة في المساعد
     const getEmployeeLeaveForDate = (empId: string, checkDate: Date) => {
         return leaveRequests.find((req: any) => {
             if (req.employeeId !== empId) return false;
@@ -382,7 +379,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
 
     const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
     
-    // إخفاء المهندسين في إجازة من قائمة الاختيار لليوم المحدد
     const engineerOptions = useMemo(() => 
         engineers
             .filter((e: Employee) => {
@@ -421,7 +417,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
                                 <InlineSearchList value={selectedEngineerId} onSelect={setSelectedEngineerId} options={engineerOptions} placeholder="اختر..." className="rounded-xl" />
                             </div>
                         </div>
-                        <div className="grid gap-2"><Label>ملاحظات إضافية</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} className="rounded-xl" /></div>
+                        <div className="grid gap-2"><Label>ملاحظات إضافية</Label><Textarea value={notes} className="rounded-xl" /></div>
                     </div>
                     <DialogFooter className="gap-2"><Button type="button" variant="outline" onClick={onClose} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-bold">{isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin"/>}{isSaving ? 'جاري الحفظ...' : 'حفظ'}</Button></DialogFooter>
                  </form>

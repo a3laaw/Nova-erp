@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -204,7 +203,6 @@ export default function ArchitecturalAppointmentsView() {
         const clientsPath = getTenantPath('clients', tenantId);
         const leavesPath = getTenantPath('leaveRequests', tenantId);
 
-        // جلب البيانات المرجعية
         getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave', 'terminated']))).then(snap => {
             const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري') && e.status !== 'terminated').sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
             setEngineers(arch);
@@ -213,7 +211,6 @@ export default function ArchitecturalAppointmentsView() {
             const clientsList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
             setClients(clientsList);
         });
-        // ✨ رادار الإجازات المعتمدة
         getDocs(query(collection(firestore, leavesPath), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
             setLeaveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest)));
         });
@@ -238,7 +235,6 @@ export default function ArchitecturalAppointmentsView() {
       }));
     }, [rawAppointments, clients]);
 
-    // ✨ محرك فحص إجازة الموظف في تاريخ محدد
     const getEmployeeLeaveForDate = useCallback((employeeId: string, checkDate: Date) => {
         return leaveRequests.find(req => {
             if (req.employeeId !== employeeId) return false;
@@ -282,11 +278,10 @@ export default function ArchitecturalAppointmentsView() {
         <div className="border rounded-lg overflow-x-auto bg-card">
             <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-                <colgroup><col className="w-[10rem]" />{slots.map((_, i) => <col key={i} className="w-[8rem]" />)}</colgroup>
+                <colgroup><col className="w-[10rem]" /><{slots.map((_, i) => <col key={i} className="w-[8rem]" />)}</colgroup>
                 <thead><tr className='border-b'><th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l">المهندس</th>{slots.map(time => <th key={time} className="p-2 text-center text-sm font-mono border-l">{time}</th>)}</tr></thead>
                 <tbody>
                     {engineers.map(eng => {
-                        // ✨ فحص الإجازة المعتمدة في هذا التاريخ تحديداً
                         const activeLeave = date ? getEmployeeLeaveForDate(eng.id!, date) : null;
                         const isOnLeave = !!activeLeave;
 
@@ -313,7 +308,7 @@ export default function ArchitecturalAppointmentsView() {
                                     <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {isOnLeave ? (
                                             <div className="h-full w-full bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(239,68,68,0.03)_5px,rgba(239,68,68,0.03)_10px)] flex flex-col items-center justify-center">
-                                                <span className="text-[9px] font-black text-red-300 opacity-40 uppercase tracking-tighter rotate-[-15deg]">الموظف مجاز حالياً</span>
+                                                <span className="text-[10px] font-black text-red-300 opacity-40 uppercase tracking-tighter rotate-[-15deg]">في إجازة رسمية</span>
                                             </div>
                                         ) : booking ? (
                                              <DropdownMenu>
