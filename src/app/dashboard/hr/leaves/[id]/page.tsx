@@ -23,14 +23,14 @@ import {
     PlaneTakeoff, 
     Home, 
     Briefcase, 
-    Badge as BadgeIcon, 
     Loader2, 
     ArrowDownCircle, 
     Calculator, 
     FileCheck, 
     AlertCircle,
     MessageSquare,
-    ShieldCheck
+    ShieldCheck,
+    Badge as BadgeIcon
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -120,7 +120,10 @@ export default function LeaveRequestDetailsPage() {
             const batch = writeBatch(firestore);
             batch.update(doc(firestore, reqPath), { status: 'on-leave', actualStartDate: Timestamp.fromDate(actualDate) });
             batch.update(doc(firestore, empPath), { status: 'on-leave' });
-            await batch.commit();
+            await batch.commit().catch(async (e) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: reqPath, operation: 'write' }));
+                throw e;
+            });
             toast({ title: 'تم تسجيل المغادرة' });
             setIsStartDialogOpen(false);
         } catch (e) { setIsProcessing(false); }
@@ -136,7 +139,10 @@ export default function LeaveRequestDetailsPage() {
             const batch = writeBatch(firestore);
             batch.update(doc(firestore, reqPath), { status: 'returned', actualReturnDate: Timestamp.fromDate(actualDate) });
             batch.update(doc(firestore, empPath), { status: 'active' });
-            await batch.commit();
+            await batch.commit().catch(async (e) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: reqPath, operation: 'write' }));
+                throw e;
+            });
             toast({ title: 'تمت المباشرة' });
             setIsReturnDialogOpen(false);
         } catch (e) { setIsProcessing(false); }

@@ -64,22 +64,32 @@ export function LeaveRequestsList() {
   const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // States for Decision Engine (Accept/Reject with Reason)
   const [requestToProcess, setRequestToProcess] = useState<{ req: LeaveRequest, action: 'approved' | 'rejected' } | null>(null);
   const [adminComment, setAdminComment] = useState('');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
 
+  // 🛡️ رادار الاستعلام السيادي: تم تحصينه لضمان رؤية الموظف لكافة طلباته
   const queryConstraints = useMemo(() => {
-      const constraints = [orderBy('createdAt', 'desc')];
-      if (!isAdmin && currentUser?.employeeId) {
-          constraints.push(where('employeeId', '==', currentUser.employeeId));
+      // للمدير: نرى كل شيء. للموظف: نرى ما أنشأناه بأنفسنا (createdBy) أو ما يخص رقمنا الوظيفي
+      const constraints = [];
+      if (!isAdmin && currentUser?.id) {
+          constraints.push(where('createdBy', '==', currentUser.id));
       }
       return constraints;
-  }, [isAdmin, currentUser?.employeeId]);
+  }, [isAdmin, currentUser?.id]);
 
-  const { data: leaveRequests, loading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
+  const { data: rawLeaveRequests, loading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
+
+  // ترتيب البيانات برمجياً لضمان الدقة وتجنب حاجة الفهارس (Indexes)
+  const leaveRequests = useMemo(() => {
+      return [...rawLeaveRequests].sort((a, b) => {
+          const dateA = toFirestoreDate(a.createdAt)?.getTime() || 0;
+          const dateB = toFirestoreDate(b.createdAt)?.getTime() || 0;
+          return dateB - dateA;
+      });
+  }, [rawLeaveRequests]);
 
   const formatDate = (dateValue: any) => {
     const date = toFirestoreDate(dateValue);
@@ -102,7 +112,6 @@ export function LeaveRequestsList() {
   const handleConfirmDecision = async () => {
     if (!requestToProcess || !firestore || !tenantId || !currentUser) return;
     
-    // يفرض النظام كتابة سبب في حالة الرفض فقط كمعيار رقابي
     if (requestToProcess.action === 'rejected' && !adminComment.trim()) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'يجب ذكر سبب الرفض لتوضيح القرار للموظف.' });
         return;
@@ -115,8 +124,8 @@ export function LeaveRequestsList() {
             status: requestToProcess.action,
             [requestToProcess.action === 'approved' ? 'approvedBy' : 'rejectedBy']: currentUser.id,
             [requestToProcess.action === 'approved' ? 'approvedAt' : 'rejectedAt']: serverTimestamp(),
-            rejectionReason: adminComment, // نستخدم نفس الحقل للرسالة الإدارية
-            adminComment: adminComment // حقل إضافي للتوثيق
+            rejectionReason: adminComment,
+            adminComment: adminComment 
         });
         
         toast({ 
@@ -137,7 +146,7 @@ export function LeaveRequestsList() {
 
   return (
     <>
-      <div className="flex justify-end mb-6">
+      <div className="flex justify-end mb-6 no-print">
         <Button asChild className="h-11 px-8 rounded-xl font-black gap-2">
           <Link href="/dashboard/hr/leaves/new"><PlusCircle className="h-5 w-5" /> تقديم طلب إجازة</Link>
         </Button>
@@ -156,7 +165,7 @@ export function LeaveRequestsList() {
           </TableHeader>
           <TableBody>
             {leaveRequests.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic font-bold">لا توجد طلبات إجازة حالياً.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic font-black">لا توجد طلبات إجازة لعرضها في سجلك.</TableCell></TableRow>
             ) : (
               leaveRequests.map(req => (
                 <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 h-16 group transition-colors">
@@ -226,7 +235,6 @@ export function LeaveRequestsList() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 🛡️ حوار اتخاذ القرار (قبو ردود الإدارة) 🛡️ */}
       <AlertDialog open={!!requestToProcess} onOpenChange={() => { setRequestToProcess(null); setAdminComment(''); }}>
         <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl overflow-hidden p-0">
             <AlertDialogHeader className={cn("p-8 text-white", requestToProcess?.action === 'approved' ? "bg-green-600" : "bg-red-600")}>
