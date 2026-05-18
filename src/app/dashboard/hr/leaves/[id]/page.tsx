@@ -1,15 +1,34 @@
-
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDocument, useFirebase } from '@/firebase';
-import { doc, collection, query, where, getDocs, writeBatch, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
 import type { LeaveRequest, Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon, Loader2, ArrowDownCircle, Calculator, FileCheck, AlertCircle } from 'lucide-react';
+import { 
+    ArrowRight, 
+    Printer, 
+    Calendar, 
+    User, 
+    FileText, 
+    CheckCircle, 
+    XCircle, 
+    Sparkles, 
+    History, 
+    Clock, 
+    PlaneTakeoff, 
+    Home, 
+    Briefcase, 
+    Badge as BadgeIcon, 
+    Loader2, 
+    ArrowDownCircle, 
+    Calculator, 
+    FileCheck, 
+    AlertCircle 
+} from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -19,7 +38,16 @@ import { Badge } from '@/components/ui/badge';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { 
+    AlertDialog, 
+    AlertDialogAction, 
+    AlertDialogCancel, 
+    AlertDialogContent, 
+    AlertDialogDescription, 
+    AlertDialogFooter, 
+    AlertDialogHeader, 
+    AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
 import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
@@ -35,6 +63,7 @@ const statusColors: Record<LeaveRequest['status'], string> = {
   'on-leave': 'bg-blue-100 text-blue-800 border-blue-200',
   'returned': 'bg-indigo-100 text-indigo-800 border-indigo-200',
 };
+
 const statusTranslations: Record<LeaveRequest['status'], string> = {
   pending: 'تحت المراجعة',
   approved: 'موافق عليه (بانتظار المغادرة)',
@@ -42,10 +71,10 @@ const statusTranslations: Record<LeaveRequest['status'], string> = {
   'on-leave': 'في إجازة حالياً',
   'returned': 'عاد للعمل',
 };
+
 const leaveTypeTranslations: Record<LeaveRequest['leaveType'], string> = {
     'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
 };
-
 
 function InfoRow({ label, value, icon }: { label: string, value: string | React.ReactNode, icon: React.ReactNode }) {
     return (
@@ -130,12 +159,12 @@ export default function LeaveRequestDetailsPage() {
                 </Button>
                 <div className="flex gap-3">
                     {leaveRequest.status === 'approved' && (
-                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.startDate) || new Date()); setIsStartDialogOpen(true); }} className="bg-blue-600 font-black gap-2 rounded-xl">
+                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.startDate) || new Date()); setIsStartDialogOpen(true); }} className="bg-blue-600 font-black gap-2 rounded-xl text-white">
                             <PlaneTakeoff className="h-4 w-4"/> تسجيل المغادرة
                         </Button>
                     )}
                     {leaveRequest.status === 'on-leave' && (
-                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.endDate) || new Date()); setIsReturnDialogOpen(true); }} className="bg-indigo-600 font-black gap-2 rounded-xl">
+                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.endDate) || new Date()); setIsReturnDialogOpen(true); }} className="bg-indigo-600 font-black gap-2 rounded-xl text-white">
                             <Home className="h-4 w-4"/> إشعار مباشرة العمل
                         </Button>
                     )}
@@ -208,7 +237,7 @@ export default function LeaveRequestDetailsPage() {
                     </div>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleStartLeave} className="bg-blue-600 rounded-xl font-black px-8">تأكيد المغادرة</AlertDialogAction>
+                        <AlertDialogAction onClick={handleStartLeave} className="bg-blue-600 rounded-xl font-black px-8 text-white">تأكيد المغادرة</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
@@ -222,12 +251,10 @@ export default function LeaveRequestDetailsPage() {
                     </div>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleReturnToWork} className="bg-indigo-600 rounded-xl font-black px-8">تأكيد العودة</AlertDialogAction>
+                        <AlertDialogAction onClick={handleReturnToWork} className="bg-indigo-600 rounded-xl font-black px-8 text-white">تأكيد العودة</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>
     );
 }
-
-import { Badge as BadgeIcon } from 'lucide-react';
