@@ -84,19 +84,20 @@
   }
 }
 
-/* 🛡️ تحسين القوائم المنسدلة للتعامل مع الماوس 🛡️ */
+/* 🛡️ تحسين القوائم المنسدلة للتعامل مع الماوس ومنع الحجب 🛡️ */
 [data-radix-popper-content-wrapper] {
   z-index: 999999 !important;
   pointer-events: auto !important;
 }
 
-[role="listbox"], [role="menu"], [role="dialog"], [data-radix-select-content], [data-radix-popover-content] {
+[role="listbox"], [role="menu"], [role="dialog"], [data-state="open"][data-radix-select-content], [data-state="open"][data-radix-popover-content] {
   pointer-events: auto !important;
   z-index: 999999 !important;
 }
 
-[role="menuitem"], [role="option"] {
+[role="menuitem"], [role="option"], [cmdk-item] {
     cursor: pointer !important;
+    pointer-events: auto !important;
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }

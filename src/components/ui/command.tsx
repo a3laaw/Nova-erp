@@ -121,7 +121,8 @@ const CommandItem = React.forwardRef<
       className
     )}
     onMouseDown={(e) => {
-      // 🛡️ Ensure mouse down doesn't get swallowed
+      // 🛡️ صمام أمان: نمنع التركيز من الهروب لضمان تسجيل النقرة
+      e.preventDefault();
       onMouseDown?.(e);
     }}
     {...props}
