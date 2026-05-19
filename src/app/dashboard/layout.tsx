@@ -5,7 +5,7 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
-import { AlertCircle, RefreshCcw, LogOut } from 'lucide-react';
+import { AlertCircle, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
@@ -40,14 +40,9 @@ export default function DashboardLayout({
   const { language } = useLanguage();
   
   const [mounted, setMounted] = useState(false);
-  const [showEmergencyExit, setShowEmergencyExit] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const timer = setTimeout(() => {
-      setShowEmergencyExit(true);
-    }, 5000);
-    return () => clearTimeout(timer);
   }, []);
 
   const handleSafeExit = () => {
@@ -65,9 +60,6 @@ export default function DashboardLayout({
             </div>
             <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري التحميل...</p>
         </div>
-        {showEmergencyExit && (
-            <Button onClick={handleSafeExit} variant="ghost" className="text-red-500 font-bold text-xs">تأخر في الاستجابة؟ اضغط هنا</Button>
-        )}
       </div>
     );
   }

@@ -26,6 +26,7 @@ import { Separator } from '@/components/ui/separator';
 /**
  * غرفة العمليات الميدانية (Sovereign Visit Control):
  * هذا هو "عقل الميدان" الذي يربط إنجاز المهندس بالدورة المستندية والمالية.
+ * تم إصلاح التعارض عند تحويل عميل محتمل لضمان اختفاء التنبيه فور الربط.
  */
 export default function AppointmentDetailsPage() {
     const params = useParams();
@@ -39,8 +40,9 @@ export default function AppointmentDetailsPage() {
 
     const { data: appointment, loading: apptLoading } = useDocument<Appointment>(firestore, id ? `appointments/${id}` : null);
     
+    // 🛡️ الربط اللحظي: جلب بيانات العميل بمجرد توفر الـ clientId
     const clientPath = useMemo(() => appointment?.clientId ? `clients/${appointment.clientId}` : null, [appointment?.clientId]);
-    const { data: client } = useDocument<Client>(firestore, clientPath);
+    const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
     
     const transactionPath = useMemo(() => (appointment?.clientId && appointment?.transactionId) ? `clients/${appointment.clientId}/transactions/${appointment.transactionId}` : null, [appointment]);
     const { data: transaction } = useDocument<ClientTransaction>(firestore, transactionPath);
@@ -55,7 +57,6 @@ export default function AppointmentDetailsPage() {
 
         const fetchStages = async () => {
             try {
-                // جلب مراحل العمل المعتمدة لنوع المعاملة هذا من المسار المرجعي
                 const txTypeSnap = await getDoc(doc(firestore, getTenantPath(`transactionTypes/${transaction.transactionTypeId}`, tenantId)));
                 if (!txTypeSnap.exists()) return;
                 
@@ -74,9 +75,6 @@ export default function AppointmentDetailsPage() {
         fetchStages();
     }, [firestore, tenantId, transaction?.transactionTypeId]);
 
-    /**
-     * محرك السلسلة الذهبية: تحديث المرحلة -> تفعيل الدفعة
-     */
     const handleUpdateVisitStatus = async () => {
         if (!firestore || !currentUser || !tenantId || !appointment || !selectedStageId) return;
         setIsSaving(true);
@@ -106,7 +104,6 @@ export default function AppointmentDetailsPage() {
                 let financeComment = "";
                 if (transaction.contract?.clauses) {
                     const updatedClauses = transaction.contract.clauses.map((clause: any) => {
-                        // 💰 الربط المالي: إذا كان اسم المرحلة يطابق شرط استحقاق الدفعة، يتم تفعيلها فوراً
                         if (clause.condition === stageTemplate?.name && clause.status === 'غير مستحقة') {
                             financeComment = `\n\n**[إشعار مالي]** استحقت دفعة "${clause.name}" بقيمة **${formatCurrency(clause.amount)}**.`;
                             return { ...clause, status: 'مستحقة' };
@@ -118,7 +115,6 @@ export default function AppointmentDetailsPage() {
 
                 batch.update(txRef, { stages, status: 'in-progress', updatedAt: serverTimestamp() });
                 
-                // توثيق في التايم لاين
                 const timelineRef = doc(collection(txRef, 'timelineEvents'));
                 batch.set(timelineRef, {
                     type: 'comment', 
@@ -145,10 +141,11 @@ export default function AppointmentDetailsPage() {
         } finally { setIsSaving(false); }
     };
 
-    if (apptLoading) return <div className="p-8 max-w-2xl mx-auto"><Skeleton className="h-[500px] w-full rounded-[3.5rem]" /></div>;
+    if (apptLoading || clientLoading) return <div className="p-8 max-w-2xl mx-auto"><Skeleton className="h-[500px] w-full rounded-[3.5rem]" /></div>;
     if (!appointment) return <div className="p-20 text-center font-black opacity-30">الزيارة غير موجودة.</div>;
 
     const apptDate = toFirestoreDate(appointment.appointmentDate);
+    const isProspective = !appointment.clientId;
 
     return (
         <div className="max-w-2xl mx-auto space-y-6 pb-20" dir="rtl">
@@ -157,15 +154,17 @@ export default function AppointmentDetailsPage() {
                     <div className="flex justify-between items-start">
                         <div className="space-y-2">
                             <Badge variant="outline" className="bg-white text-primary border-primary/20 font-black px-4">مركز تحكم الزيارة</Badge>
-                            <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{appointment.title}</CardTitle>
-                            <CardDescription className="font-bold flex items-center gap-2 text-lg">
-                                <User className="h-5 w-5 text-primary opacity-40" />
+                            <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">
                                 {client?.nameAr || appointment.clientName}
-                                {!appointment.clientId && <Badge className="bg-orange-100 text-orange-700 font-black border-none">عميل محتمل</Badge>}
+                                {isProspective && <Badge className="mr-3 bg-orange-100 text-orange-700 font-black border-none text-[10px]">عميل محتمل</Badge>}
+                            </CardTitle>
+                            <CardDescription className="font-bold flex items-center gap-2 text-lg opacity-60">
+                                <FileText className="h-4 w-4" />
+                                {appointment.title}
                             </CardDescription>
                         </div>
                         <div className="text-left font-mono text-sm opacity-40">
-                            {client?.fileId || 'ملف غير مسجل'}
+                            {client?.fileId || '---'}
                         </div>
                     </div>
                 </CardHeader>
@@ -183,7 +182,7 @@ export default function AppointmentDetailsPage() {
                             <Label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">وقت الزيارة</Label>
                             <p className="font-black text-2xl font-mono text-primary flex items-center gap-2">
                                 <Clock className="h-4 w-4" />
-                                {apptDate ? format(apptDate, 'p', { locale: ar }) : '-'}
+                                {apptDate ? format(apptDate, 'HH:mm', { locale: ar }) : '-'}
                             </p>
                         </div>
                     </div>
@@ -238,16 +237,16 @@ export default function AppointmentDetailsPage() {
                             <Alert variant="destructive" className="rounded-[2rem] border-4 border-dashed border-red-200 py-8 bg-red-50/50">
                                 <AlertCircle className="h-8 w-8 text-red-600"/>
                                 <AlertTitle className="text-red-900 font-black text-2xl mb-2">إجراء مطلوب للربط</AlertTitle>
-                                <AlertDescription className="text-red-800 font-bold text-lg">
-                                    {!appointment.clientId 
+                                <AlertDescription className="text-red-800 font-bold text-lg leading-relaxed">
+                                    {isProspective 
                                         ? "هذا الشخص (عميل محتمل)؛ يجب تحويله لملف رسمي لتمكين إدارة معاملاته وتفعيل الدفعات المالية."
                                         : "يرجى ربط هذه الزيارة بإحدى المعاملات المفتوحة لهذا العميل لتتمكن من تحديث مراحل الإنجاز."}
                                 </AlertDescription>
                             </Alert>
                             
                             <div className="flex flex-col gap-4">
-                                {!appointment.clientId ? (
-                                    <Button asChild className="h-16 rounded-[2rem] font-black text-2xl gap-4 shadow-2xl bg-primary hover:bg-black transition-all">
+                                {isProspective ? (
+                                    <Button asChild className="h-16 rounded-[2rem] font-black text-2xl gap-4 shadow-2xl bg-[#FF7A00] text-white">
                                         <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName || '')}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&fromAppointmentId=${appointment.id}&engineerId=${appointment.engineerId}`}>
                                             <UserPlus className="h-8 w-8" />
                                             تحويل لملف عميل رسمي الآن
