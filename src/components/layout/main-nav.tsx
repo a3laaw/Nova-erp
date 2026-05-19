@@ -83,6 +83,7 @@ import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
 import { ScrollArea } from '../ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 const navItems = {
   ar: [
@@ -288,7 +289,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               )}
             >
               <div className="flex items-center justify-between w-full h-full px-4">
-                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity(40)", isActive ? "text-black" : "text-white")} />
+                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-40", isActive ? "text-black" : "text-white")} />
                 <span className="text-right truncate text-[14px] font-black flex-1 pr-2">
                     {item.label}
                 </span>
@@ -319,8 +320,9 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             </SidebarMenuSub>
           </CollapsibleContent>
         </SidebarMenuItem>
-      );
-    }
+      </Collapsible>
+    );
+  }
   return null;
 }
 
