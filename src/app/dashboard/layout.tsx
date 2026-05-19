@@ -55,7 +55,6 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 🛡️ تبسيط شاشة التحميل لتكون هادئة وبسيطة
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-6 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">

@@ -40,9 +40,9 @@ export default function EmployeeHubPage() {
                             {/* 🌟 زر الشكر اللؤلؤي البارز والعائم (حركة 6 ثوانٍ) 🌟 */}
                             <Button 
                                 onClick={() => setIsKudosOpen(true)}
-                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-white text-primary shadow-[0_20px_50px_-10px_rgba(255,122,0,0.3)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-slate-50 animate-float-slow"
+                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-white text-[#1e1b4b] shadow-[0_20px_50px_-10px_rgba(255,122,0,0.3)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-slate-50 animate-float-slow"
                             >
-                                <Heart className="h-8 w-8 fill-primary text-primary animate-pulse" />
+                                <Heart className="h-8 w-8 fill-red-500 text-red-500 animate-pulse" />
                                 <span className="drop-shadow-sm">شكر زميل</span>
                             </Button>
                         </div>

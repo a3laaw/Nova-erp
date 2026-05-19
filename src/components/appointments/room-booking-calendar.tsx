@@ -31,7 +31,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer, MousePointer2 } from 'lucide-react';
+import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer, MousePointer2, Eye } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
@@ -44,8 +44,8 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '../ui/badge';
+import { useRouter } from 'next/navigation';
 
-// ✨ استيرادات محرك الإزاحة الصحيحة ✨
 import {
   DndContext, 
   closestCenter,
@@ -99,8 +99,7 @@ const weekDays = [
     { id: 'Saturday', label: 'السبت' },
 ];
 
-// 🎨 مكون الموعد القابل للسحب
-function DraggableRoomAppointment({ appointment, isOnLeave }: { appointment: Appointment, isOnLeave: boolean }) {
+function DraggableRoomAppointment({ appointment, isOnLeave, onOpenDetails, onOpenEdit, onDelete }: { appointment: Appointment, isOnLeave: boolean, onOpenDetails: (a: Appointment) => void, onOpenEdit: (a: Appointment) => void, onDelete: (a: Appointment) => void }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: appointment.id!,
         data: appointment
@@ -116,21 +115,38 @@ function DraggableRoomAppointment({ appointment, isOnLeave }: { appointment: App
         <div 
             ref={setNodeRef}
             style={{ ...(departmentStyles[appointment.department || 'أخرى'] || {}), ...style }}
-            {...attributes}
-            {...listeners}
             className={cn(
-                "flex flex-col items-center justify-center text-center p-1 sm:p-2 rounded-2xl cursor-grab active:cursor-grabbing transition-all hover:brightness-95 shadow-md h-full relative",
+                "flex flex-col items-center justify-center text-center p-1 sm:p-2 rounded-2xl transition-all hover:brightness-95 shadow-md h-full relative group",
                 isDragging && "opacity-0"
             )}
         >
-            {isOnLeave && <Badge variant="destructive" className="absolute top-0.5 right-0.5 text-[6px] h-3 px-1 font-black">في إجازة رسمية</Badge>}
-            <p className="font-bold text-[10px] sm:text-xs leading-tight select-none">{appointment.title}</p>
-            <p className="text-[9px] sm:text-[10px] mt-1 font-black select-none">{appointment.clientName}</p>
+            <div className="absolute inset-0 z-10" {...attributes} {...listeners} style={{ cursor: 'grab' }} />
+            
+            <div className="relative z-20 pointer-events-none w-full h-full flex flex-col items-center justify-center">
+                {isOnLeave && <Badge variant="destructive" className="absolute top-0.5 right-0.5 text-[6px] h-3 px-1 font-black">في إجازة رسمية</Badge>}
+                <p className="font-bold text-[10px] sm:text-xs leading-tight select-none">{appointment.title}</p>
+                <p className="text-[9px] sm:text-[10px] mt-1 font-black select-none">{appointment.clientName}</p>
+            </div>
+
+            <div className="absolute bottom-1 left-1 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full bg-white/20 pointer-events-auto">
+                            <MoreHorizontal className="h-3 w-3" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent dir="rtl">
+                        <DropdownMenuItem onClick={() => onOpenDetails(appointment)}><Eye className="ml-2 h-4 w-4"/> فتح الزيارة</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onOpenEdit(appointment)}><Pencil className="ml-2 h-4 w-4"/> تعديل</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onDelete(appointment)} className="text-destructive"><Trash2 className="ml-2 h-4 w-4"/> حذف</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </div>
     );
 }
 
-// 📥 مكون خانة وقت القاعة
 function DroppableRoomSlot({ id, children, onClick }: { id: string, children: React.ReactNode, onClick: () => void }) {
     const { isOver, setNodeRef } = useDroppable({
         id: id,
@@ -153,6 +169,7 @@ function DroppableRoomSlot({ id, children, onClick }: { id: string, children: Re
 export default function RoomBookingCalendar() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
+    const router = useRouter();
     const { toast } = useToast();
     const { branding, loading: brandingLoading } = useBranding();
 
@@ -166,7 +183,6 @@ export default function RoomBookingCalendar() {
     const [clients, setClients] = useState<Client[]>([]);
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
     const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
     const tenantId = currentUser?.currentCompanyId;
@@ -208,25 +224,15 @@ export default function RoomBookingCalendar() {
 
     useEffect(() => {
         if (!firestore || !tenantId) return;
-        const employeesPath = getTenantPath('employees', tenantId);
-        const clientsPath = getTenantPath('clients', tenantId);
-        const leavesPath = getTenantPath('leaveRequests', tenantId);
-
-        const fetchStaticData = async () => {
-            try {
-                const [clientSnap, engSnap, leavesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, clientsPath), where('isActive', '==', true))),
-                    getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave']))),
-                    getDocs(query(collection(firestore, leavesPath), where('status', 'in', ['approved', 'on-leave', 'returned']))),
-                ]);
-                const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-                setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
-                const fetchedEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
-                setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName, 'ar')));
-                setLeaveRequests(leavesSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as LeaveRequest)));
-            } catch (error) { console.error(error); }
-        };
-        fetchStaticData();
+        getDocs(query(collection(firestore, getTenantPath('employees', tenantId)), where('status', 'in', ['active', 'on-leave']))).then(snap => {
+            setEngineers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).sort((a,b) => a.fullName.localeCompare(b.fullName, 'ar')));
+        });
+        getDocs(query(collection(firestore, getTenantPath('clients', tenantId)), where('isActive', '==', true))).then(snap => {
+            setClients(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
+        });
+        getDocs(query(collection(firestore, getTenantPath('leaveRequests', tenantId)), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
+            setLeaveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data()} as LeaveRequest)));
+        });
     }, [firestore, tenantId]);
     
     const fetchAppointments = useCallback(async (d: Date) => {
@@ -288,21 +294,16 @@ export default function RoomBookingCalendar() {
     }, [leaveRequests]);
 
     const appointments = useMemo(() => {
-        if (!rawAppointments || clients.length === 0 || engineers.length === 0) return rawAppointments;
         return rawAppointments.filter(appt => appt.status !== 'cancelled').map(appt => ({
             ...appt,
             clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
-            engineerName: appt.engineerId ? engineers.find(e => e.id === appt.engineerId)?.fullName : undefined,
         }));
-    }, [rawAppointments, clients, engineers]);
+    }, [rawAppointments, clients]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
         const allSlots = [...morningSlots, ...eveningSlots];
-        rooms.forEach(room => {
-            grid[room] = {};
-            allSlots.forEach(slot => { grid[room][slot] = null; });
-        });
+        rooms.forEach(room => { grid[room] = {}; allSlots.forEach(slot => { grid[room][slot] = null; }); });
         appointments.forEach(appt => {
             if (!appt || !appt.meetingRoom || !grid[appt.meetingRoom]) return;
             const startTime = toFirestoreDate(appt.appointmentDate);
@@ -312,6 +313,16 @@ export default function RoomBookingCalendar() {
         });
         return grid;
     }, [appointments, morningSlots, eveningSlots]);
+
+    const handleCancelBooking = async () => {
+        if (!appointmentToDelete || !firestore || !tenantId) return;
+        try {
+            const apptPath = getTenantPath('appointments', tenantId);
+            await updateDoc(doc(firestore, apptPath, appointmentToDelete.id!), { status: 'cancelled' });
+            toast({ title: 'تم الإلغاء' });
+            fetchAppointments(date!);
+        } finally { setAppointmentToDelete(null); }
+    };
 
     const renderGridSection = (title: string, slots: string[]) => {
         if (slots.length === 0) return null;
@@ -347,7 +358,13 @@ export default function RoomBookingCalendar() {
                                         }}
                                     >
                                         {booking ? (
-                                            <DraggableRoomAppointment appointment={booking} isOnLeave={!!activeLeave} />
+                                            <DraggableRoomAppointment 
+                                                appointment={booking} 
+                                                isOnLeave={!!activeLeave} 
+                                                onOpenDetails={(a) => router.push(`/dashboard/appointments/${a.id}`)}
+                                                onOpenEdit={(a) => { setDialogData({ ...a, isEditing: true }); setIsDialogOpen(true); }}
+                                                onDelete={(a) => setAppointmentToDelete(a)}
+                                            />
                                         ) : null}
                                     </DroppableRoomSlot>
                                 );
@@ -393,9 +410,6 @@ export default function RoomBookingCalendar() {
                                 <Calendar mode="single" selected={date} onSelect={(d) => { if(d) setDate(d); setIsCalendarOpen(false); }} initialFocus locale={ar} />
                             </PopoverContent>
                         </Popover>
-                        <Button onClick={() => window.print()} variant="outline" className="h-11 rounded-xl font-bold border-2 bg-white gap-2">
-                            <Printer className="h-4 w-4" /> طباعة
-                        </Button>
                     </div>
                 </div>
 
@@ -405,14 +419,15 @@ export default function RoomBookingCalendar() {
                     )}
                 </div>
 
-                <div className="flex justify-center gap-4 pt-4 text-xs">
-                    {Object.entries(departmentStyles).map(([dept, style]) => (
-                        <div key={dept} className="flex items-center gap-2"><div className="h-4 w-4 rounded-lg" style={{ backgroundColor: style.backgroundColor, borderLeft: style.borderLeft }} /><span className="text-sm font-black opacity-60">{dept}</span></div>
-                    ))}
-                </div>
-
                 {isDialogOpen && <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} engineers={engineers} firestore={firestore} currentUser={currentUser} leaveRequests={leaveRequests} />}
                 
+                <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
+                    <AlertDialogContent dir="rtl" className="rounded-3xl">
+                        <AlertDialogHeader><AlertDialogTitle>إلغاء حجز القاعة؟</AlertDialogTitle><AlertDialogDescription>سيتم إزالة هذا الحجز من الجدول نهائياً.</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter className="gap-2"><AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel><AlertDialogAction onClick={handleCancelBooking} className="bg-destructive hover:bg-destructive/90 rounded-xl">نعم، إلغاء الحجز</AlertDialogAction></AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
                 <DragOverlay>
                     {activeDragId ? (
                         <div 
@@ -469,7 +484,8 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
         setIsSaving(true);
         try {
             const apptsPath = getTenantPath('appointments', tenantId);
-            const dataToSave = { clientId: selectedClientId, engineerId: selectedEngineerId, title, department, notes, meetingRoom: dialogData.room || dialogData.meetingRoom, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'room' as const, companyId: tenantId };
+            const client = clients.find((c: any) => c.id === selectedClientId);
+            const dataToSave = { clientId: selectedClientId, clientName: client?.nameAr || 'عميل محمول', engineerId: selectedEngineerId, title, department, notes, meetingRoom: dialogData.room || dialogData.meetingRoom, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'room' as const, companyId: tenantId };
             if (isEditing) await updateDoc(doc(firestore, apptsPath, dialogData.id), dataToSave);
             else await addDoc(collection(firestore, apptsPath), { ...dataToSave, createdAt: serverTimestamp() });
             toast({ title: 'نجاح الحجز' });

@@ -99,16 +99,15 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
                     <Separator orientation="vertical" className="h-6 bg-slate-200 mx-1" />
 
-                    {/* 🛡️ رادار المواعيد المنسدل السيادي 🛡️ */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90 group">
+                            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90 group relative">
                                 <CalendarDays className="h-5 w-5" />
                                 <ChevronDown className="absolute -bottom-1 h-3 w-3 opacity-20 group-hover:opacity-100 transition-opacity" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="center" className="w-60 rounded-[1.8rem] p-2 shadow-2xl bg-white border-none mt-2" dir="rtl">
-                            <DropdownMenuLabel className="font-black text-[10px] text-slate-400 uppercase tracking-widest px-4 py-3 text-right">جداول المواعيد</DropdownMenuLabel>
+                            <DropdownMenuLabel className="font-black text-[10px] text-slate-400 uppercase tracking-widest px-4 py-3 text-right">رادار المواعيد</DropdownMenuLabel>
                             <DropdownMenuItem asChild className="rounded-xl py-3.5 px-4 font-black cursor-pointer group mb-1">
                                 <Link href="/dashboard/appointments?tab=architectural" className="flex items-center justify-between w-full">
                                     <div className="flex items-center gap-3">

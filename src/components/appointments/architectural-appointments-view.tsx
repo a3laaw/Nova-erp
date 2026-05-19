@@ -36,7 +36,7 @@ import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Checkbox } from '../ui/checkbox';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
@@ -44,7 +44,6 @@ import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 
-// ✨ استيرادات محرك الإزاحة الصحيحة ✨
 import {
   DndContext, 
   closestCenter,
@@ -58,7 +57,6 @@ import {
   defaultDropAnimationSideEffects
 } from '@dnd-kit/core';
 
-// --- مساعدات الوقت ---
 const generateTimeSlots = (start: string, end: string, slotDuration: number, buffer: number): string[] => {
     if (!start || !end || !slotDuration || slotDuration <= 0) return [];
     const slots: string[] = [];
@@ -131,7 +129,7 @@ const weekDays = [
     { id: 'Saturday', label: 'السبت' },
 ];
 
-function DraggableAppointment({ appointment }: { appointment: Appointment }) {
+function DraggableAppointment({ appointment, onOpenDetails, onOpenEdit, onDelete }: { appointment: Appointment, onOpenDetails: (a: Appointment) => void, onOpenEdit: (a: Appointment) => void, onDelete: (a: Appointment) => void }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: appointment.id!,
         data: appointment
@@ -148,18 +146,35 @@ function DraggableAppointment({ appointment }: { appointment: Appointment }) {
     return (
         <div 
             ref={setNodeRef}
-            {...attributes}
-            {...listeners}
             className={cn(
-                "relative h-full w-full rounded-2xl p-2 text-xs text-gray-800 flex flex-col items-center justify-center text-center cursor-grab active:cursor-grabbing shadow-md hover:brightness-95 transition-all group",
+                "relative h-full w-full rounded-2xl p-2 text-xs text-gray-800 flex flex-col items-center justify-center text-center shadow-md hover:brightness-95 transition-all group",
                 isDragging && "opacity-0"
             )}
             style={{ backgroundColor: appointment.color, ...style }}
         >
-            {isClosed && <CheckCircle className="h-4 w-4 absolute top-1 right-1 text-white/80" />}
-            <p className="font-black leading-tight select-none">{appointment.clientName}</p>
-            {appointment.visitCount && <span className="text-[10px] mt-1 opacity-75 font-bold select-none">(الزيارة {appointment.visitCount})</span>}
-            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none rounded-2xl" />
+            <div className="absolute inset-0 z-10" {...attributes} {...listeners} style={{ cursor: 'grab' }} />
+            
+            <div className="relative z-20 flex flex-col items-center w-full h-full pointer-events-none">
+                {isClosed && <CheckCircle className="h-4 w-4 absolute top-0 right-0 text-white/80" />}
+                <p className="font-black leading-tight select-none">{appointment.clientName}</p>
+                {appointment.visitCount && <span className="text-[10px] mt-1 opacity-75 font-bold select-none">(الزيارة {appointment.visitCount})</span>}
+            </div>
+
+            <div className="absolute bottom-1 left-1 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full bg-white/20 hover:bg-white/40 pointer-events-auto">
+                            <MoreHorizontal className="h-3 w-3" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent dir="rtl">
+                        <DropdownMenuItem onClick={() => onOpenDetails(appointment)}><Eye className="ml-2 h-4 w-4"/> عرض وفتح الزيارة</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onOpenEdit(appointment)}><Pencil className="ml-2 h-4 w-4"/> تعديل</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onDelete(appointment)} className="text-destructive"><Trash2 className="ml-2 h-4 w-4"/> حذف</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </div>
     );
 }
@@ -187,6 +202,7 @@ export function ArchitecturalAppointmentsView() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const { user: currentUser } = useAuth();
+    const router = useRouter();
     const { branding, loading: brandingLoading } = useBranding();
     
     const [date, setDate] = useState<Date | undefined>(undefined);
@@ -199,6 +215,7 @@ export function ArchitecturalAppointmentsView() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogData, setDialogData] = useState<any>(null);
     const [activeDragId, setActiveDragId] = useState<string | null>(null);
+    const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
 
     const tenantId = currentUser?.currentCompanyId;
 
@@ -344,6 +361,17 @@ export function ArchitecturalAppointmentsView() {
         return grid;
     }, [appointments, engineers, morningSlots, eveningSlots]);
 
+    const handleCancelBooking = async () => {
+        if (!appointmentToDelete || !firestore || !tenantId) return;
+        try {
+            const apptPath = getTenantPath('appointments', tenantId);
+            await updateDoc(doc(firestore, apptPath, appointmentToDelete.id!), { status: 'cancelled' });
+            await reconcileClientAppointments(firestore, tenantId, { clientId: appointmentToDelete.clientId, clientMobile: appointmentToDelete.clientMobile });
+            toast({ title: 'تم الإلغاء' });
+            fetchAppointments(date!);
+        } finally { setAppointmentToDelete(null); }
+    };
+
     const renderGridSection = (title: string, slots: string[]) => {
       if (slots.length === 0) return null;
       return (
@@ -386,7 +414,12 @@ export function ArchitecturalAppointmentsView() {
                                                 <span className="text-[10px] font-black text-red-300 opacity-40 uppercase tracking-tighter rotate-[-15deg]">في إجازة رسمية</span>
                                             </div>
                                         ) : booking ? (
-                                            <DraggableAppointment appointment={booking} />
+                                            <DraggableAppointment 
+                                                appointment={booking} 
+                                                onOpenDetails={(a) => router.push(`/dashboard/appointments/${a.id}`)}
+                                                onOpenEdit={(a) => { setDialogData({ ...a, isEditing: true }); setIsDialogOpen(true); }}
+                                                onDelete={(a) => setAppointmentToDelete(a)}
+                                            />
                                         ) : null}
                                     </DroppableSlot>
                                 );
@@ -432,9 +465,6 @@ export function ArchitecturalAppointmentsView() {
                                 <Calendar mode="single" selected={date} onSelect={(d) => { if(d) setDate(d); setIsCalendarOpen(false); }} initialFocus locale={ar} />
                             </PopoverContent>
                         </Popover>
-                        <Button onClick={() => window.print()} variant="outline" className="h-11 rounded-xl font-bold border-2 bg-white gap-2">
-                            <Printer className="h-4 w-4" /> طباعة الجدول
-                        </Button>
                     </div>
                 </div>
 
@@ -446,6 +476,13 @@ export function ArchitecturalAppointmentsView() {
 
                 <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} firestore={firestore} currentUser={currentUser} />
                 
+                <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
+                    <AlertDialogContent dir="rtl" className="rounded-3xl">
+                        <AlertDialogHeader><AlertDialogTitle>إلغاء الموعد؟</AlertDialogTitle><AlertDialogDescription>سيتم إزالة هذا الموعد من الجدول وإعادة حساب ترقيم زيارات العميل.</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter className="gap-2"><AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel><AlertDialogAction onClick={handleCancelBooking} className="bg-destructive hover:bg-destructive/90 rounded-xl">نعم، إلغاء الحجز</AlertDialogAction></AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
                 <DragOverlay dropAnimation={{
                     sideEffects: defaultDropAnimationSideEffects({
                         styles: { active: { opacity: '0.5' } }
