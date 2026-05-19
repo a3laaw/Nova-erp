@@ -13,7 +13,8 @@ import {
     Send,
     ArrowRight,
     User,
-    Building2
+    Building2,
+    Sparkles
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -21,10 +22,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import Link from 'next/link';
+import { Separator } from '@/components/ui/separator';
 
 /**
- * شعار نوفا المدمج (NOVA Inline SVG):
- * تصميم فني بسيط وباهر يتناسب مع التوهج الذهبي والبرتقالي.
+ * شعار نوفا المدمج (NOVA Simple Text):
+ * تصميم فخم وبسيط يتناسب مع التوهج الذهبي.
  */
 const NovaLogo = () => (
   <svg width="120" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
@@ -109,7 +111,7 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/10 rounded-full blur-[100px] animate-pulse" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-[#FF7A00]/10 rounded-full blur-[100px] animate-pulse" />
           <div className="relative">
               <div className="h-24 w-24 rounded-full border-4 border-primary/5 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.15)]" />
               <div className="absolute inset-0 m-auto flex flex-col items-center justify-center">
@@ -133,7 +135,10 @@ export default function LoginPage() {
                     <LogIn className="h-10 w-10 text-white" />
                 </div>
                 <CardTitle className="text-4xl font-black text-[#1e1b4b] tracking-tighter">Nova ERP</CardTitle>
-                <CardDescription className="text-[#FF7A00] font-black mt-2 text-xs uppercase tracking-[0.2em]">بوابة الموظفين والمديرين</CardDescription>
+                <CardDescription className="text-[#FF7A00] font-black mt-2 text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2">
+                    <Sparkles className="h-3 w-3 animate-pulse" />
+                    بوابة الموظفين والمديرين
+                </CardDescription>
             </CardHeader>
             <CardContent className="px-10 pb-8 space-y-8">
                 {(authError || localError) && (
@@ -147,12 +152,12 @@ export default function LoginPage() {
                     <form onSubmit={handleLogin} className="space-y-8" autoComplete="off">
                         <div className="grid gap-3">
                             <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم أو البريد المعتمد</Label>
-                            <div className="relative">
-                                <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
+                            <div className="relative group">
+                                <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
                                 <Input 
                                     value={identifier} 
                                     onChange={(e) => setIdentifier(e.target.value)} 
-                                    className="h-14 rounded-2xl border-2 border-slate-100 text-center font-black text-lg bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 transition-all shadow-inner pr-12" 
+                                    className="h-14 rounded-2xl border-2 border-slate-100 text-center font-black text-lg bg-[#F8F9FB]/50 focus:bg-white focus:border-orange-500/30 transition-all shadow-inner pr-12" 
                                     required 
                                     placeholder="Username / ID"
                                     autoComplete="off"
@@ -166,7 +171,7 @@ export default function LoginPage() {
                                 type="password" 
                                 value={password} 
                                 onChange={e => setPassword(e.target.value)} 
-                                className="h-14 rounded-2xl border-2 border-slate-100 text-center font-bold text-base bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 shadow-inner" 
+                                className="h-14 rounded-2xl border-2 border-slate-100 text-center font-bold text-base bg-[#F8F9FB]/50 focus:bg-white focus:border-orange-500/30 shadow-inner" 
                                 required 
                                 placeholder="••••••••"
                                 autoComplete="current-password"
@@ -179,16 +184,16 @@ export default function LoginPage() {
                                 {!isSubmitting && <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform rotate-180" />}
                             </Button>
                             
-                            <div className="flex flex-col items-center gap-3">
-                                <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-black text-slate-400 hover:text-primary transition-colors">نسيت كلمة المرور؟</button>
+                            <div className="flex flex-col items-center gap-4">
+                                <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-black text-slate-400 hover:text-[#FF7A00] transition-colors">نسيت كلمة المرور؟</button>
                                 
                                 <Separator className="w-1/2 opacity-10" />
                                 
                                 <div className="text-center pt-2">
                                     <p className="text-[10px] font-bold text-slate-400 mb-3">هل تملك مكتباً هندسياً أو شركة مقاولات؟</p>
-                                    <Button asChild variant="outline" className="h-11 px-8 rounded-xl border-2 border-primary/20 text-primary font-black text-xs gap-2 hover:bg-primary/5 shadow-sm">
+                                    <Button asChild variant="outline" className="h-12 px-10 rounded-2xl border-2 border-orange-200 text-[#FF7A00] font-black text-sm gap-2 hover:bg-orange-50 shadow-sm transition-all">
                                         <Link href="/register">
-                                            <Building2 className="h-4 w-4" />
+                                            <Building2 className="h-5 w-5" />
                                             طلب انضمام منشأة جديدة
                                         </Link>
                                     </Button>
@@ -217,5 +222,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-import { Separator } from '@/components/ui/separator';

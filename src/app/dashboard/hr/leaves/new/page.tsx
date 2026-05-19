@@ -146,7 +146,7 @@ export default function NewLeaveRequestPage() {
             
             const dataToSave = {
                 employeeId: selectedEmployeeId,
-                employeeName: selectedEmployee?.fullName || currentUser.fullName,
+                employeeName: (selectedEmployee as any).fullName,
                 leaveType: leaveType,
                 startDate: startDate,
                 endDate: endDate,
@@ -170,7 +170,7 @@ export default function NewLeaveRequestPage() {
                     createNotification(firestore, {
                         userId: adminDoc.id,
                         title: 'طلب إجازة جديد',
-                        body: `قدم الموظف ${selectedEmployee?.fullName || currentUser.fullName} طلب إجازة ${leaveTypeTranslations[leaveType]}.`,
+                        body: `قدم الموظف ${(selectedEmployee as any).fullName} طلب إجازة ${leaveTypeTranslations[leaveType]}.`,
                         link: `/dashboard/hr/leaves/${newDocRef.id}`
                     });
                 }

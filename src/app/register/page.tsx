@@ -15,17 +15,19 @@ import {
     User,
     Sparkles,
     MessageSquare,
-    Clock
+    Clock,
+    Smartphone
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Separator } from '@/components/ui/separator';
 
 /**
- * بوابة طلب الانضمام (Sovereign Request Gateway v17.0).
- * تم ترميمها لتتوافق مع فلسفة: طلب -> تدقيق -> تفعيل.
+ * بوابة طلب الانضمام الماركة (NOVA Brand Request Gateway).
+ * تم إعادة التصميم لتطابق الهوية البرتقالية الدافئة والأنيقة.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -55,7 +57,6 @@ export default function RegisterPage() {
 
     setIsSaving(true);
     try {
-        // 1. حفظ الطلب في Firestore (لا يحتاج لمفتاح أمان)
         await addDoc(collection(firestore, 'company_requests'), {
             ...formData,
             status: 'pending',
@@ -68,7 +69,7 @@ export default function RegisterPage() {
         toast({ 
             variant: 'destructive', 
             title: 'فشل الإرسال', 
-            description: error.message || 'حدث خطأ أثناء محاولة إرسال الطلب.' 
+            description: 'حدث خطأ أثناء محاولة إرسال الطلب. يرجى المحاولة لاحقاً.' 
         });
     } finally {
         setIsSaving(false);
@@ -77,68 +78,81 @@ export default function RegisterPage() {
 
   if (isSubmitted) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-4">
-            <Card className="w-full max-w-lg rounded-[3.5rem] border-none shadow-2xl glass-effect p-12 text-center animate-in zoom-in-95">
-                <div className="bg-indigo-500/20 p-6 rounded-full w-fit mx-auto mb-6 border border-indigo-500/40 shadow-inner">
-                    <CheckCircle2 className="h-16 w-16 text-indigo-600 animate-bounce" />
+        <div className="min-h-screen flex items-center justify-center p-4 bg-[#FFFDF0]">
+            <Card className="w-full max-w-lg rounded-[3.5rem] border-none shadow-2xl bg-white p-12 text-center animate-in zoom-in-95">
+                <div className="bg-orange-500/10 p-6 rounded-[2.5rem] w-fit mx-auto mb-6 border border-orange-500/20 shadow-inner">
+                    <CheckCircle2 className="h-16 w-16 text-[#FF7A00] animate-bounce" />
                 </div>
                 <h2 className="text-3xl font-black text-[#1e1b4b] mb-4 tracking-tighter">طلبك قيد المراجعة</h2>
-                <p className="text-[#1e1b4b]/70 font-bold mb-10 leading-relaxed text-lg">
-                    شكراً لاهتمامك بـ Nova ERP. تم استلام بيانات منشأة <span className="text-primary">**{formData.companyName}**</span>.
+                <p className="text-slate-500 font-bold mb-10 leading-relaxed text-lg">
+                    شكراً لاهتمامك بـ Nova ERP. تم استلام بيانات منشأة <span className="text-[#FF7A00] font-black">{formData.companyName}</span>.
                     <br/><br/>
-                    سيقوم فريقنا بمراجعة الطلب وتفعيل حسابك قريباً، وستصلك رسالة التفعيل والبيانات الرسمية على بريدك الإلكتروني.
+                    سيقوم فريقنا بمراجعة الطلب وتفعيل حسابك قريباً، وستصلك رسالة التفعيل على بريدك الإلكتروني.
                 </p>
                 
-                <div className="flex flex-col gap-3">
-                    <Button asChild variant="outline" className="h-14 rounded-2xl border-2 border-[#1e1b4b] text-[#1e1b4b] font-black hover:bg-indigo-50 shadow-sm">
-                        <Link href="/">العودة لصفحة الدخول</Link>
-                    </Button>
-                </div>
+                <Button asChild variant="outline" className="h-14 rounded-2xl border-2 border-orange-200 text-[#FF7A00] font-black hover:bg-orange-50 shadow-sm w-full">
+                    <Link href="/">العودة لصفحة الدخول</Link>
+                </Button>
             </Card>
         </div>
       );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
-      <Card className="w-full max-w-2xl rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect relative z-10 animate-in fade-in duration-700">
-        <CardHeader className="py-10 px-10 border-b border-black/5 bg-white/20">
-            <div className="flex justify-between items-center">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#FFFDF0]" dir="rtl">
+      {/* عناصر خلفية تزيينية */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-br from-orange-200/20 to-transparent rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-gradient-to-tr from-amber-200/20 to-transparent rounded-full blur-[120px] pointer-events-none" />
+
+      <Card className="w-full max-w-2xl rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/80 backdrop-blur-3xl relative z-10 animate-in fade-in duration-1000 border-white/60">
+        <CardHeader className="py-10 px-10 border-b border-orange-100/30 bg-gradient-to-l from-orange-50/50 to-white/50">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
                 <div className="flex items-center gap-5">
-                    <div className="p-4 bg-[#1e1b4b] rounded-[2rem] shadow-xl"><MessageSquare className="h-8 w-8 text-white" /></div>
+                    <div className="p-4 bg-gradient-to-br from-[#FFB000] to-[#FF7A00] rounded-[2rem] shadow-xl border-4 border-white">
+                        <MessageSquare className="h-8 w-8 text-white" />
+                    </div>
                     <div className="text-right">
                         <CardTitle className="text-2xl font-black text-[#1e1b4b] tracking-tighter">طلب انضمام للمنظومة</CardTitle>
-                        <CardDescription className="text-[#1e1b4b]/60 font-black mt-1 text-[10px] uppercase tracking-widest">تأسيس منشأة سحابية معزولة باحترافية SaaS</CardDescription>
+                        <CardDescription className="text-orange-600 font-black mt-1 text-[10px] uppercase tracking-widest flex items-center gap-2">
+                            <Sparkles className="h-3 w-3 animate-pulse" />
+                            تأسيس منشأة سحابية باحترافية SAAS
+                        </CardDescription>
                     </div>
                 </div>
-                <Button asChild variant="ghost" className="text-[#1e1b4b] hover:bg-white/40 rounded-xl gap-2 font-black h-10 px-4">
-                    <Link href="/"><ArrowRight className="h-4 w-4 rotate-180" />دخول الموظفين</Link>
+                <Button asChild variant="ghost" className="text-slate-500 hover:bg-orange-50 hover:text-[#FF7A00] rounded-xl gap-2 font-black h-10 px-4">
+                    <Link href="/"><ArrowRight className="h-4 w-4 rotate-180" /> دخول الموظفين</Link>
                 </Button>
             </div>
         </CardHeader>
         
         <CardContent className="p-10">
-            <form onSubmit={handleSubmit} className="space-y-8" autoComplete="off">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <form onSubmit={handleSubmit} className="space-y-10" autoComplete="off">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    {/* القسم الأول: هوية المنشأة */}
                     <div className="space-y-6">
-                        <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-indigo-600 pr-3 uppercase tracking-widest">هوية المنشأة</h3>
-                        <div className="grid gap-4">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="companyName" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المكتب / الشركة *</Label>
-                                <Input 
-                                    id="companyName"
-                                    value={formData.companyName} 
-                                    onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} 
-                                    className="h-11 rounded-xl bg-white border-2 font-bold" 
-                                    required 
-                                    placeholder="أدخل الاسم التجاري..." 
-                                />
+                        <div className="flex items-center gap-3 border-r-4 border-[#FF7A00] pr-4">
+                            <h3 className="font-black text-[#1e1b4b] text-xs uppercase tracking-widest">هوية المنشأة</h3>
+                        </div>
+                        <div className="grid gap-5">
+                            <div className="grid gap-2">
+                                <Label htmlFor="companyName" className="text-slate-500 font-black text-[11px] pr-1">اسم المكتب / الشركة *</Label>
+                                <div className="relative group">
+                                    <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
+                                    <Input 
+                                        id="companyName"
+                                        value={formData.companyName} 
+                                        onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} 
+                                        className="h-11 rounded-xl border-2 bg-white/50 focus:bg-white transition-all font-bold pr-10 shadow-sm" 
+                                        required 
+                                        placeholder="الاسم التجاري..." 
+                                    />
+                                </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="grid gap-1.5">
-                                    <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">نوع النشاط</Label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label className="text-slate-500 font-black text-[11px] pr-1">نوع النشاط</Label>
                                     <Select value={formData.activity} onValueChange={(v) => setFormData(p => ({...p, activity: v}))}>
-                                        <SelectTrigger className="h-11 rounded-xl bg-white border-2 font-black">
+                                        <SelectTrigger className="h-11 rounded-xl border-2 bg-white/50 font-black text-xs shadow-sm">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent dir="rtl">
@@ -148,10 +162,10 @@ export default function RegisterPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="grid gap-1.5">
-                                    <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">حجم الشركة</Label>
+                                <div className="grid gap-2">
+                                    <Label className="text-slate-500 font-black text-[11px] pr-1">حجم الشركة</Label>
                                     <Select value={formData.employeeCountRange} onValueChange={(v) => setFormData(p => ({...p, employeeCountRange: v}))}>
-                                        <SelectTrigger className="h-11 rounded-xl bg-white border-2 font-black">
+                                        <SelectTrigger className="h-11 rounded-xl border-2 bg-white/50 font-black text-xs shadow-sm">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent dir="rtl">
@@ -166,65 +180,75 @@ export default function RegisterPage() {
                         </div>
                     </div>
 
+                    {/* القسم الثاني: بيانات المالك */}
                     <div className="space-y-6">
-                        <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-indigo-600 pr-3 uppercase tracking-widest">بيانات المالك</h3>
-                        <div className="grid gap-4">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="contactName" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المالك المسؤول *</Label>
-                                <Input 
-                                    id="contactName"
-                                    value={formData.contactName} 
-                                    onChange={e => setFormData(p => ({...p, contactName: e.target.value}))} 
-                                    className="h-11 rounded-xl bg-white border-2 font-bold" 
-                                    required 
-                                    placeholder="الاسم الثلاثي..." 
-                                />
+                        <div className="flex items-center gap-3 border-r-4 border-[#FF7A00] pr-4">
+                            <h3 className="font-black text-[#1e1b4b] text-xs uppercase tracking-widest">بيانات المالك</h3>
+                        </div>
+                        <div className="grid gap-5">
+                            <div className="grid gap-2">
+                                <Label htmlFor="contactName" className="text-slate-500 font-black text-[11px] pr-1">اسم المالك المسؤول *</Label>
+                                <div className="relative group">
+                                    <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
+                                    <Input 
+                                        id="contactName"
+                                        value={formData.contactName} 
+                                        onChange={e => setFormData(p => ({...p, contactName: e.target.value}))} 
+                                        className="h-11 rounded-xl border-2 bg-white/50 focus:bg-white transition-all font-bold pr-10 shadow-sm" 
+                                        required 
+                                        placeholder="الاسم الثلاثي..." 
+                                    />
+                                </div>
                             </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="phone" className="text-[#1e1b4b] font-black text-[11px] pr-1">رقم الهاتف (WhatsApp) *</Label>
-                                <Input 
-                                    id="phone" 
-                                    value={formData.phone} 
-                                    onChange={e => setFormData(p => ({...p, phone: e.target.value}))} 
-                                    className="h-11 rounded-xl bg-white border-2 font-black dir-ltr text-right" 
-                                    required 
-                                    placeholder="965+ XXXX XXXX" 
-                                />
+                            <div className="grid gap-2">
+                                <Label htmlFor="phone" className="text-slate-500 font-black text-[11px] pr-1">رقم الهاتف (WhatsApp) *</Label>
+                                <div className="relative group">
+                                    <Smartphone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
+                                    <Input 
+                                        id="phone" 
+                                        value={formData.phone} 
+                                        onChange={e => setFormData(p => ({...p, phone: e.target.value}))} 
+                                        className="h-11 rounded-xl border-2 bg-white/50 focus:bg-white transition-all font-black dir-ltr text-right pr-10 shadow-sm" 
+                                        required 
+                                        placeholder="965+ XXXX XXXX" 
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="space-y-6">
-                    <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-purple-600 pr-3 uppercase tracking-widest">إعدادات العبور والأمان</h3>
+                {/* القسم الثالث: أمان الدخول */}
+                <div className="space-y-6 pt-4">
+                    <div className="flex items-center gap-3 border-r-4 border-indigo-500 pr-4">
+                        <h3 className="font-black text-[#1e1b4b] text-xs uppercase tracking-widest">إعدادات العبور والأمان</h3>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="email" className="text-[#1e1b4b] font-black text-[11px] pr-1">البريد الحقيقي للتفعيل *</Label>
+                        <div className="grid gap-2">
+                            <Label htmlFor="email" className="text-slate-500 font-black text-[11px] pr-1">البريد الإلكتروني للتفعيل *</Label>
                             <div className="relative group">
-                                <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                                <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
                                 <Input 
                                     id="email"
                                     type="email"
                                     value={formData.email} 
                                     onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
-                                    className="h-12 rounded-xl border-2 bg-white pr-10 dir-ltr font-bold" 
+                                    className="h-12 rounded-xl border-2 bg-white pr-10 dir-ltr font-bold shadow-sm" 
                                     required 
-                                    autoComplete="off"
                                     placeholder="your@email.com" 
                                 />
                             </div>
                         </div>
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="username" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المستخدم للدخول (ID) *</Label>
+                        <div className="grid gap-2">
+                            <Label htmlFor="username" className="text-slate-500 font-black text-[11px] pr-1">اسم المستخدم المقترح (ID) *</Label>
                             <div className="relative group">
-                                <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                                <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
                                 <Input 
                                     id="username"
                                     value={formData.username} 
                                     onChange={e => setFormData(p => ({...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')}))} 
-                                    className="h-12 rounded-xl border-2 bg-white pr-10 dir-ltr font-black text-primary" 
+                                    className="h-12 rounded-xl border-2 bg-white pr-10 dir-ltr font-black text-[#FF7A00] shadow-sm" 
                                     required 
-                                    autoComplete="off"
                                     placeholder="e.g. alaa" 
                                 />
                             </div>
@@ -233,10 +257,14 @@ export default function RegisterPage() {
                 </div>
             </form>
         </CardContent>
-        <CardFooter className="p-8 border-t bg-black/5">
-            <Button onClick={handleSubmit} disabled={isSaving} className="w-full h-16 rounded-[2rem] font-black text-xl gap-4 shadow-2xl bg-[#1e1b4b] text-white hover:bg-black transition-all border-b-8 border-black/40 active:translate-y-1 active:border-b-0">
-                {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Rocket className="h-6 w-6 text-green-400" />}
-                إرسال طلب الانضمام للتدقيق
+        <CardFooter className="p-10 border-t bg-muted/10">
+            <Button 
+                onClick={handleSubmit} 
+                disabled={isSaving} 
+                className="w-full h-16 rounded-[2.2rem] font-black text-xl gap-4 shadow-2xl bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none transition-all active:scale-95 group"
+            >
+                {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Rocket className="h-6 w-6 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
+                إرسال طلب الانضمام للمراجعة
             </Button>
         </CardFooter>
       </Card>
