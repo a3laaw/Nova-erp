@@ -11,7 +11,7 @@ import { useFirebase } from '@/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, ImageIcon, User, Briefcase, Sparkles, Camera, Smartphone, Mail, AtSign } from 'lucide-react';
+import { Loader2, Save, ImageIcon, User, Briefcase, Sparkles, Camera, Mail, AtSign } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import Image from 'next/image';
@@ -23,6 +23,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 /**
  * الملف المهني للموظف (Professional Portfolio):
  * مساحة خاصة للموظف لإدارة صورته وخبراته بهوية بصرية ذهبية ملكية.
+ * تم تحصينه بـ errorEmitter لرصد أخطاء الـ Storage و Firestore بدقة.
  */
 export function ProfileManager() {
     const { firestore, storage } = useFirebase();
@@ -68,15 +69,26 @@ export function ProfileManager() {
         try {
             let finalAvatarUrl = formData.avatarUrl;
 
-            // 1. معالجة رفع الصورة إذا وجدت
+            // 1. معالجة رفع الصورة إلى Storage مع رصد الأخطاء
             if (profileFile && storage) {
                 const storagePath = `companies/${tenantId || 'master'}/users/${user.id}/avatar_${Date.now()}`;
                 const storageRef = ref(storage, storagePath);
-                const uploadResult = await uploadBytes(storageRef, profileFile);
-                finalAvatarUrl = await getDownloadURL(uploadResult.ref);
+                
+                try {
+                    const uploadResult = await uploadBytes(storageRef, profileFile);
+                    finalAvatarUrl = await getDownloadURL(uploadResult.ref);
+                } catch (storageErr: any) {
+                    // إذا فشل الرفع، نطلق خطأ سياقياً لنعرف السبب (مثلاً: قواعد الأمان)
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: storagePath,
+                        operation: 'write',
+                        requestResourceData: { fileName: profileFile.name, type: profileFile.type }
+                    }));
+                    throw new Error("فشل رفع الصورة؛ يرجى مراجعة قواعد أمان التخزين في كونسول جوجل.");
+                }
             }
 
-            // 2. تحديد المسار السيادي بناءً على الرتبة (المطور أم الموظف)
+            // 2. تحديث بيانات الملف الشخصي في Firestore
             const isDev = user.role === 'Developer';
             const userPath = isDev ? `developers/${user.id}` : getTenantPath(`users/${user.id}`, tenantId);
             const userRef = doc(firestore, userPath);
@@ -91,7 +103,6 @@ export function ProfileManager() {
 
             const safeData = cleanFirestoreData(updateData);
 
-            // 3. التحديث المباشر مع رصد أخطاء الصلاحيات
             await updateDoc(userRef, safeData).catch(async (serverError) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: userPath,
@@ -102,14 +113,14 @@ export function ProfileManager() {
             });
 
             await refreshToken();
-            toast({ title: '✅ تم تحديث الملف بنجاح', description: 'تظهر بياناتك الجديدة الآن لجميع الزملاء.' });
+            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث ملفك الشخصي وهويتك البصرية.' });
             setProfileFile(null);
             setPreview(null);
             setFormData(prev => ({ ...prev, avatarUrl: finalAvatarUrl }));
 
         } catch (error: any) {
             console.error("Profile Save Error:", error);
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message || 'فشل تحديث البيانات.' });
+            toast({ variant: 'destructive', title: 'عائق تقني', description: error.message || 'فشل تحديث البيانات.' });
         } finally {
             setIsSaving(false);
         }
@@ -156,27 +167,21 @@ export function ProfileManager() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div className="grid gap-3">
                             <Label className="font-black text-[10px] uppercase text-slate-400 tracking-[0.2em] pr-2">الاسم المهني المعتمد</Label>
-                            <div className="relative group">
-                                <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary transition-colors" />
-                                <Input 
-                                    value={formData.fullName} 
-                                    onChange={e => setFormData({...formData, fullName: e.target.value})} 
-                                    className="h-14 rounded-2xl border-2 bg-slate-50/50 shadow-inner font-black text-xl pr-12 focus:bg-white"
-                                    placeholder="أدخل اسمك الكامل..."
-                                />
-                            </div>
+                            <Input 
+                                value={formData.fullName} 
+                                onChange={e => setFormData({...formData, fullName: e.target.value})} 
+                                className="h-14 rounded-2xl border-2 bg-slate-50/50 shadow-inner font-black text-xl px-6 focus:bg-white"
+                                placeholder="أدخل اسمك الكامل..."
+                            />
                         </div>
                         <div className="grid gap-3">
                             <Label className="font-black text-[10px] uppercase text-slate-400 tracking-[0.2em] pr-2">المسمى الوظيفي الحالي</Label>
-                            <div className="relative group">
-                                <Briefcase className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary transition-colors" />
-                                <Input 
-                                    value={formData.jobTitle} 
-                                    onChange={e => setFormData({...formData, jobTitle: e.target.value})} 
-                                    className="h-14 rounded-2xl border-2 bg-slate-50/50 shadow-inner font-bold text-lg pr-12 focus:bg-white"
-                                    placeholder="مثال: مهندس معماري أول..."
-                                />
-                            </div>
+                            <Input 
+                                value={formData.jobTitle} 
+                                onChange={e => setFormData({...formData, jobTitle: e.target.value})} 
+                                className="h-14 rounded-2xl border-2 bg-slate-50/50 shadow-inner font-bold text-lg px-6 focus:bg-white"
+                                placeholder="مثال: مهندس معماري أول..."
+                            />
                         </div>
                     </div>
 
@@ -187,7 +192,6 @@ export function ProfileManager() {
                             <Label className="font-black text-xl flex items-center gap-3 text-[#1e1b4b]">
                                 <Sparkles className="h-6 w-6 text-primary animate-pulse" /> السيرة المهنية والخبرات
                             </Label>
-                            <Badge variant="secondary" className="bg-primary/5 text-primary border-none text-[8px] font-black h-4 px-2 uppercase tracking-widest">Professional Bio</Badge>
                         </div>
                         <div className="p-6 bg-primary/5 rounded-[2.5rem] border-2 border-dashed border-primary/10 shadow-inner group hover:bg-white transition-all duration-500">
                             <Textarea 
@@ -203,17 +207,9 @@ export function ProfileManager() {
 
                 <CardFooter className="p-10 border-t bg-muted/10 flex justify-end gap-4">
                     <Button 
-                        variant="ghost" 
-                        onClick={() => router.back()} 
-                        disabled={isSaving}
-                        className="h-14 px-8 rounded-2xl font-bold text-slate-500"
-                    >
-                        إلغاء التعديلات
-                    </Button>
-                    <Button 
                         onClick={handleSave} 
                         disabled={isSaving} 
-                        className="h-16 px-20 rounded-[2rem] font-black text-2xl shadow-[0_20px_50px_rgba(255,122,0,0.2)] min-w-[380px] gap-4 transition-all hover:scale-[1.02] active:scale-95 bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none"
+                        className="h-16 px-20 rounded-[2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[380px] gap-4 transition-all hover:scale-[1.02] active:scale-95 bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none"
                     >
                         {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
                         {isSaving ? 'جاري ترحيل البيانات...' : 'اعتماد وحفظ الملف'}

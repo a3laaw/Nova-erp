@@ -1,7 +1,9 @@
+
 import type { Metadata } from "next";
 import { Tajawal } from 'next/font/google';
 import { Providers } from './providers';
 import { Toaster } from '@/components/ui/toaster';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import './globals.css';
 
 const tajawal = Tajawal({ 
@@ -18,7 +20,7 @@ export const metadata: Metadata = {
 /**
  * الـ Root Layout الجذري:
  * تم تنظيفه تماماً من أي Hooks لضمان عدم حدوث خطأ AuthProvider.
- * المنطق الآن يبدأ من ملفات الـ layout الداخلية.
+ * تم إضافة مستمع أخطاء الـ Firebase لرصد أي رفض من القواعد الأمنية.
  */
 export default function RootLayout({
   children,
@@ -28,7 +30,10 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body className={`${tajawal.variable} font-body antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers>
+            {children}
+            <FirebaseErrorListener />
+        </Providers>
         <Toaster />
       </body>
     </html>

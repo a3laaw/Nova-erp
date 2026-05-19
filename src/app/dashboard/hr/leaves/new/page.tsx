@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, Suspense } from 'react';
 import {
   Card,
   CardContent,
@@ -41,7 +41,7 @@ const leaveTypeTranslations: Record<string, string> = {
     'Unpaid': 'بدون أجر'
 };
 
-export default function NewLeaveRequestPage() {
+function LeaveRequestFormContent() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
@@ -63,7 +63,7 @@ export default function NewLeaveRequestPage() {
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
 
-    // 🛡️ تعريف صلاحية الإدارة (Sovereign Authority Logic)
+    // 🛡️ تعريف صلاحية الإدارة (Sovereign Authority Logic) - FIXED: Moved up for clarity
     const isAdmin = useMemo(() => 
         ['Admin', 'HR', 'Developer'].includes(currentUser?.role || '')
     , [currentUser]);
@@ -274,5 +274,13 @@ export default function NewLeaveRequestPage() {
                 </form>
             </Card>
         </div>
+    );
+}
+
+export default function NewLeaveRequestPage() {
+    return (
+        <Suspense fallback={<div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>}>
+            <LeaveRequestFormContent />
+        </Suspense>
     );
 }
