@@ -7,6 +7,7 @@ import type { HubPost } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
     Heart, 
     Lightbulb, 
@@ -19,17 +20,17 @@ import {
     Activity,
     Clock
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
-import { cn, getTenantPath, formatCurrency } from '@/lib/utils';
+import { cn, getTenantPath } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { Separator } from '../ui/separator';
 
 /**
  * تدفق النشاط الحي (The Living Stream):
- * تم تحصين معالجة التواريخ لتجنب أخطاء Invalid time value.
+ * تم تحصين معالجة التواريخ لتجنب أخطاء Invalid time value وإضافة الاستيرادات المفقودة.
  */
 export function InteractionsFeed() {
     const { firestore } = useFirebase();
@@ -106,7 +107,7 @@ function PostCard({ post, index }: { post: HubPost, index: number }) {
 
     return (
         <Card className={cn(
-            "rounded-[3rem] border-none shadow-xl bg-white transition-all duration-700 group overflow-hidden hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] relative",
+            "rounded-[3.5rem] border-none shadow-xl bg-white transition-all duration-700 group overflow-hidden hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] relative",
             "border-r-[12px]", config.accent
         )}>
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -117,7 +118,7 @@ function PostCard({ post, index }: { post: HubPost, index: number }) {
                         <div className="relative">
                             <Avatar className="h-16 w-16 border-4 border-white shadow-2xl group-hover:scale-110 transition-transform duration-700">
                                 <AvatarImage src={post.userAvatar} className="object-cover" />
-                                <AvatarFallback className="bg-primary/10 text-primary font-black text-xl">{post.userName.charAt(0)}</AvatarFallback>
+                                <AvatarFallback className="bg-gradient-to-br from-[#FFB000] to-[#FF7A00] text-white font-black text-xl">{post.userName.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div className="absolute -bottom-1 -right-1 p-1.5 bg-green-500 rounded-full border-2 border-white shadow-lg" />
                         </div>
@@ -125,7 +126,7 @@ function PostCard({ post, index }: { post: HubPost, index: number }) {
                             <p className="font-black text-[#1e1b4b] text-xl leading-tight tracking-tight group-hover:text-primary transition-colors">{post.userName}</p>
                             <p className="text-[10px] font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest">
                                 <Clock className="h-3 w-3 text-primary opacity-40" />
-                                {postDate ? formatDistanceToNow(postDate, { addSuffix: true, locale: ar }) : 'الآن'}
+                                {postDate && isValid(postDate) ? formatDistanceToNow(postDate, { addSuffix: true, locale: ar }) : 'الآن'}
                             </p>
                         </div>
                     </div>
