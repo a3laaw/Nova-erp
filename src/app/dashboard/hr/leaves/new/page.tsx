@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -19,7 +20,7 @@ import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
 import { Loader2, Save, CalendarCheck, ArrowRight, AlertCircle, User, Calculator, Sparkles } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
 import { calculateWorkingDays } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';

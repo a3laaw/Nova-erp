@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -16,6 +17,8 @@ import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
  * الملف المهني للموظف (Professional Portfolio):
@@ -59,37 +62,54 @@ export function ProfileManager() {
 
     const handleSave = async () => {
         const tenantId = user?.currentCompanyId;
-        if (!firestore || !tenantId || !user?.id) return;
+        if (!firestore || !user?.id) return;
 
         setIsSaving(true);
         try {
             let finalAvatarUrl = formData.avatarUrl;
 
+            // 1. معالجة رفع الصورة إذا وجدت
             if (profileFile && storage) {
-                const storageRef = ref(storage, `companies/${tenantId}/users/${user.id}/avatar_${Date.now()}`);
+                const storagePath = `companies/${tenantId || 'master'}/users/${user.id}/avatar_${Date.now()}`;
+                const storageRef = ref(storage, storagePath);
                 const uploadResult = await uploadBytes(storageRef, profileFile);
                 finalAvatarUrl = await getDownloadURL(uploadResult.ref);
             }
 
-            const userPath = getTenantPath(`users/${user.id}`, tenantId);
+            // 2. تحديد المسار السيادي بناءً على الرتبة (المطور أم الموظف)
+            const isDev = user.role === 'Developer';
+            const userPath = isDev ? `developers/${user.id}` : getTenantPath(`users/${user.id}`, tenantId);
             const userRef = doc(firestore, userPath);
 
-            await updateDoc(userRef, cleanFirestoreData({
+            const updateData = {
                 fullName: formData.fullName,
                 jobTitle: formData.jobTitle,
                 bio: formData.bio,
                 avatarUrl: finalAvatarUrl,
                 updatedAt: serverTimestamp()
-            }));
+            };
+
+            const safeData = cleanFirestoreData(updateData);
+
+            // 3. التحديث المباشر مع رصد أخطاء الصلاحيات
+            await updateDoc(userRef, safeData).catch(async (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: userPath,
+                    operation: 'update',
+                    requestResourceData: safeData
+                }));
+                throw serverError;
+            });
 
             await refreshToken();
-            toast({ title: '✅ تم تحديث الملف بنجاح', description: 'تظهر بياناتك الجديدة الآن لجميع الزملاء في الحائط التفاعلي.' });
+            toast({ title: '✅ تم تحديث الملف بنجاح', description: 'تظهر بياناتك الجديدة الآن لجميع الزملاء.' });
             setProfileFile(null);
             setPreview(null);
             setFormData(prev => ({ ...prev, avatarUrl: finalAvatarUrl }));
 
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
+            console.error("Profile Save Error:", error);
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message || 'فشل تحديث البيانات.' });
         } finally {
             setIsSaving(false);
         }
@@ -173,7 +193,7 @@ export function ProfileManager() {
                             <Textarea 
                                 value={formData.bio} 
                                 onChange={e => setFormData({...formData, bio: e.target.value})}
-                                placeholder="اكتب هنا عن تاريخك المهني، المشاريع الكبرى التي أشرفت عليها، أو التخصصات الدقيقة التي تتقنها..."
+                                placeholder="اكتب هنا عن تاريخك المهني..."
                                 rows={10}
                                 className="border-none bg-transparent shadow-none focus-visible:ring-0 text-xl leading-loose font-medium text-slate-700 placeholder:italic placeholder:opacity-30"
                             />
