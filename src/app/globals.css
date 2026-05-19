@@ -90,8 +90,13 @@
   pointer-events: auto !important;
 }
 
-[role="listbox"], [role="menu"], [role="dialog"] {
+[role="listbox"], [role="menu"], [role="dialog"], [data-radix-select-content], [data-radix-popover-content] {
   pointer-events: auto !important;
+  z-index: 999999 !important;
+}
+
+[role="menuitem"], [role="option"] {
+    cursor: pointer !important;
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Card,
@@ -29,14 +29,14 @@ const ArchitecturalAppointmentsView = dynamic(
 );
 
 const RoomBookingCalendar = dynamic(
-    () => import('@/components/appointments/room-booking-calendar'),
+    () => import('@/components/appointments/room-booking-calendar').then(mod => mod.default),
     { 
         loading: () => <Skeleton className="h-[500px] w-full rounded-[2.5rem] animate-pulse" />,
         ssr: false 
     }
 );
 
-export default function AppointmentsPage() {
+function AppointmentsContent() {
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState('architectural');
 
@@ -93,5 +93,13 @@ export default function AppointmentsPage() {
                 </div>
             </Tabs>
         </div>
-    )
+    );
+}
+
+export default function AppointmentsPage() {
+    return (
+        <Suspense fallback={<Skeleton className="h-[600px] w-full rounded-[2.5rem]" />}>
+            <AppointmentsContent />
+        </Suspense>
+    );
 }

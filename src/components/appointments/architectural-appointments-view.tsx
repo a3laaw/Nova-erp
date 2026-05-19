@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useFirebase } from '@/firebase/provider'; // 🛡️ Fix: Use provider directly
+import { useFirebase } from '@/firebase/provider';
 import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, doc, updateDoc, writeBatch, getDoc, orderBy, limit } from 'firebase/firestore';
 import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse, isValid, isWithinInterval } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -44,7 +44,7 @@ import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 
-// ✨ استيرادات محرك الإزاحة الصحيحة (DnD Kit) ✨
+// ✨ استيرادات محرك الإزاحة الصحيحة ✨
 import {
   DndContext, 
   closestCenter,
@@ -261,7 +261,7 @@ export function ArchitecturalAppointmentsView() {
             setClients(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
         });
         getDocs(query(collection(firestore, getTenantPath('leaveRequests', tenantId)), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
-            setLeaveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest)));
+            setLeaveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data()} as LeaveRequest)));
         });
     }, [firestore, tenantId]);
 
@@ -331,7 +331,10 @@ export function ArchitecturalAppointmentsView() {
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
-        engineers.forEach(eng => { grid[eng.id!] = {}; [...morningSlots, ...eveningSlots].forEach(slot => grid[eng.id!][slot] = null); });
+        engineers.forEach(eng => { 
+            grid[eng.id!] = {}; 
+            [...morningSlots, ...eveningSlots].forEach(slot => grid[eng.id!][slot] = null); 
+        });
         appointments.forEach(appt => {
             const appointmentDate = toFirestoreDate(appt.appointmentDate);
             if(!appointmentDate) return;
@@ -358,7 +361,7 @@ export function ArchitecturalAppointmentsView() {
                         const isOnLeave = !!activeLeave;
                         return (
                         <tr key={eng.id} className={cn('border-b transition-colors hover:bg-[#F3E8FF]/10', isOnLeave && "bg-red-50/20")}>
-                            <th className={cn("sticky left-0 bg-[#F8F9FE] p-4 z-10 font-black text-gray-800 text-center border-l", isOnLeave && "text-red-300 opacity-50")}>
+                            <th className={cn("sticky left-0 bg-[#F8F9FE] p-4 font-black text-gray-800 text-center border-l", isOnLeave && "text-red-300 opacity-50")}>
                                 {eng.fullName}
                                 {isOnLeave && <div className="flex flex-col items-center mt-1"><Badge variant="outline" className="bg-red-50 text-[8px] font-black text-red-600 border-red-200">في إجازة رسمية</Badge></div>}
                             </th>
