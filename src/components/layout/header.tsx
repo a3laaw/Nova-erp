@@ -14,7 +14,8 @@ import {
     Bookmark,
     LogOut,
     Settings,
-    CalendarCheck
+    CalendarCheck,
+    Building2
 } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -56,10 +57,8 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
             </div>
 
             <div className="ml-auto flex items-center">
-                {/* 🛡️ الجزيرة العائمة الموحدة (The Sovereign Unified Island) 🛡️ */}
                 <div className="flex items-center bg-white/70 dark:bg-slate-900/80 p-1.5 rounded-[2.2rem] border-2 border-white/80 dark:border-white/10 backdrop-blur-2xl gap-1.5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)]">
                     
-                    {/* 👤 أيقونة المستخدم المدمجة مع حالة الاتصال */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="relative h-11 w-11 rounded-full p-0 transition-all hover:scale-105 active:scale-95 border-none group focus-visible:ring-0">
@@ -102,17 +101,36 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
                     <Separator orientation="vertical" className="h-6 bg-slate-200 dark:bg-white/10 mx-1" />
 
-                    {/* 📅 أيقونة جداول المواعيد (Access للرادار) */}
-                    <Button 
-                        asChild
-                        variant="ghost" 
-                        size="icon" 
-                        className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
-                    >
-                        <Link href="/dashboard/appointments">
-                            <CalendarDays className="h-5 w-5" />
-                        </Link>
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90 focus-visible:ring-0"
+                            >
+                                <CalendarDays className="h-5 w-5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center" className="w-56 rounded-[1.8rem] p-2 shadow-2xl bg-white border-none" dir="rtl">
+                            <DropdownMenuLabel className="font-black text-[10px] text-slate-400 uppercase tracking-widest px-3 py-2 text-right">رادار المواعيد</DropdownMenuLabel>
+                            <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group">
+                                <Link href="/dashboard/appointments?tab=architectural" className="flex items-center gap-3">
+                                    <div className="p-1.5 bg-orange-50 rounded-lg text-[#FF7A00] group-hover:bg-[#FF7A00] group-hover:text-white transition-colors">
+                                        <CalendarDays className="h-4 w-4" />
+                                    </div>
+                                    <span>مواعيد المعماري</span>
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group">
+                                <Link href="/dashboard/appointments?tab=rooms" className="flex items-center gap-3">
+                                    <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                        <Building2 className="h-4 w-4" />
+                                    </div>
+                                    <span>مواعيد القاعات</span>
+                                </Link>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
                     <Button 
                         variant="ghost" 
@@ -134,7 +152,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="center" className="w-56 rounded-[1.8rem] p-2 shadow-2xl bg-white border-none" dir="rtl">
-                            <DropdownMenuLabel className="font-black text-[10px] text-slate-400 uppercase tracking-widest px-3 py-2">محرك الإنتاجية</DropdownMenuLabel>
+                            <DropdownMenuLabel className="font-black text-[10px] text-slate-400 uppercase tracking-widest px-3 py-2 text-right">محرك الإنتاجية</DropdownMenuLabel>
                             <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group">
                                 <Link href="/dashboard/productivity?tab=tasks" className="flex items-center gap-3">
                                     <div className="p-1.5 bg-green-50 rounded-lg text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
