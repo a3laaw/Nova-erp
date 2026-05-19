@@ -8,9 +8,10 @@ import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, updateDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Send, Target, Sparkles, Zap } from 'lucide-react';
+import { Loader2, Send, Target, Sparkles } from 'lucide-react';
 import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { Label } from '../ui/label';
+import { Badge } from '@/components/ui/badge';
 
 const moods = [
     { emoji: '😊', label: 'سعيد', color: 'bg-green-50 text-green-600 border-green-200 shadow-green-100' },
@@ -34,17 +35,18 @@ export function MoodTracker() {
         if (!firestore || !user?.currentCompanyId) return;
         setIsSaving(true);
         try {
-            const userPath = getTenantPath(`users/${user.id}`, user.currentCompanyId);
-            const postPath = getTenantPath(`hub_posts`, user.currentCompanyId);
+            const tenantId = user.currentCompanyId;
+            const userRef = doc(firestore, getTenantPath(`users/${user.id}`, tenantId));
+            const postPath = getTenantPath(`hub_posts`, tenantId);
             
             // 1. تحديث حالة الموظف
-            await updateDoc(doc(firestore, userPath), {
+            await updateDoc(userRef, {
                 currentMood: selectedMood,
                 currentFocus: focus,
                 updatedAt: serverTimestamp()
             });
 
-            // 2. نشر تحديث للحائط ليعرف الجميع
+            // 2. نشر تحديث للحائط
             if (focus.trim()) {
                 await addDoc(collection(firestore, postPath), cleanFirestoreData({
                     userId: user.id,
@@ -56,11 +58,11 @@ export function MoodTracker() {
                     votesCount: 0,
                     pointsAwarded: 5,
                     createdAt: serverTimestamp(),
-                    companyId: user.currentCompanyId
+                    companyId: tenantId
                 }));
             }
 
-            toast({ title: 'تم تحديث حالتك', description: 'تظهر حالتك الآن لجميع الزملاء.' });
+            toast({ title: 'تم التحديث', description: 'تظهر حالتك الآن لجميع الزملاء.' });
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث الحالة.' });
         } finally { setIsSaving(false); }
@@ -70,7 +72,6 @@ export function MoodTracker() {
         <Card className="rounded-[3rem] border-none shadow-2xl bg-white/60 backdrop-blur-3xl overflow-hidden group hover:border-primary/20 transition-all duration-500 border-4 border-white">
             <CardContent className="p-10 space-y-10">
                 <div className="flex flex-col xl:flex-row justify-between items-center gap-12">
-                    {/* اختيار الحالة - تصميم كريستالي */}
                     <div className="space-y-4 text-center xl:text-right shrink-0">
                         <Label className="font-black text-xs text-slate-400 uppercase tracking-[0.3em] mr-2 block">Mood Pulse</Label>
                         <div className="flex flex-wrap justify-center gap-5">
@@ -93,7 +94,6 @@ export function MoodTracker() {
                         </div>
                     </div>
 
-                    {/* عنوان التركيز - تصميم فخم */}
                     <div className="flex-1 w-full space-y-4">
                         <div className="flex justify-between items-end pr-2">
                             <Label className="font-black text-xs text-primary uppercase tracking-[0.3em] flex items-center gap-2">

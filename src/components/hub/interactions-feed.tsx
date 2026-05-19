@@ -13,13 +13,10 @@ import {
     PartyPopper, 
     MessageCircle, 
     CheckCircle2,
-    Calendar,
     ThumbsUp,
     Loader2,
     Sparkles,
     Activity,
-    Flag,
-    MoreHorizontal,
     Clock
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -32,7 +29,7 @@ import { Separator } from '../ui/separator';
 
 /**
  * تدفق النشاط الحي (The Living Stream):
- * تم تحويل البطاقات إلى وحدات حية تتفاعل مع الحركة وتبرز أنواع التفاعلات المختلفة.
+ * تم تحصين معالجة التواريخ لتجنب أخطاء Invalid time value.
  */
 export function InteractionsFeed() {
     const { firestore } = useFirebase();
@@ -79,8 +76,8 @@ function PostCard({ post, index }: { post: HubPost, index: number }) {
         if (!firestore || !user?.id || isVoting) return;
         setIsUpdating(true);
         try {
-            const postPath = getTenantPath(`hub_posts/${post.id}`, user.currentCompanyId);
-            const postRef = doc(firestore, postPath);
+            const tenantId = user.currentCompanyId!;
+            const postRef = doc(firestore, getTenantPath(`hub_posts/${post.id}`, tenantId));
             
             if (hasVoted) {
                 await updateDoc(postRef, {
@@ -105,6 +102,7 @@ function PostCard({ post, index }: { post: HubPost, index: number }) {
 
     const config = typeConfig[post.postType] || typeConfig.system_achievement;
     const Icon = config.icon;
+    const postDate = toFirestoreDate(post.createdAt);
 
     return (
         <Card className={cn(
@@ -127,7 +125,7 @@ function PostCard({ post, index }: { post: HubPost, index: number }) {
                             <p className="font-black text-[#1e1b4b] text-xl leading-tight tracking-tight group-hover:text-primary transition-colors">{post.userName}</p>
                             <p className="text-[10px] font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest">
                                 <Clock className="h-3 w-3 text-primary opacity-40" />
-                                {formatDistanceToNow(toFirestoreDate(post.createdAt)!, { addSuffix: true, locale: ar })}
+                                {postDate ? formatDistanceToNow(postDate, { addSuffix: true, locale: ar }) : 'الآن'}
                             </p>
                         </div>
                     </div>

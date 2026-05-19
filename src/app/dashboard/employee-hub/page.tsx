@@ -10,7 +10,7 @@ import {
     Activity,
     Zap,
     Trophy,
-    LayoutGrid
+    Clock
 } from 'lucide-react';
 import { MoodTracker } from '@/components/hub/mood-tracker';
 import { InteractionsFeed } from '@/components/hub/interactions-feed';
@@ -21,8 +21,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 /**
- * الحائط التفاعلي للموظف (Interactive Employee Hub) - النسخة الحية V3.0:
- * تم إعادة التصميم ليكون نابضاً بالحياة مع مؤثرات حركية دقيقة وتفاعل بصري عميق.
+ * الحائط التفاعلي للموظف (Interactive Employee Hub):
+ * تم إحكام الهوية البصرية لتكون "حية" و "ذهبية" تتناسب مع فخامة المنظومة.
  */
 export default function EmployeeHubPage() {
     const { user } = useAuth();
@@ -30,11 +30,9 @@ export default function EmployeeHubPage() {
 
     return (
         <div className="space-y-8 pb-20 max-w-[1400px] mx-auto animate-in fade-in duration-1000" dir="rtl">
-            {/* 🛡️ الهيدر الملكي المتوهج 🛡️ */}
             <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-[#1e1b4b] text-white relative group">
                 <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none" />
                 <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/20 rounded-full blur-[100px] animate-pulse" />
-                <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-orange-500/10 rounded-full blur-[100px] animate-pulse" />
                 
                 <CardHeader className="pb-12 pt-12 px-12 relative z-10">
                     <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
@@ -49,16 +47,16 @@ export default function EmployeeHubPage() {
                                 <CardTitle className="text-5xl font-black text-white tracking-tighter drop-shadow-2xl">نبض الإنجاز</CardTitle>
                                 <div className="flex items-center gap-3">
                                     <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-ping" />
-                                    <CardDescription className="text-indigo-100/80 font-bold text-xl leading-relaxed">أهلاً بك في قلب Nova ERP التفاعلي.. حيث تلتقي الأرقام بالإنسان.</CardDescription>
+                                    <CardDescription className="text-indigo-100/80 font-bold text-xl leading-relaxed">قلب Nova ERP التفاعلي.. حيث تلتقي الأرقام بالإنسان.</CardDescription>
                                 </div>
                             </div>
                         </div>
                         
                         <Button 
                             onClick={() => setIsKudosOpen(true)}
-                            className="h-16 px-12 rounded-[2rem] font-black text-2xl gap-4 bg-white text-primary shadow-[0_20px_50px_rgba(0,0,0,0.2)] hover:bg-slate-50 hover:scale-105 active:scale-95 border-none transition-all duration-300 group"
+                            className="h-16 px-12 rounded-[2rem] font-black text-2xl gap-4 bg-white text-primary shadow-[0_20px_50px_rgba(0,0,0,0.2)] hover:scale-105 active:scale-95 border-none transition-all duration-300"
                         >
-                            <Heart className="h-8 w-8 fill-red-500 text-red-500 group-hover:scale-125 transition-transform duration-500" />
+                            <Heart className="h-8 w-8 fill-red-500 text-red-500" />
                             شكر زميل
                         </Button>
                     </div>
@@ -66,39 +64,36 @@ export default function EmployeeHubPage() {
             </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start px-2">
-                {/* العمود الجانبي: لوحة الصدارة (The Gilded Rank) */}
                 <div className="lg:col-span-4 space-y-8 sticky top-24">
                     <Leaderboard />
                     
                     <Card className="rounded-[3rem] border-none shadow-2xl bg-white/40 backdrop-blur-3xl p-10 space-y-8 border border-white/60 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-orange-500/10 transition-all duration-700" />
                         <div className="flex items-center justify-between">
                             <h3 className="font-black text-2xl text-[#1e1b4b] flex items-center gap-3">
                                 <Zap className="text-orange-500 h-8 w-8 fill-orange-500/20" /> رصيد نقاطك
                             </h3>
                             <div className="p-3 bg-orange-50 rounded-2xl text-orange-600 shadow-inner"><Trophy className="h-5 w-5"/></div>
                         </div>
-                        <div className="p-10 bg-gradient-to-br from-orange-50 via-white to-white rounded-[2.5rem] border-4 border-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)] flex items-center justify-between group-hover:shadow-xl transition-all duration-500">
+                        <div className="p-10 bg-gradient-to-br from-orange-50 via-white to-white rounded-[2.5rem] border-4 border-white shadow-xl flex items-center justify-between group-hover:scale-[1.02] transition-all duration-500">
                             <div className="space-y-1">
-                                <p className="text-[10px] font-black text-orange-400 uppercase tracking-[0.3em] mb-2">XP Tokens Available</p>
-                                <p className="text-6xl font-black font-mono text-[#FF7A00] tracking-tighter drop-shadow-sm">
+                                <p className="text-[10px] font-black text-orange-400 uppercase tracking-[0.3em] mb-2">XP Tokens</p>
+                                <p className="text-6xl font-black font-mono text-[#FF7A00] tracking-tighter">
                                     {user?.totalPoints || 0}
                                 </p>
                             </div>
-                            <div className="p-5 bg-white rounded-3xl shadow-2xl border border-orange-50 group-hover:rotate-12 transition-transform duration-700">
+                            <div className="p-5 bg-white rounded-3xl shadow-2xl border border-orange-50 animate-float">
                                 <Sparkles className="h-10 w-10 text-[#FF7A00] animate-pulse" />
                             </div>
                         </div>
                         <div className="flex items-center gap-3 p-4 bg-muted/10 rounded-2xl border-2 border-dashed border-slate-100">
                             <Activity className="h-4 w-4 text-slate-400" />
                             <p className="text-[11px] font-bold text-slate-500 leading-relaxed italic text-center">
-                                استبدل نقاطك بمكافآت عينية أو إجازات إضافية عبر قسم الـ HR.
+                                استبدل نقاطك بمكافآت عينية أو إجازات إضافية عبر الإدارة.
                             </p>
                         </div>
                     </Card>
                 </div>
 
-                {/* العمود الرئيسي: الحالة والتدفق الحي (The Pulse) */}
                 <div className="lg:col-span-8 space-y-10">
                     <MoodTracker />
                     
@@ -109,9 +104,6 @@ export default function EmployeeHubPage() {
                                 <div className="h-3 w-3 rounded-full bg-green-500 relative" />
                             </div>
                             <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">نشاط المجتمع الحي</h3>
-                        </div>
-                        <div className="flex gap-2">
-                             <Badge variant="outline" className="bg-white/60 backdrop-blur-md font-black text-[10px] uppercase h-9 px-6 rounded-full border-2 border-slate-100 shadow-sm text-slate-400">Real-time Stream</Badge>
                         </div>
                     </div>
 
