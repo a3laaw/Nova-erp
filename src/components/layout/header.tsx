@@ -8,14 +8,13 @@ import {
     Globe, 
     Bell, 
     CalendarDays, 
-    Home, 
-    Users, 
     Moon, 
     Sun,
     ListTodo,
     Bookmark,
     LogOut,
-    Settings
+    Settings,
+    CalendarCheck
 } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -34,7 +33,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { useAuth } from '@/context/auth-context';
 
 interface HeaderProps {
     currentUser: AuthenticatedUser;
@@ -103,6 +101,18 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     </DropdownMenu>
 
                     <Separator orientation="vertical" className="h-6 bg-slate-200 dark:bg-white/10 mx-1" />
+
+                    {/* 📅 أيقونة جداول المواعيد (Access للرادار) */}
+                    <Button 
+                        asChild
+                        variant="ghost" 
+                        size="icon" 
+                        className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
+                    >
+                        <Link href="/dashboard/appointments">
+                            <CalendarDays className="h-5 w-5" />
+                        </Link>
+                    </Button>
 
                     <Button 
                         variant="ghost" 

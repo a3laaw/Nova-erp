@@ -74,7 +74,7 @@ export default function DashboardLayout({
                 </div>
             </div>
             <div className="text-center space-y-2">
-                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري فتح جلسة العمل...</p>
+                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري التحميل...</p>
                 {showEmergencyExit && (
                     <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl bg-white/40 mt-6">
                         <div className="flex items-center gap-2 text-primary justify-center mb-2">

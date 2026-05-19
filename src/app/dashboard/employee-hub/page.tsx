@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * الحائط التفاعلي للموظف (Interactive Employee Hub):
- * تم إبطاء حركة الزر العائم لتكون أكثر فخامة وهدوءاً.
+ * تم تحويل زر الشكر ليكون لؤلؤياً عائماً (Pearl Floating) بوضوح نصي مطلق.
  */
 export default function EmployeeHubPage() {
     const { user } = useAuth();
@@ -37,12 +37,12 @@ export default function EmployeeHubPage() {
                 <CardHeader className="pb-12 pt-12 px-12 relative z-10">
                     <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
                         <div className="flex items-center gap-8 order-2 lg:order-1">
-                            {/* 🌟 زر الشكر البارز والعائم (بتحريك أبطأ) 🌟 */}
+                            {/* 🌟 زر الشكر اللؤلؤي البارز والعائم (بتحريك هادئ جداً) 🌟 */}
                             <Button 
                                 onClick={() => setIsKudosOpen(true)}
-                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-[#1e1b4b] text-white shadow-[0_25px_60px_-15px_rgba(30,27,75,0.5)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-[#252261] animate-float-slow"
+                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-white text-primary shadow-[0_20px_50px_-10px_rgba(255,122,0,0.3)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-slate-50 animate-float-slow"
                             >
-                                <Heart className="h-8 w-8 fill-red-500 text-red-500 animate-pulse" />
+                                <Heart className="h-8 w-8 fill-primary text-primary animate-pulse" />
                                 <span className="drop-shadow-sm">شكر زميل</span>
                             </Button>
                         </div>
