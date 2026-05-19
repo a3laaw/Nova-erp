@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase/provider'; // 🛡️ Fix: Use provider directly
 import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, doc, updateDoc, writeBatch, getDoc, orderBy, limit } from 'firebase/firestore';
 import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse, isValid, isWithinInterval } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -131,7 +131,6 @@ const weekDays = [
     { id: 'Saturday', label: 'السبت' },
 ];
 
-// 🎨 مكون الموعد القابل للسحب (Draggable Card)
 function DraggableAppointment({ appointment }: { appointment: Appointment }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: appointment.id!,
@@ -149,7 +148,6 @@ function DraggableAppointment({ appointment }: { appointment: Appointment }) {
     return (
         <div 
             ref={setNodeRef}
-            style={style}
             {...attributes}
             {...listeners}
             className={cn(
@@ -166,7 +164,6 @@ function DraggableAppointment({ appointment }: { appointment: Appointment }) {
     );
 }
 
-// 📥 مكون خانة الوقت القابلة للاستقبال (Droppable Slot)
 function DroppableSlot({ id, children, onClick }: { id: string, children: React.ReactNode, onClick: () => void }) {
     const { isOver, setNodeRef } = useDroppable({
         id: id,
@@ -201,17 +198,14 @@ export function ArchitecturalAppointmentsView() {
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogData, setDialogData] = useState<any>(null);
-    const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
     const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
     const tenantId = currentUser?.currentCompanyId;
 
-    // تهيئة المستشعرات للإزاحة
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 8, // السحب يبدأ بعد تحريك 8 بكسل لمنع تضارب الكليك مع السحب
+                distance: 8,
             },
         })
     );
@@ -259,17 +253,14 @@ export function ArchitecturalAppointmentsView() {
 
     useEffect(() => {
         if (!firestore || !tenantId) return;
-        const employeesPath = getTenantPath('employees', tenantId);
-        const clientsPath = getTenantPath('clients', tenantId);
-        const leavesPath = getTenantPath('leaveRequests', tenantId);
-        getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave']))).then(snap => {
+        getDocs(query(collection(firestore, getTenantPath('employees', tenantId)), where('status', 'in', ['active', 'on-leave']))).then(snap => {
             const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
             setEngineers(arch);
         });
-        getDocs(query(collection(firestore, clientsPath), where('isActive', '==', true))).then(snap => {
+        getDocs(query(collection(firestore, getTenantPath('clients', tenantId)), where('isActive', '==', true))).then(snap => {
             setClients(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
         });
-        getDocs(query(collection(firestore, leavesPath), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
+        getDocs(query(collection(firestore, getTenantPath('leaveRequests', tenantId)), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
             setLeaveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest)));
         });
     }, [firestore, tenantId]);
@@ -289,13 +280,11 @@ export function ArchitecturalAppointmentsView() {
             const [hours, minutes] = targetTime.split(':').map(Number);
             const newDateTime = setMinutes(setHours(date, hours), minutes);
 
-            // التحقق من الماضي
             if (isPast(newDateTime) && currentUser?.role !== 'Admin') {
                 toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكنك نقل موعد للماضي.' });
                 return;
             }
 
-            // التحقق من تعارض المهندس المستهدف
             const hasConflict = rawAppointments.some(a => a.id !== apptId && a.engineerId === targetEngineerId && format(toFirestoreDate(a.appointmentDate)!, 'HH:mm') === targetTime && a.status !== 'cancelled');
             if (hasConflict) {
                 toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'هذا المهندس لديه موعد آخر في هذا الوقت.' });
@@ -303,7 +292,8 @@ export function ArchitecturalAppointmentsView() {
             }
 
             try {
-                const apptRef = doc(firestore, getTenantPath('appointments', tenantId), apptId);
+                const apptPath = getTenantPath('appointments', tenantId);
+                const apptRef = doc(firestore, apptPath, apptId);
                 const apptToMove = rawAppointments.find(a => a.id === apptId);
 
                 await updateDoc(apptRef, {
@@ -312,7 +302,6 @@ export function ArchitecturalAppointmentsView() {
                     updatedAt: serverTimestamp()
                 });
 
-                // إعادة حساب ترقيم الزيارات للعميل
                 if (apptToMove?.clientId || apptToMove?.clientMobile) {
                     await reconcileClientAppointments(firestore, tenantId, { 
                         clientId: apptToMove.clientId, 
@@ -406,7 +395,7 @@ export function ArchitecturalAppointmentsView() {
         </div>
     )};
 
-    if (brandingLoading || loading) return <Skeleton className="h-[500px] w-full rounded-2xl" />;
+    if (brandingLoading || loading) return <div className="p-8"><Skeleton className="h-[500px] w-full rounded-2xl" /></div>;
 
     return (
         <DndContext 
@@ -424,7 +413,7 @@ export function ArchitecturalAppointmentsView() {
                         <div className="flex flex-col">
                             <span className="font-black text-sm text-[#1e1b4b]">تصفح جدول المواعيد</span>
                             <span className="text-[9px] font-bold text-primary flex items-center gap-1 uppercase tracking-widest animate-pulse">
-                                <MousePointer2 className="h-2 w-2"/> خاصية الإزاحة نشطة (Drag & Drop)
+                                <MousePointer2 className="h-2 w-2"/> خاصية الإزاحة نشطة
                             </span>
                         </div>
                     </div>
@@ -454,7 +443,6 @@ export function ArchitecturalAppointmentsView() {
 
                 <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} firestore={firestore} currentUser={currentUser} />
                 
-                {/* معاينة السحب (Drag Overlay) */}
                 <DragOverlay dropAnimation={{
                     sideEffects: defaultDropAnimationSideEffects({
                         styles: { active: { opacity: '0.5' } }
@@ -465,7 +453,7 @@ export function ArchitecturalAppointmentsView() {
                             className="h-20 w-32 rounded-2xl p-2 text-xs font-black text-white flex items-center justify-center text-center shadow-2xl scale-110 rotate-3 border-2 border-white/40 glass-effect"
                             style={{ backgroundColor: rawAppointments.find(a => a.id === activeDragId)?.color }}
                         >
-                            {rawAppointments.find(a => a.id === activeDragId)?.clientName}
+                            {rawAppointments.find(a => a.id === activeDragId)?.clientName || '...'}
                         </div>
                     ) : null}
                 </DragOverlay>

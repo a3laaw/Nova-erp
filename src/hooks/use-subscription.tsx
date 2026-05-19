@@ -15,7 +15,7 @@ import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف اشتراك لحظي مطور (Sovereign Real-time Hook):
- * تم تحصينه لفرض فلترة معرف الشركة في الاستعلامات المجمعة لمنع أخطاء الـ Permissions.
+ * تم فك ارتباط الاستيراد المباشر من الفهرس لمنع الحلقات المفرغة.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -45,7 +45,6 @@ export function useSubscription<T extends { id?: string }>(
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
         const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
-        // 🛡️ صمام أمان سيادي: منع الطلب إذا كانت الهوية غير مستقرة للمسارات المعزولة
         if (!isMasterCollection && !tenantId) {
             setLoading(true); 
             return;
@@ -57,8 +56,6 @@ export function useSubscription<T extends { id?: string }>(
         let finalPath = getTenantPath(collectionPath, tenantId);
         let finalConstraints = [...constraintsRef.current];
         
-        // 🚨 تصحيح مسار استعلام المجموعات (Force Tenant Filtering)
-        // جوجل ترفض CollectionGroup دون فلتر دقيق في نظام الـ Multi-tenancy
         if (isGroup && tenantId) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
             finalPath = collectionName;

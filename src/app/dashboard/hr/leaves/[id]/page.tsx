@@ -16,7 +16,6 @@ import {
     FileText, 
     CheckCircle, 
     XCircle, 
-    Sparkles, 
     Clock, 
     PlaneTakeoff, 
     Home, 
@@ -148,11 +147,9 @@ export default function LeaveRequestDetailsPage() {
             const reqPath = getTenantPath(`leaveRequests/${leaveRequest.id}`, tenantId);
             const empPath = getTenantPath(`employees/${leaveRequest.employeeId}`, tenantId);
 
-            // 1. تحديث الحالة الوظيفية
             batch.update(doc(firestore, reqPath), { status: 'returned', actualReturnDate: Timestamp.fromDate(actualDate) });
             batch.update(doc(firestore, empPath), { status: 'active' });
 
-            // 2. إذا طلب المستخدم توليد راتب الإجازة آلياً
             if (withSalaryGen) {
                 const payrollPath = getTenantPath('payroll', tenantId);
                 const jePath = getTenantPath('journalEntries', tenantId);
@@ -340,7 +337,6 @@ export default function LeaveRequestDetailsPage() {
                             <DateInput value={actualDate} onChange={setActualDate} className="h-12 rounded-xl border-2" />
                         </div>
 
-                        {/* 🛡️ محرك التدقيق المالي الذكي (Payroll Check Logic) 🛡️ */}
                         {!isCheckingSalary && hasLeaveSalary === false && leaveRequest.leaveType === 'Annual' && (
                             <Alert className="bg-orange-50 border-orange-200 rounded-[2rem] p-6 animate-in zoom-in-95">
                                 <ShieldAlert className="h-8 w-8 text-orange-600" />

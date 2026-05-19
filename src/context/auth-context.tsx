@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useMe
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, getIdToken } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase/provider'; // 🛡️ Fix: Import from provider directly to avoid circular dependency
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
 import { setSessionIndicators, clearSessionIndicators, mapFirebaseAuthError } from '@/lib/auth/utils';
@@ -36,7 +36,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (masterAuth?.currentUser) {
       try {
           await getIdToken(masterAuth.currentUser, true);
-          console.log("Sovereign Identity Refreshed.");
       } catch (e) {
           console.error("Token refresh failed:", e);
       }
@@ -64,7 +63,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const email = firebaseUser.email?.toLowerCase().trim() || '';
 
-      // مسار المطور (Master Admin)
       if (email === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
           uid: firebaseUser.uid,
@@ -83,42 +81,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        // 1. جلب الفهرس العالمي أولاً لمعرفة الانتماء
         const globalRef = doc(masterFirestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
         if (!globalSnap.exists()) {
-          throw new Error("عذراً، هذا الحساب غير مربوط بأي منشأة مسجلة.");
+          throw new Error("الحساب غير مربوط بمنشأة.");
         }
 
         const { companyId } = globalSnap.data();
-        
-        // 2. تجديد التوكن فوراً لضمان وجود ادعاءات الـ Multi-tenancy
         await getIdToken(firebaseUser, true);
 
-        // 3. جلب ملفات المنشأة والمستخدم
         const [compDoc, userDoc] = await Promise.all([
           getDoc(doc(masterFirestore, 'companies', companyId)),
           getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid))
         ]);
 
-        if (!userDoc.exists()) {
-            throw new Error("لم يتم العثور على ملفك الشخصي داخل المنشأة.");
-        }
+        if (!userDoc.exists()) throw new Error("الملف الشخصي غير موجود.");
 
         const userData = userDoc.data();
         const companyData = compDoc.exists() ? { id: compDoc.id, ...compDoc.data() } as Company : null;
 
-        if (!userData.isActive) {
-          throw new Error("هذا الحساب معطل حالياً.");
-        }
+        if (!userData.isActive) throw new Error("الحساب معطل.");
 
         const finalUser = {
           ...userData,
           uid: firebaseUser.uid,
           id: firebaseUser.uid,
           currentCompanyId: companyId,
-          companyName: companyData?.name || 'منشأة غير مسماة'
+          companyName: companyData?.name || 'منشأة NOVA'
         } as AuthenticatedUser;
 
         setUser(finalUser);
@@ -127,7 +117,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSessionIndicators(firebaseUser.uid, finalUser.role);
 
       } catch (err: any) {
-        console.error("Auth context error:", err);
         setError(err.message);
         setUser(null);
         clearSessionIndicators();

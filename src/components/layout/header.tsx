@@ -3,10 +3,8 @@
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { 
-    Sparkles, 
     User, 
     Globe, 
-    Bell, 
     CalendarDays, 
     Moon, 
     Sun,
@@ -14,8 +12,8 @@ import {
     Bookmark,
     LogOut,
     Settings,
-    CalendarCheck,
-    Building2
+    Building2,
+    Sparkles
 } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -64,51 +62,46 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                             <Button variant="ghost" className="relative h-11 w-11 rounded-full p-0 transition-all hover:scale-105 active:scale-95 border-none group focus-visible:ring-0">
                                 <Avatar className="h-10 w-10 border-2 border-primary/20 shadow-md ring-offset-background transition-all group-hover:ring-2 group-hover:ring-primary/40 overflow-hidden bg-white">
                                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} className="object-cover" />
-                                    <AvatarFallback className="bg-gradient-to-br from-[#FFB000] to-[#FF7A00] text-white font-black text-xs">
+                                    <AvatarFallback className="bg-primary text-white font-black text-xs">
                                         {currentUser.fullName?.charAt(0) || 'N'}
                                     </AvatarFallback>
                                 </Avatar>
-                                <div className="absolute -bottom-0.5 -left-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-green-500 shadow-md animate-pulse" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-64 rounded-[2.2rem] p-2 shadow-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-none mt-2" align="start" dir="rtl">
+                        <DropdownMenuContent className="w-64 rounded-[2.2rem] p-2 shadow-2xl bg-white/95 border-none mt-2" align="start" dir="rtl">
                             <DropdownMenuLabel className="font-normal p-5">
                                 <div className="flex flex-col space-y-2 text-right">
-                                    <p className="text-sm font-black text-[#1e1b4b] dark:text-white leading-none">{currentUser.fullName}</p>
-                                    <p className="text-[9px] font-mono text-slate-500 bg-slate-50 dark:bg-white/5 p-1.5 rounded-lg border border-slate-100 dark:border-white/10">{currentUser.email}</p>
+                                    <p className="text-sm font-black text-[#1e1b4b] leading-none">{currentUser.fullName}</p>
+                                    <p className="text-[9px] font-mono text-slate-500 bg-slate-50 p-1.5 rounded-lg border border-slate-100">{currentUser.email}</p>
                                 </div>
                             </DropdownMenuLabel>
-                            <DropdownMenuSeparator className="bg-slate-100 dark:bg-white/10 mx-2" />
-                            <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-bold cursor-pointer hover:bg-primary/5 mx-1 transition-colors">
+                            <DropdownMenuSeparator className="bg-slate-100 mx-2" />
+                            <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-bold cursor-pointer hover:bg-primary/5 mx-1">
                                 <Link href="/dashboard/settings/profile" className="flex items-center gap-3">
                                     <User className="h-4 w-4 text-primary opacity-60" />
-                                    <span className="text-[#1e1b4b] dark:text-white">ملفي الشخصي</span>
+                                    <span>ملفي الشخصي</span>
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-bold cursor-pointer hover:bg-primary/5 mx-1 transition-colors">
+                            <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-bold cursor-pointer hover:bg-primary/5 mx-1">
                                 <Link href="/dashboard/settings" className="flex items-center gap-3">
                                     <Settings className="h-4 w-4 text-primary opacity-60" />
-                                    <span className="text-[#1e1b4b] dark:text-white">إعدادات النظام</span>
+                                    <span>إعدادات النظام</span>
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-slate-100 dark:bg-white/10 mx-2" />
-                            <DropdownMenuItem onClick={onLogout} className="rounded-2xl py-3.5 font-black text-red-600 hover:text-white hover:bg-red-600 focus:bg-red-600 focus:text-white cursor-pointer mx-1 transition-all">
+                            <DropdownMenuSeparator className="bg-slate-100 mx-2" />
+                            <DropdownMenuItem onClick={onLogout} className="rounded-2xl py-3.5 font-black text-red-600 hover:text-white hover:bg-red-600 cursor-pointer mx-1 transition-all">
                                 <LogOut className="ml-2 h-4 w-4" />
                                 <span>تسجيل الخروج</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <Separator orientation="vertical" className="h-6 bg-slate-200 dark:bg-white/10 mx-1" />
+                    <Separator orientation="vertical" className="h-6 bg-slate-200 mx-1" />
 
-                    {/* 🛡️ رادار المواعيد السيادي: قائمة منسدلة ذكية 🛡️ */}
+                    {/* 🛡️ رادار المواعيد السيادي المنسدل 🛡️ */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90 focus-visible:ring-0"
-                            >
+                            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90">
                                 <CalendarDays className="h-5 w-5" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -144,11 +137,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
-                            >
+                            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary">
                                 <Sparkles className="h-5 w-5" />
                             </Button>
                         </DropdownMenuTrigger>

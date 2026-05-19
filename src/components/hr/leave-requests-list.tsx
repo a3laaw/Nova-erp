@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase/provider'; // 🛡️ Fix: Use provider
 import { 
   collection, 
   query, 
@@ -108,7 +108,7 @@ export function LeaveRequestsList() {
     try {
         const finalPath = getTenantPath(`leaveRequests/${requestToDelete.id}`, tenantId);
         await deleteDoc(doc(firestore, finalPath));
-        toast({ title: '✅ تم الحذف', description: 'تم مسح سجل الإجازة نهائياً.' });
+        toast({ title: '✅ تم الحذف' });
     } finally {
         setIsDeleting(false);
         setRequestToDelete(null);
@@ -242,7 +242,7 @@ export function LeaveRequestsList() {
                 <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><Trash2 className="h-8 w-8"/></div>
                 <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد المسح النهائي؟</AlertDialogTitle>
                 <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2">
-                    سيتم حذف سجل الإجازة للموظف <strong className="text-foreground">"{requestToDelete?.employeeName}"</strong> بشكل دائم. هذا الإجراء خاص بصلاحيات الـ HR فقط.
+                    سيتم حذف سجل الإجازة للموظف <strong className="text-foreground">"{requestToDelete?.employeeName}"</strong> بشكل دائم.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-8 gap-3">

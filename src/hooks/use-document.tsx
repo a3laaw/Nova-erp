@@ -10,7 +10,7 @@ import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف استماع لوثيقة واحدة:
- * يدعم التبديل السيادي وتوجيه المسار آلياً لمسار الشركة المختارة.
+ * تم فك ارتباط الاستيراد من الفهرس لمنع الحلقات المفرغة.
  */
 export function useDocument<T extends { id?: string }>(
   firestore: Firestore | null,
