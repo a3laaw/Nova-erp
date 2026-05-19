@@ -60,6 +60,10 @@ export default function DashboardLayout({
   }
 
   if (!user) {
+    const handleSafeExit = () => {
+      logout();
+      router.replace('/');
+    };
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]" dir="rtl">
         <AlertCircle className="h-12 w-12 text-red-600 animate-bounce" />

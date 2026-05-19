@@ -271,7 +271,7 @@ export function ArchitecturalAppointmentsView() {
     useEffect(() => {
         if (!firestore || !tenantId) return;
         getDocs(query(collection(firestore, getTenantPath('employees', tenantId)), where('status', 'in', ['active', 'on-leave']))).then(snap => {
-            const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
+            const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.nameAr));
             setEngineers(arch);
         });
         getDocs(query(collection(firestore, getTenantPath('clients', tenantId)), where('isActive', '==', true))).then(snap => {
@@ -324,7 +324,6 @@ export function ArchitecturalAppointmentsView() {
                     updatedBy: currentUser?.id
                 });
 
-                // 🛡️ توثيق حركة الإزاحة في سجل التدقيق
                 const auditRef = doc(collection(apptRef, 'auditLogs'));
                 batch.set(auditRef, {
                     action: 'rescheduled',
@@ -392,7 +391,6 @@ export function ArchitecturalAppointmentsView() {
                 updatedAt: serverTimestamp()
             });
 
-            // 🛡️ توثيق الإلغاء في سجل التدقيق
             const auditRef = doc(collection(apptRef, 'auditLogs'));
             batch.set(auditRef, {
                 action: 'cancelled',
@@ -595,7 +593,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 
             batch.set(newApptRef, dataToSave);
 
-            // 🛡️ توثيق الحجز في سجل التدقيق
             const auditRef = doc(collection(newApptRef, 'auditLogs'));
             batch.set(auditRef, {
                 action: 'created',

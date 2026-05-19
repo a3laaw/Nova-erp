@@ -166,6 +166,18 @@ const navItems = {
       ]
     },
     { 
+      label: 'إدارة التقارير',
+      icon: BarChart3,
+      roles: ['Developer', 'Admin', 'Accountant', 'HR'],
+      hrefPrefix: '/dashboard/reports',
+      children: [
+        { href: '/dashboard/reports/operational-hub', label: 'رادار الأداء الفني', icon: Activity },
+        { href: '/dashboard/reports/appointments-audit', label: 'سجل تدقيق المواعيد', icon: History },
+        { href: '/dashboard/reports/delayed-stages', label: 'المراحل المتأخرة', icon: Clock },
+        { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: Search },
+      ]
+    },
+    { 
       label: 'إعدادات النظام', 
       icon: Settings2, 
       roles: ['Developer', 'Admin'],
