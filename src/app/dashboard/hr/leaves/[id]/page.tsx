@@ -104,7 +104,7 @@ export default function LeaveRequestDetailsPage() {
             batch.update(doc(firestore, reqPath), { status: 'on-leave', actualStartDate: Timestamp.fromDate(actualDate) });
             batch.update(doc(firestore, empPath), { status: 'on-leave' });
             await batch.commit();
-            toast({ title: 'تم توثيق المغادرة' });
+            toast({ title: '✅ تم توثيق المغادرة', description: 'تم تحديث حالة الموظف لـ "في إجازة".' });
             setIsStartDialogOpen(false);
         } catch (e) { setIsProcessing(false); }
     };
@@ -120,7 +120,7 @@ export default function LeaveRequestDetailsPage() {
             batch.update(doc(firestore, reqPath), { status: 'returned', actualReturnDate: Timestamp.fromDate(actualDate) });
             batch.update(doc(firestore, empPath), { status: 'active' });
             await batch.commit();
-            toast({ title: 'تمت المباشرة بنجاح' });
+            toast({ title: '✅ تمت المباشرة بنجاح', description: 'عاد الموظف للخدمة النشطة وتم إغلاق ملف الإجازة.' });
             setIsReturnDialogOpen(false);
         } catch (e) { setIsProcessing(false); }
     };
