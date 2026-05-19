@@ -32,21 +32,20 @@ export function MoodTracker() {
     const [isSaving, setIsSaving] = useState(false);
 
     const handleUpdate = async () => {
-        if (!firestore || !user?.currentCompanyId) return;
+        const tenantId = user?.currentCompanyId;
+        if (!firestore || !tenantId) return;
+        
         setIsSaving(true);
         try {
-            const tenantId = user.currentCompanyId;
             const userRef = doc(firestore, getTenantPath(`users/${user.id}`, tenantId));
             const postPath = getTenantPath(`hub_posts`, tenantId);
             
-            // 1. تحديث حالة الموظف
             await updateDoc(userRef, {
                 currentMood: selectedMood,
                 currentFocus: focus,
                 updatedAt: serverTimestamp()
             });
 
-            // 2. نشر تحديث للحائط
             if (focus.trim()) {
                 await addDoc(collection(firestore, postPath), cleanFirestoreData({
                     userId: user.id,
@@ -62,18 +61,18 @@ export function MoodTracker() {
                 }));
             }
 
-            toast({ title: 'تم التحديث', description: 'تظهر حالتك الآن لجميع الزملاء.' });
+            toast({ title: 'تم التحديث', description: 'تظهر حالتك الآن لجميع الزملاء في الحائط الحي.' });
         } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث الحالة.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث النبض اليومي.' });
         } finally { setIsSaving(false); }
     };
 
     return (
-        <Card className="rounded-[3rem] border-none shadow-2xl bg-white/60 backdrop-blur-3xl overflow-hidden group hover:border-primary/20 transition-all duration-500 border-4 border-white">
+        <Card className="rounded-[3rem] border-none shadow-2xl bg-white/60 backdrop-blur-3xl overflow-hidden group hover:border-primary/20 transition-all duration-500 border-4 border-white active-glow">
             <CardContent className="p-10 space-y-10">
                 <div className="flex flex-col xl:flex-row justify-between items-center gap-12">
                     <div className="space-y-4 text-center xl:text-right shrink-0">
-                        <Label className="font-black text-xs text-slate-400 uppercase tracking-[0.3em] mr-2 block">Mood Pulse</Label>
+                        <Label className="font-black text-xs text-slate-400 uppercase tracking-[0.3em] mr-2 block">Mood Pulse / نبض الحالة</Label>
                         <div className="flex flex-wrap justify-center gap-5">
                             {moods.map((m) => (
                                 <button
@@ -96,22 +95,22 @@ export function MoodTracker() {
 
                     <div className="flex-1 w-full space-y-4">
                         <div className="flex justify-between items-end pr-2">
-                            <Label className="font-black text-xs text-primary uppercase tracking-[0.3em] flex items-center gap-2">
-                                <Target className="h-4 w-4 animate-spin-slow" /> What is your focus today?
+                            <Label className="font-black text-xs text-[#FF7A00] uppercase tracking-[0.3em] flex items-center gap-2">
+                                <Target className="h-4 w-4 animate-spin-slow" /> ماهو عنوان تركيزك اليوم؟
                             </Label>
-                            {focus.length > 0 && <Badge className="bg-primary/10 text-primary border-none text-[8px] font-black h-4 px-2">+5 Points</Badge>}
+                            {focus.length > 0 && <Badge className="bg-orange-500/10 text-[#FF7A00] border-none text-[8px] font-black h-4 px-2">+5 Points</Badge>}
                         </div>
-                        <div className="flex gap-4 bg-white p-2 rounded-[2.2rem] border-4 border-slate-50 shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)] group-focus-within:border-primary/20 transition-all duration-500 group-focus-within:shadow-xl">
+                        <div className="flex gap-4 bg-white p-2 rounded-[2.2rem] border-4 border-slate-50 shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)] group-focus-within:border-orange-500/20 transition-all duration-500 group-focus-within:shadow-xl">
                             <Input 
                                 value={focus} 
                                 onChange={e => setFocus(e.target.value)} 
-                                placeholder="اكتب عنواناً لمهمتك الأساسية اليوم..."
+                                placeholder="اكتب المهمة الكبرى التي تشغلك الآن..."
                                 className="h-14 rounded-2xl border-none shadow-none focus-visible:ring-0 font-black text-xl bg-transparent placeholder:text-slate-300 placeholder:italic"
                             />
                             <Button 
                                 onClick={handleUpdate} 
                                 disabled={isSaving} 
-                                className="h-14 w-20 rounded-[1.5rem] font-black shadow-2xl shadow-primary/30 bg-[#FF7A00] hover:bg-[#E66D00] transition-all hover:scale-105 active:scale-90"
+                                className="h-14 w-20 rounded-[1.5rem] font-black shadow-2xl shadow-orange-500/30 bg-[#FF7A00] hover:bg-[#E66D00] transition-all hover:scale-105 active:scale-90"
                             >
                                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Send className="h-6 w-6 rotate-180" />}
                             </Button>

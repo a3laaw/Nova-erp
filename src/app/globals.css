@@ -6,25 +6,25 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100% / 0.45;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100% / 0.95;
-    --popover-foreground: 222 47% 11%;
-    --primary: 22 100% 50%; /* برتقالي ملكي #FF5C00 */
+    --background: 40 100% 98%; /* الكريمي الدافئ #FFFDF0 */
+    --foreground: 240 60% 10%;
+    --card: 0 0% 100% / 0.8;
+    --card-foreground: 240 60% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 60% 10%;
+    --primary: 29 100% 50%; /* البرتقالي الملكي #FF7A00 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 215 25% 27%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 22 100% 50% / 0.1;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 22 100% 50%;
+    --secondary: 240 10% 96%;
+    --secondary-foreground: 240 60% 10%;
+    --muted: 240 10% 96%;
+    --muted-foreground: 240 5% 45%;
+    --accent: 29 100% 50% / 0.1;
+    --accent-foreground: 29 100% 50%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 29 100% 90%;
+    --input: 29 100% 95%;
+    --ring: 29 100% 50%;
     --radius: 2.5rem;
   }
 }
@@ -32,7 +32,7 @@
 @layer base {
   * { @apply border-border; }
   body {
-    background: linear-gradient(135deg, #FFFDF0 0%, #FFFAF5 100%);
+    background: linear-gradient(135deg, #FFFDF0 0%, #FFF5E6 100%);
     background-attachment: fixed;
     color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
@@ -43,65 +43,50 @@
 
 @layer components {
   .glass-effect {
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
-  }
-
-  .nav-item-box {
-    background: linear-gradient(135deg, #FFB000 0%, #FF7A00 100%) !important;
-    @apply flex items-center gap-4 p-4 rounded-[1.5rem] text-white transition-all duration-300 border-none w-full shadow-md;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 122, 0, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
   }
   
-  .nav-item-box svg {
-    @apply text-white size-6 shrink-0 transition-all duration-300;
+  .nav-item-box {
+    @apply flex items-center gap-4 p-4 rounded-[1.8rem] transition-all duration-300;
   }
 
-  .nav-item-box:hover, 
   .nav-item-box-active {
-    background: #FFFFFF !important;
-    color: #000000 !important;
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.15) !important;
-    @apply scale-[1.02] ring-0 !important;
-  }
-
-  .nav-item-box:hover svg,
-  .nav-item-box-active svg {
-    color: #000000 !important;
-    @apply scale-110 !important;
-  }
-
-  .sidebar-no-offset {
-    @apply pr-0 mr-0 ml-0 pl-0 border-none !important;
+    background: #FF7A00 !important;
+    color: white !important;
+    box-shadow: 0 10px 30px -5px rgba(255, 122, 0, 0.4) !important;
+    @apply scale-[1.02];
   }
 
   .glass-3d-button {
-    @apply bg-gradient-to-br from-[#FFB000] to-[#FF7A00] border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 transition-all shadow-xl shadow-orange-500/20;
+    background: linear-gradient(135deg, #FFB000 0%, #FF7A00 100%);
+    @apply border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 transition-all shadow-xl shadow-orange-500/20 text-white font-black;
   }
   
-  /* ✨ الحيوية البصرية الحية (Vibrant Nova Effects) ✨ */
   .active-glow {
-    box-shadow: 0 0 25px rgba(255, 122, 0, 0.15);
-  }
-  
-  @keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
-    100% { transform: translateY(0px); }
+    box-shadow: 0 0 20px rgba(255, 122, 0, 0.2);
   }
   
   .animate-float {
     animation: float 3s ease-in-out infinite;
   }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
 }
 
-/* 🛡️ تحرير القوائم المنسدلة للتعامل مع الماوس 🛡️ */
-[data-radix-popper-content-wrapper],
-[role="listbox"],
-[role="menu"],
-[role="dialog"] {
+/* 🛡️ تحسين القوائم المنسدلة للتعامل مع الماوس 🛡️ */
+[data-radix-popper-content-wrapper] {
   z-index: 999999 !important;
+  pointer-events: auto !important;
+}
+
+[role="listbox"], [role="menu"], [role="dialog"] {
   pointer-events: auto !important;
 }
 
