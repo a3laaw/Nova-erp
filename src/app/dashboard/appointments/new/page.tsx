@@ -29,7 +29,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateInput } from '@/components/ui/date-input';
-import { getTenantPath } from '@/lib/utils';
+import { getTenantPath, cleanFirestoreData } from '@/lib/utils';
 
 export default function NewArchitecturalAppointmentPage() {
     const router = useRouter();
@@ -223,6 +223,7 @@ export default function NewArchitecturalAppointmentPage() {
 
         setIsSaving(true);
         try {
+            const batch = writeBatch(firestore);
             const apptsPath = getTenantPath('appointments', tenantId);
             const [hours, minutes] = time.split(':').map(Number);
             const appointmentDateTime = new Date(date);
@@ -271,6 +272,7 @@ export default function NewArchitecturalAppointmentPage() {
                 title, notes,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 createdAt: serverTimestamp(),
+                createdBy: currentUser.id, // 🛡️ تعقب المنشئ
                 type: 'architectural',
                 status: 'scheduled',
                 companyId: tenantId
@@ -283,12 +285,24 @@ export default function NewArchitecturalAppointmentPage() {
                 newAppointmentData.clientId = clientId;
             }
 
-            const newApptRef = await addDoc(collection(firestore, apptsPath), newAppointmentData);
+            const newApptRef = doc(collection(firestore, apptsPath));
+            batch.set(newApptRef, cleanFirestoreData(newAppointmentData));
             
+            // 🛡️ توثيق الحجز في سجل التدقيق
+            const auditRef = doc(collection(newApptRef, 'auditLogs'));
+            batch.set(auditRef, {
+                action: 'created',
+                details: `تم إنشاء الموعد بواسطة ${currentUser.fullName}.`,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
+
             const fromAppointmentId = searchParams.get('fromAppointmentId');
             if (fromAppointmentId && !isNewClient) {
                 const appointmentRef = doc(firestore, apptsPath, fromAppointmentId);
-                await updateDoc(appointmentRef, { clientId: clientId, clientName: deleteField(), clientMobile: deleteField() });
+                batch.update(appointmentRef, { clientId: clientId, clientName: deleteField(), clientMobile: deleteField() });
             }
 
             if (!isNewClient && clientId) {
@@ -303,9 +317,10 @@ export default function NewArchitecturalAppointmentPage() {
                     createdAt: serverTimestamp(),
                     companyId: tenantId
                 };
-                await addDoc(collection(firestore, historyPath), logData);
+                batch.set(doc(collection(firestore, historyPath)), logData);
             }
 
+            await batch.commit();
             toast({ title: 'نجاح', description: 'تم إنشاء الموعد بنجاح.' });
             
             const client = clients.find(c => c.id === clientId);

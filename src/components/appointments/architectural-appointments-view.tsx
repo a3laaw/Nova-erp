@@ -32,7 +32,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, MousePointer2, MoreHorizontal } from 'lucide-react';
-import { cn, getTenantPath } from '@/lib/utils';
+import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
@@ -309,15 +309,33 @@ export function ArchitecturalAppointmentsView() {
             }
 
             try {
+                const batch = writeBatch(firestore);
                 const apptPath = getTenantPath('appointments', tenantId);
                 const apptRef = doc(firestore, apptPath, apptId);
                 const apptToMove = rawAppointments.find(a => a.id === apptId);
 
-                await updateDoc(apptRef, {
+                const oldDate = toFirestoreDate(apptToMove?.appointmentDate);
+                const oldTime = oldDate ? format(oldDate, 'HH:mm') : '---';
+
+                batch.update(apptRef, {
                     engineerId: targetEngineerId,
                     appointmentDate: Timestamp.fromDate(newDateTime),
-                    updatedAt: serverTimestamp()
+                    updatedAt: serverTimestamp(),
+                    updatedBy: currentUser?.id
                 });
+
+                // 🛡️ توثيق حركة الإزاحة في سجل التدقيق
+                const auditRef = doc(collection(apptRef, 'auditLogs'));
+                batch.set(auditRef, {
+                    action: 'rescheduled',
+                    details: `تمت إزاحة الموعد من الساعة ${oldTime} إلى ${targetTime} بواسطة ${currentUser?.fullName}.`,
+                    userName: currentUser?.fullName,
+                    userAvatar: currentUser?.avatarUrl,
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
+                });
+
+                await batch.commit();
 
                 if (apptToMove?.clientId || apptToMove?.clientMobile) {
                     await reconcileClientAppointments(firestore, tenantId, { 
@@ -364,8 +382,28 @@ export function ArchitecturalAppointmentsView() {
     const handleCancelBooking = async () => {
         if (!appointmentToDelete || !firestore || !tenantId) return;
         try {
+            const batch = writeBatch(firestore);
             const apptPath = getTenantPath('appointments', tenantId);
-            await updateDoc(doc(firestore, apptPath, appointmentToDelete.id!), { status: 'cancelled' });
+            const apptRef = doc(firestore, apptPath, appointmentToDelete.id!);
+
+            batch.update(apptRef, { 
+                status: 'cancelled',
+                updatedBy: currentUser?.id,
+                updatedAt: serverTimestamp()
+            });
+
+            // 🛡️ توثيق الإلغاء في سجل التدقيق
+            const auditRef = doc(collection(apptRef, 'auditLogs'));
+            batch.set(auditRef, {
+                action: 'cancelled',
+                details: `قام ${currentUser?.fullName} بإلغاء الموعد.`,
+                userName: currentUser?.fullName,
+                userAvatar: currentUser?.avatarUrl,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
+
+            await batch.commit();
             await reconcileClientAppointments(firestore, tenantId, { clientId: appointmentToDelete.clientId, clientMobile: appointmentToDelete.clientMobile });
             toast({ title: 'تم الإلغاء' });
             fetchAppointments(date!);
@@ -520,21 +558,55 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         if (!tenantId || !apptDate) return;
         setIsSaving(true);
         try {
+            const batch = writeBatch(firestore);
             const apptsPath = getTenantPath('appointments', tenantId);
+
             if (isPast(apptDate) && currentUser?.role !== 'Admin') {
                 toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن حجز موعد في الماضي.'});
                 setIsSaving(false); return;
             }
+
+            const newApptRef = doc(collection(firestore, apptsPath));
+            const dataToSave: any = { 
+                title: title || (isNewClient ? newClientName : clients.find((c: any) => c.id === selectedClientId)?.nameAr), 
+                engineerId: dialogData.engineerId, 
+                appointmentDate: Timestamp.fromDate(apptDate), 
+                type: 'architectural', 
+                status: 'scheduled', 
+                createdAt: serverTimestamp(), 
+                createdBy: currentUser.id,
+                workStageUpdated: false, 
+                companyId: tenantId 
+            };
+
             if (isNewClient) {
-                await addDoc(collection(firestore, apptsPath), { title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile, engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(apptDate), type: 'architectural', status: 'scheduled', visitCount: 1, color: '#facc15', createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId });
+                dataToSave.clientName = newClientName;
+                dataToSave.clientMobile = newClientMobile;
+                dataToSave.visitCount = 1;
+                dataToSave.color = '#facc15';
             } else {
                 const client = clients.find((c: any) => c.id === selectedClientId);
-                const batch = writeBatch(firestore);
                 const snap = await getDocs(query(collection(firestore, apptsPath), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'), where('status', '!=', 'cancelled')));
                 const visitCount = snap.size + 1;
-                batch.set(doc(collection(firestore, apptsPath)), { clientId: selectedClientId, engineerId: dialogData.engineerId, title: title || client.nameAr, appointmentDate: Timestamp.fromDate(apptDate), type: 'architectural', status: 'scheduled', visitCount, color: getVisitColor({ visitCount, contractSigned: client.status !== 'new' }), createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId });
-                await batch.commit();
+                dataToSave.clientId = selectedClientId;
+                dataToSave.visitCount = visitCount;
+                dataToSave.color = getVisitColor({ visitCount, contractSigned: client.status !== 'new' });
             }
+
+            batch.set(newApptRef, dataToSave);
+
+            // 🛡️ توثيق الحجز في سجل التدقيق
+            const auditRef = doc(collection(newApptRef, 'auditLogs'));
+            batch.set(auditRef, {
+                action: 'created',
+                details: `تم إنشاء الموعد بواسطة ${currentUser.fullName}.`,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
+
+            await batch.commit();
             toast({ title: 'تم الحجز بنجاح' });
             onSaveSuccess(); onClose();
         } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الحجز' }); } finally { setIsSaving(false); }

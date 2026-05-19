@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
-import type { Appointment, Client, WorkStage, ClientTransaction } from '@/lib/types';
+import type { Appointment, Client, WorkStage, ClientTransaction, AppointmentAuditLog } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Link2, Plus, ShieldCheck, UserPlus, FileText, Target } from 'lucide-react';
+import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Link2, Plus, ShieldCheck, UserPlus, FileText, Target, History } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -22,11 +22,12 @@ import { formatCurrency, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 /**
  * غرفة العمليات الميدانية (Sovereign Visit Control):
- * هذا هو "عقل الميدان" الذي يربط إنجاز المهندس بالدورة المستندية والمالية.
- * تم إصلاح التعارض عند تحويل عميل محتمل لضمان اختفاء التنبيه فور الربط.
+ * تم إضافة "سجل التدقيق التاريخي" لمعرفة من حجز الموعد ومن عدله.
  */
 export default function AppointmentDetailsPage() {
     const params = useParams();
@@ -38,9 +39,17 @@ export default function AppointmentDetailsPage() {
 
     const tenantId = currentUser?.currentCompanyId;
 
-    const { data: appointment, loading: apptLoading } = useDocument<Appointment>(firestore, id ? `appointments/${id}` : null);
+    const apptPath = useMemo(() => id ? `appointments/${id}` : null, [id]);
+    const { data: appointment, loading: apptLoading } = useDocument<Appointment>(firestore, apptPath);
     
-    // 🛡️ الربط اللحظي: جلب بيانات العميل بمجرد توفر الـ clientId
+    // جلب سجل التدقيق للموعد
+    const auditPath = useMemo(() => id ? `appointments/${id}/auditLogs` : null, [id]);
+    const { data: auditLogs, loading: auditLoading } = useSubscription<AppointmentAuditLog>(
+        firestore, 
+        auditPath, 
+        [orderBy('createdAt', 'desc')]
+    );
+
     const clientPath = useMemo(() => appointment?.clientId ? `clients/${appointment.clientId}` : null, [appointment?.clientId]);
     const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
     
@@ -83,7 +92,7 @@ export default function AppointmentDetailsPage() {
         try {
             const batch = writeBatch(firestore);
             const txPath = getTenantPath(`clients/${appointment.clientId}/transactions/${appointment.transactionId}`, tenantId);
-            const apptPath = getTenantPath(`appointments/${appointment.id}`, tenantId);
+            const finalApptPath = getTenantPath(`appointments/${appointment.id}`, tenantId);
             
             const txRef = doc(firestore, txPath);
             
@@ -127,10 +136,24 @@ export default function AppointmentDetailsPage() {
                 });
             }
 
-            batch.update(doc(firestore, apptPath), { 
+            const apptRef = doc(firestore, finalApptPath);
+            batch.update(apptRef, { 
                 workStageUpdated: true, 
                 notes, 
-                actualCompletionDate: serverTimestamp() 
+                actualCompletionDate: serverTimestamp(),
+                updatedBy: currentUser.id,
+                updatedAt: serverTimestamp()
+            });
+
+            // 🛡️ توثيق إغلاق الزيارة في سجل التدقيق
+            const auditRef = doc(collection(apptRef, 'auditLogs'));
+            batch.set(auditRef, {
+                action: 'confirmed',
+                details: `قام المهندس ${currentUser.fullName} بتوثيق إنجاز مرحلة "${stageTemplate?.name}" وإغلاق الزيارة.`,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
             });
 
             await batch.commit();
@@ -169,100 +192,160 @@ export default function AppointmentDetailsPage() {
                     </div>
                 </CardHeader>
 
-                <CardContent className="p-10 space-y-10">
-                    <div className="grid grid-cols-2 gap-8">
-                        <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
-                            <Label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">تاريخ الموعد</Label>
-                            <p className="font-black text-lg text-slate-800 flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-primary" />
-                                {apptDate ? format(apptDate, 'eeee, dd MMMM', { locale: ar }) : '-'}
-                            </p>
-                        </div>
-                        <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
-                            <Label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">وقت الزيارة</Label>
-                            <p className="font-black text-2xl font-mono text-primary flex items-center gap-2">
-                                <Clock className="h-4 w-4" />
-                                {apptDate ? format(apptDate, 'HH:mm', { locale: ar }) : '-'}
-                            </p>
-                        </div>
-                    </div>
+                <CardContent className="p-0">
+                    <Tabs defaultValue="actions" dir="rtl">
+                        <TabsList className="w-full h-14 bg-muted/20 border-b p-0 rounded-none">
+                            <TabsTrigger value="actions" className="flex-1 h-full font-black text-xs gap-2 rounded-none data-[state=active]:bg-white">
+                                <Save className="h-4 w-4" /> تنفيذ الإجراءات
+                            </TabsTrigger>
+                            <TabsTrigger value="audit" className="flex-1 h-full font-black text-xs gap-2 rounded-none data-[state=active]:bg-white">
+                                <History className="h-4 w-4" /> سجل التدقيق والأرشفة
+                            </TabsTrigger>
+                        </TabsList>
 
-                    <Separator />
+                        <div className="p-10 space-y-10">
+                            <TabsContent value="actions" className="m-0 space-y-10">
+                                <div className="grid grid-cols-2 gap-8">
+                                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
+                                        <Label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">تاريخ الموعد</Label>
+                                        <p className="font-black text-lg text-slate-800 flex items-center gap-2">
+                                            <Calendar className="h-4 w-4 text-primary" />
+                                            {apptDate ? format(apptDate, 'eeee, dd MMMM', { locale: ar }) : '-'}
+                                        </p>
+                                    </div>
+                                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
+                                        <Label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">وقت الزيارة</Label>
+                                        <p className="font-black text-2xl font-mono text-primary flex items-center gap-2">
+                                            <Clock className="h-4 w-4" />
+                                            {apptDate ? format(apptDate, 'HH:mm', { locale: ar }) : '-'}
+                                        </p>
+                                    </div>
+                                </div>
 
-                    {!appointment.workStageUpdated && appointment.transactionId ? (
-                        <div className="p-8 border-4 border-dashed border-primary/20 bg-primary/5 rounded-[2.5rem] space-y-6 animate-in zoom-in-95 duration-500">
-                            <h3 className="font-black text-primary flex items-center gap-3 text-xl">
-                                <Workflow className="h-6 w-6 animate-pulse"/> 
-                                توثيق إنجاز الأعمال (WBS)
-                            </h3>
-                            <div className="grid gap-3">
-                                <Label className="font-black text-slate-700 pr-2">ما هي المرحلة التي تم إكمالها؟ *</Label>
-                                <InlineSearchList 
-                                    value={selectedStageId} 
-                                    onSelect={setSelectedStageId} 
-                                    options={workStages.map(s => ({ value: s.id!, label: s.name }))} 
-                                    placeholder="ابحث عن مرحلة الإنجاز المخططة..." 
-                                    className="h-12 bg-white rounded-2xl border-2"
-                                />
-                            </div>
-                            <div className="grid gap-3">
-                                <Label className="font-black text-slate-700 pr-2">محضر الاجتماع / الملاحظات الفنية</Label>
-                                <Textarea 
-                                    value={notes} 
-                                    onChange={e => setNotes(e.target.value)} 
-                                    placeholder="اكتب هنا ما تم الاتفاق عليه ليتم إدراجه في سجل العميل..." 
-                                    rows={5}
-                                    className="rounded-3xl border-2 bg-white p-6 shadow-inner"
-                                />
-                            </div>
-                            <Button 
-                                onClick={handleUpdateVisitStatus} 
-                                disabled={isSaving || !selectedStageId} 
-                                className="w-full h-14 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/30"
-                            >
-                                {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <ShieldCheck className="h-6 w-6" />}
-                                اعتماد الإنجاز وتفعيل المالية
-                            </Button>
-                        </div>
-                    ) : appointment.workStageUpdated ? (
-                        <Alert className="bg-green-50 border-green-200 rounded-[2rem] py-8 shadow-xl">
-                            <Check className="h-8 w-8 text-green-600"/>
-                            <AlertTitle className="text-green-800 font-black text-2xl mb-2">تم توثيق الزيارة بنجاح</AlertTitle>
-                            <AlertDescription className="text-green-700 font-bold text-lg">
-                                تم إغلاق ملف الزيارة، تحديث سجل العميل التاريخي، وتفعيل الدفعات المالية المرتبطة آلياً.
-                            </AlertDescription>
-                        </Alert>
-                    ) : (
-                        <div className="space-y-6">
-                            <Alert variant="destructive" className="rounded-[2rem] border-4 border-dashed border-red-200 py-8 bg-red-50/50">
-                                <AlertCircle className="h-8 w-8 text-red-600"/>
-                                <AlertTitle className="text-red-900 font-black text-2xl mb-2">إجراء مطلوب للربط</AlertTitle>
-                                <AlertDescription className="text-red-800 font-bold text-lg leading-relaxed">
-                                    {isProspective 
-                                        ? "هذا الشخص (عميل محتمل)؛ يجب تحويله لملف رسمي لتمكين إدارة معاملاته وتفعيل الدفعات المالية."
-                                        : "يرجى ربط هذه الزيارة بإحدى المعاملات المفتوحة لهذا العميل لتتمكن من تحديث مراحل الإنجاز."}
-                                </AlertDescription>
-                            </Alert>
-                            
-                            <div className="flex flex-col gap-4">
-                                {isProspective ? (
-                                    <Button asChild className="h-16 rounded-[2rem] font-black text-2xl gap-4 shadow-2xl bg-[#FF7A00] text-white">
-                                        <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName || '')}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&fromAppointmentId=${appointment.id}&engineerId=${appointment.engineerId}`}>
-                                            <UserPlus className="h-8 w-8" />
-                                            تحويل لملف عميل رسمي الآن
-                                        </Link>
-                                    </Button>
+                                <Separator />
+
+                                {!appointment.workStageUpdated && appointment.transactionId ? (
+                                    <div className="p-8 border-4 border-dashed border-primary/20 bg-primary/5 rounded-[2.5rem] space-y-6 animate-in zoom-in-95 duration-500">
+                                        <h3 className="font-black text-primary flex items-center gap-3 text-xl">
+                                            <Workflow className="h-6 w-6 animate-pulse"/> 
+                                            توثيق إنجاز الأعمال (WBS)
+                                        </h3>
+                                        <div className="grid gap-3">
+                                            <Label className="font-black text-slate-700 pr-2">ما هي المرحلة التي تم إكمالها؟ *</Label>
+                                            <InlineSearchList 
+                                                value={selectedStageId} 
+                                                onSelect={setSelectedStageId} 
+                                                options={workStages.map(s => ({ value: s.id!, label: s.name }))} 
+                                                placeholder="ابحث عن مرحلة الإنجاز المخططة..." 
+                                                className="h-12 bg-white rounded-2xl border-2"
+                                            />
+                                        </div>
+                                        <div className="grid gap-3">
+                                            <Label className="font-black text-slate-700 pr-2">محضر الاجتماع / الملاحظات الفنية</Label>
+                                            <Textarea 
+                                                value={notes} 
+                                                onChange={e => setNotes(e.target.value)} 
+                                                placeholder="اكتب هنا ما تم الاتفاق عليه ليتم إدراجه في سجل العميل..." 
+                                                rows={5}
+                                                className="rounded-3xl border-2 bg-white p-6 shadow-inner"
+                                            />
+                                        </div>
+                                        <Button 
+                                            onClick={handleUpdateVisitStatus} 
+                                            disabled={isSaving || !selectedStageId} 
+                                            className="w-full h-14 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/30"
+                                        >
+                                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <ShieldCheck className="h-6 w-6" />}
+                                            اعتماد الإنجاز وتفعيل المالية
+                                        </Button>
+                                    </div>
+                                ) : appointment.workStageUpdated ? (
+                                    <Alert className="bg-green-50 border-green-200 rounded-[2rem] py-8 shadow-xl">
+                                        <Check className="h-8 w-8 text-green-600"/>
+                                        <AlertTitle className="text-green-800 font-black text-2xl mb-2">تم توثيق الزيارة بنجاح</AlertTitle>
+                                        <AlertDescription className="text-green-700 font-bold text-lg">
+                                            تم إغلاق ملف الزيارة، تحديث سجل العميل التاريخي، وتفعيل الدفعات المالية المرتبطة آلياً.
+                                        </AlertDescription>
+                                    </Alert>
                                 ) : (
-                                    <Button asChild variant="outline" className="h-16 rounded-[2rem] font-black text-2xl gap-4 border-4 border-primary text-primary hover:bg-primary/5 shadow-xl">
-                                        <Link href={`/dashboard/clients/${appointment.clientId}`}>
-                                            <Link2 className="h-8 w-8" />
-                                            ربط الزيارة بمعاملة حالية
-                                        </Link>
-                                    </Button>
+                                    <div className="space-y-6">
+                                        <Alert variant="destructive" className="rounded-[2rem] border-4 border-dashed border-red-200 py-8 bg-red-50/50">
+                                            <AlertCircle className="h-8 w-8 text-red-600"/>
+                                            <AlertTitle className="text-red-900 font-black text-2xl mb-2">إجراء مطلوب للربط</AlertTitle>
+                                            <AlertDescription className="text-red-800 font-bold text-lg leading-relaxed">
+                                                {isProspective 
+                                                    ? "هذا الشخص (عميل محمول)؛ يجب تحويله لملف رسمي لتمكين إدارة معاملاته وتفعيل الدفعات المالية."
+                                                    : "يرجى ربط هذه الزيارة بإحدى المعاملات المفتوحة لهذا العميل لتتمكن من تحديث مراحل الإنجاز."}
+                                            </AlertDescription>
+                                        </Alert>
+                                        
+                                        <div className="flex flex-col gap-4">
+                                            {isProspective ? (
+                                                <Button asChild className="h-16 rounded-[2rem] font-black text-2xl gap-4 shadow-2xl bg-[#FF7A00] text-white">
+                                                    <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName || '')}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&fromAppointmentId=${appointment.id}&engineerId=${appointment.engineerId}`}>
+                                                        <UserPlus className="h-8 w-8" />
+                                                        تحويل لملف عميل رسمي الآن
+                                                    </Link>
+                                                </Button>
+                                            ) : (
+                                                <Button asChild variant="outline" className="h-16 rounded-[2rem] font-black text-2xl gap-4 border-4 border-primary text-primary hover:bg-primary/5 shadow-xl">
+                                                    <Link href={`/dashboard/clients/${appointment.clientId}`}>
+                                                        <Link2 className="h-8 w-8" />
+                                                        ربط الزيارة بمعاملة حالية
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
                                 )}
-                            </div>
+                            </TabsContent>
+
+                            <TabsContent value="audit" className="m-0 space-y-6">
+                                <div className="space-y-4">
+                                    <h3 className="font-black text-slate-800 flex items-center gap-2">
+                                        <History className="h-5 w-5 text-primary" /> سجل حركات الموعد والأرشفة
+                                    </h3>
+                                    
+                                    {auditLoading ? (
+                                        <div className="space-y-3">
+                                            <Skeleton className="h-16 w-full rounded-2xl" />
+                                            <Skeleton className="h-16 w-full rounded-2xl" />
+                                        </div>
+                                    ) : auditLogs.length === 0 ? (
+                                        <div className="p-10 text-center opacity-30 italic font-bold">لا يوجد سجل حركات موثق لهذا الموعد.</div>
+                                    ) : (
+                                        <div className="relative pr-6 border-r-2 border-slate-100 space-y-8">
+                                            {auditLogs.map((log) => (
+                                                <div key={log.id} className="relative flex items-start gap-4">
+                                                    <div className="absolute -right-[1.85rem] top-1 p-1 bg-white rounded-full border-2 shadow-sm">
+                                                        <div className="h-3 w-3 rounded-full bg-primary" />
+                                                    </div>
+                                                    <div className="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner group">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <Avatar className="h-6 w-6 border-2 border-white shadow-sm">
+                                                                    <AvatarImage src={log.userAvatar} />
+                                                                    <AvatarFallback className="text-[8px] font-black bg-primary/10 text-primary">{log.userName?.charAt(0)}</AvatarFallback>
+                                                                </Avatar>
+                                                                <span className="font-black text-sm text-[#1e1b4b]">{log.userName}</span>
+                                                            </div>
+                                                            <span className="text-[10px] font-mono font-bold text-slate-400">
+                                                                {toFirestoreDate(log.createdAt) ? format(toFirestoreDate(log.createdAt)!, 'dd/MM HH:mm') : ''}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs font-bold text-slate-600 leading-relaxed">{log.details}</p>
+                                                        <div className="mt-2 flex justify-end">
+                                                            <Badge variant="outline" className="text-[8px] font-black uppercase bg-white/50">{log.action}</Badge>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </TabsContent>
                         </div>
-                    )}
+                    </Tabs>
                 </CardContent>
                 <CardFooter className="bg-muted/10 p-8 flex justify-between border-t">
                     <Button variant="ghost" onClick={() => router.back()} className="font-black gap-2 h-12 text-slate-500 rounded-2xl hover:bg-white">

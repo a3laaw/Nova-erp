@@ -6,6 +6,7 @@ export interface BaseEntity {
   createdAt?: Timestamp | any; 
   createdBy?: string;          
   updatedAt?: Timestamp | any;
+  updatedBy?: string;           // ✨ تم الإضافة لتعقب آخر مستخدم قام بالتعديل
 }
 
 export interface UserProfile extends BaseEntity {
@@ -19,13 +20,20 @@ export interface UserProfile extends BaseEntity {
   jobTitle?: string;
   avatarUrl?: string;
   bio?: string;
-  totalPoints?: number;         // ✨ رصيد النقاط التراكمي
-  currentMood?: string;         // ✨ الحالة المزاجية الحالية
-  currentFocus?: string;        // ✨ عنوان التركيز اليومي
+  totalPoints?: number;         
+  currentMood?: string;         
+  currentFocus?: string;        
   activatedAt?: Timestamp | any;
   isSuperAdmin?: boolean;
   currentCompanyId?: string;
   companyName?: string;
+}
+
+export interface AppointmentAuditLog extends BaseEntity {
+    action: 'created' | 'rescheduled' | 'updated' | 'cancelled' | 'confirmed';
+    details: string;
+    userName: string;
+    userAvatar?: string;
 }
 
 export interface HubPost extends BaseEntity {
@@ -38,7 +46,7 @@ export interface HubPost extends BaseEntity {
     votesCount: number;
     voters?: string[];
     pointsAwarded: number;
-    metadata?: any; // للتخزين الإضافي مثل ID المشروع المرتبط
+    metadata?: any; 
 }
 
 export interface PointsLedgerEntry extends BaseEntity {
@@ -46,8 +54,8 @@ export interface PointsLedgerEntry extends BaseEntity {
     source: 'kudos_received' | 'idea_posted' | 'vote_received' | 'task_completed' | 'system_reward';
     points: number;
     description: string;
-    referenceId?: string; // ID المنشور أو المشروع المرتبط
-    periodKey: string; // yyyy-ww (للحصر الأسبوعي) أو yyyy-mm (للشهري)
+    referenceId?: string; 
+    periodKey: string; 
 }
 
 export interface LeaveRequest extends BaseEntity {

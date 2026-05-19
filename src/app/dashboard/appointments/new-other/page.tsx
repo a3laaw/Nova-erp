@@ -23,7 +23,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Save, X, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, Timestamp, doc, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client, Department } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
@@ -35,7 +35,7 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DateInput } from '@/components/ui/date-input';
-import { getTenantPath } from '@/lib/utils';
+import { getTenantPath, cleanFirestoreData } from '@/lib/utils';
 
 const meetingRooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
@@ -222,6 +222,7 @@ export default function NewOtherAppointmentPage() {
 
         setIsSaving(true);
         try {
+            const batch = writeBatch(firestore);
             const apptsPath = getTenantPath('appointments', tenantId);
             const [hours, minutes] = time.split(':').map(Number);
             const appointmentDateTime = new Date(date);
@@ -283,12 +284,25 @@ export default function NewOtherAppointmentPage() {
                 meetingRoom: meetingRoom,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 createdAt: serverTimestamp(),
+                createdBy: currentUser.id, // 🛡️ تعقب المنشئ
                 type: 'room' as const,
                 department: departments.find(d => d.id === selectedDepartment)?.name,
                 companyId: tenantId
             };
             
-            const newApptRef = await addDoc(collection(firestore, apptsPath), newAppointment);
+            const newApptRef = doc(collection(firestore, apptsPath));
+            batch.set(newApptRef, cleanFirestoreData(newAppointment));
+
+            // 🛡️ توثيق الحجز في سجل التدقيق
+            const auditRef = doc(collection(newApptRef, 'auditLogs'));
+            batch.set(auditRef, {
+                action: 'created',
+                details: `تم حجز القاعة "${meetingRoom}" بواسطة ${currentUser.fullName}.`,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
 
             const historyPath = getTenantPath(`clients/${clientId}/history`, tenantId);
             const logContent = `قام ${currentUser.fullName} بحجز "${meetingRoom}" لموعد بعنوان "${title}" بتاريخ ${format(appointmentDateTime, "PPp", { locale: ar })}`;
@@ -301,8 +315,9 @@ export default function NewOtherAppointmentPage() {
                 createdAt: serverTimestamp(),
                 companyId: tenantId
             };
-            await addDoc(collection(firestore, historyPath), logData);
+            batch.set(doc(collection(firestore, historyPath)), logData);
 
+            await batch.commit();
             toast({ title: 'نجاح', description: 'تم إنشاء الموعد بنجاح.' });
             
             const client = clients.find(c => c.id === clientId);
