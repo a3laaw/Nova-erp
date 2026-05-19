@@ -110,7 +110,7 @@ export function MoodTracker() {
                             <Button 
                                 onClick={handleUpdate} 
                                 disabled={isSaving} 
-                                className="h-14 w-20 rounded-[1.5rem] font-black shadow-2xl shadow-orange-500/30 bg-[#FF7A00] hover:bg-[#E66D00] transition-all hover:scale-105 active:scale-90"
+                                className="h-14 w-20 rounded-[1.5rem] font-black shadow-2xl shadow-orange-500/30 bg-[#FF7A00] hover:bg-[#E66D00] transition-all hover:scale-105 active:scale-90 text-white"
                             >
                                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Send className="h-6 w-6 rotate-180" />}
                             </Button>

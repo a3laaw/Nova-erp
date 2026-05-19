@@ -132,7 +132,7 @@ function PostCard({ post, index }: { post: HubPost, index: number }) {
                         <div className="text-right space-y-1">
                             <p className="font-black text-[#1e1b4b] text-xl leading-tight tracking-tight group-hover:text-primary transition-colors">{post.userName}</p>
                             <p className="text-[10px] font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest">
-                                <Clock className="h-3 w-3 text-primary opacity-40" />
+                                <Clock className="h-3 w-3 text-[#FF7A00] opacity-40" />
                                 {formattedDate}
                             </p>
                         </div>
@@ -164,15 +164,15 @@ function PostCard({ post, index }: { post: HubPost, index: number }) {
                         className={cn(
                             "rounded-2xl px-8 h-14 font-black gap-4 transition-all duration-500 shadow-sm",
                             hasVoted 
-                                ? "bg-primary text-white shadow-2xl shadow-primary/40 scale-105" 
-                                : "bg-white border-2 border-slate-100 text-slate-400 hover:text-primary hover:border-primary/30 hover:bg-primary/5"
+                                ? "bg-[#FF7A00] text-white shadow-2xl shadow-orange-500/40 scale-105" 
+                                : "bg-white border-2 border-slate-100 text-slate-400 hover:text-[#FF7A00] hover:border-orange-500/30 hover:bg-orange-500/5"
                         )}
                     >
                         {isVoting ? <Loader2 className="h-5 w-5 animate-spin"/> : <ThumbsUp className={cn("h-6 w-6", hasVoted && "fill-white")} />}
                         <span className="text-xl font-mono tracking-tighter">{post.votesCount || 0}</span>
                     </Button>
                     
-                    <button className="flex items-center gap-3 text-slate-300 hover:text-primary transition-colors px-4 py-2 rounded-xl">
+                    <button className="flex items-center gap-3 text-slate-300 hover:text-[#FF7A00] transition-colors px-4 py-2 rounded-xl">
                         <MessageCircle className="h-5 w-5" />
                         <span className="text-xs font-black uppercase tracking-widest">Discussion</span>
                     </button>

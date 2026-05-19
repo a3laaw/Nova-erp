@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 /**
  * الحائط التفاعلي للموظف (Interactive Employee Hub):
  * تم إحكام الهوية البصرية لتكون "حية" و "ذهبية" تتناسب مع فخامة المنظومة.
+ * تم إصلاح تباين الألوان في الأزرار لضمان وضوح النص.
  */
 export default function EmployeeHubPage() {
     const { user } = useAuth();
@@ -30,35 +31,39 @@ export default function EmployeeHubPage() {
 
     return (
         <div className="space-y-8 pb-20 max-w-[1400px] mx-auto animate-in fade-in duration-1000" dir="rtl">
-            <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-[#1e1b4b] text-white relative group">
+            {/* 🛡️ الهيدر الرئيسي المحدث (The Sovereign Pulse Banner) 🛡️ */}
+            <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-[#2d2a77] to-[#1e1b4b] text-white relative group">
                 <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none" />
                 <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/20 rounded-full blur-[100px] animate-pulse" />
                 
                 <CardHeader className="pb-12 pt-12 px-12 relative z-10">
                     <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
-                        <div className="flex items-center gap-8">
+                        <div className="flex items-center gap-8 order-2 lg:order-1">
+                            {/* زر الشكر المحدث بوضوح فائق */}
+                            <Button 
+                                onClick={() => setIsKudosOpen(true)}
+                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-[#FF7A00] text-white shadow-[0_20px_50px_rgba(255,122,0,0.3)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-[#FF8A1F]"
+                            >
+                                <Heart className="h-8 w-8 fill-white text-white animate-pulse" />
+                                <span className="drop-shadow-sm">شكر زميل</span>
+                            </Button>
+                        </div>
+
+                        <div className="flex items-center gap-8 order-1 lg:order-2">
+                            <div className="text-right space-y-2">
+                                <CardTitle className="text-5xl font-black text-white tracking-tighter drop-shadow-2xl">نبض الإنجاز</CardTitle>
+                                <div className="flex items-center gap-3 justify-end">
+                                    <CardDescription className="text-indigo-100/80 font-bold text-xl leading-relaxed">قلب Nova ERP التفاعلي.. حيث تلتقي الأرقام بالإنسان.</CardDescription>
+                                    <div className="h-2 w-2 rounded-full bg-green-400 animate-ping" />
+                                </div>
+                            </div>
                             <div className="relative">
                                 <div className="p-6 bg-gradient-to-br from-[#FFB000] to-[#FF7A00] rounded-[2.5rem] shadow-[0_0_50px_rgba(255,122,0,0.3)] border-4 border-white/20 transform group-hover:rotate-6 transition-transform duration-500">
                                     <Sparkles className="h-12 w-12 text-white animate-pulse" />
                                 </div>
-                                <Badge className="absolute -top-2 -right-2 bg-white text-primary font-black px-3 py-1 border-none shadow-xl animate-bounce">LIVE</Badge>
-                            </div>
-                            <div className="text-right space-y-2">
-                                <CardTitle className="text-5xl font-black text-white tracking-tighter drop-shadow-2xl">نبض الإنجاز</CardTitle>
-                                <div className="flex items-center gap-3">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-ping" />
-                                    <CardDescription className="text-indigo-100/80 font-bold text-xl leading-relaxed">قلب Nova ERP التفاعلي.. حيث تلتقي الأرقام بالإنسان.</CardDescription>
-                                </div>
+                                <Badge className="absolute -top-3 -right-3 bg-white text-[#FF7A00] font-black px-3 py-1 border-none shadow-xl animate-bounce">LIVE</Badge>
                             </div>
                         </div>
-                        
-                        <Button 
-                            onClick={() => setIsKudosOpen(true)}
-                            className="h-16 px-12 rounded-[2rem] font-black text-2xl gap-4 bg-white text-primary shadow-[0_20px_50px_rgba(0,0,0,0.2)] hover:scale-105 active:scale-95 border-none transition-all duration-300"
-                        >
-                            <Heart className="h-8 w-8 fill-red-500 text-red-500" />
-                            شكر زميل
-                        </Button>
                     </div>
                 </CardHeader>
             </Card>
@@ -67,10 +72,11 @@ export default function EmployeeHubPage() {
                 <div className="lg:col-span-4 space-y-8 sticky top-24">
                     <Leaderboard />
                     
+                    {/* بطاقة الرصيد الذهبية */}
                     <Card className="rounded-[3rem] border-none shadow-2xl bg-white/40 backdrop-blur-3xl p-10 space-y-8 border border-white/60 relative overflow-hidden group">
                         <div className="flex items-center justify-between">
                             <h3 className="font-black text-2xl text-[#1e1b4b] flex items-center gap-3">
-                                <Zap className="text-orange-500 h-8 w-8 fill-orange-500/20" /> رصيد نقاطك
+                                <Zap className="text-[#FF7A00] h-8 w-8 fill-[#FF7A00]/20" /> رصيد نقاطك
                             </h3>
                             <div className="p-3 bg-orange-50 rounded-2xl text-orange-600 shadow-inner"><Trophy className="h-5 w-5"/></div>
                         </div>
