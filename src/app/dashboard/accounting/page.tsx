@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -97,7 +98,7 @@ export default function AccountingDashboardPage() {
                 <StatCard title="السيولة المتاحة" value={stats?.cashBalance || 0} icon={<Wallet className="h-5 w-5" />} description="الصناديق والبنوك" colorClass="bg-blue-100 text-blue-700" loading={loading} />
                 <StatCard title="مديونيات العملاء" value={stats?.totalAR || 0} icon={<ArrowDownLeft className="h-5 w-5" />} description="مبالغ بانتظار التحصيل" colorClass="bg-orange-100 text-orange-700" loading={loading} />
                 <StatCard title="صافي الأرباح" value={stats?.netProfit || 0} icon={<TrendingUp className="h-5 w-5" />} description="الإيرادات - المصروفات" colorClass="bg-green-100 text-green-700" loading={loading} />
-                <Card className="overflow-hidden border-none rounded-[2rem] bg-primary text-primary-foreground shadow-xl">
+                <Card className="overflow-hidden border-none rounded-[2rem] bg-[#1e1b4b] text-white shadow-xl">
                     <CardHeader className="p-6 pb-2">
                         <CardTitle className="text-[10px] font-black uppercase tracking-widest text-white/70">قيود بانتظار الترحيل</CardTitle>
                     </CardHeader>
@@ -111,7 +112,7 @@ export default function AccountingDashboardPage() {
             <div className="grid gap-8 md:grid-cols-2">
                 <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white/95 overflow-hidden">
                     <CardHeader className="border-b bg-muted/10 p-8">
-                        <CardTitle className="text-lg font-black flex items-center gap-3"><FileSpreadsheet className="text-primary h-5 w-5"/> القوائم المالية الرسمية (IFRS)</CardTitle>
+                        <CardTitle className="text-lg font-black flex items-center gap-3"><FileSpreadsheet className="text-[#FF7A00] h-5 w-5"/> القوائم المالية الرسمية (IFRS)</CardTitle>
                         <CardDescription>التقارير الختامية المعتمدة للمنشأة وفق المعايير الدولية.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-4 p-8">
@@ -124,7 +125,7 @@ export default function AccountingDashboardPage() {
 
                 <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white/95 overflow-hidden">
                     <CardHeader className="border-b bg-muted/10 p-8">
-                        <CardTitle className="text-lg font-black flex items-center gap-3"><ShieldCheck className="text-primary h-5 w-5"/> العمليات والتحصيل</CardTitle>
+                        <CardTitle className="text-lg font-black flex items-center gap-3"><ShieldCheck className="text-[#FF7A00] h-5 w-5"/> العمليات والتحصيل</CardTitle>
                         <CardDescription>إدارة الحسابات اليومية والرقابة على مديونيات العملاء.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-4 p-8">

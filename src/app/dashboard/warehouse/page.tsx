@@ -1,3 +1,4 @@
+
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -105,7 +106,7 @@ export default function WarehouseDashboardPage() {
                                 <CardTitle className="text-2xl font-black mt-8 text-slate-900 tracking-tight">{feature.title}</CardTitle>
                             </CardHeader>
                             <CardContent className="px-8 pb-8">
-                                <CardDescription className="text-sm font-bold text-slate-500 leading-loose min-h-[48px]">{feature.description}</CardDescription>
+                                <CardDescription className="text-sm font-bold text-slate-500 leading-relaxed min-h-[48px]">{feature.description}</CardDescription>
                             </CardContent>
                         </Card>
                     </Link>

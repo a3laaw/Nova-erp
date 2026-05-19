@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -22,7 +23,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * الحائط التفاعلي للموظف (Interactive Employee Hub):
- * تم تحويل الهيدر إلى البرتقالي الملكي (Nova Orange) بالكامل وإصلاح وضوح الأزرار.
+ * تم ترميم الزر ليكون بارزاً جداً بخلفية كحلية ونص أبيض (High Contrast).
  */
 export default function EmployeeHubPage() {
     const { user } = useAuth();
@@ -30,10 +31,9 @@ export default function EmployeeHubPage() {
 
     return (
         <div className="space-y-8 pb-20 max-w-[1400px] mx-auto animate-in fade-in duration-1000" dir="rtl">
-            {/* 🛡️ الهيدر الرئيسي المحدث (The Gilded Nova Banner) 🛡️ */}
+            {/* 🛡️ الهيدر الرئيسي المحدث بالهوية البرتقالية 🛡️ */}
             <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative group">
                 <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none" />
-                <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/20 rounded-full blur-[100px] animate-pulse" />
                 
                 <CardHeader className="pb-12 pt-12 px-12 relative z-10">
                     <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
@@ -41,9 +41,9 @@ export default function EmployeeHubPage() {
                             {/* 🌟 زر الشكر البارز والعائم (The Floating Action Button) 🌟 */}
                             <Button 
                                 onClick={() => setIsKudosOpen(true)}
-                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-white text-[#FF7A00] shadow-[0_25px_60px_-15px_rgba(255,122,0,0.5)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-white/90 animate-float"
+                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-[#1e1b4b] text-white shadow-[0_25px_60px_-15px_rgba(30,27,75,0.5)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-[#252261] animate-float"
                             >
-                                <Heart className="h-8 w-8 fill-[#FF7A00] text-[#FF7A00] animate-pulse" />
+                                <Heart className="h-8 w-8 fill-red-500 text-red-500 animate-pulse" />
                                 <span className="drop-shadow-sm">شكر زميل</span>
                             </Button>
                         </div>
@@ -71,7 +71,6 @@ export default function EmployeeHubPage() {
                 <div className="lg:col-span-4 space-y-8 sticky top-24">
                     <Leaderboard />
                     
-                    {/* بطاقة الرصيد الذهبية */}
                     <Card className="rounded-[3rem] border-none shadow-2xl bg-white/40 backdrop-blur-3xl p-10 space-y-8 border border-white/60 relative overflow-hidden group">
                         <div className="flex items-center justify-between">
                             <h3 className="font-black text-2xl text-[#1e1b4b] flex items-center gap-3">
@@ -90,28 +89,11 @@ export default function EmployeeHubPage() {
                                 <Sparkles className="h-10 w-10 text-[#FF7A00] animate-pulse" />
                             </div>
                         </div>
-                        <div className="flex items-center gap-3 p-4 bg-muted/10 rounded-2xl border-2 border-dashed border-slate-100">
-                            <Activity className="h-4 w-4 text-slate-400" />
-                            <p className="text-[11px] font-bold text-slate-500 leading-relaxed italic text-center">
-                                استبدل نقاطك بمكافآت عينية أو إجازات إضافية عبر الإدارة.
-                            </p>
-                        </div>
                     </Card>
                 </div>
 
                 <div className="lg:col-span-8 space-y-10">
                     <MoodTracker />
-                    
-                    <div className="flex items-center justify-between px-6">
-                        <div className="flex items-center gap-4">
-                            <div className="relative">
-                                <div className="h-3 w-3 rounded-full bg-green-500 animate-ping absolute inset-0" />
-                                <div className="h-3 w-3 rounded-full bg-green-500 relative" />
-                            </div>
-                            <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">نشاط المجتمع الحي</h3>
-                        </div>
-                    </div>
-
                     <InteractionsFeed />
                 </div>
             </div>
