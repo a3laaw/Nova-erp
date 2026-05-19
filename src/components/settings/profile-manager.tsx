@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -69,26 +68,28 @@ export function ProfileManager() {
         try {
             let finalAvatarUrl = formData.avatarUrl;
 
-            // 1. معالجة رفع الصورة إلى Storage مع رصد الأخطاء
+            // 1. معالجة رفع الصورة إلى Cloud Storage (فصل التخزين عن قاعدة البيانات)
             if (profileFile && storage) {
                 const storagePath = `companies/${tenantId || 'master'}/users/${user.id}/avatar_${Date.now()}`;
                 const storageRef = ref(storage, storagePath);
                 
                 try {
+                    // الرفع الفعلي للملف الخام إلى Storage
                     const uploadResult = await uploadBytes(storageRef, profileFile);
+                    // جلب الرابط العمومي للصورة المرفوعة
                     finalAvatarUrl = await getDownloadURL(uploadResult.ref);
                 } catch (storageErr: any) {
-                    // إذا فشل الرفع، نطلق خطأ سياقياً لنعرف السبب (مثلاً: قواعد الأمان)
+                    // رصد خطأ الصلاحيات في التخزين السحابي بدقة
                     errorEmitter.emit('permission-error', new FirestorePermissionError({
-                        path: storagePath,
+                        path: `[STORAGE] ${storagePath}`,
                         operation: 'write',
-                        requestResourceData: { fileName: profileFile.name, type: profileFile.type }
+                        requestResourceData: { fileName: profileFile.name, type: profileFile.type, size: profileFile.size }
                     }));
-                    throw new Error("فشل رفع الصورة؛ يرجى مراجعة قواعد أمان التخزين في كونسول جوجل.");
+                    throw new Error("فشل رفع الصورة؛ يرجى مراجعة قواعد أمان التخزين (Storage Rules).");
                 }
             }
 
-            // 2. تحديث بيانات الملف الشخصي في Firestore
+            // 2. تحديث سجل الموظف في قاعدة بيانات Firestore
             const isDev = user.role === 'Developer';
             const userPath = isDev ? `developers/${user.id}` : getTenantPath(`users/${user.id}`, tenantId);
             const userRef = doc(firestore, userPath);
@@ -104,6 +105,7 @@ export function ProfileManager() {
             const safeData = cleanFirestoreData(updateData);
 
             await updateDoc(userRef, safeData).catch(async (serverError) => {
+                // رصد خطأ الصلاحيات في قاعدة البيانات
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: userPath,
                     operation: 'update',
@@ -113,7 +115,7 @@ export function ProfileManager() {
             });
 
             await refreshToken();
-            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث ملفك الشخصي وهويتك البصرية.' });
+            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث ملفك المهني وهويتك البصرية.' });
             setProfileFile(null);
             setPreview(null);
             setFormData(prev => ({ ...prev, avatarUrl: finalAvatarUrl }));
