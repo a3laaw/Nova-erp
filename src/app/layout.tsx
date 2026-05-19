@@ -1,4 +1,3 @@
-
 import type { Metadata } from "next";
 import { Tajawal } from 'next/font/google';
 import { Providers } from './providers';
@@ -20,7 +19,7 @@ export const metadata: Metadata = {
 /**
  * الـ Root Layout الجذري:
  * تم تنظيفه تماماً من أي Hooks لضمان عدم حدوث خطأ AuthProvider.
- * تم إضافة مستمع أخطاء الـ Firebase لرصد أي رفض من القواعد الأمنية.
+ * يضم مستمع الأخطاء العالمي لرصد أي رفض من القواعد الأمنية فوراً.
  */
 export default function RootLayout({
   children,
