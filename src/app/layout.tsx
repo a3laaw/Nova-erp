@@ -16,11 +16,6 @@ export const metadata: Metadata = {
   description: "نظام إدارة الأعمال المتكامل",
 };
 
-/**
- * الـ Root Layout الجذري:
- * تم تنظيفه تماماً من أي Hooks لضمان عدم حدوث خطأ AuthProvider.
- * يضم مستمع الأخطاء العالمي لرصد أي رفض من القواعد الأمنية فوراً.
- */
 export default function RootLayout({
   children,
 }: Readonly<{

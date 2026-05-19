@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef, Suspense } from 'react';
@@ -63,7 +62,7 @@ function LeaveRequestFormContent() {
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
 
-    // 🛡️ تعريف صلاحية الإدارة (Sovereign Authority Logic) - FIXED: Moved up for clarity
+    // تعريف صلاحية الإدارة للتحكم في القوائم
     const isAdmin = useMemo(() => 
         ['Admin', 'HR', 'Developer'].includes(currentUser?.role || '')
     , [currentUser]);

@@ -12,10 +12,6 @@ import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
-/**
- * شعار نوفا البسيط (NOVA Wordmark):
- * تصميم نصي أنيق يتوسط التوهج في شاشة التحميل.
- */
 const NovaLogo = () => (
   <svg width="160" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
     <text 

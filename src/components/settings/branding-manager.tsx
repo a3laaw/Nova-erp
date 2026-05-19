@@ -15,7 +15,7 @@ import { Loader2, Save, ImageIcon, Palette, ArrowRight, Activity, Sparkles, Link
 import { Skeleton } from '../ui/skeleton';
 import { Separator } from '../ui/separator';
 import Image from 'next/image';
-import { cleanFirestoreData, cn } from '@/lib/utils';
+import { cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/context/auth-context';
@@ -167,7 +167,7 @@ export function BrandingManager() {
                 }
             }
 
-            const settingsPath = `companies/${tenantId}/settings/branding`;
+            const settingsPath = getTenantPath('settings/branding', tenantId);
             const settingsRef = doc(firestore, settingsPath);
             const cleanData = cleanFirestoreData(finalData);
             delete cleanData.id;
@@ -177,11 +177,11 @@ export function BrandingManager() {
                 updatedAt: serverTimestamp()
             }, { merge: true });
             
-            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث الهوية البصرية للمنشأة.' });
+            toast({ title: 'نجاح الحفظ', description: 'تم تحديث الهوية البصرية بنجاح.' });
             setFilesToUpload({});
 
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'فشل ترحيل البيانات', description: 'حدث خطأ تقني في قاعدة البيانات.' });
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'حدثت مشكلة أثناء تحديث الإعدادات.' });
         } finally {
             setIsSaving(false);
         }
