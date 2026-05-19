@@ -12,7 +12,7 @@
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100% / 0.95;
     --popover-foreground: 222 47% 11%;
-    --primary: 22 100% 50%; /* برتقالي #FF5C00 */
+    --primary: 22 100% 50%; /* برتقالي ملكي #FF5C00 */
     --primary-foreground: 0 0% 100%;
     --secondary: 215 25% 27%;
     --secondary-foreground: 210 40% 98%;
@@ -25,7 +25,7 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 22 100% 50%;
-    --radius: 1.5rem;
+    --radius: 2.5rem;
   }
 }
 
@@ -75,60 +75,19 @@
   .sidebar-no-offset {
     @apply pr-0 mr-0 ml-0 pl-0 border-none !important;
   }
+
+  .glass-3d-button {
+    @apply bg-gradient-to-br from-[#FFB000] to-[#FF7A00] border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 transition-all shadow-xl shadow-orange-500/20;
+  }
 }
 
-/* 🛡️ تحرير القوائم المنسدلة للتعامل مع الماوس (Mouse Unlock Matrix) 🛡️ */
+/* 🛡️ تحرير القوائم المنسدلة للتعامل مع الماوس 🛡️ */
 [data-radix-popper-content-wrapper],
 [role="listbox"],
 [role="menu"],
-[role="dialog"],
-.rdp-caption_dropdowns,
-.rdp-dropdown,
-.native-select-fix,
-.rdp-caption_dropdowns select {
+[role="dialog"] {
   z-index: 999999 !important;
   pointer-events: auto !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
-[role="option"],
-[role="menuitem"],
-[cmdk-item],
-.rdp-dropdown select,
-.native-select-fix select {
-  cursor: pointer !important;
-  pointer-events: auto !important;
-}
-
-/* 🎨 تنسيق مُنتقي التاريخ المطور (Sovereign Date Picker UI) 🎨 */
-.rdp-caption_dropdowns {
-  display: flex !important;
-  gap: 8px !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.native-select-fix select {
-  appearance: auto !important; 
-  background-color: #f8fafc !important;
-  border: 2px solid #e2e8f0 !important;
-  border-radius: 12px !important;
-  padding: 6px 12px !important;
-  font-family: inherit !important;
-  font-size: 13px !important;
-  font-weight: 900 !important;
-  color: #1e1b4b !important;
-  cursor: pointer !important;
-  outline: none !important;
-  transition: all 0.2s !important;
-}
-
-.native-select-fix select:hover {
-  background-color: #ffffff !important;
-  border-color: #FF5C00 !important;
-  color: #FF5C00 !important;
-  box-shadow: 0 4px 12px rgba(255, 92, 0, 0.1) !important;
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
