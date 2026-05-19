@@ -101,6 +101,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
                     <Separator orientation="vertical" className="h-6 bg-slate-200 dark:bg-white/10 mx-1" />
 
+                    {/* 🛡️ رادار المواعيد السيادي: قائمة منسدلة ذكية 🛡️ */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button 

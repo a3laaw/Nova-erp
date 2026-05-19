@@ -44,7 +44,7 @@ import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 
-// ✨ استيرادات محرك الإزاحة (DnD) ✨
+// ✨ استيرادات محرك الإزاحة الصحيحة (DnD Kit) ✨
 import {
   DndContext, 
   closestCenter,
@@ -528,7 +528,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                             <div className="grid gap-2 animate-in fade-in"><Label className="font-bold text-xs">العميل المسجل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clients.map((c: any) => ({ value: c.id, label: c.nameAr }))} placeholder="ابحث..." className="h-10" /></div>
                         )}
                     </div>
-                    <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3"><Button type="button" variant="ghost" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30">{isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : 'تأكيد الحجز'}</Button></DialogFooter>
+                    <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3"><Button type="button" variant="outline" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30">{isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : 'تأكيد الحجز'}</Button></DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>

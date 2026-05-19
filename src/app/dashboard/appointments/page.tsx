@@ -19,8 +19,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarDays, Home, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// 🛡️ تصحيح التوجيه السيادي: استخدام .then لضمان حل الـ Promise الخاص بالـ Named Export
 const ArchitecturalAppointmentsView = dynamic(
-    () => import('@/components/appointments/architectural-appointments-view'),
+    () => import('@/components/appointments/architectural-appointments-view').then(mod => mod.ArchitecturalAppointmentsView),
     { 
         loading: () => <Skeleton className="h-[500px] w-full rounded-[2.5rem] animate-pulse" />,
         ssr: false 
