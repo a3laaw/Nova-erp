@@ -84,20 +84,21 @@ export default function SettingsDashboardPage() {
 
   return (
     <div className="space-y-10 pb-20" dir="rtl">
-        <Card className={cn(
-            "border-none rounded-[3rem] overflow-hidden relative",
-            "bg-gradient-to-l from-white/60 to-orange-50/40 backdrop-blur-3xl border-white/60 shadow-2xl"
-        )}>
-            <div className="absolute top-0 right-0 w-64 h-full bg-primary/5 -skew-x-12 transform translate-x-10 pointer-events-none" />
-            <CardHeader className="pb-10 px-10 border-b border-orange-100/30 relative z-10">
+        {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+        <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
+            <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
+            <CardHeader className="pb-10 pt-10 px-10 relative z-10">
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
                     <div className="flex items-center gap-6">
-                        <div className="p-5 bg-primary/10 rounded-[2.2rem] text-primary shadow-inner border border-primary/20 animate-in zoom-in duration-500">
-                            <Settings2 className="h-10 w-10" />
-                        </div>
                         <div className="text-right">
-                            <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">إعدادات النظام</CardTitle>
-                            <CardDescription className="text-lg font-bold text-slate-500 mt-1">تخصيص قواعد العمل، الهوية البصرية، وإدارة صلاحيات الموظفين.</CardDescription>
+                            <CardTitle className="text-3xl font-black text-white tracking-tighter">إعدادات المنظومة</CardTitle>
+                            <div className="flex items-center gap-2 mt-1">
+                                <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
+                                <CardDescription className="text-white/90 font-bold text-sm">تخصيص قواعد العمل، الهوية البصرية، وإدارة صلاحيات الموظفين.</CardDescription>
+                            </div>
+                        </div>
+                        <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
+                            <Settings2 className="h-10 w-10 text-white" />
                         </div>
                     </div>
                 </div>

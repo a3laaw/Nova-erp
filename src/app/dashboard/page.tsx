@@ -20,7 +20,8 @@ import {
     History,
     CheckCircle2,
     Clock,
-    ListTodo
+    ListTodo,
+    Sparkles
 } from 'lucide-react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { useFirebase, useSubscription } from '@/firebase';
@@ -93,39 +94,43 @@ export default function DashboardPage() {
   const loading = analyticalLoading;
 
   return (
-    <div className="space-y-8 p-2 lg:p-4" dir="rtl">
-        <Card className="border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[3rem] shadow-sm overflow-hidden">
-            <CardContent className="p-10">
+    <div className="space-y-10" dir="rtl">
+        {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+        <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
+            <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
+            <CardHeader className="pb-10 pt-10 px-10 relative z-10">
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
-                    <div className="flex flex-col gap-4 order-2 lg:order-1 items-center lg:items-start">
-                        <Button asChild variant="outline" className="h-11 rounded-2xl font-black gap-2 bg-white/60 dark:bg-white/10 border-white/80 dark:border-white/10 text-foreground shadow-sm">
-                            <Link href="/dashboard/notifications">
-                                <BellRing className="h-4 w-4" /> سجل التنبيهات
-                            </Link>
-                        </Button>
-                        <Button asChild className="h-11 px-10 rounded-2xl font-black gap-2 bg-primary text-white shadow-xl hover:scale-105 transition-transform border-none">
-                            <Link href="/dashboard/clients/new">
-                                <PlusCircle className="h-5 w-5" /> إضافة عميل جديد
-                            </Link>
-                        </Button>
-                    </div>
-
-                    <div className="text-center lg:text-right order-1 lg:order-2 space-y-2">
-                        <div className="flex items-center justify-center lg:justify-end gap-4 mb-2">
-                            <h1 className="text-4xl font-black text-foreground tracking-tighter">لوحة التحكم الرئيسية</h1>
-                            <LayoutGrid className="text-primary h-10 w-10" strokeWidth={2.5} />
+                    <div className="flex items-center gap-6">
+                        <div className="text-right">
+                            <CardTitle className="text-3xl font-black text-white tracking-tighter">لوحة التحكم المركزية</CardTitle>
+                            <div className="flex items-center gap-2 mt-1">
+                                <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
+                                <CardDescription className="text-white/90 font-bold text-sm">مرحباً بك، {user?.fullName}. إليك ملخص المهام وحالة العمل اليوم.</CardDescription>
+                            </div>
                         </div>
-                        <p className="text-lg font-bold text-muted-foreground leading-relaxed max-w-xl">
-                            مرحباً بك، <span className="text-primary">{user?.fullName}</span>. إليك ملخص المهام وحالة العمل اليوم.
-                        </p>
+                        <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
+                            <LayoutGrid className="h-10 w-10 text-white" />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 no-print">
+                        <Button asChild variant="outline" className="h-12 px-6 rounded-2xl font-black gap-2 bg-white/20 text-white border-white/40 hover:bg-white/30 backdrop-blur-md shadow-xl">
+                            <Link href="/dashboard/notifications">
+                                <BellRing className="h-5 w-5" /> سجل التنبيهات
+                            </Link>
+                        </Button>
+                        <Button asChild className="h-12 px-8 rounded-2xl font-black gap-2 bg-white text-[#FF7A00] shadow-xl hover:bg-slate-50 border-none transition-transform hover:scale-105">
+                            <Link href="/dashboard/clients/new">
+                                <PlusCircle className="h-5 w-5" /> إضافة عميل
+                            </Link>
+                        </Button>
                     </div>
                 </div>
-            </CardContent>
+            </CardHeader>
         </Card>
 
         <div className="grid gap-8 lg:grid-cols-12">
             <div className="lg:col-span-4">
-                <Card className="h-full border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[3rem] shadow-sm flex flex-col">
+                <Card className="h-full border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[3rem] shadow-sm flex flex-col border-2">
                     <CardHeader className="p-8 border-b border-white/10">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-xl font-black flex items-center gap-2 text-foreground">
@@ -188,7 +193,7 @@ export default function DashboardPage() {
                     loading={loading}
                 />
                 
-                <Card className="col-span-1 border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] p-6 flex flex-col items-center justify-center text-center gap-4">
+                <Card className="col-span-1 border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] p-6 flex flex-col items-center justify-center text-center gap-4 border-2">
                     <div className="space-y-1">
                         <p className="font-black text-sm text-foreground">يوميات المواقع</p>
                         <p className="text-[10px] text-muted-foreground font-bold leading-tight">سجل إنجاز الفرق الميدانية.</p>
@@ -209,7 +214,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="lg:col-span-4">
-                <Card className="h-full border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[3rem] shadow-sm flex flex-col">
+                <Card className="h-full border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[3rem] shadow-sm flex flex-col border-2">
                     <CardHeader className="p-8 border-b border-white/10">
                         <CardTitle className="text-xl font-black flex items-center gap-2 text-foreground">
                             <History className="text-primary h-5 w-5" /> آخر التحديثات
