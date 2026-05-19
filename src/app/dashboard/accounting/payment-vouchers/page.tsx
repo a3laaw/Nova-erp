@@ -45,7 +45,7 @@ export default function PaymentVouchersPage() {
                 <CardContent className="pt-8">
                     <PaymentVouchersList />
                 </CardContent>
-            </Card>
+            </div>
         </div>
     )
 }

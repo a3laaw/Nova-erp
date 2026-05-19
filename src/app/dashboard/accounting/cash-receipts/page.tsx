@@ -45,7 +45,7 @@ export default function CashReceiptsPage() {
                 <CardContent className="pt-8">
                     <CashReceiptsList />
                 </CardContent>
-            </Card>
+            </div>
         </div>
     )
 }

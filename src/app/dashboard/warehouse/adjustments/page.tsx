@@ -71,7 +71,7 @@ export default function AdjustmentsPage() {
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                 <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                 <CardHeader className="pb-10 pt-10 px-10 relative z-10">
-                    <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
                         <div className="flex items-center gap-6">
                             <div className="text-right">
                                 <CardTitle className="text-3xl font-black text-white tracking-tighter">المردودات والتسويات المخزنية</CardTitle>
@@ -112,7 +112,38 @@ export default function AdjustmentsPage() {
                         </div>
 
                         <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm">
-                            {/* Table logic as existing... */}
+                            <Table>
+                                <TableHeader className="bg-[#F8F9FE]">
+                                    <TableRow className="border-none">
+                                        <TableHead className="px-8 py-5 font-black text-[#7209B7]">رقم السند</TableHead>
+                                        <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
+                                        <TableHead className="font-black text-[#7209B7]">النوع</TableHead>
+                                        <TableHead className="text-left font-black text-[#7209B7]">القيمة</TableHead>
+                                        <TableHead className="text-center font-black text-[#7209B7]">إجراء</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {loading ? <TableRow><TableCell colSpan={5} className="p-8"><Skeleton className="h-10 w-full rounded-2xl"/></TableCell></TableRow> :
+                                    filteredAdjustments.length === 0 ? <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد سجلات.</TableCell></TableRow> :
+                                    filteredAdjustments.map(adj => (
+                                        <TableRow key={adj.id} className="hover:bg-[#F3E8FF]/20 h-16 group transition-colors">
+                                            <TableCell className="px-8 font-mono font-black text-primary"><Link href={`/dashboard/warehouse/adjustments/${adj.id}`} className="hover:underline">{adj.adjustmentNumber}</Link></TableCell>
+                                            <TableCell className="font-bold text-xs opacity-60">{formatDate(adj.date)}</TableCell>
+                                            <TableCell><Badge variant="outline" className="px-3 font-black text-[10px] bg-white">{typeTranslations[adj.type] || adj.type}</Badge></TableCell>
+                                            <TableCell className="text-left font-mono font-black text-[#2E5BCC] text-lg">{formatCurrency(adj.items?.reduce((s,i) => s + (i.totalCost || 0), 0) || 0)}</TableCell>
+                                            <TableCell className="text-center">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" dir="rtl" className="rounded-xl p-2 shadow-2xl border-none">
+                                                        <DropdownMenuItem asChild className="rounded-lg py-3"><Link href={`/dashboard/warehouse/adjustments/${adj.id}`} className="gap-2 font-bold"><Eye className="h-4 w-4"/> عرض</Link></DropdownMenuItem>
+                                                        <DropdownMenuItem className="text-red-600 font-black gap-2 rounded-lg py-3 focus:bg-red-50" onClick={() => setItemToDelete(adj)}><Trash2 className="ml-2 h-4 w-4" /> حذف</DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
                         </div>
                     </Tabs>
                 </CardContent>

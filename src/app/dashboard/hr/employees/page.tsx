@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -9,7 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, Search, FileBarChart, Sparkles } from 'lucide-react';
+import { PlusCircle, Users, Search, FileBarChart, Sparkles, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { EmployeesTable } from '@/components/hr/employees-table';
 import { Input } from '@/components/ui/input';
@@ -21,7 +20,7 @@ export default function EmployeesPage() {
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
 
-    // 🛡️ درع الحماية السيادي: منع المستخدم العادي من رؤية سجل الموظفين
+    // 🛡️ درع الحماية: منع المستخدم العادي من رؤية سجل الموظفين
     useEffect(() => {
         if (!authLoading && user && !['Admin', 'HR', 'Developer'].includes(user.role)) {
             router.replace('/dashboard');
@@ -29,11 +28,12 @@ export default function EmployeesPage() {
     }, [user, authLoading, router]);
 
     if (authLoading || (user && !['Admin', 'HR', 'Developer'].includes(user.role))) {
-        return <div className="h-96 flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
+        return <div className="h-96 flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
     }
 
     return (
         <div className="space-y-10" dir="rtl">
+            {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                 <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                 <CardHeader className="pb-10 pt-10 px-10 relative z-10">
@@ -77,5 +77,3 @@ export default function EmployeesPage() {
         </div>
     );
 }
-
-import { Loader2 } from 'lucide-react';

@@ -22,8 +22,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * الحائط التفاعلي للموظف (Interactive Employee Hub):
- * تم إحكام الهوية البصرية لتكون "حية" و "ذهبية" تتناسب مع فخامة المنظومة.
- * تم إصلاح تباين الألوان في الأزرار لضمان وضوح النص.
+ * تم تحويل الهيدر إلى البرتقالي الملكي (Nova Orange) بالكامل وإصلاح وضوح الأزرار.
  */
 export default function EmployeeHubPage() {
     const { user } = useAuth();
@@ -31,20 +30,20 @@ export default function EmployeeHubPage() {
 
     return (
         <div className="space-y-8 pb-20 max-w-[1400px] mx-auto animate-in fade-in duration-1000" dir="rtl">
-            {/* 🛡️ الهيدر الرئيسي المحدث (The Sovereign Pulse Banner) 🛡️ */}
-            <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-[#2d2a77] to-[#1e1b4b] text-white relative group">
+            {/* 🛡️ الهيدر الرئيسي المحدث (The Gilded Nova Banner) 🛡️ */}
+            <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative group">
                 <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none" />
-                <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/20 rounded-full blur-[100px] animate-pulse" />
+                <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/20 rounded-full blur-[100px] animate-pulse" />
                 
                 <CardHeader className="pb-12 pt-12 px-12 relative z-10">
                     <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
                         <div className="flex items-center gap-8 order-2 lg:order-1">
-                            {/* زر الشكر المحدث بوضوح فائق */}
+                            {/* زر الشكر بتباين عالي جداً */}
                             <Button 
                                 onClick={() => setIsKudosOpen(true)}
-                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-[#FF7A00] text-white shadow-[0_20px_50px_rgba(255,122,0,0.3)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-[#FF8A1F]"
+                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-white text-[#FF7A00] shadow-[0_20px_50px_rgba(255,122,0,0.3)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-slate-50"
                             >
-                                <Heart className="h-8 w-8 fill-white text-white animate-pulse" />
+                                <Heart className="h-8 w-8 fill-[#FF7A00] text-[#FF7A00] animate-pulse" />
                                 <span className="drop-shadow-sm">شكر زميل</span>
                             </Button>
                         </div>
@@ -53,12 +52,12 @@ export default function EmployeeHubPage() {
                             <div className="text-right space-y-2">
                                 <CardTitle className="text-5xl font-black text-white tracking-tighter drop-shadow-2xl">نبض الإنجاز</CardTitle>
                                 <div className="flex items-center gap-3 justify-end">
-                                    <CardDescription className="text-indigo-100/80 font-bold text-xl leading-relaxed">قلب Nova ERP التفاعلي.. حيث تلتقي الأرقام بالإنسان.</CardDescription>
-                                    <div className="h-2 w-2 rounded-full bg-green-400 animate-ping" />
+                                    <CardDescription className="text-white font-bold text-xl leading-relaxed">قلب Nova ERP التفاعلي.. حيث تلتقي الأرقام بالإنسان.</CardDescription>
+                                    <div className="h-2 w-2 rounded-full bg-white animate-ping" />
                                 </div>
                             </div>
                             <div className="relative">
-                                <div className="p-6 bg-gradient-to-br from-[#FFB000] to-[#FF7A00] rounded-[2.5rem] shadow-[0_0_50px_rgba(255,122,0,0.3)] border-4 border-white/20 transform group-hover:rotate-6 transition-transform duration-500">
+                                <div className="p-6 bg-white/20 rounded-[2.5rem] shadow-[0_0_50px_rgba(255,255,255,0.2)] border-4 border-white/40 transform group-hover:rotate-6 transition-transform duration-500">
                                     <Sparkles className="h-12 w-12 text-white animate-pulse" />
                                 </div>
                                 <Badge className="absolute -top-3 -right-3 bg-white text-[#FF7A00] font-black px-3 py-1 border-none shadow-xl animate-bounce">LIVE</Badge>
