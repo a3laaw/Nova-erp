@@ -45,7 +45,7 @@ import { useAuth } from '@/context/auth-context';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '../ui/badge';
 
-// ✨ استيرادات محرك الإزاحة (DnD) ✨
+// ✨ استيرادات محرك الإزاحة (DnD) الصحيحة ✨
 import {
   DndContext, 
   closestCenter,
@@ -57,10 +57,7 @@ import {
   useDroppable,
   DragOverlay,
   defaultDropAnimationSideEffects
-} from '@get-it/dnd-kit-core'; // Re-mapped for compatibility if needed, but normally @dnd-kit/core
-
-// Using standard @dnd-kit/core for stability
-import { DndContext as CoreDndContext } from '@dnd-kit/core';
+} from '@dnd-kit/core';
 
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
@@ -102,7 +99,7 @@ const weekDays = [
     { id: 'Saturday', label: 'السبت' },
 ];
 
-// 🎨 مكون الموعد القابل للسحب (Draggable Room Card)
+// 🎨 مكون الموعد القابل للسحب
 function DraggableRoomAppointment({ appointment, isOnLeave }: { appointment: Appointment, isOnLeave: boolean }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: appointment.id!,
@@ -133,7 +130,7 @@ function DraggableRoomAppointment({ appointment, isOnLeave }: { appointment: App
     );
 }
 
-// 📥 مكون خانة وقت القاعة (Droppable Slot)
+// 📥 مكون خانة وقت القاعة
 function DroppableRoomSlot({ id, children, onClick }: { id: string, children: React.ReactNode, onClick: () => void }) {
     const { isOver, setNodeRef } = useDroppable({
         id: id,
@@ -500,7 +497,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
                         </div>
                         <div className="grid gap-2"><Label className="font-black pr-1">ملاحظات</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} className="rounded-xl border-2" rows={2} /></div>
                     </div>
-                    <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3"><Button type="button" variant="ghost" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-indigo-100 bg-indigo-600 hover:bg-indigo-700 text-white gap-2">{isSaving && <Loader2 className="animate-spin h-5 w-5"/>}{isSaving ? 'جاري الحفظ...' : 'تأكيد الحجز'}</Button></DialogFooter>
+                    <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3"><Button type="button" variant="outline" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-indigo-100 bg-indigo-600 hover:bg-indigo-700 text-white gap-2">{isSaving && <Loader2 className="animate-spin h-5 w-5"/>}{isSaving ? 'جاري الحفظ...' : 'تأكيد الحجز'}</Button></DialogFooter>
                  </form>
             </DialogContent>
         </Dialog>

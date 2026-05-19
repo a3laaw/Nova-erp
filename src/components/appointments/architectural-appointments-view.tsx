@@ -342,7 +342,7 @@ export function ArchitecturalAppointmentsView() {
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
-        engineers.forEach(eng => { grid[eng.id!] = {}; [...morningSlots, ...eveningSlots].forEach(slot => grid[eng.id!][slot] = null); });
+        engineers.forEach(eng => { grid[eng.id!] = {}; [..morningSlots, ...eveningSlots].forEach(slot => grid[eng.id!][slot] = null); });
         appointments.forEach(appt => {
             const appointmentDate = toFirestoreDate(appt.appointmentDate);
             if(!appointmentDate) return;
