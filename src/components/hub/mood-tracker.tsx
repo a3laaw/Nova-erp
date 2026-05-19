@@ -6,19 +6,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Send, Target, Sparkles } from 'lucide-react';
-import { cn, getTenantPath } from '@/lib/utils';
+import { Loader2, Send, Target, Sparkles, Zap } from 'lucide-react';
+import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { Label } from '../ui/label';
 
 const moods = [
-    { emoji: '😊', label: 'سعيد', color: 'bg-green-50 text-green-600 border-green-200' },
-    { emoji: '🤩', label: 'متحمس', color: 'bg-orange-50 text-orange-600 border-orange-200' },
-    { emoji: '☕', label: 'قهوة تايم', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-    { emoji: '🛠️', label: 'عمل جاد', color: 'bg-blue-50 text-blue-600 border-blue-200' },
-    { emoji: '🤔', label: 'تفكير عميق', color: 'bg-purple-50 text-purple-600 border-purple-200' },
-    { emoji: '😴', label: 'مرهق', color: 'bg-slate-50 text-slate-600 border-slate-200' },
+    { emoji: '😊', label: 'سعيد', color: 'bg-green-50 text-green-600 border-green-200 shadow-green-100' },
+    { emoji: '🤩', label: 'متحمس', color: 'bg-orange-50 text-orange-600 border-orange-200 shadow-orange-100' },
+    { emoji: '☕', label: 'تركيز', color: 'bg-amber-50 text-amber-700 border-amber-200 shadow-amber-100' },
+    { emoji: '🛠️', label: 'عمل جاد', color: 'bg-blue-50 text-blue-600 border-blue-200 shadow-blue-100' },
+    { emoji: '🤔', label: 'تفكير', color: 'bg-purple-50 text-purple-600 border-purple-200 shadow-purple-100' },
+    { emoji: '😴', label: 'مرهق', color: 'bg-slate-50 text-slate-600 border-slate-200 shadow-slate-100' },
 ];
 
 export function MoodTracker() {
@@ -35,35 +35,55 @@ export function MoodTracker() {
         setIsSaving(true);
         try {
             const userPath = getTenantPath(`users/${user.id}`, user.currentCompanyId);
+            const postPath = getTenantPath(`hub_posts`, user.currentCompanyId);
+            
+            // 1. تحديث حالة الموظف
             await updateDoc(doc(firestore, userPath), {
                 currentMood: selectedMood,
                 currentFocus: focus,
                 updatedAt: serverTimestamp()
             });
-            toast({ title: 'تم تحديث حالتك', description: 'تظهر حالتك الآن لجميع الزملاء في المنظومة.' });
+
+            // 2. نشر تحديث للحائط ليعرف الجميع
+            if (focus.trim()) {
+                await addDoc(collection(firestore, postPath), cleanFirestoreData({
+                    userId: user.id,
+                    userName: user.fullName,
+                    userAvatar: user.avatarUrl,
+                    postType: 'employee_idea',
+                    content: `تركيزي اليوم: ${focus}`,
+                    moodIcon: selectedMood,
+                    votesCount: 0,
+                    pointsAwarded: 5,
+                    createdAt: serverTimestamp(),
+                    companyId: user.currentCompanyId
+                }));
+            }
+
+            toast({ title: 'تم تحديث حالتك', description: 'تظهر حالتك الآن لجميع الزملاء.' });
         } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث الحالة اليومية.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث الحالة.' });
         } finally { setIsSaving(false); }
     };
 
     return (
-        <Card className="rounded-[2.8rem] border-none shadow-2xl bg-white/60 backdrop-blur-2xl overflow-hidden group hover:border-primary/20 transition-all border-2 border-transparent">
-            <CardContent className="p-8 space-y-8">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-10">
-                    {/* اختيار الحالة */}
-                    <div className="space-y-4 text-center md:text-right">
-                        <Label className="font-black text-xs text-slate-400 uppercase tracking-widest mr-2 block">حالتك المزاجية</Label>
-                        <div className="flex flex-wrap justify-center md:justify-start gap-4">
+        <Card className="rounded-[3rem] border-none shadow-2xl bg-white/60 backdrop-blur-3xl overflow-hidden group hover:border-primary/20 transition-all duration-500 border-4 border-white">
+            <CardContent className="p-10 space-y-10">
+                <div className="flex flex-col xl:flex-row justify-between items-center gap-12">
+                    {/* اختيار الحالة - تصميم كريستالي */}
+                    <div className="space-y-4 text-center xl:text-right shrink-0">
+                        <Label className="font-black text-xs text-slate-400 uppercase tracking-[0.3em] mr-2 block">Mood Pulse</Label>
+                        <div className="flex flex-wrap justify-center gap-5">
                             {moods.map((m) => (
                                 <button
                                     key={m.emoji}
                                     type="button"
                                     onClick={() => setSelectedMood(m.emoji)}
                                     className={cn(
-                                        "w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-3xl transition-all duration-300 hover:scale-110 active:scale-95",
+                                        "w-20 h-20 rounded-[1.8rem] flex items-center justify-center text-4xl transition-all duration-500 hover:scale-110 active:scale-95",
                                         selectedMood === m.emoji 
-                                            ? cn(m.color, "shadow-xl border-2 ring-4 ring-white") 
-                                            : "bg-white/40 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 shadow-sm border border-white/60"
+                                            ? cn(m.color, "shadow-2xl border-4 ring-8 ring-white scale-110") 
+                                            : "bg-white/40 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 shadow-md border-2 border-white/80"
                                     )}
                                     title={m.label}
                                 >
@@ -73,20 +93,27 @@ export function MoodTracker() {
                         </div>
                     </div>
 
-                    {/* عنوان التركيز */}
+                    {/* عنوان التركيز - تصميم فخم */}
                     <div className="flex-1 w-full space-y-4">
-                        <Label className="font-black text-xs text-primary uppercase tracking-widest flex items-center gap-2 pr-1">
-                            <Target className="h-4 w-4" /> ما هو تركيزك اليوم؟
-                        </Label>
-                        <div className="flex gap-3 bg-white p-1.5 rounded-[1.8rem] border-2 border-slate-100 shadow-inner group-focus-within:border-primary/30 transition-all">
+                        <div className="flex justify-between items-end pr-2">
+                            <Label className="font-black text-xs text-primary uppercase tracking-[0.3em] flex items-center gap-2">
+                                <Target className="h-4 w-4 animate-spin-slow" /> What is your focus today?
+                            </Label>
+                            {focus.length > 0 && <Badge className="bg-primary/10 text-primary border-none text-[8px] font-black h-4 px-2">+5 Points</Badge>}
+                        </div>
+                        <div className="flex gap-4 bg-white p-2 rounded-[2.2rem] border-4 border-slate-50 shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)] group-focus-within:border-primary/20 transition-all duration-500 group-focus-within:shadow-xl">
                             <Input 
                                 value={focus} 
                                 onChange={e => setFocus(e.target.value)} 
-                                placeholder="مثلاً: إنهاء مراجعة مخططات برج النور..."
-                                className="h-12 rounded-2xl border-none shadow-none focus-visible:ring-0 font-bold text-lg bg-transparent"
+                                placeholder="اكتب عنواناً لمهمتك الأساسية اليوم..."
+                                className="h-14 rounded-2xl border-none shadow-none focus-visible:ring-0 font-black text-xl bg-transparent placeholder:text-slate-300 placeholder:italic"
                             />
-                            <Button onClick={handleUpdate} disabled={isSaving} className="h-12 w-16 rounded-2xl font-black shadow-xl shadow-primary/20 bg-[#FF7A00] hover:bg-[#E66D00] transition-all">
-                                {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
+                            <Button 
+                                onClick={handleUpdate} 
+                                disabled={isSaving} 
+                                className="h-14 w-20 rounded-[1.5rem] font-black shadow-2xl shadow-primary/30 bg-[#FF7A00] hover:bg-[#E66D00] transition-all hover:scale-105 active:scale-90"
+                            >
+                                {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Send className="h-6 w-6 rotate-180" />}
                             </Button>
                         </div>
                     </div>
