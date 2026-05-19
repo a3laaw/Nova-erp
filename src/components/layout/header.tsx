@@ -1,4 +1,3 @@
-
 'use client';
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -69,7 +68,6 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     
                     <Separator orientation="vertical" className="h-6 bg-slate-200 dark:bg-white/10 mx-1" />
 
-                    {/* 🚀 محرك الإنتاجية الشخصية - الإضافة الجديدة */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button 
@@ -153,7 +151,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0 transition-all hover:scale-105 active:scale-95 border-none group focus-visible:ring-0">
                             <Avatar className="h-11 w-11 border border-primary/20 shadow-[0_10px_25px_rgba(0,0,0,0.1)] ring-offset-background transition-all group-hover:ring-2 group-hover:ring-primary/40 overflow-hidden bg-white">
                                 <AvatarImage src={currentUser.avatarUrl} alt={`@${currentUser.fullName}`} className="object-cover" />
-                                <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black text-xs">
+                                <AvatarFallback className="bg-gradient-to-br from-[#FFB000] to-[#FF7A00] text-white font-black text-xs">
                                     {currentUser.fullName?.charAt(0) || 'N'}
                                 </AvatarFallback>
                             </Avatar>
@@ -169,7 +167,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator className="bg-slate-100 dark:bg-white/10 mx-2" />
                         <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-bold cursor-pointer hover:bg-primary/5 mx-1 transition-colors text-foreground">
-                            <Link href="/dashboard/settings" className="flex items-center gap-3">
+                            <Link href="/dashboard/settings/profile" className="flex items-center gap-3">
                                 <User className="h-4 w-4 opacity-40" />
                                 <span>إعدادات الملف الشخصي</span>
                             </Link>

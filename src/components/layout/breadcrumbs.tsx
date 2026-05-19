@@ -91,6 +91,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'contract-templates': 'نماذج العقود',
     'work-hours': 'مواعيد العمل',
     'crm': 'CRM و إدارة العملاء',
+    'profile': 'الملف المهني',
   },
   en: {
     dashboard: 'Dashboard',
@@ -157,6 +158,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'contract-templates': 'Contract Templates',
     'work-hours': 'Work Hours',
     'crm': 'CRM & Clients',
+    'profile': 'Professional Profile',
   },
 };
 

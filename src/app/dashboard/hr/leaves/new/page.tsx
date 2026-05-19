@@ -120,7 +120,7 @@ export default function NewLeaveRequestPage() {
     const loading = employeesLoading || holidaysLoading || brandingLoading;
 
     const leaveDuration = useMemo(() => {
-        if (!startDate || !endDate || isBefore(startOfDay(endDate), startOfDay(startDate))) {
+        if (!startDate || !endDate || startDate > endDate) {
             return { totalDays: 0, workingDays: 0 };
         }
         return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
@@ -278,4 +278,3 @@ export default function NewLeaveRequestPage() {
         </div>
     );
 }
-

@@ -312,4 +312,3 @@ export function BrandingManager() {
         </div>
     );
 }
-

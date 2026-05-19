@@ -18,6 +18,8 @@ export interface UserProfile extends BaseEntity {
   fullName?: string;
   jobTitle?: string;
   avatarUrl?: string;
+  bio?: string;                 // ✨ سيرة الموظف وخبراته
+  skills?: string[];            // ✨ المهارات التخصصية
   activatedAt?: Timestamp | any;
   isSuperAdmin?: boolean;
   currentCompanyId?: string;
