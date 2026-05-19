@@ -45,7 +45,7 @@ import { useAuth } from '@/context/auth-context';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '../ui/badge';
 
-// ✨ استيرادات محرك الإزاحة (DnD) الصحيحة ✨
+// ✨ استيرادات محرك الإزاحة (DnD) ✨
 import {
   DndContext, 
   closestCenter,
