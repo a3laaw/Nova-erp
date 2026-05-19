@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Send, Sparkles, Target } from 'lucide-react';
+import { Loader2, Send, Target, Sparkles } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
+import { Label } from '../ui/label';
 
 const moods = [
     { emoji: '😊', label: 'سعيد', color: 'bg-green-50 text-green-600 border-green-200' },
@@ -39,44 +40,53 @@ export function MoodTracker() {
                 currentFocus: focus,
                 updatedAt: serverTimestamp()
             });
-            toast({ title: 'تم تحديث حالتك', description: 'سيتم ظهورها لزملائك الآن.' });
+            toast({ title: 'تم تحديث حالتك', description: 'تظهر حالتك الآن لجميع الزملاء في المنظومة.' });
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث الحالة اليومية.' });
         } finally { setIsSaving(false); }
     };
 
     return (
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white/60 backdrop-blur-xl overflow-hidden group hover:border-primary/20 transition-all border-2 border-transparent">
+        <Card className="rounded-[2.8rem] border-none shadow-2xl bg-white/60 backdrop-blur-2xl overflow-hidden group hover:border-primary/20 transition-all border-2 border-transparent">
             <CardContent className="p-8 space-y-8">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="flex flex-wrap justify-center gap-3">
-                        {moods.map((m) => (
-                            <button
-                                key={m.emoji}
-                                type="button"
-                                onClick={() => setSelectedMood(m.emoji)}
-                                className={cn(
-                                    "w-14 h-14 rounded-2xl flex items-center justify-center text-2xl transition-all hover:scale-110",
-                                    selectedMood === m.emoji ? cn(m.color, "shadow-lg border-2") : "bg-white/40 grayscale opacity-40 hover:grayscale-0 hover:opacity-100"
-                                )}
-                                title={m.label}
-                            >
-                                {m.emoji}
-                            </button>
-                        ))}
+                <div className="flex flex-col md:flex-row justify-between items-center gap-10">
+                    {/* اختيار الحالة */}
+                    <div className="space-y-4 text-center md:text-right">
+                        <Label className="font-black text-xs text-slate-400 uppercase tracking-widest mr-2 block">حالتك المزاجية</Label>
+                        <div className="flex flex-wrap justify-center md:justify-start gap-4">
+                            {moods.map((m) => (
+                                <button
+                                    key={m.emoji}
+                                    type="button"
+                                    onClick={() => setSelectedMood(m.emoji)}
+                                    className={cn(
+                                        "w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-3xl transition-all duration-300 hover:scale-110 active:scale-95",
+                                        selectedMood === m.emoji 
+                                            ? cn(m.color, "shadow-xl border-2 ring-4 ring-white") 
+                                            : "bg-white/40 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 shadow-sm border border-white/60"
+                                    )}
+                                    title={m.label}
+                                >
+                                    {m.emoji}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
-                    <div className="flex-1 w-full space-y-3">
-                        <Label className="font-black text-xs text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                            <Target className="h-3 w-3 text-primary" /> ما هو تركيزك اليوم؟
+                    {/* عنوان التركيز */}
+                    <div className="flex-1 w-full space-y-4">
+                        <Label className="font-black text-xs text-primary uppercase tracking-widest flex items-center gap-2 pr-1">
+                            <Target className="h-4 w-4" /> ما هو تركيزك اليوم؟
                         </Label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-3 bg-white p-1.5 rounded-[1.8rem] border-2 border-slate-100 shadow-inner group-focus-within:border-primary/30 transition-all">
                             <Input 
                                 value={focus} 
                                 onChange={e => setFocus(e.target.value)} 
                                 placeholder="مثلاً: إنهاء مراجعة مخططات برج النور..."
-                                className="h-12 rounded-2xl border-2 bg-white/50 focus:bg-white font-bold"
+                                className="h-12 rounded-2xl border-none shadow-none focus-visible:ring-0 font-bold text-lg bg-transparent"
                             />
-                            <Button onClick={handleUpdate} disabled={isSaving} className="h-12 rounded-xl px-8 font-black shadow-lg shadow-primary/20">
-                                {isSaving ? <Loader2 className="animate-spin" /> : <Send className="h-4 w-4" />}
+                            <Button onClick={handleUpdate} disabled={isSaving} className="h-12 w-16 rounded-2xl font-black shadow-xl shadow-primary/20 bg-[#FF7A00] hover:bg-[#E66D00] transition-all">
+                                {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
                             </Button>
                         </div>
                     </div>
@@ -85,5 +95,3 @@ export function MoodTracker() {
         </Card>
     );
 }
-
-import { Label } from '../ui/label';
