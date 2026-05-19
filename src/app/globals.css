@@ -79,6 +79,21 @@
   .glass-3d-button {
     @apply bg-gradient-to-br from-[#FFB000] to-[#FF7A00] border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 transition-all shadow-xl shadow-orange-500/20;
   }
+  
+  /* ✨ الحيوية البصرية الحية (Vibrant Nova Effects) ✨ */
+  .active-glow {
+    box-shadow: 0 0 25px rgba(255, 122, 0, 0.15);
+  }
+  
+  @keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+  }
+  
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
 }
 
 /* 🛡️ تحرير القوائم المنسدلة للتعامل مع الماوس 🛡️ */

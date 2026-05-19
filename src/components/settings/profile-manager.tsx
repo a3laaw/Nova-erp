@@ -10,7 +10,7 @@ import { useFirebase } from '@/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, ImageIcon, User, Briefcase, Sparkles, Camera, Mail, AtSign } from 'lucide-react';
+import { Loader2, Save, ImageIcon, User, Briefcase, Sparkles, Camera, Mail, AtSign, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import Image from 'next/image';
@@ -20,9 +20,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * الملف المهني للموظف (Professional Portfolio):
- * مساحة خاصة للموظف لإدارة صورته وخبراته بهوية بصرية ذهبية ملكية.
- * تم تحصينه بـ errorEmitter لرصد أخطاء الـ Storage و Firestore بدقة.
+ * ملف التعريف المهني (Professional Profile):
+ * تم تحصينه بـ "رادار أخطاء الرفع" وتوحيد الهوية البصرية البرتقالية الحية.
  */
 export function ProfileManager() {
     const { firestore, storage } = useFirebase();
@@ -68,28 +67,26 @@ export function ProfileManager() {
         try {
             let finalAvatarUrl = formData.avatarUrl;
 
-            // 1. معالجة رفع الصورة إلى Cloud Storage (فصل التخزين عن قاعدة البيانات)
+            // 1. محرك الرفع السحابي (Cloud Storage Engine)
             if (profileFile && storage) {
                 const storagePath = `companies/${tenantId || 'master'}/users/${user.id}/avatar_${Date.now()}`;
                 const storageRef = ref(storage, storagePath);
                 
                 try {
-                    // الرفع الفعلي للملف الخام إلى Storage
                     const uploadResult = await uploadBytes(storageRef, profileFile);
-                    // جلب الرابط العمومي للصورة المرفوعة
                     finalAvatarUrl = await getDownloadURL(uploadResult.ref);
                 } catch (storageErr: any) {
-                    // رصد خطأ الصلاحيات في التخزين السحابي بدقة
+                    // رصد خطأ الصلاحيات وإطلاقه للرادار
                     errorEmitter.emit('permission-error', new FirestorePermissionError({
                         path: `[STORAGE] ${storagePath}`,
                         operation: 'write',
                         requestResourceData: { fileName: profileFile.name, type: profileFile.type, size: profileFile.size }
                     }));
-                    throw new Error("فشل رفع الصورة؛ يرجى مراجعة قواعد أمان التخزين (Storage Rules).");
+                    throw new Error("عائق في قواعد الأمان السحابية.");
                 }
             }
 
-            // 2. تحديث سجل الموظف في قاعدة بيانات Firestore
+            // 2. محرك تحديث المستند (Firestore Sync)
             const isDev = user.role === 'Developer';
             const userPath = isDev ? `developers/${user.id}` : getTenantPath(`users/${user.id}`, tenantId);
             const userRef = doc(firestore, userPath);
@@ -104,25 +101,23 @@ export function ProfileManager() {
 
             const safeData = cleanFirestoreData(updateData);
 
-            await updateDoc(userRef, safeData).catch(async (serverError) => {
-                // رصد خطأ الصلاحيات في قاعدة البيانات
+            await updateDoc(userRef, safeData).catch(async (err) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: userPath,
                     operation: 'update',
                     requestResourceData: safeData
                 }));
-                throw serverError;
+                throw err;
             });
 
             await refreshToken();
-            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث ملفك المهني وهويتك البصرية.' });
+            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث ملفك الشخصي بنجاح.' });
             setProfileFile(null);
             setPreview(null);
             setFormData(prev => ({ ...prev, avatarUrl: finalAvatarUrl }));
 
         } catch (error: any) {
-            console.error("Profile Save Error:", error);
-            toast({ variant: 'destructive', title: 'عائق تقني', description: error.message || 'فشل تحديث البيانات.' });
+            console.error("Profile Save Failure:", error);
         } finally {
             setIsSaving(false);
         }
@@ -130,7 +125,7 @@ export function ProfileManager() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-700" dir="rtl">
-            <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/70 backdrop-blur-xl border-4 border-white">
+            <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/80 backdrop-blur-xl border-4 border-white">
                 <CardHeader className="p-10 pb-8 bg-gradient-to-r from-[#FFB000] to-[#FF7A00] text-white relative">
                     <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none" />
                     <div className="flex items-center gap-8 relative z-10">

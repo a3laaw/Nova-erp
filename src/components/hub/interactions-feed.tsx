@@ -103,7 +103,14 @@ function PostCard({ post, index }: { post: HubPost, index: number }) {
 
     const config = typeConfig[post.postType] || typeConfig.system_achievement;
     const Icon = config.icon;
-    const postDate = toFirestoreDate(post.createdAt);
+    
+    const formattedDate = useMemo(() => {
+        const date = toFirestoreDate(post.createdAt);
+        if (date && isValid(date)) {
+            return formatDistanceToNow(date, { addSuffix: true, locale: ar });
+        }
+        return 'الآن';
+    }, [post.createdAt]);
 
     return (
         <Card className={cn(
@@ -126,7 +133,7 @@ function PostCard({ post, index }: { post: HubPost, index: number }) {
                             <p className="font-black text-[#1e1b4b] text-xl leading-tight tracking-tight group-hover:text-primary transition-colors">{post.userName}</p>
                             <p className="text-[10px] font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest">
                                 <Clock className="h-3 w-3 text-primary opacity-40" />
-                                {postDate && isValid(postDate) ? formatDistanceToNow(postDate, { addSuffix: true, locale: ar }) : 'الآن'}
+                                {formattedDate}
                             </p>
                         </div>
                     </div>
