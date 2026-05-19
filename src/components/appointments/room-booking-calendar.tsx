@@ -31,7 +31,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer, PlaneTakeoff } from 'lucide-react';
+import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer, MousePointer2 } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
@@ -44,6 +44,23 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '../ui/badge';
+
+// ✨ استيرادات محرك الإزاحة (DnD) ✨
+import {
+  DndContext, 
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  useDraggable,
+  useDroppable,
+  DragOverlay,
+  defaultDropAnimationSideEffects
+} from '@get-it/dnd-kit-core'; // Re-mapped for compatibility if needed, but normally @dnd-kit/core
+
+// Using standard @dnd-kit/core for stability
+import { DndContext as CoreDndContext } from '@dnd-kit/core';
 
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
@@ -62,10 +79,7 @@ const generateTimeSlots = (start: string, end: string, slotDuration: number, buf
     try {
         const startTime = parse(start, 'HH:mm', new Date());
         const endTime = parse(end, 'HH:mm', new Date());
-        
-        if (!isValid(startTime) || !isValid(endTime) || startTime >= endTime) {
-            return [];
-        }
+        if (!isValid(startTime) || !isValid(endTime) || startTime >= endTime) return [];
 
         let currentTime = startTime;
         while (currentTime < endTime) {
@@ -88,6 +102,57 @@ const weekDays = [
     { id: 'Saturday', label: 'السبت' },
 ];
 
+// 🎨 مكون الموعد القابل للسحب (Draggable Room Card)
+function DraggableRoomAppointment({ appointment, isOnLeave }: { appointment: Appointment, isOnLeave: boolean }) {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id: appointment.id!,
+        data: appointment
+    });
+
+    const style = transform ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: 1000,
+        opacity: 0.8
+    } : undefined;
+
+    return (
+        <div 
+            ref={setNodeRef}
+            style={{ ...(departmentStyles[appointment.department || 'أخرى'] || {}), ...style }}
+            {...attributes}
+            {...listeners}
+            className={cn(
+                "flex flex-col items-center justify-center text-center p-1 sm:p-2 rounded-2xl cursor-grab active:cursor-grabbing transition-all hover:brightness-95 shadow-md h-full relative",
+                isDragging && "opacity-0"
+            )}
+        >
+            {isOnLeave && <Badge variant="destructive" className="absolute top-0.5 right-0.5 text-[6px] h-3 px-1 font-black">في إجازة رسمية</Badge>}
+            <p className="font-bold text-[10px] sm:text-xs leading-tight select-none">{appointment.title}</p>
+            <p className="text-[9px] sm:text-[10px] mt-1 font-black select-none">{appointment.clientName}</p>
+        </div>
+    );
+}
+
+// 📥 مكون خانة وقت القاعة (Droppable Slot)
+function DroppableRoomSlot({ id, children, onClick }: { id: string, children: React.ReactNode, onClick: () => void }) {
+    const { isOver, setNodeRef } = useDroppable({
+        id: id,
+    });
+
+    return (
+        <td 
+            ref={setNodeRef}
+            onClick={onClick}
+            className={cn(
+                "relative h-24 border-l p-1 transition-all",
+                isOver ? "bg-primary/20 scale-[0.98] ring-4 ring-primary/10 rounded-2xl z-20" : ""
+            )}
+        >
+            {children}
+        </td>
+    );
+}
+
 export default function RoomBookingCalendar() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -99,28 +164,24 @@ export default function RoomBookingCalendar() {
     const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogData, setDialogData] = useState<any>(null);
-
     const [clients, setClients] = useState<Client[]>([]);
     const [engineers, setEngineers] = useState<Employee[]>([]);
-
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
     const tenantId = currentUser?.currentCompanyId;
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+    useEffect(() => { if (!date) setDate(new Date()); }, [date]);
 
     const { morningSlots, eveningSlots, hasWorkHours, isRamadan } = useMemo(() => {
         if (!date) return { morningSlots: [], eveningSlots: [], hasWorkHours: false, isRamadan: false };
     
         const ramadanSettings = branding?.work_hours?.ramadan;
-        const isDateInRamadan = ramadanSettings?.is_enabled &&
-            ramadanSettings.start_date &&
-            ramadanSettings.end_date &&
-            date >= toFirestoreDate(ramadanSettings.start_date)! &&
-            date <= toFirestoreDate(ramadanSettings.end_date)!;
-    
+        const isDateInRamadan = ramadanSettings?.is_enabled && ramadanSettings.start_date && ramadanSettings.end_date && date >= toFirestoreDate(ramadanSettings.start_date)! && date <= toFirestoreDate(ramadanSettings.end_date)!;
         if (isDateInRamadan) {
             const slots = generateTimeSlots(ramadanSettings.start_time || '09:00', ramadanSettings.end_time || '15:00', ramadanSettings.appointment_slot_duration || 30, ramadanSettings.appointment_buffer_time || 0);
             return { morningSlots: slots, eveningSlots: [], hasWorkHours: slots.length > 0, isRamadan: true };
@@ -128,42 +189,25 @@ export default function RoomBookingCalendar() {
     
         const workHours = branding?.work_hours?.general;
         if (!workHours) return { morningSlots: [], eveningSlots: [], hasWorkHours: false, isRamadan: false };
-        
         const slotDuration = workHours.appointment_slot_duration || 30;
         const buffer = workHours.appointment_buffer_time || 0;
         const todayDayName = weekDays[date.getDay()].id;
-    
-        if (branding?.work_hours?.holidays?.includes(todayDayName)) {
-            return { morningSlots: [], eveningSlots: [], hasWorkHours: true, isRamadan: false };
-        }
-    
+        if (branding?.work_hours?.holidays?.includes(todayDayName)) return { morningSlots: [], eveningSlots: [], hasWorkHours: true, isRamadan: false };
         const halfDaySettings = branding?.work_hours?.half_day;
         const isHalfDay = halfDaySettings?.day === todayDayName;
         let { morning_start_time, morning_end_time, evening_start_time, evening_end_time } = workHours;
-    
         if (isHalfDay) {
-            if (halfDaySettings.type === 'morning_only') {
-                evening_start_time = '';
-                evening_end_time = '';
-            } else if (halfDaySettings.type === 'custom_end_time' && halfDaySettings.end_time) {
+            if (halfDaySettings.type === 'morning_only') { evening_start_time = ''; evening_end_time = ''; } 
+            else if (halfDaySettings.type === 'custom_end_time' && halfDaySettings.end_time) {
                 const customEnd = halfDaySettings.end_time;
-                if (customEnd <= morning_end_time) {
-                    morning_end_time = customEnd;
-                    evening_start_time = '';
-                    evening_end_time = '';
-                } else {
-                    evening_end_time = customEnd < evening_end_time ? customEnd : evening_end_time;
-                }
+                if (customEnd <= morning_end_time) { morning_end_time = customEnd; evening_start_time = ''; evening_end_time = ''; } 
+                else { evening_end_time = customEnd < evening_end_time ? customEnd : evening_end_time; }
             }
         }
-    
         const mSlots = generateTimeSlots(morning_start_time, morning_end_time, slotDuration, buffer);
         const eSlots = generateTimeSlots(evening_start_time, evening_end_time, slotDuration, buffer);
-        
         return { morningSlots: mSlots, eveningSlots: eSlots, hasWorkHours: mSlots.length > 0 || eSlots.length > 0, isRamadan: false };
     }, [branding, date]);
-
-    useEffect(() => { if (!date) setDate(new Date()); }, [date]);
 
     useEffect(() => {
         if (!firestore || !tenantId) return;
@@ -199,6 +243,42 @@ export default function RoomBookingCalendar() {
     }, [firestore, tenantId]);
 
     useEffect(() => { if(date) fetchAppointments(date); }, [date, fetchAppointments]);
+
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+        setActiveDragId(null);
+        if (!over || !firestore || !tenantId || !date) return;
+
+        const apptId = active.id as string;
+        const [targetType, targetRoomName, targetTime] = (over.id as string).split('|');
+
+        if (targetType === 'room') {
+            const [hours, minutes] = targetTime.split(':').map(Number);
+            const newDateTime = setMinutes(setHours(date, hours), minutes);
+
+            if (isPast(newDateTime) && currentUser?.role !== 'Admin') {
+                toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن نقل الحجز للماضي.' });
+                return;
+            }
+
+            const hasConflict = rawAppointments.some(a => a.id !== apptId && a.meetingRoom === targetRoomName && format(toFirestoreDate(a.appointmentDate)!, 'HH:mm') === targetTime && a.status !== 'cancelled');
+            if (hasConflict) {
+                toast({ variant: 'destructive', title: 'تعارض في المواعيد', description: 'القاعة محجوزة بالفعل في هذا الوقت.' });
+                return;
+            }
+
+            try {
+                const apptRef = doc(firestore, getTenantPath('appointments', tenantId), apptId);
+                await updateDoc(apptRef, {
+                    meetingRoom: targetRoomName,
+                    appointmentDate: Timestamp.fromDate(newDateTime),
+                    updatedAt: serverTimestamp()
+                });
+                toast({ title: 'تمت الإزاحة' });
+                fetchAppointments(date);
+            } catch (e) { toast({ variant: 'destructive', title: 'خطأ في التحديث' }); }
+        }
+    };
 
     const getEmployeeLeaveForDate = useCallback((employeeId: string, checkDate: Date) => {
         return leaveRequests.find(req => {
@@ -236,17 +316,6 @@ export default function RoomBookingCalendar() {
         return grid;
     }, [appointments, morningSlots, eveningSlots]);
 
-    const handleDeleteBooking = async () => {
-        if (!appointmentToDelete || !firestore || !tenantId) return;
-        setIsDeleting(true);
-        try {
-            const apptsPath = getTenantPath('appointments', tenantId);
-            await deleteDoc(doc(firestore, apptsPath, appointmentToDelete.id!));
-            toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
-            setRawAppointments(prev => prev.filter(appt => appt.id !== appointmentToDelete.id!));
-        } finally { setIsDeleting(false); setAppointmentToDelete(null); }
-    };
-    
     const renderGridSection = (title: string, slots: string[]) => {
         if (slots.length === 0) return null;
         return (
@@ -264,41 +333,26 @@ export default function RoomBookingCalendar() {
                             <th className="sticky left-0 bg-[#F8F9FE] p-1 sm:p-2 z-10 font-black text-gray-800 text-center border-l print:text-sm">{room}</th>
                             {slots.map(time => {
                                 const booking = bookingsGrid[room]?.[time];
-                                const appointmentDate = booking ? toFirestoreDate(booking.appointmentDate) : null;
                                 const activeLeave = (booking && booking.engineerId && date) ? getEmployeeLeaveForDate(booking.engineerId, date) : null;
-                                const isOnLeave = !!activeLeave;
+                                const slotId = `room|${room}|${time}`;
 
                                 return (
-                                    <td key={`${room}-${time}`} className="relative h-24 border-l p-1 align-top">
-                                        {booking && appointmentDate ? (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <div className="flex flex-col items-center justify-center text-center p-1 sm:p-2 rounded-2xl cursor-pointer transition-all hover:brightness-95 shadow-md h-full relative" style={{ ...(departmentStyles[booking.department || 'أخرى'] || {}) }}>
-                                                        {isOnLeave && <Badge variant="destructive" className="absolute top-0.5 right-0.5 text-[6px] h-3 px-1 font-black">في إجازة رسمية</Badge>}
-                                                        <p className="font-bold text-[10px] sm:text-xs leading-tight">{booking.title}</p>
-                                                        <p className="text-[9px] sm:text-[10px] mt-1 font-black">{booking.clientName}</p>
-                                                    </div>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent dir="rtl" className="rounded-xl shadow-2xl">
-                                                    <DropdownMenuItem onClick={() => {
-                                                        const startTime = toFirestoreDate(booking.appointmentDate);
-                                                        setDialogData({ ...booking, appointmentDate: startTime });
-                                                        setIsDialogOpen(true);
-                                                    }} className="font-bold py-3"><Pencil className="ml-2 h-4 w-4" />تعديل الموعد</DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-red-600 font-bold py-3"><Trash2 className="ml-2 h-4 w-4" />إلغاء الموعد</DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        ) : (
-                                            <div onClick={() => {
-                                                const [h, m] = time.split(':').map(Number);
-                                                const startTime = setMinutes(setHours(date!, h), m);
-                                                if (isPast(startTime)) return toast({ title: 'لا يمكن الحجز في الماضي' });
-                                                setDialogData({ room, appointmentDate: startTime });
-                                                setIsDialogOpen(true);
-                                            }} className="h-full w-full hover:bg-muted/30 transition-colors rounded-2xl no-print cursor-pointer" />
-                                        )}
-                                    </td>
+                                    <DroppableRoomSlot 
+                                        key={slotId} 
+                                        id={slotId}
+                                        onClick={() => {
+                                            if (booking) return;
+                                            const [h, m] = time.split(':').map(Number);
+                                            const startTime = setMinutes(setHours(date!, h), m);
+                                            if (isPast(startTime)) return toast({ title: 'لا يمكن الحجز في الماضي' });
+                                            setDialogData({ room, appointmentDate: startTime });
+                                            setIsDialogOpen(true);
+                                        }}
+                                    >
+                                        {booking ? (
+                                            <DraggableRoomAppointment appointment={booking} isOnLeave={!!activeLeave} />
+                                        ) : null}
+                                    </DroppableRoomSlot>
                                 );
                             })}
                         </tr>
@@ -310,57 +364,70 @@ export default function RoomBookingCalendar() {
 
     if (brandingLoading || (loading && rawAppointments.length === 0)) return <Skeleton className="h-[500px] w-full rounded-3xl" />;
     
-    if (!hasWorkHours) return <Card className="mt-4 rounded-[2rem] border-2 border-dashed"><CardHeader><CardTitle className="text-center font-black">لم يتم تكوين أوقات القاعات</CardTitle></CardHeader><CardContent className="text-center text-muted-foreground pb-10"><p className="font-bold">الرجاء الذهاب إلى صفحة الإعدادات لتحديد أوقات الدوام العامة.</p><Button asChild className="mt-6 rounded-xl font-black h-12 px-8 shadow-xl shadow-primary/20"><Link href="/dashboard/settings/work-hours">الذهاب إلى الإعدادات</Link></Button></CardContent></Card>;
-
     return (
-        <div dir="rtl" className="space-y-6">
-            {/* 🛡️ شريط التحكم الزمني (Sovereign Control Bar) */}
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white/40 backdrop-blur-md p-4 rounded-[2rem] border-2 border-white/60 shadow-sm no-print mb-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-600/10 rounded-xl text-indigo-600 shadow-inner">
-                        <CalendarIcon className="h-5 w-5" />
+        <DndContext 
+            sensors={sensors} 
+            collisionDetection={closestCenter} 
+            onDragStart={(e) => setActiveDragId(e.active.id as string)}
+            onDragEnd={handleDragEnd}
+        >
+            <div dir="rtl" className="space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white/40 backdrop-blur-md p-4 rounded-[2rem] border-2 border-white/60 shadow-sm no-print mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-600/10 rounded-xl text-indigo-600 shadow-inner">
+                            <CalendarIcon className="h-5 w-5" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="font-black text-sm text-[#1e1b4b]">تصفح حجوزات القاعات</span>
+                            <span className="text-[9px] font-bold text-indigo-600 flex items-center gap-1 uppercase tracking-widest animate-pulse">
+                                <MousePointer2 className="h-2 w-2"/> خاصية الإزاحة نشطة
+                            </span>
+                        </div>
                     </div>
-                    <span className="font-black text-sm text-[#1e1b4b]">تصفح حجوزات القاعات</span>
+                    <div className="flex items-center gap-3">
+                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className="w-[240px] justify-start text-right font-black h-11 rounded-xl border-2 bg-white shadow-sm">
+                                    <CalendarIcon className="ml-2 h-4 w-4 text-indigo-600" />
+                                    {date ? format(date, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 rounded-[2rem] border-none shadow-2xl" align="start">
+                                <Calendar mode="single" selected={date} onSelect={(d) => { if(d) setDate(d); setIsCalendarOpen(false); }} initialFocus locale={ar} />
+                            </PopoverContent>
+                        </Popover>
+                        <Button onClick={() => window.print()} variant="outline" className="h-11 rounded-xl font-bold border-2 bg-white gap-2">
+                            <Printer className="h-4 w-4" /> طباعة
+                        </Button>
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-[240px] justify-start text-right font-black h-11 rounded-xl border-2 bg-white shadow-sm">
-                                <CalendarIcon className="ml-2 h-4 w-4 text-indigo-600" />
-                                {date ? format(date, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 rounded-[2rem] border-none shadow-2xl" align="start">
-                            <Calendar mode="single" selected={date} onSelect={(d) => { if(d) setDate(d); setIsCalendarOpen(false); }} initialFocus locale={ar} />
-                        </PopoverContent>
-                    </Popover>
-                    <Button onClick={() => window.print()} variant="outline" className="h-11 rounded-xl font-bold border-2 bg-white gap-2">
-                        <Printer className="h-4 w-4" /> طباعة
-                    </Button>
+
+                <div id="room-booking-printable-area" className="space-y-4">
+                    {isRamadan ? renderGridSection('فترة دوام رمضان', morningSlots) : (
+                        <>{renderGridSection('الفترة الصباحية', morningSlots)}{renderGridSection('الفترة المسائية', eveningSlots)}</>
+                    )}
                 </div>
-            </div>
 
-            <div id="room-booking-printable-area" className="space-y-4">
-                {isRamadan ? renderGridSection('فترة دوام رمضان', morningSlots) : (
-                    <>{renderGridSection('الفترة الصباحية', morningSlots)}{renderGridSection('الفترة المسائية', eveningSlots)}</>
-                )}
-            </div>
+                <div className="flex justify-center gap-4 pt-4 text-xs">
+                    {Object.entries(departmentStyles).map(([dept, style]) => (
+                        <div key={dept} className="flex items-center gap-2"><div className="h-4 w-4 rounded-lg" style={{ backgroundColor: style.backgroundColor, borderLeft: style.borderLeft }} /><span className="text-sm font-black opacity-60">{dept}</span></div>
+                    ))}
+                </div>
 
-             <div className="flex justify-center gap-4 pt-4 text-xs">
-                {Object.entries(departmentStyles).map(([dept, style]) => (
-                    <div key={dept} className="flex items-center gap-2"><div className="h-4 w-4 rounded-lg" style={{ backgroundColor: style.backgroundColor, borderLeft: style.borderLeft }} /><span className="text-sm font-black opacity-60">{dept}</span></div>
-                ))}
+                {isDialogOpen && <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} engineers={engineers} firestore={firestore} currentUser={currentUser} leaveRequests={leaveRequests} />}
+                
+                <DragOverlay>
+                    {activeDragId ? (
+                        <div 
+                            className="flex flex-col items-center justify-center text-center p-2 rounded-2xl shadow-2xl scale-110 rotate-3 border-2 border-white/40 glass-effect min-w-[120px]"
+                            style={{ ...(departmentStyles[rawAppointments.find(a => a.id === activeDragId)?.department || 'أخرى'] || {}) }}
+                        >
+                            <p className="font-bold text-xs leading-tight">{rawAppointments.find(a => a.id === activeDragId)?.title}</p>
+                        </div>
+                    ) : null}
+                </DragOverlay>
             </div>
-
-            {isDialogOpen && <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} engineers={engineers} firestore={firestore} currentUser={currentUser} leaveRequests={leaveRequests} />}
-            
-            <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
-                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
-                    <AlertDialogHeader><AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الإلغاء؟</AlertDialogTitle><AlertDialogDescription className="text-base font-medium">سيتم حذف هذا الحجز بشكل دائم. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter className="gap-2"><AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel><AlertDialogAction onClick={handleDeleteBooking} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 rounded-xl font-black px-8">{isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، قم بالحذف'}</AlertDialogAction></AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </div>
+        </DndContext>
     );
 }
 
@@ -397,15 +464,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
     };
 
     const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
-    
-    const engineerOptions = useMemo(() => 
-        engineers
-            .filter((e: Employee) => {
-                const hasLeave = getEmployeeLeaveForDate(e.id!, dialogData.appointmentDate);
-                return e.status === 'active' && !hasLeave;
-            })
-            .map((e: Employee) => ({ value: e.id, label: e.fullName, searchKey: e.employeeNumber }))
-    , [engineers, dialogData.appointmentDate, leaveRequests]);
+    const engineerOptions = useMemo(() => engineers.filter((e: Employee) => e.status === 'active' && !getEmployeeLeaveForDate(e.id!, dialogData.appointmentDate)).map((e: Employee) => ({ value: e.id, label: e.fullName, searchKey: e.employeeNumber })), [engineers, dialogData.appointmentDate, leaveRequests]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -413,7 +472,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
         setIsSaving(true);
         try {
             const apptsPath = getTenantPath('appointments', tenantId);
-            const dataToSave = { clientId: selectedClientId, engineerId: selectedEngineerId, title, department, notes, meetingRoom: dialogData.room, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'room' as const, companyId: tenantId };
+            const dataToSave = { clientId: selectedClientId, engineerId: selectedEngineerId, title, department, notes, meetingRoom: dialogData.room || dialogData.meetingRoom, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'room' as const, companyId: tenantId };
             if (isEditing) await updateDoc(doc(firestore, apptsPath, dialogData.id), dataToSave);
             else await addDoc(collection(firestore, apptsPath), { ...dataToSave, createdAt: serverTimestamp() });
             toast({ title: 'نجاح الحجز' });
@@ -423,11 +482,11 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
     
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden">
+            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
                  <form onSubmit={handleSubmit}>
                     <DialogHeader className="p-8 bg-indigo-50 border-b">
                         <DialogTitle className="text-xl font-black text-indigo-900">{isEditing ? 'تعديل حجز القاعة' : 'حجز قاعة جديد'}</DialogTitle>
-                        <DialogDescription className="font-bold text-indigo-700">{dialogData.room} • {format(dialogData.appointmentDate, 'PPp', { locale: ar })}</DialogDescription>
+                        <DialogDescription className="font-bold text-indigo-700">{dialogData?.room || dialogData?.meetingRoom} • {format(dialogData?.appointmentDate, 'PPp', { locale: ar })}</DialogDescription>
                     </DialogHeader>
                     <div className="p-8 space-y-6">
                          <div className="grid gap-2"><Label className="font-black pr-1">عنوان الاجتماع / الغرض</Label><Input value={title} onChange={e => setTitle(e.target.value)} required className="h-12 rounded-xl border-2 font-bold" placeholder="مناقشة المشروع..." /></div>
