@@ -38,10 +38,10 @@ export default function EmployeeHubPage() {
                 <CardHeader className="pb-12 pt-12 px-12 relative z-10">
                     <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
                         <div className="flex items-center gap-8 order-2 lg:order-1">
-                            {/* زر الشكر بتباين عالي جداً */}
+                            {/* 🌟 زر الشكر البارز والعائم (The Floating Action Button) 🌟 */}
                             <Button 
                                 onClick={() => setIsKudosOpen(true)}
-                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-white text-[#FF7A00] shadow-[0_20px_50px_rgba(255,122,0,0.3)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-slate-50"
+                                className="h-16 px-12 rounded-[2.5rem] font-black text-2xl gap-4 bg-white text-[#FF7A00] shadow-[0_25px_60px_-15px_rgba(255,122,0,0.5)] hover:scale-105 active:scale-95 border-none transition-all duration-300 hover:bg-white/90 animate-float"
                             >
                                 <Heart className="h-8 w-8 fill-[#FF7A00] text-[#FF7A00] animate-pulse" />
                                 <span className="drop-shadow-sm">شكر زميل</span>
