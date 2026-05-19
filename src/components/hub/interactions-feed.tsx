@@ -18,7 +18,7 @@ import {
     Loader2,
     Sparkles,
     Activity,
-    Clock
+    Clock 
 } from 'lucide-react';
 import { formatDistanceToNow, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -30,7 +30,7 @@ import { Separator } from '../ui/separator';
 
 /**
  * تدفق النشاط الحي (The Living Stream):
- * تم تحصين معالجة التواريخ لتجنب أخطاء Invalid time value وإضافة الاستيرادات المفقودة.
+ * تم تحصين معالجة التواريخ لتجنب أخطاء Invalid time value وتأمين استيرادات المكونات.
  */
 export function InteractionsFeed() {
     const { firestore } = useFirebase();
