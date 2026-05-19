@@ -61,7 +61,6 @@ import {
   Scale,
   TrendingUp,
   Activity,
-  Waves,
   Package,
   ShoppingCart,
   FileCheck,
@@ -166,16 +165,6 @@ const navItems = {
       ]
     },
     { 
-      label: 'الإنتاجية الشخصية', 
-      icon: Zap, 
-      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'],
-      hrefPrefix: '/dashboard/productivity',
-      children: [
-        { href: '/dashboard/productivity?tab=tasks', label: 'مهامي الشخصية', icon: ListChecks },
-        { href: '/dashboard/productivity?tab=bookmarks', label: 'المفضلات', icon: Bookmark },
-      ]
-    },
-    { 
       label: 'إعدادات النظام', 
       icon: Settings2, 
       roles: ['Developer', 'Admin'],
@@ -191,7 +180,6 @@ const navItems = {
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] },
-    { href: '/dashboard/employee-hub', label: 'Employee Hub', icon: Sparkles, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] },
   ]
 };
 
@@ -200,7 +188,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   const Icon = item.icon;
   if (item.roles && !item.roles.includes(userRole)) return null;
 
-  // Filter children by role
   const visibleChildren = React.useMemo(() => {
     if (!item.children) return null;
     return item.children.filter((child: any) => !child.roles || child.roles.includes(userRole));
@@ -332,9 +319,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             </SidebarMenuSub>
           </CollapsibleContent>
         </SidebarMenuItem>
-      </Collapsible>
-    );
-  }
+      );
+    }
   return null;
 }
 
@@ -367,27 +353,10 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="p-4 mt-auto group-data-[collapsible=icon]:p-2">
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <div className="bg-white/80 border border-white/60 rounded-[1.5rem] p-4 flex items-center shadow-sm hover:bg-white transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
-                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
-                        {currentUser.fullName?.charAt(0) || 'N'}
-                    </div>
-                    <div className="mr-3 text-right overflow-hidden group-data-[collapsible=icon]:hidden flex-1">
-                        <p className="text-xs font-black truncate text-[#1e1b4b] leading-none mb-1">{currentUser.fullName}</p>
-                        <p className="text-[8px] truncate font-black uppercase tracking-widest text-primary">{currentUser.role}</p>
-                    </div>
-                </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 shadow-2xl bg-white border-none" dir="rtl">
-                <DropdownMenuLabel className="font-black text-xs px-3 py-2 text-slate-400 uppercase tracking-widest">خيارات الجلسة</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-slate-100" />
-                <DropdownMenuItem onClick={onLogout} className="text-red-600 font-black rounded-xl py-3 cursor-pointer focus:bg-red-50 transition-all">
-                    <Trash2 className="ml-2 h-4 w-4" /> تسجيل الخروج
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+      <SidebarFooter className="p-6 mt-auto">
+        <div className="flex items-center justify-center py-4 opacity-20 hover:opacity-50 transition-opacity">
+            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary">Nova Core v1.5</Badge>
+        </div>
       </SidebarFooter>
     </>
   );
