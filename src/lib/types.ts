@@ -18,12 +18,36 @@ export interface UserProfile extends BaseEntity {
   fullName?: string;
   jobTitle?: string;
   avatarUrl?: string;
-  bio?: string;                 // ✨ سيرة الموظف وخبراته
-  skills?: string[];            // ✨ المهارات التخصصية
+  bio?: string;
+  totalPoints?: number;         // ✨ رصيد النقاط التراكمي
+  currentMood?: string;         // ✨ الحالة المزاجية الحالية
+  currentFocus?: string;        // ✨ عنوان التركيز اليومي
   activatedAt?: Timestamp | any;
   isSuperAdmin?: boolean;
   currentCompanyId?: string;
   companyName?: string;
+}
+
+export interface HubPost extends BaseEntity {
+    userId: string;
+    userName: string;
+    userAvatar?: string;
+    postType: 'system_achievement' | 'employee_idea' | 'kudos' | 'birthday' | 'anniversary';
+    content: string;
+    moodIcon?: string;
+    votesCount: number;
+    voters?: string[];
+    pointsAwarded: number;
+    metadata?: any; // للتخزين الإضافي مثل ID المشروع المرتبط
+}
+
+export interface PointsLedgerEntry extends BaseEntity {
+    userId: string;
+    source: 'kudos_received' | 'idea_posted' | 'vote_received' | 'task_completed' | 'system_reward';
+    points: number;
+    description: string;
+    referenceId?: string; // ID المنشور أو المشروع المرتبط
+    periodKey: string; // yyyy-ww (للحصر الأسبوعي) أو yyyy-mm (للشهري)
 }
 
 export interface LeaveRequest extends BaseEntity {
@@ -473,4 +497,21 @@ export interface RecurringObligation extends BaseEntity {
     creditAccountId: string;
     creditAccountName?: string;
     status: 'active' | 'paused';
+}
+
+export interface UserProductivityItem extends BaseEntity {
+  userId: string;
+  entryType: 'task' | 'bookmark';
+  title: string;
+  actionType?: 'review' | 'decision' | 'design' | 'redesign' | 'meeting' | 'general';
+  status?: 'pending' | 'in-progress' | 'completed' | 'cancelled';
+  startDate?: Timestamp | any;
+  dueDate?: Timestamp | any;
+  completedAt?: Timestamp | any;
+  sourceModule: string;
+  sourceId: string;
+  sourceSubId?: string;
+  sourceUrl?: string;
+  viewCounter?: number;
+  lastViewedAt?: Timestamp | any;
 }

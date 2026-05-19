@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -78,7 +77,8 @@ import {
   Building2,
   ShieldCheck,
   Calculator,
-  BarChart3
+  BarChart3,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -91,6 +91,12 @@ const navItems = {
       href: '/dashboard', 
       label: 'الرئيسية', 
       icon: LayoutGrid, 
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] 
+    },
+    { 
+      href: '/dashboard/employee-hub', 
+      label: 'الحائط التفاعلي', 
+      icon: Sparkles, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] 
     },
     { 
@@ -185,6 +191,7 @@ const navItems = {
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] },
+    { href: '/dashboard/employee-hub', label: 'Employee Hub', icon: Sparkles, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] },
   ]
 };
 
