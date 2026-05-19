@@ -31,7 +31,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, GripVertical, MousePointer2, MoreHorizontal } from 'lucide-react';
+import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, MousePointer2, MoreHorizontal } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
@@ -512,26 +512,27 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     const [newClientMobile, setNewClientMobile] = useState('');
 
     const tenantId = currentUser?.currentCompanyId;
+    
+    const apptDate = useMemo(() => toFirestoreDate(dialogData?.appointmentDate), [dialogData?.appointmentDate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!tenantId) return;
+        if (!tenantId || !apptDate) return;
         setIsSaving(true);
         try {
             const apptsPath = getTenantPath('appointments', tenantId);
-            const appointmentDateTime = dialogData.appointmentDate;
-            if (isPast(appointmentDateTime) && currentUser?.role !== 'Admin') {
+            if (isPast(apptDate) && currentUser?.role !== 'Admin') {
                 toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن حجز موعد في الماضي.'});
                 setIsSaving(false); return;
             }
             if (isNewClient) {
-                await addDoc(collection(firestore, apptsPath), { title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile, engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount: 1, color: '#facc15', createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId });
+                await addDoc(collection(firestore, apptsPath), { title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile, engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(apptDate), type: 'architectural', status: 'scheduled', visitCount: 1, color: '#facc15', createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId });
             } else {
                 const client = clients.find((c: any) => c.id === selectedClientId);
                 const batch = writeBatch(firestore);
                 const snap = await getDocs(query(collection(firestore, apptsPath), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'), where('status', '!=', 'cancelled')));
                 const visitCount = snap.size + 1;
-                batch.set(doc(collection(firestore, apptsPath)), { clientId: selectedClientId, engineerId: dialogData.engineerId, title: title || client.nameAr, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount, color: getVisitColor({ visitCount, contractSigned: client.status !== 'new' }), createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId });
+                batch.set(doc(collection(firestore, apptsPath)), { clientId: selectedClientId, engineerId: dialogData.engineerId, title: title || client.nameAr, appointmentDate: Timestamp.fromDate(apptDate), type: 'architectural', status: 'scheduled', visitCount, color: getVisitColor({ visitCount, contractSigned: client.status !== 'new' }), createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId });
                 await batch.commit();
             }
             toast({ title: 'تم الحجز بنجاح' });
@@ -545,7 +546,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 <form onSubmit={handleSubmit}>
                     <DialogHeader className="p-8 bg-primary/5 border-b">
                         <DialogTitle className="text-xl font-black">حجز موعد جديد</DialogTitle>
-                        <DialogDescription className="font-bold">{dialogData?.engineerName} • {dialogData?.appointmentDate && format(dialogData.appointmentDate, 'p', { locale: ar })}</DialogDescription>
+                        <DialogDescription className="font-bold">{dialogData?.engineerName} • {apptDate && format(apptDate, 'p', { locale: ar })}</DialogDescription>
                     </DialogHeader>
                     <div className="p-8 space-y-6">
                         <div className="grid gap-2"><Label className="font-black text-gray-700 pr-1">الغرض من الزيارة</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: مناقشة المخططات..." className="h-12 rounded-xl border-2" /></div>

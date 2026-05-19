@@ -45,11 +45,6 @@ export default function DashboardLayout({
     setMounted(true);
   }, []);
 
-  const handleSafeExit = () => {
-    logout();
-    router.replace('/');
-  };
-
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-6 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
@@ -73,6 +68,11 @@ export default function DashboardLayout({
       </div>
     );
   }
+
+  const handleSafeExit = () => {
+    logout();
+    router.replace('/');
+  };
 
   return (
     <div className="relative min-h-screen">
