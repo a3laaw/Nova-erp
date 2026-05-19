@@ -6,7 +6,7 @@ import './globals.css';
 
 const tajawal = Tajawal({ 
     subsets: ['arabic', 'latin'],
-    weight: ['400', '500', '700', '800'],
+    weight: ['400', '500', '700', '800', '900'],
     variable: '--font-body',
 });
 
@@ -15,6 +15,11 @@ export const metadata: Metadata = {
   description: "نظام إدارة الأعمال المتكامل",
 };
 
+/**
+ * الـ Root Layout الجذري:
+ * تم تنظيفه تماماً من أي Hooks لضمان عدم حدوث خطأ AuthProvider.
+ * المنطق الآن يبدأ من ملفات الـ layout الداخلية.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{

@@ -15,7 +15,6 @@ import {
     User,
     Sparkles,
     MessageSquare,
-    Clock,
     Smartphone
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -23,11 +22,10 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Separator } from '@/components/ui/separator';
 
 /**
- * بوابة طلب الانضمام الماركة (NOVA Brand Request Gateway).
- * تم إعادة التصميم لتطابق الهوية البرتقالية الدافئة والأنيقة.
+ * بوابة طلب الانضمام (Registration Gateway):
+ * تم تبسيط اللغة لتكون مهنية وودودة (بيانات الحساب، بريد الإدارة).
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -100,7 +98,6 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#FFFDF0]" dir="rtl">
-      {/* عناصر خلفية تزيينية */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-br from-orange-200/20 to-transparent rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-gradient-to-tr from-amber-200/20 to-transparent rounded-full blur-[120px] pointer-events-none" />
 
@@ -115,7 +112,7 @@ export default function RegisterPage() {
                         <CardTitle className="text-2xl font-black text-[#1e1b4b] tracking-tighter">طلب انضمام للمنظومة</CardTitle>
                         <CardDescription className="text-orange-600 font-black mt-1 text-[10px] uppercase tracking-widest flex items-center gap-2">
                             <Sparkles className="h-3 w-3 animate-pulse" />
-                            تأسيس منشأة سحابية باحترافية SAAS
+                            تأسيس منشأة سحابية جديدة
                         </CardDescription>
                     </div>
                 </div>
@@ -128,10 +125,9 @@ export default function RegisterPage() {
         <CardContent className="p-10">
             <form onSubmit={handleSubmit} className="space-y-10" autoComplete="off">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                    {/* القسم الأول: هوية المنشأة */}
                     <div className="space-y-6">
                         <div className="flex items-center gap-3 border-r-4 border-[#FF7A00] pr-4">
-                            <h3 className="font-black text-[#1e1b4b] text-xs uppercase tracking-widest">هوية المنشأة</h3>
+                            <h3 className="font-black text-[#1e1b4b] text-xs uppercase tracking-widest">بيانات المنشأة</h3>
                         </div>
                         <div className="grid gap-5">
                             <div className="grid gap-2">
@@ -180,10 +176,9 @@ export default function RegisterPage() {
                         </div>
                     </div>
 
-                    {/* القسم الثاني: بيانات المالك */}
                     <div className="space-y-6">
                         <div className="flex items-center gap-3 border-r-4 border-[#FF7A00] pr-4">
-                            <h3 className="font-black text-[#1e1b4b] text-xs uppercase tracking-widest">بيانات المالك</h3>
+                            <h3 className="font-black text-[#1e1b4b] text-xs uppercase tracking-widest">بيانات التواصل</h3>
                         </div>
                         <div className="grid gap-5">
                             <div className="grid gap-2">
@@ -218,14 +213,13 @@ export default function RegisterPage() {
                     </div>
                 </div>
 
-                {/* القسم الثالث: أمان الدخول */}
                 <div className="space-y-6 pt-4">
                     <div className="flex items-center gap-3 border-r-4 border-indigo-500 pr-4">
-                        <h3 className="font-black text-[#1e1b4b] text-xs uppercase tracking-widest">إعدادات العبور والأمان</h3>
+                        <h3 className="font-black text-[#1e1b4b] text-xs uppercase tracking-widest">بيانات الحساب والمدير</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="grid gap-2">
-                            <Label htmlFor="email" className="text-slate-500 font-black text-[11px] pr-1">البريد الإلكتروني للتفعيل *</Label>
+                            <Label htmlFor="email" className="text-slate-500 font-black text-[11px] pr-1">البريد الإلكتروني للإدارة *</Label>
                             <div className="relative group">
                                 <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
                                 <Input 
@@ -264,7 +258,7 @@ export default function RegisterPage() {
                 className="w-full h-16 rounded-[2.2rem] font-black text-xl gap-4 shadow-2xl bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none transition-all active:scale-95 group"
             >
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Rocket className="h-6 w-6 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
-                إرسال طلب الانضمام للمراجعة
+                إرسال طلب الانضمام
             </Button>
         </CardFooter>
       </Card>

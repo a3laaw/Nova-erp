@@ -26,7 +26,6 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { startOfDay, endOfDay, isBefore } from 'date-fns';
 import { format } from 'date-fns';
@@ -89,7 +88,6 @@ export default function NewLeaveRequestPage() {
         setOverlapError(null);
     }, [startDate, endDate, toast]);
 
-    // 🛡️ رادار فحص التداخل
     useEffect(() => {
         if (!firestore || !selectedEmployeeId || !startDate || !endDate || !tenantId) return;
 
@@ -160,7 +158,6 @@ export default function NewLeaveRequestPage() {
 
             const newDocRef = await addDoc(collection(firestore, leavePath), cleanFirestoreData(dataToSave));
             
-            // 🚀 إرسال إشعارات فورية للإدارة والـ HR مع رابط مباشر
             const usersPath = getTenantPath('users', tenantId);
             const adminHRUsersQuery = query(collection(firestore, usersPath), where('role', 'in', ['Admin', 'HR']));
             const adminsSnap = await getDocs(adminHRUsersQuery);
@@ -176,7 +173,7 @@ export default function NewLeaveRequestPage() {
                 }
             });
 
-            toast({ title: 'تم تقديم الطلب', description: 'تم إخطار الإدارة والـ HR بطلبك بنجاح.' });
+            toast({ title: 'تم تقديم الطلب', description: 'تم إخطار الإدارة بطلبك بنجاح.' });
             router.push('/dashboard/hr/leaves');
         } catch (error) {
             setIsSaving(false);
@@ -199,7 +196,7 @@ export default function NewLeaveRequestPage() {
                 <form onSubmit={handleSubmit}>
                     <CardHeader className="bg-primary/5 pb-8 border-b">
                         <CardTitle className="text-2xl font-black">تقديم طلب إجازة جديد</CardTitle>
-                        <CardDescription className="text-base font-medium">تحديد التواريخ لضمان دقة رصيد الإجازات وسجل الحضور.</CardDescription>
+                        <CardDescription className="text-base font-medium">تحديد التواريخ لضمان دقة الرصيد وسجل الحضور.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-8 space-y-6">
                         {overlapError && (
@@ -269,8 +266,8 @@ export default function NewLeaveRequestPage() {
                     <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">
                         <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
                         <Button type="submit" disabled={isSaving || !!overlapError} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/30 gap-3 min-w-[280px]">
-                            {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6" />}
-                            إرسال الطلب للمراجعة
+                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
+                            إرسال الطلب
                         </Button>
                     </CardFooter>
                 </form>
