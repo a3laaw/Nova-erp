@@ -19,7 +19,8 @@ import {
     Sparkles,
     Activity,
     Flag,
-    MoreHorizontal
+    MoreHorizontal,
+    Clock
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
