@@ -89,10 +89,6 @@ const quotationSchema = z.object({
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
 
-/**
- * مكون الكتلة القابلة للسحب (Sortable Block)
- * يدعم النوع النصي (Preamble) أو الكتلة المالية (Table)
- */
 function SortableBlock({ id, block, index, register, remove, children }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
@@ -108,52 +104,34 @@ function SortableBlock({ id, block, index, register, remove, children }: any) {
         ref={setNodeRef} 
         style={style} 
         className={cn(
-            "group relative flex flex-col gap-4 p-8 rounded-[3rem] border-2 transition-all mb-6 animate-in fade-in slide-in-from-right-4",
-            block.type === 'financial_table' 
-                ? "bg-slate-900 border-primary shadow-2xl" 
-                : "bg-white border-slate-100 shadow-sm hover:border-primary/20"
+            "group relative flex flex-col gap-4 p-6 rounded-[2.5rem] border-2 transition-all mb-6 animate-in fade-in slide-in-from-right-4 bg-white/60 backdrop-blur-xl border-white/80 shadow-lg hover:border-primary/20",
+            block.type === 'financial_table' && "ring-4 ring-primary/5 border-primary/20"
         )}
     >
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
                 <button {...attributes} {...listeners} type="button" className="cursor-grab active:cursor-grabbing p-2 hover:bg-muted rounded-xl transition-colors">
-                    <GripVertical className={cn("h-6 w-6", block.type === 'financial_table' ? "text-white/40" : "text-slate-300")} />
+                    <GripVertical className="h-5 w-5 text-slate-300 group-hover:text-primary transition-colors" />
                 </button>
                 <div className="flex items-center gap-3">
                     <div className={cn("p-2 rounded-xl", block.type === 'financial_table' ? "bg-primary text-white" : "bg-primary/10 text-primary")}>
-                        {block.type === 'financial_table' ? <Calculator className="h-5 w-5" /> : <ScrollText className="h-5 w-5" />}
+                        {block.type === 'financial_table' ? <Calculator className="h-4 w-4" /> : <ScrollText className="h-4 w-4" />}
                     </div>
-                    <span className={cn("font-black text-sm uppercase tracking-widest", block.type === 'financial_table' ? "text-white/60" : "text-slate-400")}>
-                        {block.type === 'financial_table' ? 'كتلة الدفعات المالية' : `بند ديباجة #${index + 1}`}
+                    <span className="font-black text-[10px] uppercase tracking-widest text-[#1e1b4b] opacity-60">
+                        {block.type === 'financial_table' ? 'مصفوفة الدفعات المالية' : `كتلة نصية #${index + 1}`}
                     </span>
                 </div>
             </div>
             {block.type === 'preamble' && (
                 <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full">
-                    <Trash2 className="h-5 w-5" />
+                    <Trash2 className="h-4 w-4" />
                 </Button>
             )}
         </div>
 
-        {block.type === 'preamble' ? (
-            <div className="space-y-4">
-                <Input 
-                    {...register(`layoutBlocks.${index}.title`)} 
-                    placeholder="عنوان البند (مثال: الشروط العامة)" 
-                    className="h-12 border-none shadow-none font-black text-2xl text-[#1e1b4b] bg-transparent focus-visible:ring-0"
-                />
-                <Textarea 
-                    {...register(`layoutBlocks.${index}.content`)} 
-                    placeholder="اكتب نص البند هنا..." 
-                    className="rounded-[2rem] border-none bg-slate-50/50 shadow-inner min-h-[120px] text-xl font-medium leading-relaxed p-6"
-                    rows={4}
-                />
-            </div>
-        ) : (
-            <div className="py-2">
-                {children}
-            </div>
-        )}
+        <div className="py-2">
+            {children}
+        </div>
     </div>
   );
 }
@@ -194,7 +172,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const financials_type = watch("financialsType");
   const watchedTotalAmount = watch("totalAmount") || 0;
 
-  // ✨ محرك الحساب التلقائي (Auto-Sum) ✨
   const totalCalculatedValue = useMemo(() => {
     const items = watchedItems || [];
     if (financials_type === 'fixed') {
@@ -264,55 +241,54 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
   return (
     <form onSubmit={handleSubmit(onSave)} className="space-y-12 pb-20">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-10 rounded-[3.5rem] border-2 border-dashed shadow-inner">
-          <div className="grid gap-3">
-              <Label className="font-black text-slate-700 pr-2">العميل المستهدف *</Label>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white/40 backdrop-blur-xl p-8 rounded-[2.5rem] border-2 border-white/60 shadow-sm">
+          <div className="grid gap-2">
+              <Label className="font-black text-[10px] uppercase text-slate-400 tracking-widest pr-2">العميل المستهدف *</Label>
               <Controller control={control} name="clientId" render={({ field }) => (
-                  <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن اسم العميل..." disabled={!!initialData} className="h-14 border-2 shadow-sm rounded-2xl" />
+                  <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن اسم العميل..." disabled={!!initialData} className="h-12 bg-white rounded-2xl border-2" />
               )} />
           </div>
-          <div className="grid gap-3">
-              <Label className="font-black text-primary pr-2 flex items-center gap-2"><Sparkles className="h-4 w-4"/> ملء آلي من القوالب</Label>
-              <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً لتعبئة الدفعات..." className="h-14 border-2 border-primary/20 bg-primary/5 rounded-2xl" />
+          <div className="grid gap-2">
+              <Label className="font-black text-[10px] uppercase text-primary tracking-widest pr-2 flex items-center gap-2"><Sparkles className="h-3 w-3"/> جلب من القوالب</Label>
+              <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً للتعبئة..." className="h-12 border-2 border-primary/20 bg-primary/5 rounded-2xl" />
           </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          <div className="grid gap-3 md:col-span-1">
-              <Label className="font-black text-[#1e1b4b] pr-2">موضوع العرض / الخدمة *</Label>
-              <Input {...register('subject')} placeholder="عنوان العرض..." className="h-14 rounded-2xl border-2 font-black text-2xl text-primary shadow-sm" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid gap-2 md:col-span-1">
+              <Label className="font-black text-[10px] uppercase text-slate-400 tracking-widest pr-2">موضوع العرض *</Label>
+              <Input {...register('subject')} placeholder="عنوان العرض..." className="h-12 rounded-2xl border-2 font-black text-lg text-[#1e1b4b]" />
           </div>
-          <div className="grid gap-3">
-              <Label className="font-black text-slate-500 pr-2">تاريخ العرض</Label>
-              <Controller name="date" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-14 rounded-2xl border-2 shadow-sm" />} />
+          <div className="grid gap-2">
+              <Label className="font-black text-[10px] uppercase text-slate-400 tracking-widest pr-2">تاريخ العرض</Label>
+              <Controller name="date" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-12 rounded-2xl border-2" />} />
           </div>
-          <div className="grid gap-3">
-              <Label className="font-black text-slate-500 pr-2">صلاحية العرض لغاية</Label>
-              <Controller name="validUntil" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-14 rounded-2xl border-2 shadow-sm" />} />
+          <div className="grid gap-2">
+              <Label className="font-black text-[10px] uppercase text-slate-400 tracking-widest pr-2">صلاحية العرض</Label>
+              <Controller name="validUntil" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-12 rounded-2xl border-2" />} />
           </div>
       </div>
 
-      <div className="space-y-6">
-          <h3 className="text-2xl font-black text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
-            <Layers className="h-7 w-7 text-indigo-600" /> المواصفات والمساحات
+      <div className="space-y-4">
+          <h3 className="text-xl font-black text-[#1e1b4b] flex items-center gap-3 pr-2">
+            <Layers className="h-5 w-5 text-indigo-600" /> المواصفات والمساحات
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-white p-10 rounded-[3rem] border-2 shadow-xl items-end relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-2 h-full bg-indigo-600" />
-              <div className="grid gap-2"><Label className="font-black text-slate-500">المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-14 font-black text-4xl font-mono border-2 rounded-2xl text-center text-indigo-600" /></div>
-              <div className="grid gap-2"><Label className="font-black text-slate-500">عدد الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-14 font-black text-3xl border-2 rounded-2xl text-center" /></div>
-              <div className="grid gap-2"><Label className="font-black text-slate-500">توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-14 border-2 rounded-2xl font-black text-xl"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
-              <div className="grid gap-2"><Label className="font-black text-slate-500">خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-14 border-2 rounded-2xl font-black text-xl"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">سرداب كامل</SelectItem><SelectItem value="half">سرداب نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 bg-white/60 backdrop-blur-xl p-8 rounded-[2.5rem] border-2 border-white shadow-xl items-end relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500" />
+              <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-slate-400">المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-12 font-black text-2xl font-mono border-2 rounded-xl text-center text-indigo-600" /></div>
+              <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-slate-400">الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-12 font-black text-xl border-2 rounded-xl text-center" /></div>
+              <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-slate-400">السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-12 border-2 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-slate-400">السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-12 border-2 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">بدون</SelectItem><SelectItem value="full">كامل</SelectItem><SelectItem value="half">نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
           </div>
       </div>
 
-      {/* 🧩 مصفوفة الكتل القابلة لإعادة الترتيب 🧩 */}
       <div className="space-y-6">
           <div className="flex justify-between items-center px-4">
-            <h3 className="text-2xl font-black text-[#1e1b4b] border-r-8 border-primary pr-4 flex items-center gap-3">
-                <LayoutGrid className="h-7 w-7 text-primary" /> تنظيم هيكل وثيقة العرض
+            <h3 className="text-xl font-black text-[#1e1b4b] flex items-center gap-3">
+                <LayoutGrid className="h-5 w-5 text-primary" /> تنظيم هيكل الوثيقة
             </h3>
-            <Button type="button" onClick={() => appendBlock({ id: generateStableId(), type: 'preamble', title: '', content: '' })} className="rounded-2xl h-12 px-8 font-black gap-2 shadow-lg shadow-primary/20">
-                <PlusCircle className="h-5 w-5" /> إضافة بند نصي جديد +
+            <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateStableId(), type: 'preamble', title: '', content: '' })} className="rounded-xl h-10 px-6 font-bold gap-2 border-primary/20 text-primary hover:bg-primary/5">
+                <PlusCircle className="h-4 w-4" /> إضافة ديباجة / بند نصي +
             </Button>
           </div>
           
@@ -328,83 +304,91 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                             register={register} 
                             remove={removeBlock}
                           >
-                              {block.type === 'financial_table' && (
-                                  <div className="space-y-8 p-4">
-                                      <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+                              {block.type === 'preamble' ? (
+                                  <div className="space-y-4">
+                                      <Input 
+                                          {...register(`layoutBlocks.${index}.title`)} 
+                                          placeholder="عنوان البند (مثال: الشروط العامة)" 
+                                          className="h-10 border-none shadow-none font-black text-xl text-[#1e1b4b] bg-transparent focus-visible:ring-0"
+                                      />
+                                      <Textarea 
+                                          {...register(`layoutBlocks.${index}.content`)} 
+                                          placeholder="اكتب نص البند هنا..." 
+                                          className="rounded-2xl border-none bg-white/40 shadow-inner text-base font-medium leading-relaxed p-5"
+                                          rows={3}
+                                      />
+                                  </div>
+                              ) : (
+                                  <div className="space-y-6">
+                                      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/40 p-4 rounded-3xl border border-white/60">
                                           <div className="flex items-center gap-4">
-                                              <div className="p-3 bg-white/10 rounded-2xl text-white shadow-inner"><Calculator className="h-8 w-8"/></div>
-                                              <Label className="text-3xl font-black text-white tracking-tighter">جدول الدفعات المالية</Label>
+                                              <div className="p-2 bg-primary/10 rounded-xl text-primary"><Calculator className="h-5 w-5"/></div>
+                                              <Label className="text-xl font-black text-[#1e1b4b]">جدول الدفعات المالية</Label>
                                           </div>
-                                          <div className="flex items-center gap-3 bg-white/10 p-2 rounded-[2rem] border border-white/20 backdrop-blur-md">
-                                              <div className="flex items-center bg-black/20 px-6 py-2 rounded-[1.5rem] gap-3">
-                                                  <Label className="text-[10px] font-black uppercase text-white/60">نظام الحساب:</Label>
-                                                  <Controller name="financialsType" control={control} render={({ field }) => (
-                                                      <Select value={field.value} onValueChange={field.onChange}>
-                                                          <SelectTrigger className="w-48 h-10 rounded-xl border-none bg-white font-black text-primary"><SelectValue /></SelectTrigger>
-                                                          <SelectContent dir="rtl"><SelectItem value="fixed">مبالغ ثابتة</SelectItem><SelectItem value="percentage">نسب مئوية %</SelectItem></SelectContent>
-                                                      </Select>
-                                                  )} />
-                                              </div>
+                                          <div className="flex items-center gap-3">
+                                              <Controller name="financialsType" control={control} render={({ field }) => (
+                                                  <Select value={field.value} onValueChange={(v: any) => { field.onChange(v); if(v === 'fixed') setValue('totalAmount', totalCalculatedValue); }}>
+                                                      <SelectTrigger className="w-40 h-10 rounded-xl border-none bg-white font-bold text-primary shadow-sm"><SelectValue /></SelectTrigger>
+                                                      <SelectContent dir="rtl"><SelectItem value="fixed">مبلغ ثابت (KWD)</SelectItem><SelectItem value="percentage">نسب مئوية (%)</SelectItem></SelectContent>
+                                                  </Select>
+                                              )} />
                                               {financials_type === 'percentage' && (
-                                                  <div className="bg-primary px-8 py-2 rounded-[1.5rem] flex items-center gap-4 text-white shadow-xl animate-in zoom-in-95">
-                                                      <Label className="text-[10px] font-black uppercase text-white/70">إجمالي العقد</Label>
-                                                      <Input type="number" step="any" {...register('totalAmount')} className="w-32 h-10 bg-white/20 border-white/40 text-center font-black text-2xl text-white font-mono rounded-xl focus-visible:ring-0" placeholder="0.000" />
+                                                  <div className="flex items-center gap-3 animate-in zoom-in-95">
+                                                      <Label className="text-[9px] font-black text-slate-400 uppercase">قيمة العقد:</Label>
+                                                      <Input type="number" step="any" {...register('totalAmount')} className="w-28 h-10 bg-white border-none text-center font-black text-lg text-primary rounded-xl shadow-sm" placeholder="0.000" />
                                                   </div>
                                               )}
                                           </div>
                                       </div>
 
-                                      <div className="border-4 border-white/10 rounded-[3.5rem] overflow-hidden shadow-2xl bg-white animate-in zoom-in-95 duration-700">
+                                      <div className="border-2 border-white/60 rounded-[2.5rem] overflow-hidden shadow-2xl bg-white/95">
                                           <Table>
-                                              <TableHeader className="bg-slate-900 text-white h-16">
+                                              <TableHeader className="bg-slate-50 h-12">
                                                 <TableRow className="border-none">
-                                                    <TableHead className="px-12 font-black text-lg text-white">بيان الدفعة المستحقة</TableHead>
-                                                    <TableHead className="text-center font-black text-lg text-white w-72">
+                                                    <TableHead className="px-8 font-black text-slate-400 text-right">بيان الدفعة المستحقة</TableHead>
+                                                    <TableHead className="text-center font-black text-slate-400 w-64">
                                                         {financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                                     </TableHead>
-                                                    <TableHead className="w-24 text-center"></TableHead>
+                                                    <TableHead className="w-16"></TableHead>
                                                 </TableRow>
                                               </TableHeader>
                                               <TableBody>
                                                   {itemFields.map((field, itemIdx) => (
-                                                      <TableRow key={field.id} className="h-28 border-b last:border-0 hover:bg-primary/[0.03] transition-all group">
-                                                          <TableCell className="px-12">
-                                                            <Input {...register(`items.${itemIdx}.description`)} className="font-black text-3xl border-none shadow-none focus-visible:ring-0 bg-transparent text-[#1e1b4b] placeholder:italic placeholder:opacity-10" placeholder="مسمى الدفعة..." />
+                                                      <TableRow key={field.id} className="h-20 border-b last:border-0 hover:bg-primary/[0.02] group/row transition-all">
+                                                          <TableCell className="px-8">
+                                                            <Input {...register(`items.${itemIdx}.description`)} className="font-bold text-lg border-none shadow-none focus-visible:ring-0 bg-transparent text-[#1e1b4b]" placeholder="مسمى الدفعة..." />
                                                           </TableCell>
-                                                          <TableCell className="bg-primary/[0.02] border-r border-primary/5">
-                                                            <div className="relative">
+                                                          <TableCell className="bg-primary/[0.01] border-r border-slate-50">
+                                                            <div className="relative flex justify-center">
                                                                 <Input 
                                                                     type="number" step="any" 
                                                                     {...register(financials_type === 'percentage' ? `items.${itemIdx}.percentage` : `items.${itemIdx}.unitPrice`)} 
-                                                                    className="text-center font-black text-5xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono tracking-tighter"
+                                                                    className="text-center font-black text-2xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono"
                                                                     placeholder="0"
                                                                 />
-                                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/30 font-black text-xl">{financials_type === 'percentage' ? '%' : 'KD'}</span>
+                                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/20 font-black text-sm">{financials_type === 'percentage' ? '%' : 'KD'}</span>
                                                             </div>
                                                           </TableCell>
-                                                          <TableCell className="text-center pr-8">
-                                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(itemIdx)} disabled={itemFields.length <= 1} className="text-red-400 h-12 w-12 rounded-full hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <Trash2 className="h-7 w-7"/>
+                                                          <TableCell className="text-center">
+                                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(itemIdx)} disabled={itemFields.length <= 1} className="text-red-300 h-9 w-9 rounded-full hover:bg-red-50 hover:text-red-500 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                                                                <Trash2 className="h-4 w-4"/>
                                                             </Button>
                                                           </TableCell>
                                                       </TableRow>
                                                   ))}
                                               </TableBody>
-                                              <TableFooter className="bg-slate-900 text-white h-32">
-                                                  <TableRow className="border-none hover:bg-slate-900">
-                                                    <TableCell className="text-right px-12">
-                                                        <p className="text-4xl font-black tracking-tighter text-white">إجمالي قيمة التعاقد:</p>
-                                                        <p className="text-xs font-bold text-white/40 mt-1 uppercase tracking-widest">Total Sovereign Assessment</p>
+                                              <TableFooter className="bg-slate-50 h-20">
+                                                  <TableRow className="border-none hover:bg-transparent">
+                                                    <TableCell className="text-right px-10">
+                                                        <p className="text-xl font-black tracking-tight text-slate-800">إجمالي القيمة المعتمدة:</p>
                                                     </TableCell>
-                                                    <TableCell className="text-center bg-white/5 border-r border-white/10">
+                                                    <TableCell className="text-center border-r border-slate-100 bg-white">
                                                         <div className="flex flex-col items-center">
-                                                            <div className="text-6xl font-black font-mono text-primary tracking-tighter drop-shadow-[0_0_20px_rgba(255,122,0,0.3)]">
+                                                            <div className="text-3xl font-black font-mono text-primary tracking-tighter">
                                                                 {financials_type === 'fixed' ? formatCurrency(totalCalculatedValue) : `${totalCalculatedValue}%`}
                                                             </div>
-                                                            {financials_type === 'percentage' && (
-                                                                <Badge variant="outline" className={cn("mt-2 font-black text-[10px] px-6 border-2", totalCalculatedValue === 100 ? "bg-green-500 text-white border-none" : "bg-red-500/10 text-red-500 animate-pulse")}>
-                                                                    {totalCalculatedValue === 100 ? "مكتمل (100%)" : "خلل في النسب"}
-                                                                </Badge>
+                                                            {financials_type === 'percentage' && totalCalculatedValue !== 100 && (
+                                                                <span className="text-[8px] font-black text-red-500 animate-pulse mt-1">المجموع يجب أن يكون 100%</span>
                                                             )}
                                                         </div>
                                                     </TableCell>
@@ -412,9 +396,9 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                   </TableRow>
                                               </TableFooter>
                                           </Table>
-                                          <div className="p-8 flex justify-center bg-muted/5 border-t">
-                                            <Button type="button" variant="ghost" onClick={() => appendItem({ id: generateStableId(), description: `الدفعة رقم ${itemFields.length + 1}`, quantity: 1, unitPrice: 0 })} className="h-14 px-12 rounded-2xl border-dashed border-2 font-black text-xl text-primary gap-3 hover:bg-white transition-all">
-                                                <PlusCircle className="h-6 w-6" /> إضافة دفعة مالية +
+                                          <div className="p-6 flex justify-center bg-muted/5 border-t">
+                                            <Button type="button" variant="ghost" onClick={() => appendItem({ id: generateStableId(), description: `الدفعة رقم ${itemFields.length + 1}`, quantity: 1, unitPrice: 0 })} className="h-11 px-10 rounded-xl border-dashed border-2 font-bold text-primary gap-2 hover:bg-white transition-all">
+                                                <PlusCircle className="h-5 w-5" /> إضافة دفعة +
                                             </Button>
                                           </div>
                                       </div>
@@ -427,15 +411,15 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </DndContext>
       </div>
 
-      <DialogFooter className="pt-16 border-t flex flex-col md:flex-row gap-8">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-16 px-12 rounded-[2rem] font-black text-xl text-slate-400 hover:text-red-600">إلغاء المراجعة</Button>
+      <DialogFooter className="pt-10 border-t flex flex-col md:flex-row gap-6">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-14 px-10 rounded-2xl font-bold text-slate-400">إلغاء المراجعة</Button>
           <Button 
             type="submit" 
             disabled={isSaving || refDataLoading || (financials_type === 'percentage' && totalCalculatedValue !== 100)} 
-            className="h-24 px-40 rounded-[3rem] font-black text-4xl shadow-[0_20px_80px_-15px_rgba(255,122,0,0.4)] flex-1 gap-6 bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none transition-all active:scale-95"
+            className="h-14 px-16 rounded-[2rem] font-black text-xl shadow-xl flex-1 gap-3"
           >
-              {isSaving ? <Loader2 className="h-12 w-12 animate-spin" /> : <Save className="h-12 w-12" />}
-              اعتماد وحفظ العرض النهائي
+              {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+              اعتماد وإرسال عرض السعر
           </Button>
       </DialogFooter>
     </form>
