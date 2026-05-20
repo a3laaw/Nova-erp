@@ -20,7 +20,7 @@ import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/uti
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where, limit, doc, getDoc } from 'firebase/firestore';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '../ui/switch';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -123,7 +123,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     if (financials_type === 'fixed') {
         return items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
     }
-    // 🛡️ إصلاح منطق النسبة المئوية: حساب المجموع آلياً
     return items.reduce((sum, item) => sum + (Number(item.percentage) || 0), 0);
   }, [watchedItems, financials_type]);
 
@@ -187,7 +186,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="grid gap-3 md:col-span-1">
               <Label className="font-black text-gray-700 pr-2">موضوع العرض *</Label>
-              <Input {...register('subject')} placeholder="مثال: عرض سعر هيكل أسود..." className="h-12 rounded-2xl border-2 font-black text-xl text-[#1e1b4b]" />
+              <Input {...register('subject')} placeholder="مثال: عرض سعر هيكل أسود..." className="h-12 rounded-xl border-2 font-black text-xl text-[#1e1b4b]" />
           </div>
           <div className="grid gap-3">
               <Label className="font-black text-gray-700 pr-2">تاريخ العرض</Label>
@@ -277,7 +276,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       </div>
 
       <DialogFooter className="pt-10 border-t flex flex-col md:flex-row gap-6">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-14 px-12 rounded-2xl font-black text-lg text-slate-500">إلغاء وإغلاق</Button>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-14 px-12 rounded-2xl font-black text-lg text-slate-500">إلغاء وإغلاق</Button>
           <Button type="submit" disabled={isSaving || refDataLoading} className="h-20 px-32 rounded-[2.5rem] font-black text-3xl shadow-2xl shadow-primary/40 flex-1 gap-5 bg-primary text-white border-none transition-all active:scale-95 hover:brightness-110">
               {isSaving ? <Loader2 className="h-10 w-10 animate-spin" /> : <Save className="h-10 w-10" />}
               اعتماد وحفظ عرض السعر

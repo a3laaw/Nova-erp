@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, Suspense } from 'react';
+import { useState, useCallback, useEffect, Suspense, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
@@ -15,14 +15,14 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import type { Quotation } from '@/lib/types';
 import { QuotationForm } from '@/components/accounting/quotation-form';
-import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
+import { cleanFirestoreData, getTenantPath, cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calculator, Sparkles, AlertCircle } from 'lucide-react';
 
 /**
- * صفحة إصدار عرض سعر جديد (Sovereign Quote Engine V13.0):
- * تم تحصين محرك الترقيم ليعمل عبر المسار الموحد المخصص للمنشأة لضمان تجاوز الرفض الأمني لـ Firebase.
+ * صفحة إصدار عرض سعر جديد (Sovereign Quote Engine V14.0):
+ * تم تحصين محرك الترقيم واستيراد كافة المكونات (cn) لضمان استقرار البناء.
  */
 function NewQuotationContent() {
   const router = useRouter();
@@ -62,8 +62,7 @@ function NewQuotationContent() {
             }
             setQuotationNumber(`Q-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
         } catch (error: any) {
-            console.error("❌ Number Generation Permission Failure:", error);
-            // إظهار تنبيه تقني للمسؤول
+            console.error("❌ Number Generation Failure:", error);
             setQuotationNumber('خطأ في الصلاحيات');
         } finally {
             setIsGeneratingNumber(false);
@@ -131,7 +130,7 @@ function NewQuotationContent() {
                 <div className="space-y-1">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-primary/10 rounded-xl text-primary"><Calculator className="h-6 w-6"/></div>
-                        <CardTitle className="text-3xl font-black tracking-tighter">إنشاء عرض سعر جديد</CardTitle>
+                        <CardTitle className="text-3xl font-black tracking-tighter text-[#1e1b4b]">إنشاء عرض سعر جديد</CardTitle>
                     </div>
                     <CardDescription className="font-bold text-base pr-11">املأ التفاصيل الفنية والمالية بدقة لضمان تحويلها لعقد رسمي لاحقاً.</CardDescription>
                 </div>
