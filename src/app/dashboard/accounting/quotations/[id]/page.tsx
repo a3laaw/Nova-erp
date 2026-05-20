@@ -192,7 +192,7 @@ export default function ViewQuotationPage() {
                                                     <TableHead className="w-20 text-center text-white border-l border-white/10 font-black">#</TableHead>
                                                     <TableHead className="px-10 font-black text-xl text-white text-right">بيان الدفعة المستحقة</TableHead>
                                                     <TableHead className="w-56 text-center font-black text-xl text-white">
-                                                        {quotation.financialsType === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
+                                                        المبلغ (د.ك)
                                                     </TableHead>
                                                     <TableHead className="w-64 text-left px-12 font-black text-xl text-white">الإجمالي</TableHead>
                                                 </TableRow>
@@ -237,62 +237,6 @@ export default function ViewQuotationPage() {
                             )}
                         </div>
                     ))}
-                    
-                    {(!quotation.layoutBlocks || quotation.layoutBlocks.length === 0) && (
-                         <section className="space-y-8">
-                            <h3 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-4 border-r-8 border-primary pr-6">
-                                <Calculator className="h-8 w-8 text-primary"/> الترتيبات المالية للدفعات
-                            </h3>
-                            <div className="border-4 border-slate-100 rounded-[3.5rem] overflow-hidden shadow-2xl">
-                                <Table>
-                                    <TableHeader className="bg-slate-900 h-16">
-                                        <TableRow className="border-none">
-                                            <TableHead className="w-20 text-center text-white border-l border-white/10 font-black">#</TableHead>
-                                            <TableHead className="px-10 font-black text-xl text-white text-right">بيان الدفعة المستحقة</TableHead>
-                                            <TableHead className="w-56 text-center font-black text-xl text-white">
-                                                {quotation.financialsType === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
-                                            </TableHead>
-                                            <TableHead className="w-64 text-left px-12 font-black text-xl text-white">الإجمالي</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {quotation.items.map((item, index) => {
-                                            const rowTotal = quotation.financialsType === 'percentage' 
-                                                ? (item.percentage / 100) * (quotation.totalAmount || 0)
-                                                : item.total;
-
-                                            return (
-                                                <TableRow key={index} className="h-24 border-b last:border-0 hover:bg-transparent">
-                                                    <TableCell className="text-center font-mono font-black text-slate-300 border-l">{index + 1}</TableCell>
-                                                    <TableCell className="px-10">
-                                                        <p className="font-black text-2xl text-slate-800 leading-tight">{item.description}</p>
-                                                        <p className="text-xs font-bold text-slate-400 mt-1">{item.triggerCondition}</p>
-                                                    </TableCell>
-                                                    <TableCell className="text-center font-mono font-black text-3xl opacity-40">
-                                                        {quotation.financialsType === 'percentage' ? `${item.percentage}%` : formatCurrency(item.unitPrice || 0)}
-                                                    </TableCell>
-                                                    <TableCell className="text-left font-mono font-black text-3xl text-primary px-12 bg-primary/[0.02] border-r">
-                                                        {formatCurrency(rowTotal || 0)}
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                    <TableFooter className="bg-primary text-white h-32">
-                                        <TableRow className="border-none hover:bg-primary">
-                                            <TableCell colSpan={3} className="text-right px-16">
-                                                <p className="text-4xl font-black tracking-tighter">إجمالي قيمة التعاقد:</p>
-                                                <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mt-1">Total Fixed Contract Sum</p>
-                                            </TableCell>
-                                            <TableCell className="text-left font-mono text-5xl font-black px-12 bg-white/10 border-r border-white/20">
-                                                {formatCurrency(quotation.totalAmount || 0)}
-                                            </TableCell>
-                                        </TableRow>
-                                    </TableFooter>
-                                </Table>
-                            </div>
-                        </section>
-                    )}
                 </div>
 
                 <footer className="mt-32 pt-10 border-t-2 border-dashed text-center space-y-4">

@@ -31,7 +31,7 @@ export default function LeaveRequestsPage() {
                 <CardContent className="pt-8">
                     <LeaveRequestsList />
                 </CardContent>
-            </div>
+            </Card>
         </div>
     );
 }

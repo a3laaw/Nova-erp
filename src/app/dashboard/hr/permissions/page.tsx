@@ -31,7 +31,7 @@ export default function PermissionRequestsPage() {
                 <CardContent className="pt-8">
                     <PermissionRequestsList />
                 </CardContent>
-            </div>
+            </Card>
         </div>
     );
 }

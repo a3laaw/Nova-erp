@@ -39,7 +39,7 @@ export default function TransfersPage() {
                 <CardContent className="pt-8">
                     <TransferList />
                 </CardContent>
-            </div>
+            </Card>
         </div>
     );
 }
