@@ -13,8 +13,8 @@ import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 /**
- * شعار نوفا المدمج (NOVA Simple Text):
- * تصميم مطابق تماماً للصورة المطلوبة مع تمركز دقيق.
+ * شعار نوفا المعتمد (NOVA Text Logo):
+ * تصميم رصين يتوسط قطر دائرة التحميل المتوهجة.
  */
 const NovaLogo = () => (
   <svg width="140" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -59,7 +59,7 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 1. معالجة حالة التحميل المطابقة للصورة مع التوهج والتمركز المداري
+  // معالجة حالة التحميل المطابقة للصورة المعتمدة
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
@@ -67,12 +67,12 @@ export default function DashboardLayout({
             {/* 🛡️ حلقة التحميل مع التوهج المداري الفخم 🛡️ */}
             <div className="h-48 w-48 rounded-full border-2 border-primary/5 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.4)]" />
             
-            {/* شعار NOVA في المركز الهندسي المطلق للدائرة */}
+            {/* الشعار في المركز الهندسي المطلق للدائرة */}
             <div className="absolute inset-0 flex items-center justify-center">
                 <NovaLogo />
             </div>
             
-            {/* النص الكحلي بالأسفل بوضوح تام */}
+            {/* النص الكحلي المعتمد بالأسفل بوضوح تام */}
             <div className="mt-12 text-center space-y-4">
                 <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري التحميل...</p>
                 {showEmergencyExit && (
@@ -91,7 +91,6 @@ export default function DashboardLayout({
     );
   }
 
-  // 2. التحقق من وجود المستخدم
   if (!user) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]" dir="rtl">

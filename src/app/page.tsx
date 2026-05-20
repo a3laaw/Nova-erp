@@ -25,8 +25,7 @@ import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 
 /**
- * شعار نوفا المدمج (NOVA Simple Text):
- * تصميم مطابق تماماً للصورة المطلوبة مع تمركز دقيق.
+ * الشعار النصي المعتمد (NOVA Logo)
  */
 const NovaLogo = () => (
   <svg width="140" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -106,15 +105,10 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
           <div className="relative flex flex-col items-center">
-              {/* 🛡️ حلقة التحميل مع التوهج المشع 🛡️ */}
               <div className="h-48 w-48 rounded-full border-2 border-primary/5 border-t-primary animate-spin shadow-[0_0_30px_rgba(255,122,0,0.4)]" />
-              
-              {/* شعار NOVA في المركز الهندسي الدقيق للقطر */}
               <div className="absolute inset-0 flex items-center justify-center">
                   <NovaLogo />
               </div>
-
-              {/* النص الكحلي بالأسفل بمسافة كافية */}
               <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter mt-12">جاري التحميل...</p>
           </div>
       </div>

@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useFirebase } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, query, where, getDocs, writeBatch, deleteField } from 'firebase/firestore';
+import { doc, runTransaction, collection, serverTimestamp, query, where, getDocs, deleteField } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import type { Client } from '@/lib/types';
@@ -19,8 +19,7 @@ import { getTenantPath, cleanFirestoreData } from '@/lib/utils';
 
 /**
  * صفحة إضافة عميل جديد:
- * تم تحديثها بمحرك الربط التلقائي (Auto-Link Engine) الذي يبحث عن كافة المواعيد
- * المرتبطة برقم الجوال ويدمجها في الملف الرسمي الجديد فور التأسيس.
+ * تم إصلاح محرك المزامنة لضمان تسجيل رقم الجوال والاسم القادمين من الميدان بشكل آلي.
  */
 export default function NewClientPage() {
     const router = useRouter();
@@ -31,11 +30,12 @@ export default function NewClientPage() {
     
     const [isSaving, setIsSaving] = useState(false);
     
-    const initialData = {
+    // 🛡️ استخلاص البيانات القادمة من رادار المواعيد لضمان المزامنة
+    const initialData = useMemo(() => ({
         nameAr: searchParams.get('nameAr') || '',
         mobile: searchParams.get('mobile') || '',
         assignedEngineer: searchParams.get('engineerId') || '',
-    };
+    }), [searchParams]);
     
     const fromAppointmentId = searchParams.get('fromAppointmentId');
     const tenantId = currentUser?.currentCompanyId;
@@ -44,16 +44,13 @@ export default function NewClientPage() {
         if (!firestore || !currentUser || !tenantId) return;
         
         setIsSaving(true);
-        let newClientId = '';
+        const clientsCollectionPath = getTenantPath('clients', tenantId);
 
         try {
-            const clientsCollectionPath = getTenantPath('clients', tenantId);
-            
-            // 🛡️ التحقق من تكرار الجوال داخل المنشأة
             const mobileQuery = query(collection(firestore, clientsCollectionPath), where('mobile', '==', newClientData.mobile));
             const mobileSnapshot = await getDocs(mobileQuery);
             if (!mobileSnapshot.empty) {
-                throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر في هذه المنشأة.');
+                throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر في هذه المنشأة الموحدة.');
             }
 
             await runTransaction(firestore, async (transaction) => {
@@ -84,11 +81,10 @@ export default function NewClientPage() {
                 };
 
                 const newClientRef = doc(collection(firestore, clientsCollectionPath));
-                newClientId = newClientRef.id;
+                const newClientId = newClientRef.id;
                 transaction.set(newClientRef, cleanFirestoreData(finalClientData));
 
-                // 🚀 محرك الربط التلقائي (Auto-Link Logic)
-                // البحث عن كافة المواعيد المرتبطة بنفس رقم الجوال لتحويلها لملف رسمي
+                // الربط التلقائي للمواعيد السابقة والحالية بالملف الرسمي الجديد
                 const apptsPath = getTenantPath('appointments', tenantId);
                 const apptsQuery = query(collection(firestore, apptsPath), where('clientMobile', '==', newClientData.mobile));
                 const apptsSnapshot = await getDocs(apptsQuery);
@@ -103,11 +99,11 @@ export default function NewClientPage() {
                 });
             });
 
-            toast({ title: 'نجاح التأسيس والربط', description: 'تم إنشاء ملف العميل وربط كافة مواعيده السابقة آلياً.' });
-            router.push(`/dashboard/clients/${newClientId}`);
+            toast({ title: 'نجاح المزامنة', description: 'تم إنشاء ملف العميل وربط تاريخه الميداني آلياً.' });
+            router.push(`/dashboard/clients`);
 
         } catch (error: any) {
-            toast({ title: "خطأ", description: error.message, variant: "destructive" });
+            toast({ title: "فشل الحفظ", description: error.message, variant: "destructive" });
             setIsSaving(false);
         }
     }, [firestore, currentUser, toast, router, tenantId]);
@@ -115,8 +111,8 @@ export default function NewClientPage() {
     return (
         <Card className="max-w-2xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
             <CardHeader className="bg-primary/5 pb-8 border-b">
-                <CardTitle className="text-2xl font-black">إضافة عميل جديد</CardTitle>
-                <CardDescription className="text-base font-medium">سيقوم النظام آلياً بربط كافة المواعيد السابقة لهذا الرقم بالملف الجديد.</CardDescription>
+                <CardTitle className="text-2xl font-black">إكمال بيانات الملف الرسمي</CardTitle>
+                <CardDescription className="text-base font-medium">سيقوم النظام آلياً بدمج كافة المواعيد السابقة المرتبطة بهذا الرقم في السجل الرسمي.</CardDescription>
             </CardHeader>
             <CardContent className="p-8">
                 <ClientForm
@@ -129,3 +125,5 @@ export default function NewClientPage() {
         </Card>
     );
 }
+
+import { useMemo } from 'react';

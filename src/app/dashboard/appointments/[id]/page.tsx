@@ -26,8 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 /**
- * غرفة العمليات الميدانية (Sovereign Visit Control):
- * تم إضافة "سجل التدقيق التاريخي" لمعرفة من حجز الموعد ومن عدله.
+ * غرفة العمليات الميدانية (Visit Control Hub):
+ * تم تحديث الواجهة لتعمل بانسجام مع محرك المزامنة التلقائي للملفات.
  */
 export default function AppointmentDetailsPage() {
     const params = useParams();
@@ -145,7 +145,7 @@ export default function AppointmentDetailsPage() {
                 updatedAt: serverTimestamp()
             });
 
-            // 🛡️ توثيق إغلاق الزيارة في سجل التدقيق
+            // توثيق إغلاق الزيارة في سجل التدقيق المعتمد
             const auditRef = doc(collection(apptRef, 'auditLogs'));
             batch.set(auditRef, {
                 action: 'confirmed',
@@ -176,7 +176,7 @@ export default function AppointmentDetailsPage() {
                 <CardHeader className="bg-primary/5 pb-10 px-10 border-b">
                     <div className="flex justify-between items-start">
                         <div className="space-y-2">
-                            <Badge variant="outline" className="bg-white text-primary border-primary/20 font-black px-4">مركز تحكم الزيارة</Badge>
+                            <Badge variant="outline" className="bg-white text-primary border-primary/20 font-black px-4">مركز تحكم الزيارة الموحد</Badge>
                             <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">
                                 {client?.nameAr || appointment.clientName}
                                 {isProspective && <Badge className="mr-3 bg-orange-100 text-orange-700 font-black border-none text-[10px]">عميل محتمل</Badge>}
@@ -196,7 +196,7 @@ export default function AppointmentDetailsPage() {
                     <Tabs defaultValue="actions" dir="rtl">
                         <TabsList className="w-full h-14 bg-muted/20 border-b p-0 rounded-none">
                             <TabsTrigger value="actions" className="flex-1 h-full font-black text-xs gap-2 rounded-none data-[state=active]:bg-white">
-                                <Save className="h-4 w-4" /> تنفيذ الإجراءات
+                                <Save className="h-4 w-4" /> تنفيذ الإجراءات المعتمدة
                             </TabsTrigger>
                             <TabsTrigger value="audit" className="flex-1 h-full font-black text-xs gap-2 rounded-none data-[state=active]:bg-white">
                                 <History className="h-4 w-4" /> سجل التدقيق والأرشفة
@@ -207,14 +207,14 @@ export default function AppointmentDetailsPage() {
                             <TabsContent value="actions" className="m-0 space-y-10">
                                 <div className="grid grid-cols-2 gap-8">
                                     <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
-                                        <Label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">تاريخ الموعد</Label>
+                                        <Label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">تاريخ الموعد المخطط</Label>
                                         <p className="font-black text-lg text-slate-800 flex items-center gap-2">
                                             <Calendar className="h-4 w-4 text-primary" />
                                             {apptDate ? format(apptDate, 'eeee, dd MMMM', { locale: ar }) : '-'}
                                         </p>
                                     </div>
                                     <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
-                                        <Label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">وقت الزيارة</Label>
+                                        <Label className="text-[10px] font-black text-slate-400 block mb-2 uppercase">وقت الزيارة المعتمد</Label>
                                         <p className="font-black text-2xl font-mono text-primary flex items-center gap-2">
                                             <Clock className="h-4 w-4" />
                                             {apptDate ? format(apptDate, 'HH:mm', { locale: ar }) : '-'}
@@ -228,7 +228,7 @@ export default function AppointmentDetailsPage() {
                                     <div className="p-8 border-4 border-dashed border-primary/20 bg-primary/5 rounded-[2.5rem] space-y-6 animate-in zoom-in-95 duration-500">
                                         <h3 className="font-black text-primary flex items-center gap-3 text-xl">
                                             <Workflow className="h-6 w-6 animate-pulse"/> 
-                                            توثيق إنجاز الأعمال (WBS)
+                                            توثيق إنجاز الأعمال الميدانية
                                         </h3>
                                         <div className="grid gap-3">
                                             <Label className="font-black text-slate-700 pr-2">ما هي المرحلة التي تم إكمالها؟ *</Label>
@@ -241,11 +241,11 @@ export default function AppointmentDetailsPage() {
                                             />
                                         </div>
                                         <div className="grid gap-3">
-                                            <Label className="font-black text-slate-700 pr-2">محضر الاجتماع / الملاحظات الفنية</Label>
+                                            <Label className="font-black text-slate-700 pr-2">محضر الاجتماع المعتمد / الملاحظات</Label>
                                             <Textarea 
                                                 value={notes} 
                                                 onChange={e => setNotes(e.target.value)} 
-                                                placeholder="اكتب هنا ما تم الاتفاق عليه ليتم إدراجه في سجل العميل..." 
+                                                placeholder="اكتب هنا ما تم الاتفاق عليه ليتم إدراجه في سجل العميل الموحد..." 
                                                 rows={5}
                                                 className="rounded-3xl border-2 bg-white p-6 shadow-inner"
                                             />
@@ -256,7 +256,7 @@ export default function AppointmentDetailsPage() {
                                             className="w-full h-14 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/30"
                                         >
                                             {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <ShieldCheck className="h-6 w-6" />}
-                                            اعتماد الإنجاز وتفعيل المالية
+                                            اعتماد الإنجاز وتفعيل المطالبة المالية
                                         </Button>
                                     </div>
                                 ) : appointment.workStageUpdated ? (
@@ -271,11 +271,11 @@ export default function AppointmentDetailsPage() {
                                     <div className="space-y-6">
                                         <Alert variant="destructive" className="rounded-[2rem] border-4 border-dashed border-red-200 py-8 bg-red-50/50">
                                             <AlertCircle className="h-8 w-8 text-red-600"/>
-                                            <AlertTitle className="text-red-900 font-black text-2xl mb-2">إجراء مطلوب للربط</AlertTitle>
+                                            <AlertTitle className="text-red-900 font-black text-2xl mb-2">إجراء مطلوب لربط البيانات</AlertTitle>
                                             <AlertDescription className="text-red-800 font-bold text-lg leading-relaxed">
                                                 {isProspective 
-                                                    ? "هذا الشخص (عميل محمول)؛ يجب تحويله لملف رسمي لتمكين إدارة معاملاته وتفعيل الدفعات المالية."
-                                                    : "يرجى ربط هذه الزيارة بإحدى المعاملات المفتوحة لهذا العميل لتتمكن من تحديث مراحل الإنجاز."}
+                                                    ? "هذا الشخص (عميل محتمل)؛ يجب تحويله لملف رسمي لتمكين إدارة معاملاته وتفعيل الدفعات المالية المعتمدة."
+                                                    : "يرجى ربط هذه الزيارة بإحدى المعاملات المفتوحة لهذا العميل لتتمكن من تحديث مراحل الإنجاز الميدانية."}
                                             </AlertDescription>
                                         </Alert>
                                         
@@ -303,7 +303,7 @@ export default function AppointmentDetailsPage() {
                             <TabsContent value="audit" className="m-0 space-y-6">
                                 <div className="space-y-4">
                                     <h3 className="font-black text-slate-800 flex items-center gap-2">
-                                        <History className="h-5 w-5 text-primary" /> سجل حركات الموعد والأرشفة
+                                        <History className="h-5 w-5 text-primary" /> سجل حركات الموعد والأرشفة الرسمية
                                     </h3>
                                     
                                     {auditLoading ? (
@@ -349,7 +349,7 @@ export default function AppointmentDetailsPage() {
                 </CardContent>
                 <CardFooter className="bg-muted/10 p-8 flex justify-between border-t">
                     <Button variant="ghost" onClick={() => router.back()} className="font-black gap-2 h-12 text-slate-500 rounded-2xl hover:bg-white">
-                        <ArrowRight className="h-5 w-5"/> العودة للجدول
+                        <ArrowRight className="h-5 w-5"/> العودة لجدول المواعيد
                     </Button>
                 </CardFooter>
             </Card>
