@@ -17,7 +17,7 @@ import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
  * تصميم مطابق تماماً للصورة المطلوبة.
  */
 const NovaLogo = () => (
-  <svg width="120" height="40" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
+  <svg width="140" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg">
     <text 
       x="50%" 
       y="60%" 
@@ -52,18 +52,18 @@ export default function DashboardLayout({
   // 1. معالجة حالة التحميل المطابقة للصورة الصحيحة
   if (loading || !mounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-6 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        <div className="relative flex flex-col items-center gap-4">
-            {/* حلقة التحميل الدائرية كما في الصورة */}
-            <div className="h-20 w-20 rounded-full border-4 border-primary/5 border-t-primary animate-spin" />
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
+        <div className="relative flex flex-col items-center gap-8">
+            {/* 🛡️ تكبير حلقة التحميل لمنع التداخل مع النص 🛡️ */}
+            <div className="h-40 w-40 rounded-full border-2 border-primary/10 border-t-primary animate-spin" />
             
-            {/* شعار NOVA في المنتصف */}
-            <div className="absolute inset-0 m-auto flex items-center justify-center">
+            {/* شعار NOVA في المنتصف المعزول تماماً عن مسار الدائرة */}
+            <div className="absolute inset-0 m-auto flex items-center justify-center mb-8">
                 <NovaLogo />
             </div>
             
-            {/* النص الكحلي بالأسفل */}
-            <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري التحميل...</p>
+            {/* النص الكحلي بالأسفل بوضوح تام */}
+            <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter mt-4">جاري التحميل...</p>
         </div>
       </div>
     );

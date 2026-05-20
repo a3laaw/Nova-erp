@@ -29,7 +29,7 @@ import { Separator } from '@/components/ui/separator';
  * تصميم فخم وبسيط يتناسب مع التوهج الذهبي.
  */
 const NovaLogo = () => (
-  <svg width="120" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
+  <svg width="140" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg">
     <text 
       x="50%" 
       y="60%" 
@@ -38,17 +38,11 @@ const NovaLogo = () => (
       fontFamily="inherit" 
       fontWeight="900" 
       fontSize="42" 
-      fill="url(#loginGradient)"
+      fill="#FF7A00"
       style={{ filter: 'drop-shadow(0px 0px 8px rgba(255,122,0,0.3))' }}
     >
       NOVA
     </text>
-    <defs>
-      <linearGradient id="loginGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#FFB000" />
-        <stop offset="100%" stopColor="#FF7A00" />
-      </linearGradient>
-    </defs>
   </svg>
 );
 
@@ -111,17 +105,19 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-[#FF7A00]/10 rounded-full blur-[100px] animate-pulse" />
-          <div className="relative">
-              {/* حلقة التحميل الدائرية المطابقة للصورة */}
-              <div className="h-24 w-24 rounded-full border-4 border-primary/5 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.15)]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-[#FF7A00]/5 rounded-full blur-[100px]" />
+          <div className="relative flex flex-col items-center gap-8">
+              {/* 🛡️ تكبير الحلقة لمنع التداخل مع الكلمة 🛡️ */}
+              <div className="h-40 w-40 rounded-full border-2 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.1)]" />
               
-              {/* نص NOVA في المنتصف */}
-              <div className="absolute inset-0 m-auto flex flex-col items-center justify-center">
+              {/* نص NOVA في المنتصف المعزول تماماً */}
+              <div className="absolute inset-0 m-auto flex flex-col items-center justify-center mb-8">
                   <NovaLogo />
               </div>
+
+              {/* النص الكحلي بالأسفل بمسافة كافية */}
+              <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter mt-4">جاري التحميل...</p>
           </div>
-          <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري فتح جلسة العمل...</p>
       </div>
     );
   }
@@ -182,7 +178,7 @@ export default function LoginPage() {
                         </div>
 
                         <div className="space-y-4">
-                            <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none transition-all active:scale-95 group">
+                            <Button type="submit" className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none transition-all active:scale-95 group">
                                 {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول النظام"}
                                 {!isSubmitting && <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform rotate-180" />}
                             </Button>
