@@ -1,9 +1,8 @@
-
 'use client';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, writeBatch, serverTimestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, writeBatch, serverTimestamp, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -21,6 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
 import { 
     Pencil, 
     User, 
@@ -131,7 +131,7 @@ export default function ClientProfilePage() {
     });
   }, [firestore, tenantId]);
 
-  // 🛡️ معالجة التجميد (Handle Freeze) المحصنة
+  // 🛡️ معالجة التجميد (Handle Freeze) المحصنة - تم استبدال onClick بـ onSelect لضمان الاستجابة
   const handleToggleFreeze = async (tx: ClientTransaction) => {
     if (!firestore || !tenantId || !tx.id) return;
     setIsProcessing(true);
@@ -174,7 +174,7 @@ export default function ClientProfilePage() {
     }
   };
 
-  // محرك التجميع الثلاثي (Grouping Logic)
+  // محرك التجميع الثلاثي (Grouping Logic) لتطبيق نظام الطبقات الثلاث
   const groupedTransactions = useMemo(() => {
     const groups = new Map<string, ClientTransaction[]>();
     transactions.forEach(tx => {
@@ -215,10 +215,10 @@ export default function ClientProfilePage() {
             </CardContent>
         </Card>
 
-        {/* الطبقة 2 و 3: المعاملات الرئيسية والداخلية */}
+        {/* الطبقة 2 و 3: المعاملات الرئيسية والداخلية المدمجة في جدول موحد */}
         <div className="space-y-12">
             <h3 className="text-2xl font-black text-[#1e1b4b] border-r-8 border-primary pr-4 flex items-center gap-3">
-                <Workflow className="h-7 w-7 text-primary" /> هيكل الخدمات الميدانية المعتمدة
+                <Workflow className="h-7 w-7 text-primary" /> هيكل الخدمات الميدانية والمعاملات
             </h3>
             
             {groupedTransactions.length === 0 ? (
@@ -265,12 +265,12 @@ export default function ClientProfilePage() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
                                                     <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">إجراءات المعاملة</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => handleToggleFreeze(tx)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                                    <DropdownMenuItem onSelect={() => handleToggleFreeze(tx)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
                                                         {tx.status === 'on-hold' ? <FolderOpen className="h-4 w-4 text-green-600"/> : <FolderLock className="h-4 w-4 text-orange-600"/>}
                                                         {tx.status === 'on-hold' ? 'إلغاء التجميد' : 'تجميد المعاملة'}
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator className="bg-slate-100" />
-                                                    <DropdownMenuItem onClick={() => setTransactionToDelete(tx)} className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50">
+                                                    <DropdownMenuItem onSelect={() => setTransactionToDelete(tx)} className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50">
                                                         <Trash2 className="h-4 w-4" /> حذف نهائي
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>

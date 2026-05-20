@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 @import "react-day-picker/dist/style.css";
 @tailwind base;
@@ -74,10 +73,10 @@
   pointer-events: auto !important;
 }
 
-/* فرض الخلفية البيضاء المصمتة لمنع التشتت البصري */
+/* فرض الخلفية البيضاء المصمتة لمنع التشتت البصري وضمان سيادة الماوس */
 [role="listbox"], 
 [role="menu"], 
-[role="dialog"]:not([data-state="open"]),
+[role="dialog"][data-state="open"],
 [data-radix-select-content], 
 [data-radix-popover-content],
 .react-select__menu {
@@ -92,7 +91,7 @@
   z-index: 999999 !important;
 }
 
-[role="menuitem"], [role="option"], [cmdk-item] {
+[role="menuitem"], [role="option"], [cmdk-item], button {
     cursor: pointer !important;
     pointer-events: auto !important;
 }
