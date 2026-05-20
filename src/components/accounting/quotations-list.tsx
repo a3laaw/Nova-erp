@@ -91,7 +91,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
         <TableHeader className="bg-[#F8F9FE]">
           <TableRow className="hover:bg-transparent border-none">
             <TableHead className="px-6 py-5 font-black text-[#7209B7] text-right rounded-r-2xl">رقم العرض</TableHead>
-            <TableHead className="font-black text-[#7209B7] text-right">العميل</TableHead>
+            <TableHead className="font-black text-[#7209B7] text-right">المالك / العميل</TableHead>
             <TableHead className="font-black text-[#7209B7] text-right">الموضوع</TableHead>
             <TableHead className="font-black text-[#7209B7] text-center">التاريخ</TableHead>
             <TableHead className="font-black text-[#7209B7] text-left">الإجمالي</TableHead>
@@ -107,13 +107,21 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
             ) : (
                 filteredQuotations.map((quotation) => (
                     <TableRow key={quotation.id} className="group border-none shadow-sm transition-all duration-300 hover:bg-[#F3E8FF]/20 [&:nth-child(even)]:bg-[#F3E8FF]/10">
-                        <TableCell className="px-6 py-5 font-mono font-black text-[#7209B7] text-sm rounded-r-2xl">{quotation.quotationNumber}</TableCell>
+                        <TableCell className="px-6 py-5 font-mono font-black text-[#7209B7] text-sm rounded-r-2xl">
+                            <Link href={`/dashboard/accounting/quotations/${quotation.id}`} className='hover:underline'>{quotation.quotationNumber}</Link>
+                        </TableCell>
                         <TableCell>
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-[#F8F9FE] rounded-full group-hover:bg-white transition-colors">
                                     <User className="h-4 w-4 text-[#7209B7]" />
                                 </div>
-                                <span className="font-black text-gray-800">{quotation.clientName}</span>
+                                {quotation.clientId ? (
+                                    <Link href={`/dashboard/clients/${quotation.clientId}`} className='font-black text-gray-800 hover:underline hover:text-primary transition-colors'>
+                                        {quotation.clientName}
+                                    </Link>
+                                ) : (
+                                    <span className="font-black text-gray-800">{quotation.clientName}</span>
+                                )}
                             </div>
                         </TableCell>
                         <TableCell className="font-bold text-gray-600">{quotation.subject}</TableCell>

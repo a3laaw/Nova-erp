@@ -220,7 +220,9 @@ export default function TransactionDetailPage() {
                                 <Badge className="bg-primary text-white font-black px-4 h-7 rounded-full border-none shadow-md">{transaction.subServiceName}</Badge>
                             </div>
                         )}
-                        <CardDescription className="text-base font-bold">العميل: {client.nameAr}</CardDescription>
+                        <CardDescription className="text-base font-bold">
+                            العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link>
+                        </CardDescription>
                     </div>
                     <div className="flex flex-col items-end gap-3">
                         <Badge variant="outline" className={cn("px-6 py-1.5 rounded-full font-black text-sm border-2 shadow-sm", transactionStatusColors[transaction.status])}>
@@ -306,7 +308,7 @@ export default function TransactionDetailPage() {
             </TabsContent>
 
             <TabsContent value="history" className="animate-in fade-in duration-500">
-                <TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="log" showInput={false} title="سجل الأحداث الإجرائية" icon={<History className='text-primary h-6 w-6'/>} client={client} transaction={transaction} />
+                <TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="log" showInput={false} title="السجل الإجرائي التاريخي" icon={<History className='text-primary h-6 w-6'/>} client={client} transaction={transaction} />
             </TabsContent>
         </Tabs>
 

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -18,7 +17,7 @@ import type { CashReceipt } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
-import { MoreHorizontal, Eye, Pencil, Trash2, Search, ArrowDownLeft } from 'lucide-react';
+import { MoreHorizontal, Eye, Pencil, Trash2, Search, ArrowDownLeft, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
@@ -130,7 +129,20 @@ export function CashReceiptsList() {
                             <TableCell className="px-8 font-mono font-black text-primary">
                                 <Link href={`/dashboard/accounting/cash-receipts/${receipt.id}`} className="hover:underline">{receipt.voucherNumber}</Link>
                             </TableCell>
-                            <TableCell className="font-black text-gray-800">{receipt.clientNameAr}</TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-[#F8F9FE] rounded-full">
+                                        <User className="h-4 w-4 text-[#7209B7]" />
+                                    </div>
+                                    {receipt.clientId ? (
+                                        <Link href={`/dashboard/clients/${receipt.clientId}`} className='font-black text-gray-800 hover:underline'>
+                                            {receipt.clientNameAr}
+                                        </Link>
+                                    ) : (
+                                        <span className="font-black text-gray-800">{receipt.clientNameAr}</span>
+                                    )}
+                                </div>
+                            </TableCell>
                             <TableCell className="font-bold text-xs opacity-60">{formatDate(receipt.receiptDate)}</TableCell>
                             <TableCell>
                                 <Badge variant="outline" className="px-3 font-black text-[10px] bg-white border-primary/20 text-primary">
@@ -172,7 +184,7 @@ export function CashReceiptsList() {
          <AlertDialog open={!!receiptToDelete} onOpenChange={() => setReceiptToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2rem] p-10 border-none shadow-2xl">
                 <AlertDialogHeader>
-                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4"><Trash2 className="h-8 w-8"/></div>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><Trash2 className="h-8 w-8"/></div>
                     <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-lg font-medium leading-relaxed">
                         سيتم حذف السند رقم <strong className="text-foreground">"{receiptToDelete?.voucherNumber}"</strong> وكافة قيوده المحاسبية المرتبطة. هذا الإجراء سيؤثر على ميزان المراجعة ومديونية العميل.

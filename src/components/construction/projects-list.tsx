@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, ArrowUpDown, Pencil, FolderLock, FolderOpen, Trash2, Loader2 } from 'lucide-react';
+import { MoreHorizontal, ArrowUpDown, Pencil, FolderLock, FolderOpen, Trash2, Loader2, User } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -103,8 +103,8 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
                 description: `تم تغيير حالة المشروع إلى "${newStatus}".`
             });
         } catch (error) {
-            console.error("Failed to toggle project status:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة المشروع.' });
+            console.error("Failed to update status:", error);
+            toast({ variant: 'destructive', title: 'خطأ' });
         } finally {
             setIsProcessing(false);
         }
@@ -117,11 +117,11 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
             await deleteDoc(doc(firestore, 'projects', projectToDelete.id!));
             toast({
                 title: 'تم الحذف',
-                description: `تم حذف المشروع "${projectToDelete.projectName}" بنجاح.`
+                description: `تم حذف المشروع بنجاح.`
             });
         } catch (error) {
             console.error("Failed to delete project:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف المشروع.' });
+            toast({ variant: 'destructive', title: 'خطأ' });
         } finally {
             setIsProcessing(false);
             setProjectToDelete(null);
@@ -138,17 +138,26 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
                         <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                 ),
-                cell: ({ row }) => <div className="font-mono">{row.original.projectId}</div>,
+                cell: ({ row }) => <div className="font-mono text-xs">{row.original.projectId}</div>,
             },
             {
                 accessorKey: 'projectName',
-                header: 'اسم المشروع',
+                header: 'المشروع والمالك',
                 cell: ({ row }) => (
-                    <div>
-                        <Link href={`/dashboard/construction/projects/${row.original.id}`} className="font-medium hover:underline text-primary">
+                    <div className="flex flex-col gap-1">
+                        <Link href={`/dashboard/construction/projects/${row.original.id}`} className="font-black hover:underline text-primary text-base">
                             {row.original.projectName}
                         </Link>
-                        <p className="text-xs text-muted-foreground">{row.original.clientName}</p>
+                        <div className="flex items-center gap-1.5">
+                            <User className="h-3 w-3 text-muted-foreground opacity-40"/>
+                            {row.original.clientId ? (
+                                <Link href={`/dashboard/clients/${row.original.clientId}`} className='text-[11px] font-bold text-slate-500 hover:text-primary transition-colors'>
+                                    {row.original.clientName}
+                                </Link>
+                            ) : (
+                                <span className="text-[11px] font-bold text-slate-500">{row.original.clientName}</span>
+                            )}
+                        </div>
                     </div>
                 )
             },
@@ -158,22 +167,17 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
                 cell: ({ row }) => formatDate(row.original.startDate),
             },
             {
-                accessorKey: 'projectCategory',
-                header: 'الفئة',
-                cell: ({ row }) => <Badge variant="outline">{row.original.projectCategory === 'Private (Subsidized)' ? 'مدعوم' : 'تجاري'}</Badge>,
-            },
-            {
                 accessorKey: 'status',
                 header: 'الحالة',
-                cell: ({ row }) => <Badge variant="outline" className={statusColors[row.original.status] || ''}>{row.original.status}</Badge>,
+                cell: ({ row }) => <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[row.original.status] || '')}>{row.original.status}</Badge>,
             },
             {
                 accessorKey: 'progressPercentage',
                 header: 'نسبة الإنجاز',
                 cell: ({ row }) => (
-                    <div className="flex items-center gap-2">
-                        <Progress value={row.original.progressPercentage} className="w-24 h-2" />
-                        <span className="text-xs font-mono">{row.original.progressPercentage}%</span>
+                    <div className="flex items-center gap-3 w-40">
+                        <Progress value={row.original.progressPercentage} className="h-1.5 flex-1" />
+                        <span className="text-[10px] font-black font-mono text-primary">{row.original.progressPercentage}%</span>
                     </div>
                 )
             },
@@ -184,34 +188,33 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
                     return (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0" disabled={isProcessing}>
-                                    <span className="sr-only">فتح القائمة</span>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border" disabled={isProcessing}>
                                     <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" dir="rtl">
-                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/construction/projects/${project.id}`}>عرض التفاصيل</Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                     <Link href={`/dashboard/construction/projects/${project.id}/edit`}>
-                                        <Pencil className="ml-2 h-4 w-4" />
-                                        تعديل
+                            <DropdownMenuContent align="end" dir="rtl" className="rounded-xl p-2 shadow-2xl border-none bg-white">
+                                <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">إدارة المشروع</DropdownMenuLabel>
+                                <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3">
+                                    <Link href={`/dashboard/construction/projects/${project.id}`}>
+                                        <Eye className="h-4 w-4 text-primary"/> فتح المسار الفني
                                     </Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleToggleStatus(project)}>
-                                    {project.status === 'معلق' ? <FolderOpen className="ml-2 h-4 w-4" /> : <FolderLock className="ml-2 h-4 w-4" />}
+                                <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3">
+                                     <Link href={`/dashboard/construction/projects/${project.id}/edit`}>
+                                        <Pencil className="h-4 w-4 text-primary" /> تعديل البيانات
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-slate-100" />
+                                <DropdownMenuItem onClick={() => handleToggleStatus(project)} className="rounded-lg py-3 font-bold gap-3">
+                                    {project.status === 'معلق' ? <FolderOpen className="ml-2 h-4 w-4 text-green-600" /> : <FolderLock className="ml-2 h-4 w-4 text-orange-600" />}
                                     {project.status === 'معلق' ? 'إلغاء التعليق' : 'تعليق المشروع'}
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
+                                <DropdownMenuSeparator className="bg-slate-100" />
                                 <DropdownMenuItem 
                                     onClick={() => setProjectToDelete(project)} 
-                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                    className="text-red-600 font-black rounded-lg py-3 gap-3 focus:bg-red-50"
                                 >
-                                    <Trash2 className="ml-2 h-4 w-4" />
-                                    حذف المشروع
+                                    <Trash2 className="ml-2 h-4 w-4" /> حذف نهائي
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -219,7 +222,7 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
                 },
             },
         ],
-        [isProcessing]
+        [isProcessing, firestore, toast]
     );
 
     const table = useReactTable({
@@ -235,13 +238,13 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
 
     return (
         <>
-            <div className="rounded-md border">
+            <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm">
                 <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-muted/50 h-14">
                         {table.getHeaderGroups().map((headerGroup) => (
-                            <TableRow key={headerGroup.id}>
+                            <TableRow key={headerGroup.id} className="border-none">
                                 {headerGroup.headers.map((header) => (
-                                    <TableHead key={header.id}>
+                                    <TableHead key={header.id} className="font-black">
                                         {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                                     </TableHead>
                                 ))}
@@ -250,12 +253,12 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
                     </TableHeader>
                     <TableBody>
                         {loading ? (
-                            Array.from({ length: 5 }).map((_, i) => (
-                                <TableRow key={i}><TableCell colSpan={columns.length}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                            Array.from({ length: 3 }).map((_, i) => (
+                                <TableRow key={i}><TableCell colSpan={columns.length} className="p-8"><Skeleton className="h-10 w-full rounded-2xl" /></TableCell></TableRow>
                             ))
                         ) : table.getRowModel().rows?.length ? (
                             table.getRowModel().rows.map((row) => (
-                                <TableRow key={row.id}>
+                                <TableRow key={row.id} className="h-20 hover:bg-muted/5 transition-colors border-b last:border-0 group">
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -265,8 +268,8 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={columns.length} className="h-24 text-center">
-                                    لا توجد مشاريع مقاولات لعرضها.
+                                <TableCell colSpan={columns.length} className="h-48 text-center text-muted-foreground font-black italic">
+                                    لا توجد مشاريع مقاولات نشطة حالياً.
                                 </TableCell>
                             </TableRow>
                         )}
@@ -275,19 +278,16 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
             </div>
 
             <AlertDialog open={!!projectToDelete} onOpenChange={() => setProjectToDelete(null)}>
-                <AlertDialogContent dir="rtl">
+                <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>تأكيد حذف المشروع؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            هل أنت متأكد من رغبتك في حذف المشروع "{projectToDelete?.projectName}"؟ 
-                            سيؤدي هذا إلى حذف كافة البيانات الفنية والهيكل المرتبط بالمشروع بشكل نهائي. 
-                            لا يمكن التراجع عن هذا الإجراء.
-                        </AlertDialogDescription>
+                        <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><Trash2 className="h-10 w-10"/></div>
+                        <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tighter">تأكيد حذف المشروع؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2">سيتم مسح كافة البيانات الفنية، مراحل الإنجاز الميداني، والارتباط بجدول الكميات لـ "{projectToDelete?.projectName}" نهائياً.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isProcessing}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} disabled={isProcessing} className="bg-destructive hover:bg-destructive/90">
-                            {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالحذف'}
+                    <AlertDialogFooter className="mt-8 gap-3">
+                        <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
+                            {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

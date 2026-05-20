@@ -25,10 +25,6 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-/**
- * غرفة العمليات الميدانية (Visit Control Hub):
- * تم تحديث الواجهة لتعمل بانسجام مع محرك المزامنة التلقائي للملفات.
- */
 export default function AppointmentDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -42,7 +38,6 @@ export default function AppointmentDetailsPage() {
     const apptPath = useMemo(() => id ? `appointments/${id}` : null, [id]);
     const { data: appointment, loading: apptLoading } = useDocument<Appointment>(firestore, apptPath);
     
-    // جلب سجل التدقيق للموعد
     const auditPath = useMemo(() => id ? `appointments/${id}/auditLogs` : null, [id]);
     const { data: auditLogs, loading: auditLoading } = useSubscription<AppointmentAuditLog>(
         firestore, 
@@ -145,7 +140,6 @@ export default function AppointmentDetailsPage() {
                 updatedAt: serverTimestamp()
             });
 
-            // توثيق إغلاق الزيارة في سجل التدقيق المعتمد
             const auditRef = doc(collection(apptRef, 'auditLogs'));
             batch.set(auditRef, {
                 action: 'confirmed',
@@ -178,7 +172,13 @@ export default function AppointmentDetailsPage() {
                         <div className="space-y-2">
                             <Badge variant="outline" className="bg-white text-primary border-primary/20 font-black px-4">مركز تحكم الزيارة الموحد</Badge>
                             <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">
-                                {client?.nameAr || appointment.clientName}
+                                {appointment.clientId ? (
+                                    <Link href={`/dashboard/clients/${appointment.clientId}`} className='hover:underline'>
+                                        {client?.nameAr || appointment.clientName}
+                                    </Link>
+                                ) : (
+                                    appointment.clientName
+                                )}
                                 {isProspective && <Badge className="mr-3 bg-orange-100 text-orange-700 font-black border-none text-[10px]">عميل محتمل</Badge>}
                             </CardTitle>
                             <CardDescription className="font-bold flex items-center gap-2 text-lg opacity-60">
@@ -320,7 +320,7 @@ export default function AppointmentDetailsPage() {
                                                     <div className="absolute -right-[1.85rem] top-1 p-1 bg-white rounded-full border-2 shadow-sm">
                                                         <div className="h-3 w-3 rounded-full bg-primary" />
                                                     </div>
-                                                    <div className="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner group">
+                                                    <div className="flex-1 bg-slate-50 p-4 rounded-2xl border shadow-inner group">
                                                         <div className="flex justify-between items-start mb-2">
                                                             <div className="flex items-center gap-2">
                                                                 <Avatar className="h-6 w-6 border-2 border-white shadow-sm">
