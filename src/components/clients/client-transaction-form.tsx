@@ -33,7 +33,7 @@ interface ClientTransactionFormProps {
 
 /**
  * نموذج إضافة معاملة جديدة:
- * تم ربطه بـ "إدارة أنواع الخدمات" لضمان ظهور القوائم المرجعية المحدثة.
+ * تم ربطه بـ "إدارة أنواع الخدمات" لضمان ظهور القوائم المرجعية المحدثة المخصصة للمنشأة.
  */
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
@@ -67,7 +67,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 const engSnap = await getDocs(query(collection(firestore, empPath), where('status', '==', 'active')));
                 setEngineers(engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
 
-                // 2. جلب أنواع الخدمات المعتمدة من القوائم المرجعية
+                // 2. جلب أنواع الخدمات المعتمدة من القوائم المرجعية الموحدة
                 const typesPath = getTenantPath('transactionTypes', tenantId);
                 const typesSnap = await getDocs(query(collection(firestore, typesPath), orderBy('order')));
                 setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
@@ -104,7 +104,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const departmentIds = selectedType?.departmentIds || [];
 
-            // جلب مراحل العمل المرتبطة بالأقسام التي تتبع لها هذه الخدمة
+            // جلب مراحل العمل المعتمدة المرتبطة بالأقسام التي تتبع لها هذه الخدمة
             let initialStages: any[] = [];
             for (const deptId of departmentIds) {
                 const stagesPath = getTenantPath(`departments/${deptId}/workStages`, tenantId);
@@ -155,7 +155,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 batch.update(doc(firestore, apptPath), { transactionId: newTransactionRef.id });
             }
 
-            // توثيق الحدث في سجل المتابعة
+            // توثيق الحدث في سجل المتابعة المعتمد
             const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
                 type: 'log', 
@@ -168,7 +168,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
             await batch.commit();
             
-            toast({ title: 'نجاح الربط', description: 'تم إنشاء المعاملة وربطها بسير العمل المرجعي بنجاح.' });
+            toast({ title: 'نجاح الربط', description: 'تم إنشاء المعاملة وربطها بسير العمل المعتمد بنجاح.' });
             onClose();
             router.refresh();
 
@@ -230,7 +230,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                     </div>
 
                     <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
-                        <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
                         <Button type="submit" disabled={isSaving || !transactionTypeName} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2">
                             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
                             حفظ المعاملة

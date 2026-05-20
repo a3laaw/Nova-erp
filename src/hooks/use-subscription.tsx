@@ -68,7 +68,6 @@ export function useSubscription<T extends { id?: string }>(
         if (isGroup && tenantId) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
             finalConstraints.push(where('companyId', '==', tenantId));
-            // في حالة الـ group، الـ base path هو اسم الكولكشن فقط
             try {
                 const q = query(collectionGroup(firestore, collectionName), ...finalConstraints);
                 const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -76,6 +75,7 @@ export function useSubscription<T extends { id?: string }>(
                     setData(newData);
                     setLoading(false);
                 }, (err) => {
+                    console.error(`Group Subscription Error [${collectionName}]:`, err.message);
                     setError(err);
                     setLoading(false);
                 });

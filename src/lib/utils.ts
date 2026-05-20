@@ -1,6 +1,6 @@
 /**
  * @fileOverview المحرك البرمجي للأدوات المساعدة (Utils).
- * تم تحديثه لفرض العزل التام للمنشآت (SaaS Multi-tenancy).
+ * تم تحديثه لفرض العزل التام للمنشآت (SaaS Multi-tenancy) وتطهير المصطلحات.
  */
 
 import { clsx, type ClassValue } from "clsx"
@@ -43,7 +43,7 @@ export function numberToArabicWords(inputNumber: number | string): string {
 
 /**
  * محرك توجيه المسارات المطور (SaaS Tenant Router):
- * 🛡️ الضابط الأكبر لعزل البيانات. 
+ * 🛡️ الضابط الأكبر لعزل البيانات لضمان عدم حدوث أخطاء صلاحيات.
  */
 export function getTenantPath(path: string, tenantId: string | null | undefined): string {
   if (!path) return '';

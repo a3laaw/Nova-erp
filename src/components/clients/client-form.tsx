@@ -29,7 +29,6 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
     
     const tenantId = currentUser?.currentCompanyId;
 
-    // تم تحديث الحالة لتبدأ فارغة ويتم حقن البيانات فيها عبر useEffect لضمان سماع المحرك لها
     const [formData, setFormData] = useState({
         nameAr: '', nameEn: '', mobile: '', governorateId: '', area: '',
         block: '', street: '', houseNumber: '',
@@ -59,20 +58,23 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
                 setFormData(prev => ({...prev, area: preselectArea}));
             }
         } catch (e) {
-            console.error("Error fetching hierarchical areas:", e);
+            console.error("Error fetching areas:", e);
         } finally {
             setIsAreaLoading(false);
         }
     }, [firestore, tenantId]);
     
-    // ✨ إصلاح الخلل: حقن البيانات القادمة من جدول الزيارات في الحالة النشطة فوراً
+    /**
+     * محرك المزامنة الفوري (Immediate State Injection):
+     * يضمن حقن البيانات القادمة من الميدان في الحالة النشطة فوراً لضمان حفظها.
+     */
     useEffect(() => {
         if (initialData) {
             setFormData(prev => ({
                 ...prev,
                 nameAr: initialData.nameAr || prev.nameAr,
-                nameEn: initialData.nameEn || prev.nameEn,
                 mobile: initialData.mobile || prev.mobile,
+                nameEn: initialData.nameEn || prev.nameEn,
                 block: initialData.address?.block || prev.block,
                 street: initialData.address?.street || prev.street,
                 houseNumber: initialData.address?.houseNumber || prev.houseNumber,
@@ -159,7 +161,7 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-8">
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-8 scrollbar-none">
                 <p className="text-[11px] text-muted-foreground font-medium">الحقول المميزة بالنجمة (<span className="text-destructive">*</span>) مطلوبة</p>
 
                 <section className="bg-muted/30 p-6 rounded-[1.5rem] border border-border/50 space-y-6">
@@ -173,7 +175,7 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
                                 onChange={handleInputChange} 
                                 required 
                                 placeholder="مثال: محمد عبدالله العتيبي"
-                                className="pr-10 h-12 bg-white rounded-xl shadow-sm focus:ring-primary/20 border-gray-200 transition-all"
+                                className="pr-10 h-12 bg-white rounded-xl shadow-sm border-gray-200"
                             />
                         </div>
                     </div>
@@ -187,7 +189,7 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
                                 value={formData.nameEn} 
                                 onChange={handleInputChange} 
                                 placeholder="e.g. Mohammed Abdullah"
-                                className="h-12 bg-white rounded-xl shadow-sm focus:ring-primary/20 border-gray-200"
+                                className="h-12 bg-white rounded-xl shadow-sm border-gray-200"
                             />
                         </div>
                         <div className="grid gap-2">
@@ -201,7 +203,7 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
                                     onChange={handleInputChange} 
                                     required 
                                     placeholder="XXXXXXXXX05"
-                                    className="pr-10 h-12 bg-white rounded-xl shadow-sm focus:ring-primary/20 border-gray-200"
+                                    className="pr-10 h-12 bg-white rounded-xl shadow-sm border-gray-200"
                                 />
                                 {isMobileValid && (
                                     <CheckCircle2 className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-500 animate-in fade-in zoom-in" />

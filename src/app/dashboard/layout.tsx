@@ -95,7 +95,7 @@ export default function DashboardLayout({
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]" dir="rtl">
         <AlertCircle className="h-12 w-12 text-red-600 animate-bounce" />
-        <h2 className="text-3xl font-black text-[#1e1b4b]">انتهت الجلسة</h2>
+        <h2 className="text-3xl font-black text-[#1e1b4b]">انتهت جلسة العمل</h2>
         <Button onClick={handleSafeExit} className="bg-primary text-white font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl">بوابة الدخول</Button>
       </div>
     );
