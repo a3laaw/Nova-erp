@@ -14,7 +14,8 @@ import {
     Settings,
     Building2,
     Sparkles,
-    ChevronDown
+    ChevronDown,
+    Palette
 } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -131,15 +132,6 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={toggleTheme} 
-                        className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
-                    >
-                        {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-                    </Button>
                     
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -169,6 +161,18 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     </DropdownMenu>
 
                     <Notifications />
+
+                    <Separator orientation="vertical" className="h-6 bg-slate-200 mx-1" />
+
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={toggleTheme} 
+                        className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
+                        title="تغيير المظهر (فاتح/داكن)"
+                    >
+                        <Palette className="h-5 w-5" />
+                    </Button>
 
                     <Button 
                         variant="ghost" 
