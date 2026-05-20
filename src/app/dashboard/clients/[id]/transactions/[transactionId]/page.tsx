@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where, getDoc, collectionGroup, addDoc, Timestamp, limit } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, writeBatch, serverTimestamp, updateDoc, getDoc } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -23,16 +23,40 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Pencil, User, Calendar, Workflow, Play, Check, Undo2, Plus, MessageSquare, History, ClipboardList, ExternalLink, Sparkles, Coins, FileSignature, Loader2, Layers, Package, AlertCircle, CheckCircle } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { 
+    Pencil, 
+    User, 
+    Calendar, 
+    Workflow, 
+    Play, 
+    Check, 
+    Undo2, 
+    Plus, 
+    MessageSquare, 
+    History, 
+    ClipboardList, 
+    ExternalLink, 
+    Sparkles, 
+    Coins, 
+    FileSignature, 
+    Loader2, 
+    Layers, 
+    Package, 
+    AlertCircle, 
+    CheckCircle,
+    CheckCircle2
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
-import type { Client, ClientTransaction, Employee, TransactionType, WorkStage, TransactionStage, Account } from '@/lib/types';
-import { format, differenceInDays } from 'date-fns';
+import type { Client, ClientTransaction, Employee, TransactionType, WorkStage, TransactionStage } from '@/lib/types';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 import { useAuth } from '@/context/auth-context';
@@ -104,7 +128,7 @@ export default function TransactionDetailPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSignDialogOpen, setIsSignDialogOpen] = useState(false);
 
-  // 🛡️ توجيه المسار المعتمد
+  // توجيه المسار المعتمد
   const transactionPath = useMemo(() => (firestore && clientId && transactionId && tenantId ? getTenantPath(`clients/${clientId}/transactions/${transactionId}`, tenantId) : null), [firestore, clientId, transactionId, tenantId]);
   const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(firestore, transactionPath);
   
@@ -274,7 +298,7 @@ export default function TransactionDetailPage() {
                                     </Badge>
                                     <div className="flex flex-col">
                                         <span className="font-black text-lg text-slate-800 leading-tight">{stage.name}</span>
-                                        {stage.endDate && <p className="text-[10px] font-bold text-green-600 mt-1 flex items-center gap-1"><CheckCircle className="h-3 w-3"/> تم الإنجاز في: {format(toFirestoreDate(stage.endDate)!, 'dd/MM/yyyy')}</p>}
+                                        {stage.endDate && <p className="text-[10px] font-bold text-green-600 mt-1 flex items-center gap-1"><CheckCircle2 className="h-3 w-3"/> تم الإنجاز في: {format(toFirestoreDate(stage.endDate)!, 'dd/MM/yyyy')}</p>}
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-6 mt-4 sm:mt-0">
@@ -380,4 +404,25 @@ export default function TransactionDetailPage() {
         </Dialog>
     </div>
   );
+}
+
+function Info({ className }: { className?: string }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+        >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4" />
+            <path d="M12 8h.01" />
+        </svg>
+    )
 }
