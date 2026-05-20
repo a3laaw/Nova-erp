@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useCallback, useEffect, Suspense, useMemo } from 'react';
@@ -15,28 +16,41 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import type { Quotation } from '@/lib/types';
 import { QuotationForm } from '@/components/accounting/quotation-form';
-import { cleanFirestoreData, getTenantPath, cn } from '@/lib/utils';
+import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calculator, Sparkles, AlertCircle } from 'lucide-react';
+import { Calculator, Sparkles, AlertCircle, Building2, Layers, Zap, Droplets, Ruler } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const deptPrefixes: Record<string, string> = {
+    'arch': 'ARCH',
+    'facade': 'FAC',
+    'struct': 'STR',
+    'elec': 'ELEC',
+    'sani': 'SANI',
+    'mech': 'MECH',
+    'general': 'GEN'
+};
 
 /**
- * صفحة إصدار عرض سعر جديد (Sovereign Quote Engine V14.0):
- * تم تحصين محرك الترقيم واستيراد كافة المكونات (cn) لضمان استقرار البناء.
+ * صفحة إصدار عرض سعر جديد (Sovereign Quote Engine V15.0):
+ * تم تفعيل الترقيم القطاعي (ARCH, FAC...) وإصلاح كافة أخطاء الـ Reference.
  */
 function NewQuotationContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedDept, setSelectedDept] = useState('arch');
   const [quotationNumber, setQuotationNumber] = useState('جاري التوليد...');
   const [isGeneratingNumber, setIsGeneratingNumber] = useState(true);
   
   const tenantId = currentUser?.currentCompanyId;
 
-  // ✨ محرك توليد رقم عرض السعر الموحد والمحصن ✨
+  // ✨ محرك توليد رقم عرض السعر الموحد والقطاعي ✨
   useEffect(() => {
     if (!firestore || !tenantId) return;
     setIsGeneratingNumber(true);
@@ -44,7 +58,6 @@ function NewQuotationContent() {
     const generateNumber = async () => {
         try {
             const currentYear = new Date().getFullYear();
-            // 🛡️ استخدام المسار الموحد المخصص للمنشأة لضمان الصلاحيات
             const counterPath = getTenantPath('counters/quotations', tenantId);
             
             if (!counterPath) {
@@ -60,7 +73,9 @@ function NewQuotationContent() {
                 const counts = counterDoc.data()?.counts || {};
                 nextNumber = (counts[currentYear] || 0) + 1;
             }
-            setQuotationNumber(`Q-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
+            
+            const prefix = deptPrefixes[selectedDept] || 'Q';
+            setQuotationNumber(`${String(nextNumber).padStart(4, '0')}-${prefix}-${currentYear}`);
         } catch (error: any) {
             console.error("❌ Number Generation Failure:", error);
             setQuotationNumber('خطأ في الصلاحيات');
@@ -69,7 +84,7 @@ function NewQuotationContent() {
         }
     };
     generateNumber();
-  }, [firestore, tenantId]);
+  }, [firestore, tenantId, selectedDept]);
 
   const handleSave = useCallback(async (data: Omit<Quotation, 'id'>) => {
     if (!firestore || !currentUser || !tenantId || isGeneratingNumber) return;
@@ -89,7 +104,9 @@ function NewQuotationContent() {
                 nextNumber = (counts[currentYear] || 0) + 1;
             }
             
-            const finalQuotationNumber = `Q-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+            const prefix = deptPrefixes[selectedDept] || 'Q';
+            const finalQuotationNumber = `${String(nextNumber).padStart(4, '0')}-${prefix}-${currentYear}`;
+            
             const quotationsPath = getTenantPath('quotations', tenantId);
             const newQuotationRef = doc(collection(firestore, quotationsPath!));
             newQuotationId = newQuotationRef.id;
@@ -103,6 +120,7 @@ function NewQuotationContent() {
                 quotationNumber: finalQuotationNumber,
                 quotationSequence: nextNumber,
                 quotationYear: currentYear,
+                quotationDept: selectedDept,
                 clientName: clientName,
                 status: 'draft',
                 createdAt: serverTimestamp(),
@@ -121,7 +139,7 @@ function NewQuotationContent() {
         toast({ variant: 'destructive', title: 'فشل الحفظ', description: error.message || 'حدث خطأ غير متوقع.' });
         setIsSaving(false);
     }
-  }, [firestore, currentUser, toast, router, isGeneratingNumber, tenantId]);
+  }, [firestore, currentUser, toast, router, isGeneratingNumber, tenantId, selectedDept]);
 
   return (
     <Card className="max-w-4xl mx-auto rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect" dir="rtl">
@@ -134,18 +152,40 @@ function NewQuotationContent() {
                     </div>
                     <CardDescription className="font-bold text-base pr-11">املأ التفاصيل الفنية والمالية بدقة لضمان تحويلها لعقد رسمي لاحقاً.</CardDescription>
                 </div>
-                <div className="text-left bg-white p-4 rounded-2xl border shadow-inner">
+                <div className="text-left bg-white p-4 rounded-2xl border shadow-inner min-w-[160px]">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground block mb-1">رقم العرض المعتمد</Label>
                     <div className={cn("font-mono text-2xl font-black", quotationNumber.includes('خطأ') ? "text-red-600" : "text-primary")}>
                         {isGeneratingNumber ? <Skeleton className="h-8 w-24" /> : quotationNumber}
                     </div>
-                    {quotationNumber.includes('خطأ') && (
-                        <p className="text-[8px] font-bold text-red-500 mt-1 max-w-[120px] leading-tight">يرجى مراجعة إعدادات الأمان للمنشأة.</p>
-                    )}
                 </div>
             </div>
         </CardHeader>
-        <CardContent className="p-8">
+        <CardContent className="p-8 space-y-8">
+            {/* 🛡️ محرك اختيار القسم لتحديد الترقيم 🛡️ */}
+            <div className="p-6 bg-white rounded-3xl border-2 border-dashed border-primary/20 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Layers className="h-6 w-6" /></div>
+                    <div>
+                        <Label className="font-black text-primary text-base">القسم المختص بالعرض *</Label>
+                        <p className="text-[10px] text-muted-foreground font-bold">سيقوم النظام بتحديث كود الترقيم آلياً حسب اختيارك.</p>
+                    </div>
+                </div>
+                <Select value={selectedDept} onValueChange={setSelectedDept}>
+                    <SelectTrigger className="w-full md:w-64 h-12 rounded-xl border-2 font-black text-primary">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl">
+                        <SelectItem value="arch">القسم المعماري (ARCH)</SelectItem>
+                        <SelectItem value="facade">قسم الواجهات (FAC)</SelectItem>
+                        <SelectItem value="struct">القسم الإنشائي (STR)</SelectItem>
+                        <SelectItem value="elec">قسم الكهرباء (ELEC)</SelectItem>
+                        <SelectItem value="sani">القسم الصحي (SANI)</SelectItem>
+                        <SelectItem value="mech">قسم الميكانيك (MECH)</SelectItem>
+                        <SelectItem value="general">نشاط عام (GEN)</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
             <QuotationForm 
                 onSave={handleSave} 
                 onClose={() => router.back()} 
