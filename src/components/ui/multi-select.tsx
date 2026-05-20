@@ -29,11 +29,12 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
   const customStyles: StylesConfig<MultiSelectOption, true> = {
     control: (base, state) => ({
       ...base,
-      backgroundColor: 'hsl(var(--card))',
+      backgroundColor: 'white', // 🛡️ خلفية مصمتة لمنع التشتت
       borderColor: state.isFocused ? 'hsl(var(--ring))' : 'hsl(var(--border))',
       minHeight: '40px',
       boxShadow: state.isFocused ? '0 0 0 1px hsl(var(--ring))' : 'none',
       cursor: 'pointer',
+      borderRadius: '0.75rem',
       '&:hover': {
         borderColor: 'hsl(var(--ring))',
       },
@@ -41,6 +42,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
     placeholder: (base) => ({
         ...base,
         color: 'hsl(var(--muted-foreground))',
+        fontWeight: '700',
     }),
     input: (base) => ({
         ...base,
@@ -48,24 +50,32 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
     }),
     menu: (base) => ({
       ...base,
-      backgroundColor: 'hsl(var(--card))',
-      zIndex: 999999, // قوة معتمدة للطبقة
+      backgroundColor: 'white', // 🛡️ عزل كامل عما خلف القائمة
+      zIndex: 999999,
       position: 'absolute',
+      borderRadius: '1rem',
+      boxShadow: '0 20px 50px rgba(0,0,0,0.15)', // ظل عميق للبروز
+      border: '1px solid hsl(var(--border))',
+      marginTop: '4px',
     }),
     menuList: (base) => ({
       ...base,
-      maxHeight: '200px',
+      maxHeight: '250px',
+      padding: '4px',
     }),
     option: (base, state) => ({
       ...base,
       cursor: 'pointer',
+      borderRadius: '0.5rem',
+      marginBottom: '2px',
+      fontWeight: '700',
       backgroundColor: state.isSelected 
         ? 'hsl(var(--primary))' 
         : state.isFocused 
-        ? 'hsl(var(--accent))' 
+        ? 'hsl(var(--primary) / 0.05)' 
         : 'transparent',
       color: state.isSelected 
-        ? 'hsl(var(--primary-foreground))' 
+        ? 'white' 
         : 'hsl(var(--foreground))',
       '&:active': {
         backgroundColor: 'hsl(var(--primary))',
@@ -73,27 +83,30 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
     }),
     multiValue: (base) => ({
       ...base,
-      backgroundColor: 'hsl(var(--secondary))',
+      backgroundColor: 'hsl(var(--primary) / 0.1)',
       borderRadius: '9999px',
+      padding: '1px 4px',
     }),
     multiValueLabel: (base) => ({
       ...base,
-      color: 'hsl(var(--secondary-foreground))',
+      color: 'hsl(var(--primary))',
       paddingRight: '6px',
-      fontSize: '0.875rem'
+      fontSize: '0.75rem',
+      fontWeight: '900',
     }),
     multiValueRemove: (base) => ({
       ...base,
       cursor: 'pointer',
-      color: 'hsl(var(--secondary-foreground))',
+      color: 'hsl(var(--primary))',
       '&:hover': {
-        backgroundColor: 'hsl(var(--destructive) / 0.8)',
-        color: 'hsl(var(--destructive-foreground))',
+        backgroundColor: 'hsl(var(--destructive))',
+        color: 'white',
       },
     }),
     noOptionsMessage: (base) => ({
       ...base,
       color: 'hsl(var(--muted-foreground))',
+      fontWeight: '700',
     }),
   };
 
@@ -108,35 +121,11 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       classNamePrefix="react-select"
       isDisabled={disabled}
       isSearchable={true}
-      noOptionsMessage={() => "لا توجد نتائج"}
+      noOptionsMessage={() => "لا توجد نتائج مطابقة"}
       styles={customStyles}
       menuPlacement="auto"
       closeMenuOnSelect={false}
       blurInputOnSelect={false}
-      theme={(theme) => ({
-        ...theme,
-        borderRadius: 6,
-        colors: {
-            ...theme.colors,
-            primary: 'hsl(var(--primary))',
-            primary75: 'hsl(var(--primary) / 0.75)',
-            primary50: 'hsl(var(--primary) / 0.5)',
-            primary25: 'hsl(var(--primary) / 0.25)',
-            danger: 'hsl(var(--destructive))',
-            dangerLight: 'hsl(var(--destructive) / 0.25)',
-            neutral0: 'hsl(var(--card))',
-            neutral5: 'hsl(var(--border))',
-            neutral10: 'hsl(var(--secondary))',
-            neutral20: 'hsl(var(--border))',
-            neutral30: 'hsl(var(--border))',
-            neutral40: 'hsl(var(--muted-foreground))',
-            neutral50: 'hsl(var(--muted-foreground))',
-            neutral60: 'hsl(var(--foreground))',
-            neutral70: 'hsl(var(--foreground))',
-            neutral80: 'hsl(var(--foreground))',
-            neutral90: 'hsl(var(--foreground))',
-        }
-      })}
     />
   );
 }

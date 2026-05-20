@@ -84,13 +84,26 @@
   }
 }
 
-/* 🛡️ حماية الرسمية للقوائم المنسدلة لضمان استجابة الماوس المطلقة 🛡️ */
+/* 🛡️ عزل بصري وحماية الاستجابة للقوائم المنسدلة 🛡️ */
 [data-radix-popper-content-wrapper] {
   z-index: 999999 !important;
   pointer-events: auto !important;
 }
 
-[role="listbox"], [role="menu"], [role="dialog"], [data-state="open"][data-radix-select-content], [data-state="open"][data-radix-popover-content] {
+/* فرض الخلفية المصمتة (Opaque) على كافة القوائم والمنبثقات */
+[role="listbox"], 
+[role="menu"], 
+[role="dialog"]:not([data-state="open"]),
+[data-radix-select-content], 
+[data-radix-popover-content],
+.react-select__menu {
+  background-color: white !important;
+  background-image: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
   pointer-events: auto !important;
   z-index: 999999 !important;
 }
