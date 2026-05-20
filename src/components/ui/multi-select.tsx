@@ -49,7 +49,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
     menu: (base) => ({
       ...base,
       backgroundColor: 'hsl(var(--card))',
-      zIndex: 999999, // قوة سيادية للطبقة
+      zIndex: 999999, // قوة معتمدة للطبقة
       position: 'absolute',
     }),
     menuList: (base) => ({

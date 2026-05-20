@@ -91,9 +91,9 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     }, [firestore, isOpen, tenantId, clientId]);
 
     /**
-     * ✨ محرك الإسناد العضوي (The Organic Link Engine):
-     * - يبحث عن الأقسام المرتبطة بنوع الخدمة المختار.
-     * - إذا وجد "القسم المعماري" من ضمنها، يسند المهندس المعماري المتابع للعميل فوراً.
+     * ✨ محرك الإسناد الموحد (The Integrated Link Engine):
+     * - يبحث عن الأقسام المرتبطة بنوع الخدمة المختار من القوائم المرجعية.
+     * - إذا وجد قسماً يطابق تخصص مهندس العميل، يتم الإسناد فوراً.
      * - يسهل العمل المكتبي عبر تقليل الاختيارات اليدوية.
      */
     useEffect(() => {
@@ -101,17 +101,24 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             if (!selectedType) return;
 
-            // هل هذه الخدمة مرتبطة بقسم المهندس المعماري؟
-            // (نفترض أن كلمة 'معماري' أو تخصص التصميم هو المفتاح)
-            const isArchitecturalService = selectedType.name.includes('تصميم') || 
-                                          selectedType.name.includes('بلدية') ||
-                                          selectedType.departmentIds?.some(id => {
-                                              const dept = engineers.find(e => e.id === client.assignedEngineer)?.department;
-                                              return dept?.includes('معماري');
-                                          });
+            // استخلاص الأقسام المربوطة بالخدمة من القوائم المرجعية
+            const linkedDeptIds = selectedType.departmentIds || [];
             
-            if (isArchitecturalService && client.assignedEngineer) {
-                setAssignedEngineerId(client.assignedEngineer);
+            if (client.assignedEngineer) {
+                const clientEngineer = engineers.find(e => e.id === client.assignedEngineer);
+                const engineerDeptId = engineers.find(e => e.id === client.assignedEngineer)?.department; // Assuming dept name for simplified matching
+
+                // البحث عن تطابق بين قسم المهندس والأقسام المربوطة بالخدمة
+                const isMatch = linkedDeptIds.some(deptId => {
+                    const deptName = allDepartments.find(d => d.id === deptId)?.name;
+                    return deptName && clientEngineer?.department === deptName;
+                });
+                
+                if (isMatch) {
+                    setAssignedEngineerId(client.assignedEngineer);
+                } else {
+                    setAssignedEngineerId('');
+                }
             }
         }
     }, [transactionTypeName, client, transactionTypes, engineers]);
@@ -241,7 +248,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                             <Alert className="bg-green-50 border-green-200 rounded-2xl animate-in slide-in-from-top-2 border-2 border-dashed">
                                 <UserCheck className="h-4 w-4 text-green-600" />
                                 <AlertTitle className="text-xs font-black text-green-800 uppercase tracking-tighter">إسناد تلقائي ذكي</AlertTitle>
-                                <AlertDescription className="text-[10px] font-bold text-green-700 leading-tight">تم التعرف على المهندس المعماري المتابع لهذا العميل وإسناده آلياً لتسهيل العملية.</AlertDescription>
+                                <AlertDescription className="text-[10px] font-bold text-green-700 leading-tight">تم التعرف على المهندس المتابع لهذا العميل وإسناده آلياً لتوافق تخصصه مع هذه الخدمة.</AlertDescription>
                             </Alert>
                         )}
 
@@ -279,3 +286,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         </Dialog>
     );
 }
+
+import { useSubscription } from '@/hooks/use-subscription';
+import type { Department as DeptType } from '@/lib/types';
+const { data: allDepartments } = useSubscription<DeptType>(null, 'departments'); // Simplified for access

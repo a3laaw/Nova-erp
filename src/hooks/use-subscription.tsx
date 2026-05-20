@@ -48,7 +48,7 @@ export function useSubscription<T extends { id?: string }>(
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
         const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
-        // 🛡️ صمام أمان راداري: نمنع الاتصال بـ Firebase إذا لم تتوفر هوية المنشأة بعد
+        // 🛡️ صمام أمان راداري: ننتظر استقرار هوية المنشأة قبل محاولة الاتصال
         if (!isMasterCollection && !tenantId) {
             setLoading(true); 
             return;

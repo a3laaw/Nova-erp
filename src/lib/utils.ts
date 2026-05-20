@@ -42,7 +42,7 @@ export function numberToArabicWords(inputNumber: number | string): string {
 }
 
 /**
- * محرك توجيه المسارات المطور (SaaS Tenant Router):
+ * محرك توجيه المسارات المعتمد (SaaS Tenant Router):
  * 🛡️ الضابط الأكبر لعزل البيانات لضمان عدم حدوث أخطاء صلاحيات.
  */
 export function getTenantPath(path: string, tenantId: string | null | undefined): string {
