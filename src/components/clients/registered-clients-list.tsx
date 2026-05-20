@@ -38,8 +38,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { doc, deleteDoc, collection, serverTimestamp, runTransaction, query, where, getDocs, writeBatch } from 'firebase/firestore';
-import { useLanguage } from '@/context/language-context';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase/provider';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,7 +49,9 @@ import { searchClients } from '@/lib/cache/fuse-search';
 import { ClientForm } from '@/components/clients/client-form';
 import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
 import { findUserIdByEmployeeId, createNotification } from '@/services/notification-service';
-import { cn } from '@/lib/utils';
+import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
 
@@ -79,6 +80,7 @@ export function RegisteredClientsList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSavingClient, setIsSavingClient] = useState(false);
   
+  const tenantId = currentUser?.currentCompanyId;
   const { items: clients, loading: clientsLoading, loaderRef, loadingMore } = useInfiniteScroll<Client>('clients');
   const { data: employees } = useSubscription<Employee>(firestore, 'employees');
   
@@ -100,20 +102,23 @@ export function RegisteredClientsList() {
   const filteredClients = useMemo(() => searchClients(augmentedClients, searchQuery), [augmentedClients, searchQuery]);
 
   const handleSaveClient = async (newClientData: Partial<Client>) => {
-        if (!firestore || !currentUser) return;
+        if (!firestore || !currentUser || !tenantId) return;
         setIsSavingClient(true);
         let newClientId = '';
 
+        const clientsPath = getTenantPath('clients', tenantId);
+
         try {
             if (newClientData.mobile) {
-                const mobileQuery = query(collection(firestore, 'clients'), where('mobile', '==', newClientData.mobile));
+                const mobileQuery = query(collection(firestore, clientsPath), where('mobile', '==', newClientData.mobile));
                 const mobileSnapshot = await getDocs(mobileQuery);
                 if (!mobileSnapshot.empty) throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر.');
             }
 
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = String(new Date().getFullYear());
-                const clientFileCounterRef = doc(firestore, 'counters', 'clientFiles');
+                const counterPath = getTenantPath('counters/clientFiles', tenantId);
+                const clientFileCounterRef = doc(firestore, counterPath);
                 const clientFileCounterDoc = await transaction.get(clientFileCounterRef);
                 
                 let nextFileNumber = 1;
@@ -125,34 +130,24 @@ export function RegisteredClientsList() {
                 transaction.set(clientFileCounterRef, { counts: { [currentYear]: nextFileNumber } }, { merge: true });
                 const newFileId = `${nextFileNumber}/${currentYear}`;
 
-                const finalClientData: Omit<Client, 'id'> = {
-                  ...(newClientData as any),
+                const finalClientData = {
+                  ...newClientData,
                   fileId: newFileId,
                   fileNumber: nextFileNumber,
                   fileYear: parseInt(currentYear, 10),
-                  status: 'new',
+                  status: 'new' as const,
                   transactionCounter: 0,
                   createdAt: serverTimestamp(),
                   isActive: true,
+                  companyId: tenantId
                 };
 
-                const newClientRef = doc(collection(firestore, 'clients'));
+                const newClientRef = doc(collection(firestore, clientsPath));
                 newClientId = newClientRef.id;
-                transaction.set(newClientRef, finalClientData);
+                transaction.set(newClientRef, cleanFirestoreData(finalClientData));
             });
 
             toast({ title: 'نجاح', description: 'تمت إضافة العميل بنجاح.' });
-            if (newClientData.assignedEngineer) {
-                const targetUserId = await findUserIdByEmployeeId(firestore, newClientData.assignedEngineer);
-                if (targetUserId && targetUserId !== currentUser.id) {
-                    await createNotification(firestore, {
-                        userId: targetUserId,
-                        title: 'تم إسناد عميل جديد لك',
-                        body: `قام ${currentUser.fullName} بإسناد العميل "${newClientData.nameAr}" إليك.`,
-                        link: `/dashboard/clients/${newClientId}`
-                    });
-                }
-            }
             setIsFormOpen(false);
         } catch (error: any) {
             toast({ title: "خطأ", description: error.message, variant: "destructive" });
@@ -162,19 +157,26 @@ export function RegisteredClientsList() {
     };
 
   const handleDeleteClient = async () => {
-        if (!clientToDelete || !firestore) return;
+        if (!clientToDelete || !firestore || !tenantId) return;
         setIsDeleting(true);
-        try {
-            const batch = writeBatch(firestore);
-            batch.delete(doc(firestore, 'clients', clientToDelete.id!));
-            await batch.commit();
-            toast({ title: 'نجاح', description: 'تم حذف العميل بنجاح.' });
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العميل.' });
-        } finally {
-            setIsDeleting(false);
-            setClientToDelete(null);
-        }
+        
+        const clientPath = getTenantPath(`clients/${clientToDelete.id}`, tenantId);
+        const clientRef = doc(firestore, clientPath);
+
+        deleteDoc(clientRef)
+            .then(() => {
+                toast({ title: 'نجاح التطهير', description: 'تم حذف ملف العميل من السجلات السيادية.' });
+            })
+            .catch(async (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: clientPath,
+                    operation: 'delete'
+                }));
+            })
+            .finally(() => {
+                setIsDeleting(false);
+                setClientToDelete(null);
+            });
     };
 
   return (
@@ -229,8 +231,8 @@ export function RegisteredClientsList() {
                         <TableCell className="font-medium text-xs text-gray-600">{client.assignedEngineerName || <span className="text-muted-foreground">غير مسند</span>}</TableCell>
                         <TableCell dir="ltr" className="text-right font-mono text-xs opacity-60">{client.mobile}</TableCell>
                         <TableCell>
-                            <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[client.status])}>
-                                {statusTranslations[client.status]}
+                            <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[client.status as ClientStatus])}>
+                                {statusTranslations[client.status as ClientStatus]}
                             </Badge>
                         </TableCell>
                         <TableCell className="text-center">
@@ -274,11 +276,16 @@ export function RegisteredClientsList() {
         </Dialog>
 
         <AlertDialog open={!!clientToDelete} onOpenChange={() => setClientToDelete(null)}>
-            <AlertDialogContent dir="rtl" className="rounded-3xl">
-                <AlertDialogHeader><AlertDialogTitle>تأكيد الحذف النهائي؟</AlertDialogTitle><AlertDialogDescription>سيتم حذف ملف العميل وجميع معاملاته وسجلاته المالية بشكل دائم ومسح القيد المالي المرتبط.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed">أنت على وشك مسح ملف العميل "<strong>{clientToDelete?.nameAr}</strong>" من السجلات السيادية للمنظومة. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
+                </AlertDialogHeader>
                 <AlertDialogFooter className="gap-2">
-                    <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteClient} disabled={isDeleting} className="bg-destructive rounded-xl">نعم، حذف</AlertDialogAction>
+                    <AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteClient} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black px-10">
+                        {isDeleting ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، حذف'}
+                    </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

@@ -59,15 +59,15 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 1. معالجة حالة التحميل المطابقة للصورة مع التوهج والتمركز
+  // 1. معالجة حالة التحميل المطابقة للصورة مع التوهج والتمركز المداري
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
         <div className="relative flex flex-col items-center">
-            {/* 🛡️ حلقة التحميل مع التوهج المشع 🛡️ */}
-            <div className="h-48 w-48 rounded-full border-2 border-primary/5 border-t-primary animate-spin shadow-[0_0_30px_rgba(255,122,0,0.4)]" />
+            {/* 🛡️ حلقة التحميل مع التوهج المداري الفخم 🛡️ */}
+            <div className="h-48 w-48 rounded-full border-2 border-primary/5 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.4)]" />
             
-            {/* شعار NOVA في المركز الهندسي الدقيق للقطر */}
+            {/* شعار NOVA في المركز الهندسي المطلق للدائرة */}
             <div className="absolute inset-0 flex items-center justify-center">
                 <NovaLogo />
             </div>
