@@ -201,7 +201,7 @@ export default function ViewQuotationPage() {
                                                 {quotation.items.map((item, index) => {
                                                     const rowTotal = quotation.financialsType === 'percentage' 
                                                         ? (item.percentage / 100) * (quotation.totalAmount || 0)
-                                                        : item.total;
+                                                        : item.unitPrice; // FIXED: In fixed mode, unitPrice is the total
                                                     
                                                     return (
                                                         <TableRow key={index} className="h-24 border-b last:border-0 hover:bg-transparent">

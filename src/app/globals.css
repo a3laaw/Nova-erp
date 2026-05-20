@@ -77,15 +77,24 @@
   }
 }
 
-/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V144.0) 🛡️ */
-/* فرض السيادة البصرية المطلقة فوق كافة الجداول والمكونات الزجاجية */
+/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V145.0) 🛡️ */
+/* فرض السيادة الوظيفية فقط دون تكرار البراويز أو الظلال المزدوجة */
+
 [data-radix-portal] {
   z-index: 999999999 !important;
-  pointer-events: auto !important;
 }
 
+/* منع تكرار البرواز والظل في الغلاف الخارجي لضمان مظهر نظيف */
 [data-radix-popper-content-wrapper], 
-.react-select__menu-portal, 
+.react-select__menu-portal {
+  z-index: 999999999 !important;
+  pointer-events: auto !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* تطهير محتوى القوائم المباشر ليكون مصمتاً وأنيقاً بقطعة واحدة */
 [role="listbox"], 
 [role="menu"], 
 [data-radix-select-content], 
@@ -99,7 +108,7 @@
   -webkit-backdrop-filter: none !important;
   border: 2px solid #FF7A00 !important;
   border-radius: 1rem !important;
-  box-shadow: 0 25px 60px rgba(0,0,0,0.3) !important;
+  box-shadow: 0 25px 60px rgba(255, 122, 0, 0.2) !important;
 }
 
 [role="menuitem"], [role="option"], [cmdk-item], .react-select__option {
