@@ -10,14 +10,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { Button } from '../ui/button';
+import { Label } from '../ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, X, Workflow, Info, UserCheck } from 'lucide-react';
-import { useFirebase } from '@/firebase';
+import { Loader2, Save, X, Workflow, UserCheck } from 'lucide-react';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType, WorkStage } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, Department } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
@@ -33,9 +33,9 @@ interface ClientTransactionFormProps {
 }
 
 /**
- * نموذج إضافة معاملة جديدة (محرك الإسناد الذكي V10.0):
- * - يقوم آلياً بإسناد المهندس المختص بناءً على ربط "أنواع الخدمات" بـ "أقسام الوظائف".
- * - يدعم القوائم المرجعية المعتمدة للمنشأة بالكامل.
+ * نموذج إضافة معاملة جديدة (محرك الإسناد الذكي V11.0):
+ * - يقوم آلياً بإسناد المهندس المختص بناءً على ربط "أنواع الخدمات" بـ "أقسام الوظائف المعتمدة".
+ * - تم إصلاح خطأ الـ Hooks عبر نقل الاستدعاء لداخل المكون.
  */
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
@@ -57,6 +57,9 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     const savingRef = useRef(false);
 
     const tenantId = currentUser?.currentCompanyId;
+
+    // جلب الأقسام المعتمدة لغرض الربط الذكي
+    const { data: allDepartments = [] } = useSubscription<Department>(firestore, 'departments');
 
     useEffect(() => {
         if (!firestore || !isOpen || !tenantId) return;
@@ -91,24 +94,19 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     }, [firestore, isOpen, tenantId, clientId]);
 
     /**
-     * ✨ محرك الإسناد الموحد (The Integrated Link Engine):
-     * - يبحث عن الأقسام المرتبطة بنوع الخدمة المختار من القوائم المرجعية.
-     * - إذا وجد قسماً يطابق تخصص مهندس العميل، يتم الإسناد فوراً.
-     * - يسهل العمل المكتبي عبر تقليل الاختيارات اليدوية.
+     * محرك الإسناد الموحد (The Integrated Link Engine):
+     * يقوم بمطابقة قسم المهندس مع الأقسام المعتمدة للخدمة المختارة.
      */
     useEffect(() => {
-        if (transactionTypeName && client && engineers.length > 0) {
+        if (transactionTypeName && client && engineers.length > 0 && allDepartments.length > 0) {
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             if (!selectedType) return;
 
-            // استخلاص الأقسام المربوطة بالخدمة من القوائم المرجعية
             const linkedDeptIds = selectedType.departmentIds || [];
             
             if (client.assignedEngineer) {
                 const clientEngineer = engineers.find(e => e.id === client.assignedEngineer);
-                const engineerDeptId = engineers.find(e => e.id === client.assignedEngineer)?.department; // Assuming dept name for simplified matching
-
-                // البحث عن تطابق بين قسم المهندس والأقسام المربوطة بالخدمة
+                
                 const isMatch = linkedDeptIds.some(deptId => {
                     const deptName = allDepartments.find(d => d.id === deptId)?.name;
                     return deptName && clientEngineer?.department === deptName;
@@ -121,7 +119,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 }
             }
         }
-    }, [transactionTypeName, client, transactionTypes, engineers]);
+    }, [transactionTypeName, client, transactionTypes, engineers, allDepartments]);
 
     const transactionTypeOptions = useMemo(() => 
         transactionTypes.map(t => ({ value: t.name, label: t.name })), 
@@ -143,7 +141,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const departmentIds = selectedType?.departmentIds || [];
 
-            // جلب مراحل العمل المعتمدة من الأقسام المرتبطة بالخدمة
             let initialStages: any[] = [];
             for (const deptId of departmentIds) {
                 const stagesPath = getTenantPath(`departments/${deptId}/workStages`, tenantId);
@@ -191,7 +188,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 batch.update(doc(firestore, apptPath), { transactionId: newTransactionRef.id });
             }
 
-            // توثيق الحدث المعتمد في سجل المتابعة
             const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
                 type: 'log', 
@@ -286,7 +282,3 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         </Dialog>
     );
 }
-
-import { useSubscription } from '@/hooks/use-subscription';
-import type { Department as DeptType } from '@/lib/types';
-const { data: allDepartments } = useSubscription<DeptType>(null, 'departments'); // Simplified for access

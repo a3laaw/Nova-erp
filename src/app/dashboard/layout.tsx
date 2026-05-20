@@ -59,7 +59,7 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // معالجة حالة التحميل المطابقة للصورة المعتمدة
+  // معالجة حالة التحميل المعتمدة والموحدة
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
