@@ -51,7 +51,7 @@ export function Notifications() {
         });
     }
 
-    // 2. التوجيه المباشر والسيادي للرابط المرفق (Redirect to Transaction/Leave/etc.)
+    // 2. التوجيه المباشر للرابط المرفق (Redirect to Transaction/Leave/etc.)
     if (notification.link) {
         router.push(notification.link);
     }

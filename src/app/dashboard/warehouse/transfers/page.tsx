@@ -8,7 +8,7 @@ import { TransferList } from '@/components/warehouse/transfer-list';
 export default function TransfersPage() {
     return (
         <div className="space-y-10" dir="rtl">
-            {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+            {/* 🛡️ الهيدر الرئيسي المحدث بالهوية البرتقالية 🛡️ */}
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                 <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                 <CardHeader className="pb-10 pt-10 px-10 relative z-10">
@@ -39,7 +39,7 @@ export default function TransfersPage() {
                 <CardContent className="pt-8">
                     <TransferList />
                 </CardContent>
-            </Card>
+            </div>
         </div>
     );
 }

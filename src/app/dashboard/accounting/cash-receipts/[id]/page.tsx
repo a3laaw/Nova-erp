@@ -38,7 +38,7 @@ export default function ViewCashReceiptPage() {
     <div className="max-w-4xl mx-auto p-8"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>
   );
 
-  if (!receipt) return <div className="text-center py-20 font-bold">لم يتم العثور على السند السيادي.</div>;
+  if (!receipt) return <div className="text-center py-20 font-bold">لم يتم العثور على السند المطلوب.</div>;
 
   const apptDate = toFirestoreDate(receipt.receiptDate);
 

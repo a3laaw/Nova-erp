@@ -67,7 +67,7 @@ export default function AdjustmentsPage() {
 
     return (
         <div className="space-y-10" dir="rtl">
-            {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+            {/* 🛡️ الهيدر الرئيسي المحدث بالهوية البرتقالية 🛡️ */}
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                 <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                 <CardHeader className="pb-10 pt-10 px-10 relative z-10">
@@ -135,6 +135,7 @@ export default function AdjustmentsPage() {
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" dir="rtl" className="rounded-xl p-2 shadow-2xl border-none">
+                                                        <DropdownMenuLabel className="font-black px-3 py-2">خيارات السند</DropdownMenuLabel>
                                                         <DropdownMenuItem asChild className="rounded-lg py-3"><Link href={`/dashboard/warehouse/adjustments/${adj.id}`} className="gap-2 font-bold"><Eye className="h-4 w-4"/> عرض</Link></DropdownMenuItem>
                                                         <DropdownMenuItem className="text-red-600 font-black gap-2 rounded-lg py-3 focus:bg-red-50" onClick={() => setItemToDelete(adj)}><Trash2 className="ml-2 h-4 w-4" /> حذف</DropdownMenuItem>
                                                     </DropdownMenuContent>

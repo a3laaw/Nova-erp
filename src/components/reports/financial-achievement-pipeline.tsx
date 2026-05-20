@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { 
     Coins, FileSearch, Loader2, Wallet, 
     ArrowDownLeft, CheckCircle2, TrendingUp, Filter, Building2, User, Clock, AlertTriangle, ArrowUpRight,
-    LayoutGrid, ListChecks, KanBan
+    LayoutGrid, ListChecks
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -23,8 +23,8 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 /**
- * تقرير ميزان التحصيل والتدفق المالي (v3.0):
- * - إضافة لوحة Pipeline مرئية (Kanban Style).
+ * تقرير ميزان التحصيل والتدفق المالي:
+ * - لوحة Pipeline مرئية (Kanban Style).
  * - رصد التقادم المالي (Aging).
  * - تصنيف مديونيات "تحت التحصيل".
  */

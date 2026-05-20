@@ -16,14 +16,14 @@ import {
     Activity 
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { differenceInDays, format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { differenceInDays, format, isWithinInterval, startOfDay, endOfDay, Timestamp } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 
 /**
- * رادار متابعة العمل والميدان (v2.0):
+ * رادار متابعة العمل والميدان:
  * - تخصيص عتبة الخمول.
  * - تصنيف درجة الخطورة (Critical/Warning/Active).
  * - فلترة متقدمة للتواريخ.

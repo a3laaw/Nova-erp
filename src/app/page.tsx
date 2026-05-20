@@ -26,7 +26,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * شعار نوفا المدمج (NOVA Simple Text):
- * تصميم مطابق تماماً للصورة المطلوبة مع تمركز سيادي.
+ * تصميم مطابق تماماً للصورة المطلوبة مع تمركز دقيق.
  */
 const NovaLogo = () => (
   <svg width="140" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg">

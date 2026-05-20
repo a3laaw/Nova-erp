@@ -6,7 +6,7 @@ import { ClipboardList } from 'lucide-react';
 export default function BoqLibraryPage() {
     return (
         <div className="space-y-10" dir="rtl">
-            <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-blue-50 shadow-sm">
+            <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-blue-50">
                 <CardHeader className="pb-8 px-10 border-b">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-600 shadow-inner">

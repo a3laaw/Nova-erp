@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, Timestamp } from 'firebase/firestore';
 import type { Appointment, Client, UserProfile, AppointmentAuditLog } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,13 +20,14 @@ import { format, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDa
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/auth-context';
 import { getTenantPath } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 /**
- * تقرير رادار تدقيق المواعيد (Sovereign Appointment Audit):
+ * تقرير رادار تدقيق المواعيد التاريخي:
  * يتيح للإدارة مراجعة "المسيرة التاريخية" لكل موعد، ومعرفة من قام بالحجز ومن عدل الأوقات.
  */
 export function AppointmentsAuditReport() {
@@ -113,7 +114,7 @@ export function AppointmentsAuditReport() {
                 <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white animate-in fade-in duration-500">
                     <Table>
                         <TableHeader className="bg-slate-900 text-white">
-                            <TableRow className="h-14">
+                            <TableRow className="h-14 border-none">
                                 <TableHead className="px-8 font-black text-white text-right">العميل والموعد</TableHead>
                                 <TableHead className="font-black text-white text-center">التاريخ والوقت</TableHead>
                                 <TableHead className="font-black text-white text-center">عدد الزيارات</TableHead>
@@ -209,5 +210,3 @@ export function AppointmentsAuditReport() {
         </div>
     );
 }
-
-import { Timestamp } from 'firebase/firestore';
