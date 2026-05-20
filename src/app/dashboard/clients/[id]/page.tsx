@@ -130,15 +130,12 @@ export default function ClientProfilePage() {
   const [transactionToDelete, setTransactionToDelete] = useState<ClientTransaction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 1. جلب بيانات العميل المعتمدة
   const clientPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}`, tenantId) : null, [id, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
-  // 2. جلب المعاملات
   const txPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}/transactions`, tenantId) : null, [id, tenantId]);
   const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, txPath);
 
-  // 3. جلب عروض الأسعار
   const qQuery = useMemo(() => [where('clientId', '==', id)], [id]);
   const { data: quotations, loading: quotationsLoading } = useSubscription<Quotation>(firestore, 'quotations', qQuery);
   
@@ -369,3 +366,4 @@ export default function ClientProfilePage() {
     </div>
   );
 }
+

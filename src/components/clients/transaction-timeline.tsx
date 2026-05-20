@@ -88,7 +88,6 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
         createdAt: new Date(),
     };
     
-    // التحديث المتفائل للواجهة (Optimistic Update)
     setEvents(prev => [optimisticComment, ...prev]);
     setNewComment('');
 
@@ -102,13 +101,11 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
         companyId: tenantId,
     };
 
-    // 🚀 تنفيذ الإرسال السحابي
     addDoc(collection(firestore, finalPath), commentData)
         .then(async () => {
             const clientName = client?.nameAr || 'عميل';
             const transactionName = transaction?.transactionType || 'معاملة';
             
-            // إخطار المهندس المسؤول (إذا وجد)
             if (transaction?.assignedEngineerId && transaction.assignedEngineerId !== currentUser.employeeId) {
                 const assigneeUserId = await findUserIdByEmployeeId(firestore, transaction.assignedEngineerId);
                 if (assigneeUserId) {
@@ -122,7 +119,6 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
             }
         })
         .catch(async (serverError) => {
-            // التراجع عن التحديث المتفائل في حال الفشل
             setEvents(prev => prev.filter(e => e.id !== tempId));
             setNewComment(optimisticComment.content);
 
@@ -152,8 +148,8 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
       </CardHeader>
       <CardContent className="p-8 space-y-8">
         {showInput && currentUser && (
-          <div className="flex items-start gap-4 p-6 bg-white rounded-[2rem] border-2 border-dashed border-primary/20 shadow-inner group focus-within:border-primary transition-all">
-            <Avatar className="h-12 w-12 border-2 border-white shadow-md">
+          <div className="flex items-start gap-4 p-8 bg-white rounded-[2.5rem] border-2 border-dashed border-primary/20 shadow-inner group focus-within:border-primary transition-all">
+            <Avatar className="h-14 w-14 border-2 border-white shadow-md">
               <AvatarImage src={currentUser?.avatarUrl} className="object-cover" />
               <AvatarFallback className="bg-primary/10 text-primary font-black">{currentUser?.fullName?.charAt(0)}</AvatarFallback>
             </Avatar>
@@ -162,17 +158,17 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
                 placeholder="اكتب ملاحظاتك الميدانية أو ردك هنا..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                rows={3}
-                className="border-none shadow-none focus-visible:ring-0 text-base font-medium placeholder:italic bg-transparent p-0"
+                rows={4}
+                className="border-none shadow-none focus-visible:ring-0 text-xl leading-relaxed font-bold placeholder:italic bg-transparent p-2 text-slate-900 min-h-[120px]"
               />
               <div className="flex justify-end">
                 <Button 
                     onClick={handlePostComment} 
                     disabled={isPosting || !newComment.trim()}
-                    className="rounded-xl h-10 px-8 font-black gap-2 shadow-lg shadow-primary/20"
+                    className="rounded-2xl h-12 px-10 font-black gap-2 shadow-lg shadow-primary/20"
                 >
-                  {isPosting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 rotate-180" />}
-                  {isPosting ? 'جاري الإرسال...' : 'نشر التعليق'}
+                  {isPosting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 rotate-180" />}
+                  {isPosting ? 'جاري الإرسال...' : 'نشر التعليق الآن'}
                 </Button>
               </div>
             </div>
@@ -203,17 +199,17 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
                         <AvatarFallback className="font-bold bg-muted text-muted-foreground">{event.userName?.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className={cn(
-                        "flex-1 p-5 rounded-[1.8rem] border shadow-sm",
+                        "flex-1 p-6 rounded-[2rem] border shadow-sm",
                         event.type === 'log' ? "bg-muted/30 border-muted" : "bg-white border-slate-100"
                     )}>
-                        <div className="flex justify-between items-center mb-2">
+                        <div className="flex justify-between items-center mb-3">
                             <p className="font-black text-sm text-[#1e1b4b]">{event.userName}</p>
                             <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                                 <span className="h-1 w-1 rounded-full bg-slate-300" />
                                 {formatDate(event.createdAt)}
                             </p>
                         </div>
-                        <p className="text-sm font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">{event.content}</p>
+                        <p className="text-lg font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{event.content}</p>
                     </div>
                 </div>
             ))}
