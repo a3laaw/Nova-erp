@@ -2,7 +2,18 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, writeBatch, serverTimestamp, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { 
+    doc, 
+    collection, 
+    query, 
+    orderBy, 
+    getDocs, 
+    writeBatch, 
+    serverTimestamp, 
+    updateDoc, 
+    deleteDoc, 
+    addDoc 
+} from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -41,7 +52,8 @@ import {
     Layers,
     ArrowRight,
     Loader2,
-    AlertCircle
+    AlertCircle,
+    ArrowUpRight
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -117,11 +129,11 @@ export default function ClientProfilePage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // 1. جلب بيانات العميل المعتمدة
-  const clientPath = useMemo(() => getTenantPath(`clients/${id}`, tenantId), [id, tenantId]);
+  const clientPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}`, tenantId) : null, [id, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
   // 2. جلب كافة المعاملات المرتبطة بالعميل
-  const txPath = useMemo(() => getTenantPath(`clients/${id}/transactions`, tenantId), [id, tenantId]);
+  const txPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}/transactions`, tenantId) : null, [id, tenantId]);
   const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, txPath);
   
   useEffect(() => {
@@ -134,7 +146,6 @@ export default function ClientProfilePage() {
     });
   }, [firestore, tenantId]);
 
-  // 🛡️ معالجة التجميد (Handle Freeze) المعتمدة
   const handleToggleFreeze = async (tx: ClientTransaction) => {
     if (!firestore || !tenantId || !tx.id) return;
     setIsProcessing(true);
@@ -151,7 +162,6 @@ export default function ClientProfilePage() {
     } finally { setIsProcessing(false); }
   };
 
-  // 🛡️ معالجة الحذف المعتمدة
   const handleConfirmDelete = async () => {
     if (!firestore || !tenantId || !transactionToDelete?.id) return;
     setIsProcessing(true);
@@ -162,7 +172,7 @@ export default function ClientProfilePage() {
         const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
         await addDoc(collection(firestore, historyPath!), {
             type: 'log',
-            content: `قام ${currentUser?.fullName} بحذف المعاملة "${transactionToDelete.transactionType}" نهائياً.`,
+            content: `قام ${currentUser?.fullName} بحذف المعاملة "${transactionToDelete.subServiceName || transactionToDelete.transactionType}" نهائياً.`,
             createdAt: serverTimestamp(),
             userId: currentUser?.id,
             userName: currentUser?.fullName,
@@ -178,7 +188,6 @@ export default function ClientProfilePage() {
     }
   };
 
-  // محرك التجميع الثلاثي للطبقات
   const groupedTransactions = useMemo(() => {
     const groups = new Map<string, ClientTransaction[]>();
     transactions.forEach(tx => {
@@ -246,7 +255,13 @@ export default function ClientProfilePage() {
                                             <Badge variant="outline" className="font-mono font-black text-primary text-xs h-8 px-4 border-primary/20 bg-primary/5">{tx.transactionNumber}</Badge>
                                             <div className="text-right">
                                                 <div className="flex items-center gap-2">
-                                                    <p className="font-black text-lg text-slate-900 leading-tight">{tx.subServiceName || 'خدمة تأسيسية'}</p>
+                                                    {/* ✨ الاسم أصبح هو الرابط (Name as Hyperlink) ✨ */}
+                                                    <Link 
+                                                        href={`/dashboard/clients/${id}/transactions/${tx.id}`}
+                                                        className="font-black text-lg text-slate-900 leading-tight hover:text-primary hover:underline transition-colors"
+                                                    >
+                                                        {tx.subServiceName || 'خدمة تأسيسية'}
+                                                    </Link>
                                                     <Badge className={cn("px-4 py-0.5 rounded-full font-black text-[9px] border-none shadow-sm", transactionStatusColors[tx.status])}>
                                                         {statusTranslations[tx.status]}
                                                     </Badge>
@@ -257,18 +272,18 @@ export default function ClientProfilePage() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <Button asChild variant="outline" className="rounded-xl h-10 px-8 font-black gap-2 border-2 hover:bg-primary hover:text-white transition-all shadow-sm">
-                                                <Link href={`/dashboard/clients/${id}/transactions/${tx.id}`}><Eye className="h-4 w-4"/> عرض التفاصيل</Link>
-                                            </Button>
-                                            
+                                            {/* حذف زر عرض التفاصيل لتقليل الازدحام */}
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border bg-slate-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border bg-slate-50 transition-opacity">
                                                         <MoreHorizontal className="h-4 w-4"/>
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
                                                     <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">إجراءات المعاملة</DropdownMenuLabel>
+                                                    <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                                        <Eye className="h-4 w-4 text-primary"/> فتح المسار الفني
+                                                    </DropdownMenuItem>
                                                     <DropdownMenuItem onSelect={() => handleToggleFreeze(tx)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
                                                         {tx.status === 'on-hold' ? <FolderOpen className="h-4 w-4 text-green-600"/> : <FolderLock className="h-4 w-4 text-orange-600"/>}
                                                         {tx.status === 'on-hold' ? 'إلغاء التجميد' : 'تجميد المعاملة'}
@@ -313,3 +328,4 @@ export default function ClientProfilePage() {
     </div>
   );
 }
+
