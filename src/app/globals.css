@@ -73,7 +73,6 @@
   pointer-events: auto !important;
 }
 
-/* فرض السيادة الكاملة واللون الأبيض المصمت لمنع التداخل البصري وعدم استجابة الماوس */
 [role="listbox"], 
 [role="menu"], 
 [role="dialog"][data-state="open"],
@@ -92,7 +91,6 @@
   z-index: 99999999 !important;
 }
 
-/* تحسين وضوح نصوص القوائم المنسدلة وتفاعلها مع الماوس */
 [role="menuitem"], [role="option"], [cmdk-item], .react-select__option {
     cursor: pointer !important;
     pointer-events: auto !important;
