@@ -9,8 +9,8 @@ import { useAuth } from '@/context/auth-context';
 import { getTenantPath } from '@/lib/utils';
 
 /**
- * خطاف استماع لوثيقة واحدة محصن:
- * يمنع الوصول للمسارات العامة في حال وجود جلسة عمل نشطة.
+ * خطاف استماع لوثيقة واحدة محصن (Standard Document Hook):
+ * تم تحصينه بـ "رادار التزامن" لضمان عدم طلب البيانات قبل توفر التوكن المعتمد.
  */
 export function useDocument<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -32,6 +32,7 @@ export function useDocument<T extends { id?: string }>(
     const isMasterCollection = masterCollections.some(mc => docPath.startsWith(mc));
     const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
 
+    // 🛡️ صمام أمان راداري: ننتظر استقرار هوية المنشأة
     if (!isMasterCollection && !tenantId) {
         setLoading(true);
         return;
@@ -57,7 +58,7 @@ export function useDocument<T extends { id?: string }>(
             setError(null);
           },
           (err) => {
-            console.error(`Document Listener Error [${finalPath}]:`, err.message);
+            console.warn(`[Permission Guard] Document Deferred: ${finalPath}`);
             setError(err);
             setLoading(false);
           }

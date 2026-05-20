@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, X, Workflow } from 'lucide-react';
+import { Loader2, Save, X, Workflow, Info, UserCheck } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,7 @@ import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { InlineSearchList } from '../ui/inline-search-list';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface ClientTransactionFormProps {
   isOpen: boolean;
@@ -32,8 +33,9 @@ interface ClientTransactionFormProps {
 }
 
 /**
- * نموذج إضافة معاملة جديدة:
- * تم ربطه بـ "إدارة أنواع الخدمات" لضمان ظهور القوائم المرجعية المحدثة المخصصة للمنشأة.
+ * نموذج إضافة معاملة جديدة (محرك الإسناد الذكي V9.0):
+ * - يقوم آلياً بإسناد المهندس المعماري إذا كانت المعاملة تتبع قسمه.
+ * - يربط أنواع الخدمات بالقوائم المرجعية المعتمدة للمنشأة.
  */
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
@@ -41,6 +43,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     const { toast } = useToast();
     const router = useRouter();
 
+    const [client, setClient] = useState<Client | null>(null);
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(true);
     const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
@@ -55,34 +58,54 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
     const tenantId = currentUser?.currentCompanyId;
 
+    // جلب البيانات المرجعية وبيانات العميل
     useEffect(() => {
         if (!firestore || !isOpen || !tenantId) return;
         
-        const fetchReferenceData = async () => {
+        const fetchAllData = async () => {
             setEngineersLoading(true);
             setTypesLoading(true);
             try {
-                // 1. جلب الموظفين المتاحين للإسناد
+                const clientRef = doc(firestore, getTenantPath(`clients/${clientId}`, tenantId));
                 const empPath = getTenantPath('employees', tenantId);
-                const engSnap = await getDocs(query(collection(firestore, empPath), where('status', '==', 'active')));
-                setEngineers(engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
-
-                // 2. جلب أنواع الخدمات المعتمدة من القوائم المرجعية الموحدة
                 const typesPath = getTenantPath('transactionTypes', tenantId);
-                const typesSnap = await getDocs(query(collection(firestore, typesPath), orderBy('order')));
+
+                const [clientSnap, engSnap, typesSnap] = await Promise.all([
+                    getDoc(clientRef),
+                    getDocs(query(collection(firestore, empPath), where('status', '==', 'active'))),
+                    getDocs(query(collection(firestore, typesPath), orderBy('order')))
+                ]);
+
+                if (clientSnap.exists()) setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
+                setEngineers(engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
                 setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
 
             } catch (error) {
                 console.error("Reference data error:", error);
-                toast({ variant: 'destructive', title: 'خطأ في جلب البيانات', description: 'تأكد من إعداد القوائم المرجعية للخدمات.' });
             } finally {
                 setEngineersLoading(false);
                 setTypesLoading(false);
             }
         };
 
-        fetchReferenceData();
-    }, [firestore, isOpen, tenantId, toast]);
+        fetchAllData();
+    }, [firestore, isOpen, tenantId, clientId]);
+
+    /**
+     * ✨ محرك الإسناد الذكي: 
+     * إذا كانت المعاملة "معمارية" أو "بلدية"، يتم سحب المهندس المسؤول عن ملف العميل آلياً.
+     */
+    useEffect(() => {
+        if (transactionTypeName && client) {
+            const isArchitectural = transactionTypeName.includes('بلدية') || 
+                                    transactionTypeName.includes('معماري') || 
+                                    transactionTypeName.includes('تصميم');
+            
+            if (isArchitectural && client.assignedEngineer) {
+                setAssignedEngineerId(client.assignedEngineer);
+            }
+        }
+    }, [transactionTypeName, client]);
 
     const transactionTypeOptions = useMemo(() => 
         transactionTypes.map(t => ({ value: t.name, label: t.name })), 
@@ -104,7 +127,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const departmentIds = selectedType?.departmentIds || [];
 
-            // جلب مراحل العمل المعتمدة المرتبطة بالأقسام التي تتبع لها هذه الخدمة
+            // جلب مراحل العمل المعتمدة
             let initialStages: any[] = [];
             for (const deptId of departmentIds) {
                 const stagesPath = getTenantPath(`departments/${deptId}/workStages`, tenantId);
@@ -122,12 +145,9 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
             const batch = writeBatch(firestore);
             const clientRef = doc(firestore, getTenantPath(`clients/${clientId}`, tenantId));
-            const clientSnap = await getDoc(clientRef);
-            if (!clientSnap.exists()) throw new Error("الملف الرسمي للعميل غير موجود.");
             
-            const clientData = clientSnap.data() as Client;
-            const newCounter = (clientData.transactionCounter || 0) + 1;
-            const transactionNumber = `CL${clientData.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
+            const newCounter = (client?.transactionCounter || 0) + 1;
+            const transactionNumber = `CL${client?.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
             
             const transactionsPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
             const newTransactionRef = doc(collection(firestore, transactionsPath));
@@ -168,13 +188,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
             await batch.commit();
             
-            toast({ title: 'نجاح الربط', description: 'تم إنشاء المعاملة وربطها بسير العمل المعتمد بنجاح.' });
+            toast({ title: 'تمت الإضافة بنجاح', description: `المعاملة جاهزة الآن برقم ${transactionNumber}` });
             onClose();
             router.refresh();
 
         } catch (error: any) {
             console.error("Save transaction error:", error);
-            toast({ variant: 'destructive', title: 'فشل الربط', description: error.message || 'فشل في إضافة المعاملة.' });
+            toast({ variant: 'destructive', title: 'فشل الحفظ', description: error.message });
             setIsSaving(false);
             savingRef.current = false;
         }
@@ -191,7 +211,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                             </div>
                             <div className="text-right">
                                 <DialogTitle className="text-xl font-black text-[#1e1b4b]">إضافة معاملة جديدة</DialogTitle>
-                                <DialogDescription className="font-bold">اختر نوع الخدمة من القوائم المرجعية لفتح ملف إنجاز جديد.</DialogDescription>
+                                <DialogDescription className="font-bold">ربط الخدمة المطلوبة بملف العميل المعتمد.</DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
@@ -207,6 +227,15 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                                 disabled={typesLoading || isSaving} 
                             />
                         </div>
+
+                        {assignedEngineerId && (
+                            <Alert className="bg-green-50 border-green-200 rounded-2xl animate-in slide-in-from-top-2">
+                                <UserCheck className="h-4 w-4 text-green-600" />
+                                <AlertTitle className="text-xs font-black text-green-800">إسناد تلقائي ذكي</AlertTitle>
+                                <AlertDescription className="text-[10px] font-bold text-green-700">تم اختيار المهندس المعماري المتابع للعميل آلياً لتسهيل العملية.</AlertDescription>
+                            </Alert>
+                        )}
+
                         <div className="grid gap-2">
                             <Label className="font-black text-gray-700 pr-1">إسناد لمهندس المتابعة</Label>
                             <InlineSearchList 

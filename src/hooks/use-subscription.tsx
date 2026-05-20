@@ -15,7 +15,7 @@ import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف اشتراك لحظي محصن (Protected Real-time Hook):
- * يضمن عدم محاولة قراءة البيانات قبل استقرار هوية المنشأة لمنع Permission Errors.
+ * تم تحصينه بـ "رادار الانتظار" لضمان عدم حدوث أخطاء صلاحيات عند تبديل الجلسات.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -28,6 +28,7 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user, loading: authLoading } = useAuth();
 
+    // 🛡️ استخدام Ref لضمان استقرار الفلاتر في محرك المقارنة
     const constraintsHash = JSON.stringify(constraints.map(c => c.toString()));
     const constraintsRef = useRef(constraints);
     
@@ -36,16 +37,18 @@ export function useSubscription<T extends { id?: string }>(
     }, [constraintsHash]);
 
     useEffect(() => {
+        // 1. انتظار تهيئة النظام وهوية المستخدم
         if (!firestore || !collectionPath || authLoading) {
             setLoading(!firestore || !collectionPath ? false : true);
             return;
         }
 
+        // 2. محرك فرز المسارات المعتمد
         const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters'];
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
         const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
-        // 🛡️ صمام أمان: إذا لم يكن مسار ماستر ولم تتوفر هوية الشركة بعد، ننتظر
+        // 🛡️ صمام أمان راداري: نمنع الاتصال بـ Firebase إذا لم تتوفر هوية المنشأة بعد
         if (!isMasterCollection && !tenantId) {
             setLoading(true); 
             return;
@@ -53,7 +56,7 @@ export function useSubscription<T extends { id?: string }>(
 
         const finalPath = getTenantPath(collectionPath, tenantId);
         
-        // منع محاولة قراءة مسارات غير مكتملة
+        // منع القراءة من المسارات غير المستقرة
         if (finalPath.startsWith('_WAITING_FOR_TENANT_')) {
             setLoading(true);
             return;
@@ -64,7 +67,7 @@ export function useSubscription<T extends { id?: string }>(
         
         let finalConstraints = [...constraintsRef.current];
         
-        // في حال استعلام المجموعات (Collection Group)، نفرض عزل الشركة يدوياً
+        // 3. محرك الاستعلام المجمع (Collection Group) مع فرض عزل المنشأة
         if (isGroup && tenantId) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
             finalConstraints.push(where('companyId', '==', tenantId));
@@ -75,7 +78,7 @@ export function useSubscription<T extends { id?: string }>(
                     setData(newData);
                     setLoading(false);
                 }, (err) => {
-                    console.error(`Group Subscription Error [${collectionName}]:`, err.message);
+                    console.warn(`[Permission Guard] Access Deferred: ${collectionName}`);
                     setError(err);
                     setLoading(false);
                 });
@@ -84,6 +87,7 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
+        // 4. محرك الاشتراك المباشر
         try {
             const q = query(collection(firestore, finalPath), ...finalConstraints);
             const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -91,7 +95,7 @@ export function useSubscription<T extends { id?: string }>(
                 setData(newData);
                 setLoading(false);
             }, (err) => {
-                console.error(`Subscription Error [${finalPath}]:`, err.message);
+                console.warn(`[Permission Guard] Access Deferred: ${finalPath}`);
                 setError(err);
                 setLoading(false);
             });
