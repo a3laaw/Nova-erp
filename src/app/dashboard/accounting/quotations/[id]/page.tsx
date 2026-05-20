@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -19,6 +18,7 @@ import Link from 'next/link';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
 import { useBranding } from '@/context/branding-context';
 import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
@@ -67,7 +67,12 @@ export default function ViewQuotationPage() {
   };
 
   if (quotationLoading || brandingLoading) {
-      return <div className="p-12 max-w-4xl mx-auto space-y-10" dir="rtl"><Skeleton className="h-32 w-full rounded-[2.5rem]" /><Skeleton className="h-[600px] w-full rounded-[3rem]" /></div>;
+      return (
+        <div className="p-12 max-w-4xl mx-auto space-y-10" dir="rtl">
+            <Skeleton className="h-32 w-full rounded-[2.5rem]" />
+            <Skeleton className="h-[600px] w-full rounded-[3rem]" />
+        </div>
+      );
   }
 
   if (!quotation) return <div className="text-center py-20 font-black opacity-30">لم يتم العثور على عرض السعر.</div>;
@@ -165,7 +170,6 @@ export default function ViewQuotationPage() {
                     </div>
                 </section>
 
-                {/* 🧩 المعالج الذكي لعرض كتل البيانات بالترتيب المعتمد 🧩 */}
                 <div className="space-y-12">
                     {quotation.layoutBlocks?.map((block: any, bIdx: number) => (
                         <div key={block.id} className="animate-in fade-in duration-700">
@@ -199,6 +203,7 @@ export default function ViewQuotationPage() {
                                                         <TableCell className="text-center font-mono font-black text-slate-300 border-l">{index + 1}</TableCell>
                                                         <TableCell className="px-10">
                                                             <p className="font-black text-2xl text-slate-800 leading-tight">{item.description}</p>
+                                                            {item.triggerCondition && <p className="text-xs font-bold text-slate-400 mt-1">{item.triggerCondition}</p>}
                                                         </TableCell>
                                                         <TableCell className="text-center font-mono font-black text-3xl opacity-40">
                                                             {quotation.financialsType === 'percentage' ? `${item.percentage}%` : formatCurrency(item.unitPrice || 0)}
@@ -227,7 +232,6 @@ export default function ViewQuotationPage() {
                         </div>
                     ))}
                     
-                    {/* التوافقية مع العروض القديمة التي لا تملك layoutBlocks */}
                     {(!quotation.layoutBlocks || quotation.layoutBlocks.length === 0) && (
                          <section className="space-y-8">
                             <h3 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-4 border-r-8 border-primary pr-6">
@@ -251,6 +255,7 @@ export default function ViewQuotationPage() {
                                                 <TableCell className="text-center font-mono font-black text-slate-300 border-l">{index + 1}</TableCell>
                                                 <TableCell className="px-10">
                                                     <p className="font-black text-2xl text-slate-800 leading-tight">{item.description}</p>
+                                                    {item.triggerCondition && <p className="text-xs font-bold text-slate-400 mt-1">{item.triggerCondition}</p>}
                                                 </TableCell>
                                                 <TableCell className="text-center font-mono font-black text-3xl opacity-40">
                                                     {quotation.financialsType === 'percentage' ? `${item.percentage}%` : formatCurrency(item.unitPrice || 0)}
