@@ -84,7 +84,7 @@
   }
 }
 
-/* 🛡️ تحسين القوائم المنسدلة للتعامل مع الماوس ومنع الحجب 🛡️ */
+/* تحسين القوائم المنسدلة للتعامل مع الماوس ومنع الحجب */
 [data-radix-popper-content-wrapper] {
   z-index: 999999 !important;
   pointer-events: auto !important;

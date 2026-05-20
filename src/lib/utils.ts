@@ -42,9 +42,8 @@ export function numberToArabicWords(inputNumber: number | string): string {
 }
 
 /**
- * محرك توجيه المسارات المطور (SaaS Tenant Routing):
+ * محرك توجيه المسارات المطور (SaaS Tenant Router):
  * 🛡️ الضابط الأكبر لعزل البيانات. 
- * يضمن بقاء كل شركة داخل "صندوقها" الخاص ومنع أخطاء الصلاحيات.
  */
 export function getTenantPath(path: string, tenantId: string | null | undefined): string {
   if (!path) return '';
