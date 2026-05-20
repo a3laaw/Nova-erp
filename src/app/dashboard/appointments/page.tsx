@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarDays, Home, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// 🛡️ تصحيح التوجيه: استخدام .then لضمان حل الـ Promise الخاص بالـ Named Export
+// 🛡️ تصحيح التوجيه: استخدام استيراد مباشر محمي لمنع ChunkLoadError
 const ArchitecturalAppointmentsView = dynamic(
     () => import('@/components/appointments/architectural-appointments-view').then(mod => mod.ArchitecturalAppointmentsView),
     { 
@@ -29,7 +29,7 @@ const ArchitecturalAppointmentsView = dynamic(
 );
 
 const RoomBookingCalendar = dynamic(
-    () => import('@/components/appointments/room-booking-calendar').then(mod => mod.default),
+    () => import('@/components/appointments/room-booking-calendar'),
     { 
         loading: () => <Skeleton className="h-[500px] w-full rounded-[2.5rem] animate-pulse" />,
         ssr: false 

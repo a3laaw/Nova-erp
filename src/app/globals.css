@@ -77,7 +77,7 @@
   }
 }
 
-/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V145.0) 🛡️ */
+/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V146.0) 🛡️ */
 /* فرض السيادة الوظيفية فقط دون تكرار البراويز أو الظلال المزدوجة */
 
 [data-radix-portal] {
@@ -98,7 +98,8 @@
 [role="listbox"], 
 [role="menu"], 
 [data-radix-select-content], 
-[data-radix-popover-content] {
+[data-radix-popover-content],
+.react-select__menu {
   z-index: 999999999 !important;
   pointer-events: auto !important;
   background-color: white !important;

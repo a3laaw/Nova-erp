@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { toFirestoreDate } from '@/services/date-converter';
 import { Logo } from '@/components/layout/logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Printer, Pencil, ArrowRight, FileSignature, Ruler, Building2, Layers, ScrollText, Calculator } from 'lucide-react';
@@ -62,7 +63,7 @@ export default function ViewQuotationPage() {
   const { data: quotation, loading: quotationLoading } = useDocument<Quotation>(firestore, quotationRef ? quotationRef.path : null);
 
   const formatDate = (dateValue: any) => {
-      const d = dateValue?.toDate ? dateValue.toDate() : new Date(dateValue);
+      const d = toFirestoreDate(dateValue);
       return d ? format(d, 'dd/MM/yyyy', { locale: ar }) : '-';
   };
 
@@ -192,7 +193,7 @@ export default function ViewQuotationPage() {
                                                     <TableHead className="w-20 text-center text-white border-l border-white/10 font-black">#</TableHead>
                                                     <TableHead className="px-10 font-black text-xl text-white text-right">بيان الدفعة المستحقة</TableHead>
                                                     <TableHead className="w-56 text-center font-black text-xl text-white">
-                                                        المبلغ (د.ك)
+                                                        {quotation.financialsType === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                                     </TableHead>
                                                     <TableHead className="w-64 text-left px-12 font-black text-xl text-white">الإجمالي</TableHead>
                                                 </TableRow>
@@ -201,7 +202,7 @@ export default function ViewQuotationPage() {
                                                 {quotation.items.map((item, index) => {
                                                     const rowTotal = quotation.financialsType === 'percentage' 
                                                         ? (item.percentage / 100) * (quotation.totalAmount || 0)
-                                                        : item.unitPrice; // FIXED: In fixed mode, unitPrice is the total
+                                                        : item.unitPrice; 
                                                     
                                                     return (
                                                         <TableRow key={index} className="h-24 border-b last:border-0 hover:bg-transparent">
