@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -15,11 +15,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import type { Quotation, Client } from '@/lib/types';
 import { QuotationForm } from '@/components/accounting/quotation-form';
-import { cleanFirestoreData } from '@/lib/utils';
+import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Calculator, Sparkles } from 'lucide-react';
 
-export default function NewQuotationPage() {
+/**
+ * صفحة إصدار عرض سعر جديد (Sovereign Quote Engine V12.0):
+ * تم تحصين محرك الترقيم ليعمل عبر المسار الموحد للمنشأة لضمان تجاوز الرفض الأمني.
+ */
+function NewQuotationContent() {
   const router = useRouter();
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -29,14 +34,20 @@ export default function NewQuotationPage() {
   const [quotationNumber, setQuotationNumber] = useState('جاري التوليد...');
   const [isGeneratingNumber, setIsGeneratingNumber] = useState(true);
   
+  const tenantId = currentUser?.currentCompanyId;
+
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || !tenantId) return;
     setIsGeneratingNumber(true);
+    
     const generateNumber = async () => {
         try {
             const currentYear = new Date().getFullYear();
-            const counterRef = doc(firestore, 'counters', 'quotations');
+            // 🛡️ استخدام المسار الموحد المحصن للعدادات
+            const counterPath = getTenantPath('counters/quotations', tenantId);
+            const counterRef = doc(firestore, counterPath!);
             const counterDoc = await getDoc(counterRef);
+            
             let nextNumber = 1;
             if (counterDoc.exists()) {
                 const counts = counterDoc.data()?.counts || {};
@@ -44,24 +55,27 @@ export default function NewQuotationPage() {
             }
             setQuotationNumber(`Q-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
         } catch (error) {
-            setQuotationNumber('خطأ');
+            console.error("Number Generation Error:", error);
+            setQuotationNumber('خطأ أمان');
         } finally {
             setIsGeneratingNumber(false);
         }
     };
     generateNumber();
-  }, [firestore]);
+  }, [firestore, tenantId]);
 
   const handleSave = useCallback(async (data: Omit<Quotation, 'id'>) => {
-    if (!firestore || !currentUser || isGeneratingNumber) return;
+    if (!firestore || !currentUser || !tenantId || isGeneratingNumber) return;
     setIsSaving(true);
     let newQuotationId = '';
     
     try {
         await runTransaction(firestore, async (transaction) => {
             const currentYear = new Date().getFullYear();
-            const counterRef = doc(firestore, 'counters', 'quotations');
+            const counterPath = getTenantPath('counters/quotations', tenantId);
+            const counterRef = doc(firestore, counterPath!);
             const counterDoc = await transaction.get(counterRef);
+            
             let nextNumber = 1;
             if (counterDoc.exists()) {
                 const counts = counterDoc.data()?.counts || {};
@@ -69,10 +83,12 @@ export default function NewQuotationPage() {
             }
             
             const newQuotationNumber = `Q-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
-            const newQuotationRef = doc(collection(firestore, 'quotations'));
+            const quotationsPath = getTenantPath('quotations', tenantId);
+            const newQuotationRef = doc(collection(firestore, quotationsPath!));
             newQuotationId = newQuotationRef.id;
 
-            const clientSnap = await getDoc(doc(firestore, 'clients', data.clientId));
+            const clientPath = getTenantPath(`clients/${data.clientId}`, tenantId);
+            const clientSnap = await getDoc(doc(firestore, clientPath!));
             const clientName = clientSnap.exists() ? clientSnap.data().nameAr : 'عميل غير معروف';
 
             const quotationData = {
@@ -84,43 +100,42 @@ export default function NewQuotationPage() {
                 status: 'draft',
                 createdAt: serverTimestamp(),
                 createdBy: currentUser.id,
+                companyId: tenantId
             };
             
             transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             transaction.set(newQuotationRef, cleanFirestoreData(quotationData));
         });
         
-        toast({ title: 'نجاح', description: 'تم حفظ عرض السعر كمسودة.' });
-        if (newQuotationId) {
-            router.push(`/dashboard/accounting/quotations/${newQuotationId}`);
-        } else {
-            router.push('/dashboard/accounting/quotations');
-        }
-        // isSaving remains true until navigation
-    } catch (error) {
+        toast({ title: 'نجاح الحفظ', description: 'تم إنشاء مسودة عرض السعر بنجاح.' });
+        router.push(`/dashboard/accounting/quotations/${newQuotationId}`);
+    } catch (error: any) {
         console.error("Error saving quotation:", error);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم حفظ عرض السعر.' });
-        setIsSaving(false); // Reset only on error
+        toast({ variant: 'destructive', title: 'فشل الحفظ', description: error.message || 'حدث خطأ غير متوقع.' });
+        setIsSaving(false);
     }
-  }, [firestore, currentUser, toast, router, isGeneratingNumber]);
+  }, [firestore, currentUser, toast, router, isGeneratingNumber, tenantId]);
 
   return (
-    <Card className="max-w-4xl mx-auto" dir="rtl">
-        <CardHeader>
+    <Card className="max-w-4xl mx-auto rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect" dir="rtl">
+        <CardHeader className="bg-primary/5 pb-8 border-b">
             <div className="flex justify-between items-start">
-                <div>
-                    <CardTitle>عرض سعر جديد</CardTitle>
-                    <CardDescription>املأ التفاصيل لإنشاء عرض سعر جديد.</CardDescription>
+                <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-xl text-primary"><Calculator className="h-6 w-6"/></div>
+                        <CardTitle className="text-3xl font-black tracking-tighter">إنشاء عرض سعر جديد</CardTitle>
+                    </div>
+                    <CardDescription className="font-bold text-base pr-11">املأ التفاصيل الفنية والمالية بدقة لضمان تحويلها لعقد رسمي لاحقاً.</CardDescription>
                 </div>
-                <div className="text-right">
-                    <Label>رقم العرض</Label>
-                    <div className="font-mono text-lg font-semibold h-7">
-                        {isGeneratingNumber ? <Skeleton className="h-6 w-24" /> : quotationNumber}
+                <div className="text-left bg-white p-4 rounded-2xl border shadow-inner">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground block mb-1">رقم العرض المعتمد</Label>
+                    <div className="font-mono text-2xl font-black text-primary">
+                        {isGeneratingNumber ? <Skeleton className="h-8 w-24" /> : quotationNumber}
                     </div>
                 </div>
             </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-8">
             <QuotationForm 
                 onSave={handleSave} 
                 onClose={() => router.back()} 
@@ -129,4 +144,12 @@ export default function NewQuotationPage() {
         </CardContent>
     </Card>
   );
+}
+
+export default function NewQuotationPage() {
+    return (
+        <Suspense fallback={<Skeleton className="h-[600px] w-full rounded-[3rem]" />}>
+            <NewQuotationContent />
+        </Suspense>
+    );
 }

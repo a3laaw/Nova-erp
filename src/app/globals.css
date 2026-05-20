@@ -67,9 +67,9 @@
   }
 }
 
-/* 🛡️ التطهير البصري للقوائم المنسدلة (Opaque Dropdowns) 🛡️ */
+/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (Opaque Dropdowns) 🛡️ */
 [data-radix-popper-content-wrapper] {
-  z-index: 999999 !important;
+  z-index: 9999999 !important;
   pointer-events: auto !important;
 }
 
@@ -79,21 +79,30 @@
 [role="dialog"][data-state="open"],
 [data-radix-select-content], 
 [data-radix-popover-content],
-.react-select__menu {
+.react-select__menu,
+.rdp-dropdown {
   background-color: white !important;
   background-image: none !important;
   opacity: 1 !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  border: 2px solid #e2e8f0 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
   pointer-events: auto !important;
-  z-index: 999999 !important;
+  z-index: 9999999 !important;
 }
 
-[role="menuitem"], [role="option"], [cmdk-item], button {
+/* تحسين وضوح نصوص القوائم */
+[role="menuitem"], [role="option"], [cmdk-item], .react-select__option {
     cursor: pointer !important;
     pointer-events: auto !important;
+    font-weight: 900 !important;
+    color: #1e1b4b !important;
+}
+
+[role="menuitem"]:hover, [role="option"][aria-selected="true"], .react-select__option--is-focused {
+    background-color: #FF7A00 !important;
+    color: white !important;
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
@@ -107,7 +116,6 @@
   animation: float 3s ease-in-out infinite;
 }
 
-/* توهج مداري للجزء المتحرك في السبينر */
 @keyframes spin-glow {
   0% { transform: rotate(0deg); filter: drop-shadow(0 0 5px #FF7A00); }
   50% { filter: drop-shadow(0 0 15px #FFB000); }
@@ -118,7 +126,6 @@
   animation: spin-glow 1.2s linear infinite;
 }
 
-/* 🌟 توهج ذهبي عكسي لاسم نوفا 🌟 */
 @keyframes gold-reverse-aura {
   0% { transform: rotate(360deg); opacity: 0.4; }
   50% { opacity: 0.8; scale: 1.1; }
