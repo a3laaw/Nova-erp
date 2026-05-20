@@ -25,10 +25,10 @@ import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 
 /**
- * الشعار النصي المعتمد (NOVA Logo)
+ * شعار نوفا المعتمد (NOVA Text Logo)
  */
 const NovaLogo = () => (
-  <svg width="140" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="80" height="30" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
     <text 
       x="50%" 
       y="50%" 
@@ -36,9 +36,8 @@ const NovaLogo = () => (
       textAnchor="middle" 
       fontFamily="inherit" 
       fontWeight="900" 
-      fontSize="42" 
+      fontSize="32" 
       fill="#FF7A00"
-      style={{ filter: 'drop-shadow(0px 0px 8px rgba(255,122,0,0.3))' }}
     >
       NOVA
     </text>
@@ -105,7 +104,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
           <div className="relative flex flex-col items-center">
-              <div className="h-48 w-48 rounded-full border-2 border-primary/5 border-t-primary animate-spin shadow-[0_0_30px_rgba(255,122,0,0.4)]" />
+              <div className="h-32 w-32 rounded-full border-4 border-slate-100 border-t-[#FF7A00] animate-spin shadow-[0_0_30px_rgba(255,122,0,0.3)]" />
               <div className="absolute inset-0 flex items-center justify-center">
                   <NovaLogo />
               </div>

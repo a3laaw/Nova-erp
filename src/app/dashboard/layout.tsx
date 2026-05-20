@@ -14,10 +14,10 @@ import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 /**
  * شعار نوفا المعتمد (NOVA Text Logo):
- * تصميم رصين يتوسط قطر دائرة التحميل المتوهجة.
+ * تم ضبط الحجم ليتوسط الدائرة المصغرة بدقة هندسية.
  */
 const NovaLogo = () => (
-  <svg width="140" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="80" height="30" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
     <text 
       x="50%" 
       y="50%" 
@@ -25,9 +25,8 @@ const NovaLogo = () => (
       textAnchor="middle" 
       fontFamily="inherit" 
       fontWeight="900" 
-      fontSize="42" 
-      fill="#FF7A00" 
-      style={{ filter: 'drop-shadow(0px 0px 8px rgba(255,122,0,0.3))' }}
+      fontSize="32" 
+      fill="#FF7A00"
     >
       NOVA
     </text>
@@ -59,29 +58,28 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // معالجة حالة التحميل المعتمدة والموحدة
+  // 🛡️ شاشة التحميل المعتمدة والمحدثة جمالياً (Glow & Center)
   if (loading || !mounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-12 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
         <div className="relative flex flex-col items-center">
-            {/* 🛡️ حلقة التحميل مع التوهج المداري الفخم 🛡️ */}
-            <div className="h-48 w-48 rounded-full border-2 border-primary/5 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.4)]" />
+            {/* 🌟 الدائرة المصغرة والمتوهجة 🌟 */}
+            <div className="h-32 w-32 rounded-full border-4 border-slate-100 border-t-[#FF7A00] animate-spin shadow-[0_0_30px_rgba(255,122,0,0.3)]" />
             
-            {/* الشعار في المركز الهندسي المطلق للدائرة */}
+            {/* التمركز المطلق لكلمة NOVA */}
             <div className="absolute inset-0 flex items-center justify-center">
                 <NovaLogo />
             </div>
             
-            {/* النص الكحلي المعتمد بالأسفل بوضوح تام */}
-            <div className="mt-12 text-center space-y-4">
+            <div className="absolute -bottom-16 text-center w-64">
                 <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري التحميل...</p>
                 {showEmergencyExit && (
-                    <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl">
-                        <Button onClick={() => window.location.reload()} variant="outline" className="h-11 rounded-xl font-bold gap-2 text-[#1e1b4b] border-orange-200">
-                            <RefreshCcw className="h-4 w-4" /> تحديث الصفحة
+                    <div className="mt-4 flex flex-col gap-2 animate-in zoom-in-95 duration-500 glass-effect p-4 rounded-2xl border-white/20 shadow-xl">
+                        <Button onClick={() => window.location.reload()} variant="outline" className="h-9 rounded-xl font-bold gap-2 text-[#1e1b4b] border-orange-200 text-xs">
+                            <RefreshCcw className="h-3 w-3" /> تحديث الصفحة
                         </Button>
-                        <Button onClick={handleSafeExit} variant="ghost" className="h-11 rounded-xl font-black gap-2 text-red-600 hover:bg-red-50">
-                            <LogOut className="h-4 w-4" /> خروج آمن وإصلاح
+                        <Button onClick={handleSafeExit} variant="ghost" className="h-9 rounded-xl font-black gap-2 text-red-600 hover:bg-red-50 text-xs">
+                            <LogOut className="h-3 w-3" /> خروج آمن وإصلاح
                         </Button>
                     </div>
                 )}
