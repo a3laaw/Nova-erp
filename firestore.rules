@@ -3,28 +3,31 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات السيادية (V125.0)
+    // 🛡️ مصفوفة الصلاحيات الموحدة (V126.0)
     
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
     function isDeveloper() {
-      return request.auth != null && 
-             (request.auth.token.isSuperAdmin == true || 
-              request.auth.token.role == 'Developer');
+      return isAuthenticated() && 
+             (request.auth.token.role == 'Developer' || request.auth.token.isSuperAdmin == true);
     }
 
     function isTenantMember(companyId) {
-      return request.auth != null && 
+      return isAuthenticated() && 
              (request.auth.token.companyId == companyId || 
               request.auth.token.currentCompanyId == companyId);
     }
 
-    // 🏯 قاعدة الوصول الشاملة للمطور
+    // 🏯 قاعدة الوصول الشاملة للمطور المعتمد
     match /{document=**} {
       allow read, write: if isDeveloper();
     }
 
-    // 🏢 عزل المنشآت
+    // 🏢 عزل بيانات المنشآت (Multi-tenancy Isolation)
     match /companies/{companyId} {
-      allow read: if request.auth != null;
+      allow read: if isAuthenticated();
       allow write: if isDeveloper() || isTenantMember(companyId);
       
       match /{allSubcollections=**} {
@@ -32,29 +35,40 @@ service cloud.firestore {
       }
     }
 
-    // 🌍 الفهرس العالمي (Global Index)
+    // 🌍 الفهرس العالمي للمستخدمين
     match /global_users/{uid} {
-      // 🛡️ تصحيح سيادي: السماح بالقراءة العامة لتمكين البحث عن اليوزر عند الدخول قبل التسجيل
       allow read: if true; 
-      allow write: if isDeveloper() || (request.auth != null && request.auth.uid == uid);
+      allow write: if isDeveloper() || (isAuthenticated() && request.auth.uid == uid);
     }
     
     match /company_requests/{id} {
-      allow create: if request.auth != null; 
+      allow create: if isAuthenticated(); 
       allow read, write: if isDeveloper();
     }
 
-    // 📊 تحصين استعلامات المجموعات
+    // 📊 تحصين الاستعلامات المجمعة (Collection Group Security)
+    // يجب أن تتطابق هذه القواعد مع الفلاتر المستخدمة في الكود البرمجي
+    
     match /{path=**}/userProductivity/{id} {
-        allow read, write: if request.auth != null && (isDeveloper() || (request.auth.uid == resource.data.userId && isTenantMember(request.auth.token.companyId)));
+        allow read: if isAuthenticated() && (isDeveloper() || resource.data.companyId == request.auth.token.companyId);
+        allow write: if isAuthenticated() && (isDeveloper() || request.resource.data.companyId == request.auth.token.companyId);
     }
 
-    // 🛡️ السماح للموظفين برؤية طلباتهم الخاصة بالاستئذان والإجازات حتى لو فشل الكليم المباشر في بعض المتصفحات
-    match /{path=**}/leaveRequests/{id} {
-        allow read: if request.auth != null && (isDeveloper() || resource.data.employeeId == request.auth.token.employeeId || resource.data.createdBy == request.auth.uid);
+    match /{path=**}/transactions/{id} {
+        allow read: if isAuthenticated() && (isDeveloper() || resource.data.companyId == request.auth.token.companyId);
     }
+
+    match /{path=**}/timelineEvents/{id} {
+        allow read: if isAuthenticated() && (isDeveloper() || resource.data.companyId == request.auth.token.companyId);
+        allow write: if isAuthenticated() && (isDeveloper() || request.resource.data.companyId == request.auth.token.companyId);
+    }
+
+    match /{path=**}/leaveRequests/{id} {
+        allow read: if isAuthenticated() && (isDeveloper() || resource.data.companyId == request.auth.token.companyId);
+    }
+
     match /{path=**}/permissionRequests/{id} {
-        allow read: if request.auth != null && (isDeveloper() || resource.data.employeeId == request.auth.token.employeeId || resource.data.createdBy == request.auth.uid);
+        allow read: if isAuthenticated() && (isDeveloper() || resource.data.companyId == request.auth.token.companyId);
     }
   }
 }

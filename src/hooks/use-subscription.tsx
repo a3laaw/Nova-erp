@@ -28,6 +28,7 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user, loading: authLoading } = useAuth();
 
+    // 🛡️ استخدام مرجع للقيود لضمان ثبات الاستعلام ومنع حلقات التكرار
     const constraintsHash = JSON.stringify(constraints.map(c => c.toString()));
     const constraintsRef = useRef(constraints);
     
@@ -48,7 +49,7 @@ export function useSubscription<T extends { id?: string }>(
         
         const finalPath = getTenantPath(collectionPath, tenantId);
         
-        // 🛡️ صمام أمان راداري: إذا لم يتم استنتاج المسار النهائي، نتوقف عن المحاولة
+        // 🛡️ صمام أمان راداري: إذا لم يتم استنتاج المسار النهائي المعزول، نتوقف عن المحاولة
         if (!finalPath) {
             setLoading(true); 
             return;
@@ -62,7 +63,9 @@ export function useSubscription<T extends { id?: string }>(
         // 2. محرك الاستعلام المجمع (Collection Group) مع فرض عزل المنشأة
         if (isGroup && tenantId) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
+            // 🛡️ فرض فلتر الهوية في الاستعلام المجمع لمطابقة قواعد الأمان
             finalConstraints.push(where('companyId', '==', tenantId));
+            
             try {
                 const q = query(collectionGroup(firestore, collectionName), ...finalConstraints);
                 const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -70,7 +73,7 @@ export function useSubscription<T extends { id?: string }>(
                     setData(newData);
                     setLoading(false);
                 }, (err) => {
-                    console.warn(`[Permission Guard] Access Deferred: ${collectionName}`);
+                    console.warn(`[Permission Guard] CG Access Deferred: ${collectionName}`);
                     setError(err);
                     setLoading(false);
                 });
