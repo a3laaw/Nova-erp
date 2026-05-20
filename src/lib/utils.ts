@@ -1,6 +1,7 @@
 /**
  * @fileOverview المحرك البرمجي للأدوات المساعدة (Utils).
  * تم تحديثه لفرض العزل التام للمنشآت ومنع أخطاء الصلاحيات.
+ * تم تصحيح مصفوفة masterCollections لتمكين الموظفين من الوصول لعدادات أرقام العروض والمستندات.
  */
 
 import { clsx, type ClassValue } from "clsx"
@@ -44,11 +45,13 @@ export function numberToArabicWords(inputNumber: number | string): string {
 /**
  * محرك توجيه المسارات المعتمد (Tenant Router):
  * 🛡️ الضابط الأكبر لعزل البيانات لضمان عدم حدوث أخطاء صلاحيات.
+ * تم حذف 'counters' من القائمة العامة لضمان توليد أرقام عروض الأسعار داخل مسار المنشأة.
  */
 export function getTenantPath(path: string | null | undefined, tenantId: string | null | undefined): string | null {
   if (!path) return null;
   
-  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters', 'holidays'];
+  // 🛡️ القائمة العامة السيادية (Master Only)
+  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'holidays'];
   
   const isMaster = masterCollections.some(mc => path.startsWith(mc));
   if (isMaster) return path;

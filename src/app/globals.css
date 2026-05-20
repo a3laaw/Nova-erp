@@ -67,13 +67,13 @@
   }
 }
 
-/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (Opaque Dropdowns) 🛡️ */
+/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (Total Opaque Interaction) 🛡️ */
 [data-radix-popper-content-wrapper] {
-  z-index: 9999999 !important;
+  z-index: 99999999 !important;
   pointer-events: auto !important;
 }
 
-/* فرض الخلفية البيضاء المصمتة لمنع التشتت البصري وضمان سيادة الماوس */
+/* فرض السيادة الكاملة واللون الأبيض المصمت لمنع التداخل البصري وعدم استجابة الماوس */
 [role="listbox"], 
 [role="menu"], 
 [role="dialog"][data-state="open"],
@@ -89,15 +89,17 @@
   border: 2px solid #e2e8f0 !important;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
   pointer-events: auto !important;
-  z-index: 9999999 !important;
+  z-index: 99999999 !important;
 }
 
-/* تحسين وضوح نصوص القوائم */
+/* تحسين وضوح نصوص القوائم المنسدلة وتفاعلها مع الماوس */
 [role="menuitem"], [role="option"], [cmdk-item], .react-select__option {
     cursor: pointer !important;
     pointer-events: auto !important;
     font-weight: 900 !important;
     color: #1e1b4b !important;
+    padding: 12px 16px !important;
+    transition: all 0.2s ease !important;
 }
 
 [role="menuitem"]:hover, [role="option"][aria-selected="true"], .react-select__option--is-focused {

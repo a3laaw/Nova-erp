@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -13,16 +13,16 @@ import { useFirebase } from '@/firebase';
 import { doc, runTransaction, collection, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import type { Quotation, Client } from '@/lib/types';
+import type { Quotation } from '@/lib/types';
 import { QuotationForm } from '@/components/accounting/quotation-form';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calculator, Sparkles } from 'lucide-react';
+import { Calculator, Sparkles, AlertCircle } from 'lucide-react';
 
 /**
- * صفحة إصدار عرض سعر جديد (Sovereign Quote Engine V12.0):
- * تم تحصين محرك الترقيم ليعمل عبر المسار الموحد للمنشأة لضمان تجاوز الرفض الأمني.
+ * صفحة إصدار عرض سعر جديد (Sovereign Quote Engine V13.0):
+ * تم تحصين محرك الترقيم ليعمل عبر المسار الموحد المخصص للمنشأة لضمان تجاوز الرفض الأمني لـ Firebase.
  */
 function NewQuotationContent() {
   const router = useRouter();
@@ -36,6 +36,7 @@ function NewQuotationContent() {
   
   const tenantId = currentUser?.currentCompanyId;
 
+  // ✨ محرك توليد رقم عرض السعر الموحد والمحصن ✨
   useEffect(() => {
     if (!firestore || !tenantId) return;
     setIsGeneratingNumber(true);
@@ -43,9 +44,15 @@ function NewQuotationContent() {
     const generateNumber = async () => {
         try {
             const currentYear = new Date().getFullYear();
-            // 🛡️ استخدام المسار الموحد المحصن للعدادات
+            // 🛡️ استخدام المسار الموحد المخصص للمنشأة لضمان الصلاحيات
             const counterPath = getTenantPath('counters/quotations', tenantId);
-            const counterRef = doc(firestore, counterPath!);
+            
+            if (!counterPath) {
+                setQuotationNumber('خطأ في تحديد المنشأة');
+                return;
+            }
+
+            const counterRef = doc(firestore, counterPath);
             const counterDoc = await getDoc(counterRef);
             
             let nextNumber = 1;
@@ -54,9 +61,10 @@ function NewQuotationContent() {
                 nextNumber = (counts[currentYear] || 0) + 1;
             }
             setQuotationNumber(`Q-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
-        } catch (error) {
-            console.error("Number Generation Error:", error);
-            setQuotationNumber('خطأ أمان');
+        } catch (error: any) {
+            console.error("❌ Number Generation Permission Failure:", error);
+            // إظهار تنبيه تقني للمسؤول
+            setQuotationNumber('خطأ في الصلاحيات');
         } finally {
             setIsGeneratingNumber(false);
         }
@@ -82,7 +90,7 @@ function NewQuotationContent() {
                 nextNumber = (counts[currentYear] || 0) + 1;
             }
             
-            const newQuotationNumber = `Q-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+            const finalQuotationNumber = `Q-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
             const quotationsPath = getTenantPath('quotations', tenantId);
             const newQuotationRef = doc(collection(firestore, quotationsPath!));
             newQuotationId = newQuotationRef.id;
@@ -93,7 +101,7 @@ function NewQuotationContent() {
 
             const quotationData = {
                 ...data,
-                quotationNumber: newQuotationNumber,
+                quotationNumber: finalQuotationNumber,
                 quotationSequence: nextNumber,
                 quotationYear: currentYear,
                 clientName: clientName,
@@ -129,9 +137,12 @@ function NewQuotationContent() {
                 </div>
                 <div className="text-left bg-white p-4 rounded-2xl border shadow-inner">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground block mb-1">رقم العرض المعتمد</Label>
-                    <div className="font-mono text-2xl font-black text-primary">
+                    <div className={cn("font-mono text-2xl font-black", quotationNumber.includes('خطأ') ? "text-red-600" : "text-primary")}>
                         {isGeneratingNumber ? <Skeleton className="h-8 w-24" /> : quotationNumber}
                     </div>
+                    {quotationNumber.includes('خطأ') && (
+                        <p className="text-[8px] font-bold text-red-500 mt-1 max-w-[120px] leading-tight">يرجى مراجعة إعدادات الأمان للمنشأة.</p>
+                    )}
                 </div>
             </div>
         </CardHeader>
