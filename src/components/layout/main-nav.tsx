@@ -77,7 +77,8 @@ import {
   ShieldCheck,
   Calculator,
   BarChart3,
-  Sparkles
+  Sparkles,
+  History
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
