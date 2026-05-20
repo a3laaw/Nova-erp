@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Pencil, User, Calendar, Workflow, Play, Check, Undo2, Plus, MessageSquare, History, ClipboardList, ExternalLink, Sparkles, Coins, FileSignature, Loader2 } from 'lucide-react';
+import { Pencil, User, Calendar, Workflow, Play, Check, Undo2, Plus, MessageSquare, History, ClipboardList, ExternalLink, Sparkles, Coins, FileSignature, Loader2, Layers } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -38,7 +38,7 @@ import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
+import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -97,48 +97,56 @@ export default function TransactionDetailPage() {
   
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
-  
+  const tenantId = currentUser?.currentCompanyId;
+
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   const [workStageTemplates, setWorkStageTemplates] = useState<WorkStage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSignDialogOpen, setIsSignDialogOpen] = useState(false);
 
-  const transactionRef = useMemo(() => (firestore && clientId && transactionId ? doc(firestore, 'clients', clientId, 'transactions', transactionId) : null), [firestore, clientId, transactionId]);
-  const { data: transaction, loading: transactionLoading, error: transactionError } = useDocument<ClientTransaction>(firestore, transactionRef ? transactionRef.path : null);
-  const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientId ? `clients/${clientId}` : null);
+  // 🛡️ توجيه المسار السيادي المعتمد
+  const transactionPath = useMemo(() => (firestore && clientId && transactionId && tenantId ? getTenantPath(`clients/${clientId}/transactions/${transactionId}`, tenantId) : null), [firestore, clientId, transactionId, tenantId]);
+  const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(firestore, transactionPath);
+  
+  const clientPath = useMemo(() => (firestore && clientId && tenantId ? getTenantPath(`clients/${clientId}`, tenantId) : null), [firestore, clientId, tenantId]);
+  const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
   useEffect(() => {
-    if (!firestore) return;
-    getDocs(collection(firestore, 'employees')).then(snap => {
+    if (!firestore || !tenantId) return;
+    getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!))).then(snap => {
         const newMap = new Map<string, string>();
         snap.forEach(doc => newMap.set(doc.id, doc.data().fullName));
         setEmployeesMap(newMap);
     });
-  }, [firestore]);
+  }, [firestore, tenantId]);
   
   useEffect(() => {
-    if (!firestore || !transaction?.transactionTypeId) return;
+    if (!firestore || !transaction?.transactionTypeId || !tenantId) return;
     const fetchTemplates = async () => {
         try {
-            const transTypeSnap = await getDoc(doc(firestore, 'transactionTypes', transaction.transactionTypeId!));
+            const transTypePath = getTenantPath(`transactionTypes/${transaction.transactionTypeId}`, tenantId);
+            const transTypeSnap = await getDoc(doc(firestore, transTypePath!));
             if (!transTypeSnap.exists()) return;
+            
             const departmentIds = transTypeSnap.data().departmentIds || [];
             if (departmentIds.length === 0) return;
-            const stagePromises = departmentIds.map(deptId => getDocs(query(collection(firestore, `departments/${deptId}/workStages`), orderBy('order'))));
-            const snapshots = await Promise.all(stagePromises);
+            
             const allStages: WorkStage[] = [];
-            snapshots.forEach(s => s.docs.forEach(d => allStages.push({ id: d.id, ...d.data() } as WorkStage)));
+            for (const deptId of departmentIds) {
+                const stagesPath = getTenantPath(`departments/${deptId}/workStages`, tenantId);
+                const stagesSnap = await getDocs(query(collection(firestore, stagesPath!), orderBy('order')));
+                stagesSnap.forEach(d => allStages.push({ id: d.id, ...d.data() } as WorkStage));
+            }
             setWorkStageTemplates(allStages);
         } catch (e) { console.error(e); }
     };
     fetchTemplates();
-  }, [firestore, transaction?.transactionTypeId]);
+  }, [firestore, transaction?.transactionTypeId, tenantId]);
 
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
-        if (!firestore || !currentUser || !transaction || !transactionRef) return;
+        if (!firestore || !currentUser || !transaction || !transactionPath) return;
         setIsProcessing(true);
         try {
-            const batch = writeBatch(firestore);
             const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
             const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
             if (stageIndex === -1) throw new Error("Stage not found");
@@ -149,9 +157,8 @@ export default function TransactionDetailPage() {
             if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = now;
             if (newStatus === 'completed') stage.endDate = now;
 
-            batch.update(transactionRef, { stages: currentStages });
-            await batch.commit();
-            toast({ title: 'نجاح', description: 'تم تحديث حالة المرحلة.' });
+            await updateDoc(doc(firestore, transactionPath), { stages: currentStages });
+            toast({ title: 'نجاح', description: 'تم تحديث حالة المرحلة بنجاح.' });
         } catch (error) { 
             console.error(error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المرحلة.' }); 
@@ -160,10 +167,10 @@ export default function TransactionDetailPage() {
   };
 
   const handleSaveSignature = async (signatureDataUrl: string) => {
-    if (!firestore || !transactionRef || !transaction) return;
+    if (!firestore || !transactionPath || !transaction) return;
     setIsProcessing(true);
     try {
-        await updateDoc(transactionRef, {
+        await updateDoc(doc(firestore, transactionPath), {
             'contract.signatureInfo': {
                 clientSignature: signatureDataUrl,
                 signedAt: serverTimestamp(),
@@ -186,115 +193,193 @@ export default function TransactionDetailPage() {
         }).sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
   }, [transaction, workStageTemplates]);
 
-  if (transactionLoading || clientLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
-  if (!transaction || !client) return <div className="text-center py-10 text-destructive">فشل تحميل بيانات المعاملة.</div>;
+  if (transactionLoading || clientLoading) return <div className="p-8 max-w-5xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
+  if (!transaction || !client) return <div className="text-center py-20 text-destructive">فشل تحميل بيانات المعاملة.</div>;
 
   return (
-    <div className='space-y-6' dir='rtl'>
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <div className="flex items-center gap-4">
-                        <CardTitle className='text-2xl'>{transaction.transactionType}</CardTitle>
-                        <UniversalActionTrigger 
-                            title={transaction.transactionType}
-                            sourceModule="المعاملات"
-                            sourceId={transaction.id!}
-                        />
+    <div className='space-y-6 max-w-6xl mx-auto' dir='rtl'>
+        <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
+            <CardHeader className="bg-primary/5 pb-8 px-10 border-b">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="text-right space-y-2">
+                        <div className="flex items-center gap-3">
+                            <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
+                            <UniversalActionTrigger 
+                                title={transaction.transactionType}
+                                sourceModule="المعاملات المعتمدة"
+                                sourceId={transaction.id!}
+                            />
+                        </div>
+                        {transaction.subServiceName && (
+                            <div className="flex items-center gap-2">
+                                <Layers className="h-4 w-4 text-primary opacity-60" />
+                                <Badge className="bg-primary text-white font-black px-4 h-7 rounded-full border-none shadow-md">{transaction.subServiceName}</Badge>
+                            </div>
+                        )}
+                        <CardDescription className="text-base font-bold">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link></CardDescription>
                     </div>
-                    <CardDescription>العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link></CardDescription>
-                </div>
-                <div className="flex gap-2">
-                    <Badge variant="outline" className={cn("flex items-center", transactionStatusColors[transaction.status])}>
-                        {transactionStatusTranslations[transaction.status]}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-3">
+                        <Badge variant="outline" className={cn("px-6 py-1.5 rounded-full font-black text-sm border-2 shadow-sm", transactionStatusColors[transaction.status])}>
+                            {transactionStatusTranslations[transaction.status]}
+                        </Badge>
+                        <span className="font-mono text-xs font-black opacity-30">REF: {transaction.transactionNumber}</span>
+                    </div>
                 </div>
             </CardHeader>
-            <CardContent>
-                <InfoRow icon={<User />} label="المهندس المسؤول" value={transaction.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) : 'لم يحدد'} />
-                <InfoRow icon={<Calendar />} label="تاريخ الإنشاء" value={toFirestoreDate(transaction.createdAt) ? format(toFirestoreDate(transaction.createdAt)!, 'PPP', { locale: ar }) : '-'} />
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10 bg-white">
+                <div className="space-y-4">
+                    <InfoRow icon={<User className="h-5 w-5 text-primary opacity-40"/>} label="المهندس المسؤول" value={transaction.assignedEngineerId ? <span className="font-black text-slate-800">{employeesMap.get(transaction.assignedEngineerId)}</span> : <span className="text-muted-foreground italic">لم يحدد بعد</span>} />
+                    <InfoRow icon={<Calendar className="h-5 w-5 text-primary opacity-40"/>} label="تاريخ الفتح الرسمي" value={<span className="font-bold">{toFirestoreDate(transaction.createdAt) ? format(toFirestoreDate(transaction.createdAt)!, 'eeee, dd MMMM yyyy', { locale: ar }) : '-'}</span>} />
+                </div>
+                {transaction.description && (
+                    <div className="bg-muted/10 p-6 rounded-3xl border-2 border-dashed border-primary/10">
+                        <Label className="text-[10px] font-black uppercase text-primary mb-2 block">ملاحظات التأسيس:</Label>
+                        <p className="text-sm font-medium leading-relaxed italic text-slate-600">{transaction.description}</p>
+                    </div>
+                )}
             </CardContent>
         </Card>
         
-        <Tabs defaultValue="stages" dir="rtl">
-            <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="stages">سير العمل</TabsTrigger>
-                <TabsTrigger value="boq">جدول الكميات (BOQ)</TabsTrigger>
-                <TabsTrigger value="comments">المتابعة</TabsTrigger>
-                <TabsTrigger value="history">سجل الأحداث</TabsTrigger>
-            </TabsList>
-            <TabsContent value="stages" className="mt-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className='flex items-center gap-2'><Workflow className='text-primary'/> مراحل العمل</CardTitle>
+        <Tabs defaultValue="stages" dir="rtl" className="w-full">
+            <div className="flex justify-center mb-8">
+                <TabsList className="bg-white/60 backdrop-blur-xl p-1.5 rounded-[2rem] border border-white shadow-2xl h-16 w-full max-w-3xl">
+                    <TabsTrigger value="stages" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">
+                        <Workflow className='h-4 w-4'/> سير العمل الفني
+                    </TabsTrigger>
+                    <TabsTrigger value="boq" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">
+                        <ClipboardList className="h-4 w-4"/> المقايسة (BOQ)
+                    </TabsTrigger>
+                    <TabsTrigger value="comments" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">
+                        <MessageSquare className="h-4 w-4"/> المتابعة والردود
+                    </TabsTrigger>
+                    <TabsTrigger value="history" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">
+                        <History className='h-4 w-4'/> سجل الأحداث
+                    </TabsTrigger>
+                </TabsList>
+            </div>
+
+            <TabsContent value="stages" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
+                    <CardHeader className="border-b bg-muted/5 p-8 px-10">
+                        <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
+                            <Workflow className='text-primary h-6 w-6'/> حالة مراحل الإنجاز الميداني
+                        </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="p-10 space-y-6">
                         {enrichedStages.map((stage) => (
-                            <div key={stage.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 group">
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className={cn("w-28 justify-center", stageStatusColors[stage.status])}>{stageStatusTranslations[stage.status]}</Badge>
+                            <div key={stage.id} className="flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent bg-muted/20 rounded-[2rem] hover:bg-white hover:border-primary/20 hover:shadow-md transition-all group">
+                                <div className="flex items-center gap-6 w-full sm:w-auto">
+                                    <Badge variant="outline" className={cn("w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2 shadow-sm", stageStatusColors[stage.status])}>
+                                        {stageStatusTranslations[stage.status]}
+                                    </Badge>
                                     <div className="flex flex-col">
-                                        <span className="font-semibold">{stage.name}</span>
+                                        <span className="font-black text-lg text-slate-800 leading-tight">{stage.name}</span>
+                                        {stage.endDate && <p className="text-[10px] font-bold text-green-600 mt-1 flex items-center gap-1"><CheckCircle className="h-3 w-3"/> تم الإنجاز في: {format(toFirestoreDate(stage.endDate)!, 'dd/MM/yyyy')}</p>}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-6 mt-4 sm:mt-0">
                                     <UniversalActionTrigger 
                                         title={transaction.transactionType}
                                         subItemName={stage.name}
-                                        sourceModule="مراحل العمل"
+                                        sourceModule="مراحل العمل الميدانية"
                                         sourceId={transaction.id!}
                                         sourceSubId={stage.id}
                                     />
                                     <div className="flex gap-2">
-                                        {stage.status === 'pending' && <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.id!, 'in-progress')} disabled={isProcessing}><Play className="ml-2 h-4 w-4"/> بدء</Button>}
+                                        {stage.status === 'pending' && (
+                                            <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.id!, 'in-progress')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 border-2 px-6 hover:bg-primary hover:text-white transition-all">
+                                                <Play className="ml-2 h-4 w-4"/> بـدء العمل
+                                            </Button>
+                                        )}
                                         {stage.status === 'in-progress' && (
-                                            <Button size="sm" variant="outline" className="bg-green-50 text-green-700" onClick={() => handleStageStatusChange(stage.id!, 'completed')} disabled={isProcessing}>
-                                                <Check className="ml-2 h-4 w-4"/> إكمال
+                                            <Button size="sm" onClick={() => handleStageStatusChange(stage.id!, 'completed')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 hover:bg-green-700 shadow-lg shadow-green-100 gap-2">
+                                                <Check className="ml-2 h-4 w-4"/> تأكيد الإنجاز
                                             </Button>
                                         )}
                                     </div>
                                 </div>
                             </div>
                         ))}
-                    </CardContent>
-                </Card>
-            </TabsContent>
-            <TabsContent value="boq" className="mt-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><ClipboardList className="text-primary"/> جدول الكميات (BOQ)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {transaction.boqId ? (
-                            <LinkedBoqView boqId={transaction.boqId} />
-                        ) : (
-                            <div className="p-12 text-center border-2 border-dashed rounded-lg">
-                                <p className="text-muted-foreground">لا يوجد جدول كميات مرتبط.</p>
+                        {enrichedStages.length === 0 && (
+                            <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] opacity-30">
+                                <AlertCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                                <p className="text-xl font-black">لم يتم تحديد مراحل عمل لهذا النوع من المعاملات في القوائم المرجعية.</p>
                             </div>
                         )}
                     </CardContent>
                 </Card>
             </TabsContent>
-            <TabsContent value="comments" className="mt-6">
-                <TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="comment" showInput={true} title="التعليقات" icon={<MessageSquare className="text-primary" />} client={client} transaction={transaction}/>
+
+            <TabsContent value="boq" className="animate-in fade-in duration-500">
+                <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white p-10">
+                    <CardHeader className="px-0 pt-0 pb-8">
+                        <CardTitle className="flex items-center gap-3 text-xl font-black">
+                            <ClipboardList className="text-primary h-6 w-6"/> جدول الكميات والحصر المعتمد (BOQ)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0">
+                        {transaction.boqId ? (
+                            <LinkedBoqView boqId={transaction.boqId} />
+                        ) : (
+                            <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] bg-muted/5 space-y-6">
+                                <div className="p-6 bg-muted rounded-full w-fit mx-auto shadow-inner"><Package className="h-12 w-12 text-muted-foreground opacity-30"/></div>
+                                <div className="space-y-1">
+                                    <p className="text-xl font-black text-slate-400">لا يوجد جدول كميات مرتبط حالياً.</p>
+                                    <p className="text-sm font-bold text-slate-300">يجب ربط مقايسة من المكتبة لتمكين تتبع التكاليف الميدانية.</p>
+                                </div>
+                                <Button asChild className="rounded-2xl font-black px-12 h-12 shadow-xl shadow-primary/20">
+                                    <Link href={`/dashboard/construction/boq/new?projectId=${transaction.id}&clientId=${clientId}`}>إنشاء مقايسة جديدة +</Link>
+                                </Button>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </TabsContent>
-            <TabsContent value="history" className="mt-6">
-                <TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="log" showInput={false} title="السجل التاريخي" icon={<History className='text-primary'/>} client={client} transaction={transaction}/>
+
+            <TabsContent value="comments" className="animate-in fade-in duration-500">
+                <TransactionTimeline 
+                    clientId={clientId} 
+                    transactionId={transactionId} 
+                    filterType="comment" 
+                    showInput={true} 
+                    title="ساحة المتابعة والنقاش" 
+                    icon={<MessageSquare className="text-primary h-6 w-6" />} 
+                    client={client} 
+                    transaction={transaction}
+                />
+            </TabsContent>
+
+            <TabsContent value="history" className="animate-in fade-in duration-500">
+                <TransactionTimeline 
+                    clientId={clientId} 
+                    transactionId={transactionId} 
+                    filterType="log" 
+                    showInput={false} 
+                    title="السجل الإجرائي التاريخي" 
+                    icon={<History className='text-primary h-6 w-6'/>} 
+                    client={client} 
+                    transaction={transaction}
+                />
             </TabsContent>
         </Tabs>
 
         <Dialog open={isSignDialogOpen} onOpenChange={setIsSignDialogOpen}>
-            <DialogContent className="max-w-lg rounded-3xl" dir="rtl">
-                <DialogHeader>
-                    <DialogTitle className="text-xl font-black flex items-center gap-2">
-                        <FileSignature className="text-primary" /> توقيع العقد إلكترونياً
+            <DialogContent className="max-w-lg rounded-[2.5rem] border-none shadow-2xl p-10 bg-white" dir="rtl">
+                <DialogHeader className="mb-6">
+                    <DialogTitle className="text-2xl font-black flex items-center gap-3">
+                        <FileSignature className="text-primary h-7 w-7" /> توقيع المالك المعتمد
                     </DialogTitle>
+                    <DialogDescription className="font-bold text-slate-500">سيتم دمج هذا التوقيع في العقد الرسمي والأرشفة الفنية.</DialogDescription>
                 </DialogHeader>
-                <div className="py-6">
-                    <SignaturePad onSave={handleSaveSignature} />
+                <SignaturePad onSave={handleSaveSignature} />
+                <div className="mt-6 p-4 bg-muted/20 rounded-2xl border border-dashed text-xs text-muted-foreground flex gap-2">
+                    <Info className="h-4 w-4 shrink-0" />
+                    <p>هذا التوقيع يعتبر موافقة نهائية من المالك على بنود المعاملة والمواصفات الفنية المذكورة.</p>
                 </div>
             </DialogContent>
         </Dialog>
     </div>
   );
 }
+
+import { Package, Play } from 'lucide-react';

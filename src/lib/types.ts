@@ -6,7 +6,7 @@ export interface BaseEntity {
   createdAt?: Timestamp | any; 
   createdBy?: string;          
   updatedAt?: Timestamp | any;
-  updatedBy?: string;           // ✨ تم الإضافة لتعقب آخر مستخدم قام بالتعديل
+  updatedBy?: string;           
 }
 
 export interface UserProfile extends BaseEntity {
@@ -378,6 +378,12 @@ export interface TransactionType extends BaseEntity {
   departmentIds?: string[];
 }
 
+export interface SubService extends BaseEntity {
+    name: string;
+    order?: number;
+    parentId?: string;
+}
+
 export interface Holiday extends BaseEntity {
   name: string;
   date: Timestamp | any;
@@ -395,6 +401,8 @@ export interface ClientTransaction extends BaseEntity {
     transactionNumber: string;
     clientId: string;
     transactionType: string;
+    subServiceId?: string | null;
+    subServiceName?: string | null;
     status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
     assignedEngineerId?: string | null;
     transactionTypeId?: string | null;
