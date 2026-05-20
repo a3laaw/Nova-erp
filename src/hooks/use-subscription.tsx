@@ -37,19 +37,16 @@ export function useSubscription<T extends { id?: string }>(
     }, [constraintsHash]);
 
     useEffect(() => {
-        // 1. انتظار تهيئة النظام وهوية المستخدم تماماً
+        // 1. الانتظار حتى استقرار الجلسة تماماً
         if (!firestore || !collectionPath || authLoading) {
             setLoading(!firestore || !collectionPath ? false : true);
             return;
         }
 
-        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters', 'holidays'];
-        const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
-        const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
-        
+        const tenantId = user?.currentCompanyId || null;
         const finalPath = getTenantPath(collectionPath, tenantId);
         
-        // 🛡️ صمام أمان راداري: إذا لم يتم استنتاج المسار النهائي المعزول، نتوقف عن المحاولة
+        // 🛡️ صمام أمان راداري: إذا لم يتم استنتاج المسار النهائي المعزول، نتوقف
         if (!finalPath) {
             setLoading(true); 
             return;
@@ -60,10 +57,8 @@ export function useSubscription<T extends { id?: string }>(
         
         let finalConstraints = [...constraintsRef.current];
         
-        // 2. محرك الاستعلام المجمع (Collection Group) مع فرض عزل المنشأة
         if (isGroup && tenantId) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
-            // 🛡️ فرض فلتر الهوية في الاستعلام المجمع لمطابقة قواعد الأمان
             finalConstraints.push(where('companyId', '==', tenantId));
             
             try {
@@ -82,7 +77,6 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
-        // 3. محرك الاشتراك المباشر المحصن
         try {
             const q = query(collection(firestore, finalPath), ...finalConstraints);
             const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -90,7 +84,6 @@ export function useSubscription<T extends { id?: string }>(
                 setData(newData);
                 setLoading(false);
             }, (err) => {
-                // 🛡️ التطهير: تسجيل الرفض كتحذير داخلي بدلاً من كراش للواجهة
                 console.warn(`[Permission Guard] Access Deferred: ${finalPath}`);
                 setError(err);
                 setLoading(false);

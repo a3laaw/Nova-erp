@@ -65,19 +65,15 @@
     background: linear-gradient(135deg, #FFB000 0%, #FF7A00 100%);
     @apply border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 transition-all shadow-xl shadow-orange-500/20 text-white font-black;
   }
-  
-  .active-glow {
-    box-shadow: 0 0 20px rgba(255, 122, 0, 0.2);
-  }
 }
 
-/* 🛡️ حماية القوائم المنسدلة من الشفافية والتداخل 🛡️ */
+/* 🛡️ التطهير البصري للقوائم المنسدلة (Opaque Dropdowns) 🛡️ */
 [data-radix-popper-content-wrapper] {
   z-index: 999999 !important;
   pointer-events: auto !important;
 }
 
-/* فرض الخلفية البيضاء المصمتة على كافة القوائم والمنبثقات المعتمدة */
+/* فرض الخلفية البيضاء المصمتة لمنع التشتت البصري */
 [role="listbox"], 
 [role="menu"], 
 [role="dialog"]:not([data-state="open"]),
@@ -102,7 +98,6 @@
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
-/* 🌟 تأثيرات حركية مخصصة لشاشة التحميل 🌟 */
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }

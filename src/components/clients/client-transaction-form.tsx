@@ -14,7 +14,7 @@ import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save, X, Workflow, UserCheck, Layers } from 'lucide-react';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, Department, SubService } from '@/lib/types';
@@ -56,8 +56,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     const savingRef = useRef(false);
 
     const tenantId = currentUser?.currentCompanyId;
-
-    const { data: allDepartments = [] } = useSubscription<Department>(firestore, 'departments');
 
     useEffect(() => {
         if (!firestore || !isOpen || !tenantId) return;
@@ -120,29 +118,18 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         fetchSubServices();
     }, [transactionTypeName, transactionTypes, firestore, tenantId]);
 
+    // ✨ محرك الإسناد التلقائي الذكي
     useEffect(() => {
-        if (transactionTypeName && client && engineers.length > 0 && allDepartments.length > 0) {
+        if (transactionTypeName && client && engineers.length > 0) {
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             if (!selectedType) return;
 
-            const linkedDeptIds = selectedType.departmentIds || [];
-            
+            // إذا كانت الخدمة تتبع القسم المعماري أو مرتبطة بمهندس العميل
             if (client.assignedEngineer) {
-                const clientEngineer = engineers.find(e => e.id === client.assignedEngineer);
-                
-                const isMatch = linkedDeptIds.some(deptId => {
-                    const deptName = allDepartments.find(d => d.id === deptId)?.name;
-                    return deptName && clientEngineer?.department === deptName;
-                });
-                
-                if (isMatch) {
-                    setAssignedEngineerId(client.assignedEngineer);
-                } else {
-                    setAssignedEngineerId('');
-                }
+                setAssignedEngineerId(client.assignedEngineer);
             }
         }
-    }, [transactionTypeName, client, transactionTypes, engineers, allDepartments]);
+    }, [transactionTypeName, client, transactionTypes, engineers]);
 
     const transactionTypeOptions = useMemo(() => 
         transactionTypes.map(t => ({ value: t.name, label: t.name })), 
@@ -172,23 +159,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         try {
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const selectedSub = subServices.find(s => s.id === selectedSubServiceId);
-            const departmentIds = selectedType?.departmentIds || [];
 
+            // جلب مراحل العمل المعتمدة
             let initialStages: any[] = [];
-            for (const deptId of departmentIds) {
-                const stagesPath = getTenantPath(`departments/${deptId}/workStages`, tenantId);
-                if (!stagesPath) continue;
-
+            const stagesPath = getTenantPath(`transactionTypes/${selectedType?.id}/workStages`, tenantId);
+            if (stagesPath) {
                 const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
-                stagesSnap.forEach(d => {
-                    const data = d.data() as WorkStage;
-                    initialStages.push({
-                        stageId: d.id,
-                        name: data.name,
-                        status: 'pending',
-                        order: data.order || 0
-                    });
-                });
+                initialStages = stagesSnap.docs.map(d => ({ stageId: d.id, name: d.data().name, status: 'pending' }));
             }
 
             const batch = writeBatch(firestore);
