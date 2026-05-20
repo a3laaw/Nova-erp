@@ -29,7 +29,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
   const customStyles: StylesConfig<MultiSelectOption, true> = {
     control: (base, state) => ({
       ...base,
-      backgroundColor: 'white', // 🛡️ خلفية مصمتة لمنع التشتت
+      backgroundColor: 'white', 
       borderColor: state.isFocused ? 'hsl(var(--ring))' : 'hsl(var(--border))',
       minHeight: '40px',
       boxShadow: state.isFocused ? '0 0 0 1px hsl(var(--ring))' : 'none',
@@ -50,11 +50,11 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
     }),
     menu: (base) => ({
       ...base,
-      backgroundColor: 'white', // 🛡️ عزل كامل عما خلف القائمة
+      backgroundColor: 'white', 
       zIndex: 999999,
       position: 'absolute',
       borderRadius: '1rem',
-      boxShadow: '0 20px 50px rgba(0,0,0,0.15)', // ظل عميق للبروز
+      boxShadow: '0 20px 50px rgba(0,0,0,0.15)', 
       border: '1px solid hsl(var(--border))',
       marginTop: '4px',
     }),

@@ -6,13 +6,13 @@
 
 @layer base {
   :root {
-    --background: 40 100% 98%; /* الكريمي الدافئ #FFFDF0 */
+    --background: 40 100% 98%; 
     --foreground: 240 60% 10%;
     --card: 0 0% 100% / 0.8;
     --card-foreground: 240 60% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 60% 10%;
-    --primary: 29 100% 50%; /* البرتقالي الملكي #FF7A00 */
+    --primary: 29 100% 50%; 
     --primary-foreground: 0 0% 100%;
     --secondary: 240 10% 96%;
     --secondary-foreground: 240 60% 10%;
@@ -69,28 +69,15 @@
   .active-glow {
     box-shadow: 0 0 20px rgba(255, 122, 0, 0.2);
   }
-  
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
-  }
-
-  .animate-float-slow {
-    animation: float 6s ease-in-out infinite;
-  }
-  
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-  }
 }
 
-/* 🛡️ عزل بصري وحماية الاستجابة للقوائم المنسدلة 🛡️ */
+/* 🛡️ تطهير وحماية القوائم المنسدلة من الشفافية والتداخل 🛡️ */
 [data-radix-popper-content-wrapper] {
   z-index: 999999 !important;
   pointer-events: auto !important;
 }
 
-/* فرض الخلفية المصمتة (Opaque) على كافة القوائم والمنبثقات */
+/* فرض الخلفية البيضاء المصمتة (Opaque) على كافة القوائم والمنبثقات لمنع التشتت */
 [role="listbox"], 
 [role="menu"], 
 [role="dialog"]:not([data-state="open"]),
