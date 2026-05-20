@@ -4,7 +4,7 @@ import { AppointmentsAuditReport } from '@/components/reports/appointments-audit
 
 /**
  * صفحة تقرير تدقيق المواعيد:
- * مركز سيادي لمراجعة كافة حركات المواعيد، من حجزها ومن عدلها، مع إمكانية فرزها حسب العميل.
+ * مركز إداري لمراجعة كافة حركات المواعيد، من حجزها ومن عدلها، مع إمكانية فرزها حسب العميل.
  */
 export default function AppointmentsAuditPage() {
     return (

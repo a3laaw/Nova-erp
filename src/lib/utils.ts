@@ -44,19 +44,24 @@ export function numberToArabicWords(inputNumber: number | string): string {
 /**
  * محرك توجيه المسارات المطور (SaaS Tenant Routing):
  * 🛡️ الضابط الأكبر لعزل البيانات. 
- * يضمن بقاء كل شركة داخل "صندوقها" الخاص.
+ * يضمن بقاء كل شركة داخل "صندوقها" الخاص ومنع أخطاء الصلاحيات.
  */
 export function getTenantPath(path: string, tenantId: string | null | undefined): string {
-  if (!tenantId) return path;
+  if (!path) return '';
   
-  // مجموعات مشروع الماستر (لا يتم عزلها لأنها عالمية للإدارة والمطور)
-  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
+  // مجموعات المطور والإدارة العامة (لا يتم عزلها)
+  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters'];
   
   const isMaster = masterCollections.some(mc => path.startsWith(mc));
   if (isMaster) return path;
 
-  // توجيه كافة البيانات إلى: companies/{tenantId}/{collectionName}
+  // إذا كان المسار موجه مسبقاً، نتركه كما هو
   if (path.startsWith('companies/')) return path;
+
+  // في حال عدم وجود tenantId، ننتظر ولا نعيد المسار العام لتجنب Permission Error
+  if (!tenantId) {
+      return `_WAITING_FOR_TENANT_/${path}`;
+  }
 
   return `companies/${tenantId}/${path}`;
 }

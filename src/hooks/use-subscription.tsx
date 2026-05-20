@@ -14,8 +14,8 @@ import { useAuth } from '@/context/auth-context';
 import { getTenantPath } from '@/lib/utils';
 
 /**
- * خطاف اشتراك لحظي مطور (Sovereign Real-time Hook):
- * تم فك ارتباط الاستيراد المباشر من الفهرس لمنع الحلقات المفرغة.
+ * خطاف اشتراك لحظي محصن (Protected Real-time Hook):
+ * يضمن عدم محاولة قراءة البيانات قبل استقرار هوية المنشأة لمنع Permission Errors.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -45,56 +45,59 @@ export function useSubscription<T extends { id?: string }>(
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
         const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
+        // 🛡️ صمام أمان: إذا لم يكن مسار ماستر ولم تتوفر هوية الشركة بعد، ننتظر
         if (!isMasterCollection && !tenantId) {
             setLoading(true); 
+            return;
+        }
+
+        const finalPath = getTenantPath(collectionPath, tenantId);
+        
+        // منع محاولة قراءة مسارات غير مكتملة
+        if (finalPath.startsWith('_WAITING_FOR_TENANT_')) {
+            setLoading(true);
             return;
         }
 
         setLoading(true);
         setError(null);
         
-        let finalPath = getTenantPath(collectionPath, tenantId);
         let finalConstraints = [...constraintsRef.current];
         
+        // في حال استعلام المجموعات (Collection Group)، نفرض عزل الشركة يدوياً
         if (isGroup && tenantId) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
-            finalPath = collectionName;
             finalConstraints.push(where('companyId', '==', tenantId));
+            // في حالة الـ group، الـ base path هو اسم الكولكشن فقط
+            try {
+                const q = query(collectionGroup(firestore, collectionName), ...finalConstraints);
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const newData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+                    setData(newData);
+                    setLoading(false);
+                }, (err) => {
+                    setError(err);
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            } catch (e: any) { setError(e); setLoading(false); }
+            return;
         }
 
         try {
-            const baseRef = isGroup
-                ? collectionGroup(firestore, finalPath)
-                : collection(firestore, finalPath);
-
-            const q = query(baseRef, ...finalConstraints);
-
-            const unsubscribe = onSnapshot(
-                q,
-                (snapshot) => {
-                    const newData = snapshot.docs.map(doc => {
-                        const docData = doc.data() as any;
-                        const parentId = doc.ref.parent.parent?.id || null;
-                        return { 
-                            id: doc.id, 
-                            parentId, 
-                            ...docData 
-                        } as T;
-                    });
-                    setData(newData);
-                    setLoading(false);
-                    setError(null);
-                },
-                (err: any) => {
-                    console.error(`Sovereign Subscription Denied [${finalPath}]:`, err.message);
-                    setError(err);
-                    setLoading(false);
-                }
-            );
+            const q = query(collection(firestore, finalPath), ...finalConstraints);
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const newData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+                setData(newData);
+                setLoading(false);
+            }, (err) => {
+                console.error(`Subscription Error [${finalPath}]:`, err.message);
+                setError(err);
+                setLoading(false);
+            });
 
             return () => unsubscribe();
         } catch (err: any) {
-            console.error("Critical hook execution error:", err);
             setError(err);
             setLoading(false);
         }

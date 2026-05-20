@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -110,12 +109,14 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         fetchJobs();
     }, [formData.department, departments, firestore, tenantId, initialData?.jobTitle]);
 
+    // ✨ إصلاح الخلل: حقن البيانات الأولية فوراً في الحالة النشطة لضمان المزامنة
     useEffect(() => {
         if (initialData) {
-            setFormData({
+            setFormData(prev => ({
+                ...prev,
                 ...initialData,
-                fullName: initialData.fullName || (initialData as any).nameAr || '',
-                nameEn: initialData.nameEn || '',
+                fullName: initialData.fullName || (initialData as any).nameAr || prev.fullName,
+                mobile: initialData.mobile || prev.mobile,
                 hireDate: toFirestoreDate(initialData.hireDate) || new Date(),
                 dob: toFirestoreDate(initialData.dob) || undefined,
                 residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
@@ -127,7 +128,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 transportAllowance: Number(initialData.transportAllowance || 0),
                 dailyRate: Number(initialData.dailyRate || 0),
                 contractPercentage: Number(initialData.contractPercentage || 0),
-            });
+            }));
             setShowHousingAllowance(Number(initialData.housingAllowance) > 0);
             setShowTransportAllowance(Number(initialData.transportAllowance) > 0);
             setIsCustomHours(!!initialData.workStartTime);

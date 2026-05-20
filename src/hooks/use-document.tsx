@@ -9,8 +9,8 @@ import { useAuth } from '@/context/auth-context';
 import { getTenantPath } from '@/lib/utils';
 
 /**
- * خطاف استماع لوثيقة واحدة:
- * تم فك ارتباط الاستيراد من الفهرس لمنع الحلقات المفرغة.
+ * خطاف استماع لوثيقة واحدة محصن:
+ * يمنع الوصول للمسارات العامة في حال وجود جلسة عمل نشطة.
  */
 export function useDocument<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -37,9 +37,13 @@ export function useDocument<T extends { id?: string }>(
         return;
     }
 
-    setLoading(true);
     const finalPath = getTenantPath(docPath, tenantId);
+    if (finalPath.startsWith('_WAITING_FOR_TENANT_')) {
+        setLoading(true);
+        return;
+    }
 
+    setLoading(true);
     try {
         const unsubscribe = onSnapshot(
           doc(firestore, finalPath),
@@ -53,7 +57,7 @@ export function useDocument<T extends { id?: string }>(
             setError(null);
           },
           (err) => {
-            console.error(`Error listening to doc [${finalPath}]:`, err);
+            console.error(`Document Listener Error [${finalPath}]:`, err.message);
             setError(err);
             setLoading(false);
           }

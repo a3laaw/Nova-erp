@@ -20,8 +20,8 @@ const PAGE_SIZE = 15;
 const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
 
 /**
- * محرك التمرير اللانهائي المطور (Sovereign Infinite Scroll):
- * تم تحصينه ليدعم عزل الشركات (Tenant Routing) آلياً.
+ * محرك التمرير اللانهائي الموحد (Infinite Scroll):
+ * تم تحصينه ليدعم عزل المنشآت آلياً ومنع أخطاء الصلاحيات.
  */
 export function useInfiniteScroll<T extends { id?: string }>(
   collectionPath: string | null,
@@ -40,12 +40,12 @@ export function useInfiniteScroll<T extends { id?: string }>(
   
   const isFetching = useRef(false);
 
-  // 🛡️ محرك التوجيه السيادي
+  // 🛡️ محرك التوجيه الموحد
   const tenantId = user?.currentCompanyId || null;
   const finalPath = collectionPath ? getTenantPath(collectionPath, tenantId) : null;
 
   const fetchMore = useCallback(() => {
-    if (!firestore || !finalPath || isFetching.current || !hasMore) return;
+    if (!firestore || !finalPath || isFetching.current || !hasMore || finalPath.startsWith('_WAITING_')) return;
 
     isFetching.current = true;
     setLoadingMore(true);
@@ -60,33 +60,36 @@ export function useInfiniteScroll<T extends { id?: string }>(
       queryConstraints.push(startAfter(lastVisible));
     }
 
-    const q = query(collection(firestore, finalPath), ...queryConstraints);
-    getDocs(q).then(snapshot => {
-      const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
-      setItems(prev => [...prev, ...newItems]);
-      
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-      setLastVisible(lastDoc || null);
+    try {
+        const q = query(collection(firestore, finalPath), ...queryConstraints);
+        getDocs(q).then(snapshot => {
+            const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+            setItems(prev => [...prev, ...newItems]);
+            
+            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+            setLastVisible(lastDoc || null);
 
-      if (snapshot.docs.length < PAGE_SIZE) {
+            if (snapshot.docs.length < PAGE_SIZE) {
+                setHasMore(false);
+            }
+        }).catch(error => {
+            console.error(`Infinite Scroll Error [${finalPath}]:`, error.message);
+            setHasMore(false);
+        }).finally(() => {
+            setLoadingMore(false);
+            isFetching.current = false;
+        });
+    } catch (e) {
         setHasMore(false);
-      }
-    }).catch(error => {
-      console.error(`Infinite Scroll Error [${finalPath}]:`, error);
-      setHasMore(false); // وقف المحاولة عند الخطأ
-    }).finally(() => {
-      setLoadingMore(false);
-      isFetching.current = false;
-    });
+        setLoadingMore(false);
+        isFetching.current = false;
+    }
 
   }, [firestore, finalPath, constraints, orderByField, lastVisible, hasMore]);
   
-  // إعادة التأسيس عند تغيير المسار أو الفلاتر
   useEffect(() => {
-    if (!firestore || !finalPath) {
-        if (!collectionPath) {
-            setLoading(false);
-        }
+    if (!firestore || !finalPath || finalPath.startsWith('_WAITING_')) {
+        if (!collectionPath) setLoading(false);
         return;
     }
 
@@ -96,30 +99,36 @@ export function useInfiniteScroll<T extends { id?: string }>(
     setLoading(true);
     isFetching.current = true;
 
-    const queryConstraints: QueryConstraint[] = [
-      ...constraints,
-      orderBy(orderByField, 'desc'),
-      limit(PAGE_SIZE),
-    ];
+    try {
+        const queryConstraints: QueryConstraint[] = [
+            ...constraints,
+            orderBy(orderByField, 'desc'),
+            limit(PAGE_SIZE),
+        ];
 
-    const q = query(collection(firestore, finalPath), ...queryConstraints);
-    getDocs(q).then(snapshot => {
-        const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
-        setItems(newItems);
-        
-        const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-        setLastVisible(lastDoc || null);
+        const q = query(collection(firestore, finalPath), ...queryConstraints);
+        getDocs(q).then(snapshot => {
+            const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+            setItems(newItems);
+            
+            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+            setLastVisible(lastDoc || null);
 
-        if (snapshot.docs.length < PAGE_SIZE) {
+            if (snapshot.docs.length < PAGE_SIZE) {
+                setHasMore(false);
+            }
+        }).catch(error => {
+            console.error(`Initial Fetch Error [${finalPath}]:`, error.message);
             setHasMore(false);
-        }
-    }).catch(error => {
-        console.error(`Initial Fetch Error [${finalPath}]:`, error);
-        setHasMore(false);
-    }).finally(() => {
+        }).finally(() => {
+            setLoading(false);
+            isFetching.current = false;
+        });
+    } catch (e) {
         setLoading(false);
+        setHasMore(false);
         isFetching.current = false;
-    });
+    }
     
   }, [finalPath, JSON.stringify(constraints.map(c => c.toString())), orderByField, firestore]);
 
