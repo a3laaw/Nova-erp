@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -223,4 +222,3 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     </Card>
   );
 }
-

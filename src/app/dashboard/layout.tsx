@@ -14,7 +14,7 @@ import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 /**
  * شعار نوفا المعتمد (NOVA Text Logo):
- * تم تكبير الخط بنسبة 25% (من 32 إلى 40) لمركزية أعمق.
+ * تم تكبير الخط بنسبة 25% (من 32 إلى 40) مع التوهج المداري.
  */
 const NovaLogo = () => (
   <svg width="120" height="50" viewBox="0 0 120 50" fill="none" xmlns="http://www.w3.org/2000/svg">
