@@ -208,7 +208,11 @@ export default function TransactionDetailPage() {
                     <div className="text-right space-y-2">
                         <div className="flex items-center gap-3">
                             <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
-                            <UniversalActionTrigger title={transaction.transactionType} sourceModule="المعاملات المعتمدة" sourceId={transaction.id!} />
+                            <UniversalActionTrigger 
+                                title={transaction.transactionType}
+                                sourceModule="المعاملات المعتمدة"
+                                sourceId={transaction.id!}
+                            />
                         </div>
                         {transaction.subServiceName && (
                             <div className="flex items-center gap-2">
@@ -324,4 +328,3 @@ export default function TransactionDetailPage() {
     </div>
   );
 }
-
