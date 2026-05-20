@@ -10,7 +10,7 @@ import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف استماع لوثيقة واحدة محصن (Standard Document Hook):
- * تم تحصينه بـ "رادار التزامن" لضمان عدم طلب البيانات قبل توفر التوكن المعتمد.
+ * تم تحصينه بـ "رادار الانتظار" لضمان عدم طلب البيانات قبل توفر التوكن المعتمد.
  */
 export function useDocument<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -32,14 +32,10 @@ export function useDocument<T extends { id?: string }>(
     const isMasterCollection = masterCollections.some(mc => docPath.startsWith(mc));
     const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
 
-    // 🛡️ صمام أمان راداري: ننتظر استقرار هوية المنشأة
-    if (!isMasterCollection && !tenantId) {
-        setLoading(true);
-        return;
-    }
-
     const finalPath = getTenantPath(docPath, tenantId);
-    if (finalPath.startsWith('_WAITING_FOR_TENANT_')) {
+    
+    // 🛡️ صمام أمان راداري: إذا لم يتم استنتاج المسار النهائي المعزول، نتوقف
+    if (!finalPath) {
         setLoading(true);
         return;
     }

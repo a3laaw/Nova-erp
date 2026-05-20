@@ -79,37 +79,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [showTransportAllowance, setShowTransportAllowance] = useState(false);
     const [isCustomHours, setIsCustomHours] = useState(false);
 
-    useEffect(() => {
-        if (!formData.department || !firestore || !tenantId || departments.length === 0) {
-            setFilteredJobs([]);
-            return;
-        }
-
-        const fetchJobs = async () => {
-            const dept = departments.find(d => d.name === formData.department);
-            if (!dept?.id) return;
-
-            setLoadingJobs(true);
-            try {
-                const jobsPath = getTenantPath(`departments/${dept.id}/jobs`, tenantId);
-                const snap = await getDocs(query(collection(firestore, jobsPath), orderBy('order')));
-                const fetchedJobs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Job));
-                setFilteredJobs(fetchedJobs);
-
-                if (initialData?.jobTitle && !formData.jobTitle) {
-                    setFormData(prev => ({ ...prev, jobTitle: initialData.jobTitle }));
-                }
-            } catch (err) {
-                console.error("Error fetching jobs:", err);
-            } finally {
-                setLoadingJobs(false);
-            }
-        };
-
-        fetchJobs();
-    }, [formData.department, departments, firestore, tenantId, initialData?.jobTitle]);
-
-    // ✨ إصلاح الخلل: حقن البيانات الأولية فوراً في الحالة النشطة لضمان المزامنة
+    // ✨ محرك حقن البيانات الفوري (Immediate State Injection):
+    // يضمن حقن البيانات القادمة من الميدان أو الموعد في الحالة النشطة فوراً لضمان حفظها.
     useEffect(() => {
         if (initialData) {
             setFormData(prev => ({
@@ -135,6 +106,38 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         }
     }, [initialData]);
 
+    useEffect(() => {
+        if (!formData.department || !firestore || !tenantId || departments.length === 0) {
+            setFilteredJobs([]);
+            return;
+        }
+
+        const fetchJobs = async () => {
+            const dept = departments.find(d => d.name === formData.department);
+            if (!dept?.id) return;
+
+            setLoadingJobs(true);
+            try {
+                const jobsPath = getTenantPath(`departments/${dept.id}/jobs`, tenantId);
+                if (!jobsPath) return;
+
+                const snap = await getDocs(query(collection(firestore, jobsPath), orderBy('order')));
+                const fetchedJobs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Job));
+                setFilteredJobs(fetchedJobs);
+
+                if (initialData?.jobTitle && !formData.jobTitle) {
+                    setFormData(prev => ({ ...prev, jobTitle: initialData.jobTitle }));
+                }
+            } catch (err) {
+                console.error("Error fetching jobs:", err);
+            } finally {
+                setLoadingJobs(false);
+            }
+        };
+
+        fetchJobs();
+    }, [formData.department, departments, firestore, tenantId, initialData?.jobTitle]);
+
     const handleAiAnalysis = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -159,7 +162,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         toast({ title: 'نجاح المسح', description: 'تم استخراج البيانات آلياً.' });
                     }
                 } catch (err: any) {
-                    toast({ variant: 'destructive', title: 'خطأ في التحليل', description: err.message });
+                    toast({ variant: 'destructive', title: 'تنبيه', description: err.message });
                 } finally { setIsAnalyzing(false); }
             };
             reader.readAsDataURL(file);
@@ -336,7 +339,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-emerald-50/20 border-emerald-100">
                     <h3 className="font-black text-lg flex items-center gap-2 text-emerald-800">
-                        <Banknote className="h-5 w-5" /> الرواتب والمعلومات المالية
+                        <Banknote className="h-5 w-5" /> المعلومات المالية
                     </h3>
                     
                     <div className="grid gap-6">
@@ -408,7 +411,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             </div>
 
             <DialogFooter className="mt-6 pt-6 border-t bg-muted/10 rounded-b-[2rem] p-6">
-                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
+                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-xl px-6 h-12 font-bold">إلغاء</Button>
                 <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
                     {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                     حفظ الملف الوظيفي

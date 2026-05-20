@@ -28,7 +28,6 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user, loading: authLoading } = useAuth();
 
-    // 🛡️ استخدام Ref لضمان استقرار الفلاتر في محرك المقارنة
     const constraintsHash = JSON.stringify(constraints.map(c => c.toString()));
     const constraintsRef = useRef(constraints);
     
@@ -37,28 +36,21 @@ export function useSubscription<T extends { id?: string }>(
     }, [constraintsHash]);
 
     useEffect(() => {
-        // 1. انتظار تهيئة النظام وهوية المستخدم
+        // 1. انتظار تهيئة النظام وهوية المستخدم تماماً
         if (!firestore || !collectionPath || authLoading) {
             setLoading(!firestore || !collectionPath ? false : true);
             return;
         }
 
-        // 2. محرك فرز المسارات المعتمد
-        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters'];
+        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters', 'holidays'];
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
         const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
-        // 🛡️ صمام أمان راداري: ننتظر استقرار هوية المنشأة قبل محاولة الاتصال
-        if (!isMasterCollection && !tenantId) {
-            setLoading(true); 
-            return;
-        }
-
         const finalPath = getTenantPath(collectionPath, tenantId);
         
-        // منع القراءة من المسارات غير المستقرة
-        if (finalPath.startsWith('_WAITING_FOR_TENANT_')) {
-            setLoading(true);
+        // 🛡️ صمام أمان راداري: إذا لم يتم استنتاج المسار النهائي، نتوقف عن المحاولة
+        if (!finalPath) {
+            setLoading(true); 
             return;
         }
 
@@ -67,7 +59,7 @@ export function useSubscription<T extends { id?: string }>(
         
         let finalConstraints = [...constraintsRef.current];
         
-        // 3. محرك الاستعلام المجمع (Collection Group) مع فرض عزل المنشأة
+        // 2. محرك الاستعلام المجمع (Collection Group) مع فرض عزل المنشأة
         if (isGroup && tenantId) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
             finalConstraints.push(where('companyId', '==', tenantId));
@@ -87,7 +79,7 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
-        // 4. محرك الاشتراك المباشر
+        // 3. محرك الاشتراك المباشر المحصن
         try {
             const q = query(collection(firestore, finalPath), ...finalConstraints);
             const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -95,6 +87,7 @@ export function useSubscription<T extends { id?: string }>(
                 setData(newData);
                 setLoading(false);
             }, (err) => {
+                // 🛡️ التطهير: تسجيل الرفض كتحذير داخلي بدلاً من كراش للواجهة
                 console.warn(`[Permission Guard] Access Deferred: ${finalPath}`);
                 setError(err);
                 setLoading(false);

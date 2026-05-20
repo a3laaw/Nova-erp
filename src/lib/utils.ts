@@ -1,6 +1,6 @@
 /**
  * @fileOverview المحرك البرمجي للأدوات المساعدة (Utils).
- * تم تحديثه لفرض العزل التام للمنشآت (SaaS Multi-tenancy) وتطهير المصطلحات.
+ * تم تحديثه لفرض العزل التام للمنشآت (SaaS Multi-tenancy) ومنع أخطاء الصلاحيات.
  */
 
 import { clsx, type ClassValue } from "clsx"
@@ -42,14 +42,15 @@ export function numberToArabicWords(inputNumber: number | string): string {
 }
 
 /**
- * محرك توجيه المسارات المعتمد (SaaS Tenant Router):
+ * محرك توجيه المسارات المعتمد (Tenant Router):
  * 🛡️ الضابط الأكبر لعزل البيانات لضمان عدم حدوث أخطاء صلاحيات.
+ * يعيد null إذا لم تتوفر الهوية لمنع طلب مسارات مرفوضة أمنياً.
  */
-export function getTenantPath(path: string, tenantId: string | null | undefined): string {
-  if (!path) return '';
+export function getTenantPath(path: string | null | undefined, tenantId: string | null | undefined): string | null {
+  if (!path) return null;
   
   // مجموعات المطور والإدارة العامة (لا يتم عزلها)
-  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters'];
+  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters', 'holidays'];
   
   const isMaster = masterCollections.some(mc => path.startsWith(mc));
   if (isMaster) return path;
@@ -57,9 +58,9 @@ export function getTenantPath(path: string, tenantId: string | null | undefined)
   // إذا كان المسار موجه مسبقاً، نتركه كما هو
   if (path.startsWith('companies/')) return path;
 
-  // في حال عدم وجود tenantId، ننتظر ولا نعيد المسار العام لتجنب Permission Error
+  // 🛡️ الحماية القصوى: إذا كان المسار يتطلب منشأة ولم تتوفر الهوية، نعيد null فوراً
   if (!tenantId) {
-      return `_WAITING_FOR_TENANT_/${path}`;
+      return null;
   }
 
   return `companies/${tenantId}/${path}`;

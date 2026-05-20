@@ -19,7 +19,7 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn("p-3 bg-white rounded-[2rem] shadow-2xl border-none", className)}
-      // 🛡️ تفعيل القوائم المنسدلة بشكل دائم وسيادي (Sovereign Dropdowns)
+      // 🛡️ تفعيل القوائم المنسدلة بشكل دائم ومعتمد (Sovereign Dropdowns)
       captionLayout="dropdown-buttons"
       fromYear={1900}
       toYear={2100}

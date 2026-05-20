@@ -35,7 +35,6 @@ interface ClientTransactionFormProps {
 /**
  * نموذج إضافة معاملة جديدة (محرك الإسناد الذكي V11.0):
  * - يقوم آلياً بإسناد المهندس المختص بناءً على ربط "أنواع الخدمات" بـ "أقسام الوظائف المعتمدة".
- * - تم إصلاح خطأ الـ Hooks عبر نقل الاستدعاء لداخل المكون.
  */
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
@@ -68,12 +67,14 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             setEngineersLoading(true);
             setTypesLoading(true);
             try {
-                const clientRef = doc(firestore, getTenantPath(`clients/${clientId}`, tenantId));
+                const clientRefPath = getTenantPath(`clients/${clientId}`, tenantId);
                 const empPath = getTenantPath('employees', tenantId);
                 const typesPath = getTenantPath('transactionTypes', tenantId);
 
+                if (!clientRefPath || !empPath || !typesPath) return;
+
                 const [clientSnap, engSnap, typesSnap] = await Promise.all([
-                    getDoc(clientRef),
+                    getDoc(doc(firestore, clientRefPath)),
                     getDocs(query(collection(firestore, empPath), where('status', '==', 'active'))),
                     getDocs(query(collection(firestore, typesPath), orderBy('order')))
                 ]);
@@ -144,6 +145,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             let initialStages: any[] = [];
             for (const deptId of departmentIds) {
                 const stagesPath = getTenantPath(`departments/${deptId}/workStages`, tenantId);
+                if (!stagesPath) continue;
+
                 const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
                 stagesSnap.forEach(d => {
                     const data = d.data() as WorkStage;
@@ -157,12 +160,17 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             }
 
             const batch = writeBatch(firestore);
-            const clientRef = doc(firestore, getTenantPath(`clients/${clientId}`, tenantId));
+            const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
+            if (!clientPath) throw new Error("فشل تحديد مسار العميل.");
+
+            const clientRef = doc(firestore, clientPath);
             
             const newCounter = (client?.transactionCounter || 0) + 1;
             const transactionNumber = `CL${client?.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
             
             const transactionsPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
+            if (!transactionsPath) throw new Error("فشل تحديد مسار المعاملات.");
+
             const newTransactionRef = doc(collection(firestore, transactionsPath));
             
             batch.update(clientRef, { transactionCounter: newCounter });
@@ -185,7 +193,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
             if (fromAppointmentId) {
                 const apptPath = getTenantPath(`appointments/${fromAppointmentId}`, tenantId);
-                batch.update(doc(firestore, apptPath), { transactionId: newTransactionRef.id });
+                if (apptPath) batch.update(doc(firestore, apptPath), { transactionId: newTransactionRef.id });
             }
 
             const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
