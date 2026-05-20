@@ -99,7 +99,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
         userName: optimisticComment.userName,
         userAvatar: currentUser.avatarUrl || null,
         createdAt: serverTimestamp(),
-        companyId: tenantId, // 🛡️ الإضافة السيادية لقواعد الأمان
+        companyId: tenantId,
     };
 
     // 🚀 تنفيذ الإرسال السحابي

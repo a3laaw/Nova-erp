@@ -45,7 +45,9 @@ import {
     Info,
     AlertCircle,
     Package,
-    Layers
+    Layers,
+    FileSignature,
+    Loader2
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -233,7 +235,7 @@ export default function TransactionDetailPage() {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10 bg-white">
                 <div className="space-y-4">
                     <InfoRow icon={<User className="h-5 w-5 text-primary opacity-40"/>} label="المهندس المسؤول" value={transaction.assignedEngineerId ? <span className="font-black text-slate-800">{employeesMap.get(transaction.assignedEngineerId)}</span> : <span className="text-muted-foreground italic">لم يحدد بعد</span>} />
-                    <InfoRow icon={<Calendar className="h-5 w-5 text-primary opacity-40"/>} label="تاريخ الفتح الرسمي" value={<span className="font-bold">{toFirestoreDate(transaction.createdAt) ? format(toFirestoreDate(transaction.createdAt)!, 'dd MMMM yyyy', { locale: ar }) : '-'}</span>} />
+                    <InfoRow icon={<Calendar className="h-5 w-5 text-primary opacity-40"/>} label="تاريخ الفتح الرسمي" value={<span className="font-bold">{toFirestoreDate(transaction.createdAt) ? format(toFirestoreDate(transaction.createdAt)!, 'eeee, dd MMMM yyyy', { locale: ar }) : '-'}</span>} />
                 </div>
                 {transaction.description && (
                     <div className="bg-muted/10 p-6 rounded-3xl border-2 border-dashed border-primary/10">

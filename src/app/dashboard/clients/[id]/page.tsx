@@ -138,7 +138,7 @@ export default function ClientProfilePage() {
   const txPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}/transactions`, tenantId) : null, [id, tenantId]);
   const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, txPath);
 
-  // 3. جلب عروض الأسعار - [جديد]
+  // 3. جلب عروض الأسعار
   const qQuery = useMemo(() => [where('clientId', '==', id)], [id]);
   const { data: quotations, loading: quotationsLoading } = useSubscription<Quotation>(firestore, 'quotations', qQuery);
   
@@ -182,7 +182,8 @@ export default function ClientProfilePage() {
             createdAt: serverTimestamp(),
             userId: currentUser?.id,
             userName: currentUser?.fullName,
-            userAvatar: currentUser?.avatarUrl
+            userAvatar: currentUser?.avatarUrl,
+            companyId: tenantId
         });
 
         toast({ title: 'تم الحذف', description: 'تم مسح سجل المعاملة نهائياً.' });
@@ -209,7 +210,6 @@ export default function ClientProfilePage() {
 
   return (
     <div className='space-y-10 max-w-6xl mx-auto pb-20' dir='rtl'>
-        {/* الطبقة 1: بطاقة العميل الأساسية */}
         <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
             <CardHeader className="bg-primary/5 pb-8 px-10 border-b">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -236,7 +236,6 @@ export default function ClientProfilePage() {
 
         <Separator className="opacity-10" />
 
-        {/* القسم الملحق: عروض الأسعار والمقترحات المعتمدة */}
         <div className="space-y-6">
             <h3 className="text-2xl font-black text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
                 <Calculator className="h-7 w-7 text-indigo-600" /> المقترحات المالية (عروض الأسعار)
@@ -273,7 +272,6 @@ export default function ClientProfilePage() {
 
         <Separator className="opacity-10" />
 
-        {/* الطبقة 2 و 3: المعاملات */}
         <div className="space-y-12">
             <h3 className="text-2xl font-black text-[#1e1b4b] border-r-8 border-primary pr-4 flex items-center gap-3">
                 <Workflow className="h-7 w-7 text-primary" /> هيكل الخدمات والمعاملات الميدانية
