@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 @import "react-day-picker/dist/style.css";
 @tailwind base;
@@ -105,4 +106,15 @@
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+/* توهج مداري للجزء المتحرك في السبينر */
+@keyframes spin-glow {
+  0% { transform: rotate(0deg); filter: drop-shadow(0 0 5px #FF7A00); }
+  50% { filter: drop-shadow(0 0 15px #FFB000); }
+  100% { transform: rotate(360deg); filter: drop-shadow(0 0 5px #FF7A00); }
+}
+
+.animate-spin-glow {
+  animation: spin-glow 1.2s linear infinite;
 }

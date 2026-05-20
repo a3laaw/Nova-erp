@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -45,7 +46,8 @@ import {
     Package, 
     AlertCircle, 
     CheckCircle2,
-    ArrowRight
+    ArrowRight,
+    Info
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -63,7 +65,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { SignaturePad } from '@/components/ui/signature-pad';
 import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
 
-const statusColors: Record<string, string> = {
+const transactionStatusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
   'in-progress': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   completed: 'bg-green-100 text-green-800 border-green-200',
@@ -127,7 +129,8 @@ export default function TransactionDetailPage() {
 
   useEffect(() => {
     if (!firestore || !tenantId) return;
-    getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!))).then(snap => {
+    const empPath = getTenantPath('employees', tenantId);
+    getDocs(query(collection(firestore, empPath!))).then(snap => {
         const newMap = new Map<string, string>();
         snap.forEach(doc => newMap.set(doc.id, doc.data().fullName));
         setEmployeesMap(newMap);
@@ -138,7 +141,7 @@ export default function TransactionDetailPage() {
     if (!firestore || !transaction?.transactionTypeId || !tenantId) return;
     const fetchTemplates = async () => {
         try {
-            // جلب مراحل العمل من مسار الخدمة المرجعية
+            // جلب مراحل العمل من مسار الخدمة المرجعية الموحدة
             const stagesPath = getTenantPath(`transactionTypes/${transaction.transactionTypeId}/workStages`, tenantId);
             if (!stagesPath) return;
             const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
@@ -176,6 +179,23 @@ export default function TransactionDetailPage() {
         }).sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
   }, [transaction, workStageTemplates]);
 
+  const handleSaveSignature = async (signatureDataUrl: string) => {
+    if (!firestore || !transactionPath || !transaction) return;
+    setIsProcessing(true);
+    try {
+        await updateDoc(doc(firestore, transactionPath), {
+            'contract.signatureInfo': {
+                clientSignature: signatureDataUrl,
+                signedAt: serverTimestamp(),
+            }
+        });
+        toast({ title: 'تم التوقيع', description: 'تم اعتماد توقيع المالك وحفظه في العقد بنجاح.' });
+        setIsSignDialogOpen(false);
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ' });
+    } finally { setIsProcessing(false); }
+  };
+
   if (transactionLoading || clientLoading) return <div className="p-8 max-w-5xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
   if (!transaction || !client) return <div className="text-center py-20 text-destructive">فشل تحميل بيانات المعاملة المعتمدة.</div>;
 
@@ -191,7 +211,7 @@ export default function TransactionDetailPage() {
                     <div className="text-right space-y-2">
                         <div className="flex items-center gap-3">
                             <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
-                            <UniversalActionTrigger title={transaction.transactionType} sourceModule="المعاملات" sourceId={transaction.id!} />
+                            <UniversalActionTrigger title={transaction.transactionType} sourceModule="المعاملات المعتمدة" sourceId={transaction.id!} />
                         </div>
                         {transaction.subServiceName && (
                             <div className="flex items-center gap-2">
@@ -226,17 +246,19 @@ export default function TransactionDetailPage() {
         <Tabs defaultValue="stages" dir="rtl" className="w-full">
             <div className="flex justify-center mb-8">
                 <TabsList className="bg-white/60 backdrop-blur-xl p-1.5 rounded-[2rem] border border-white shadow-2xl h-16 w-full max-w-3xl">
-                    <TabsTrigger value="stages" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full">سير العمل الفني</TabsTrigger>
-                    <TabsTrigger value="boq" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full">المقايسة (BOQ)</TabsTrigger>
-                    <TabsTrigger value="comments" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full">المتابعة والردود</TabsTrigger>
-                    <TabsTrigger value="history" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full">سجل الأحداث</TabsTrigger>
+                    <TabsTrigger value="stages" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">سير العمل الفني</TabsTrigger>
+                    <TabsTrigger value="boq" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">المقايسة (BOQ)</TabsTrigger>
+                    <TabsTrigger value="comments" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">المتابعة والردود</TabsTrigger>
+                    <TabsTrigger value="history" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">سجل الأحداث</TabsTrigger>
                 </TabsList>
             </div>
 
             <TabsContent value="stages" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
                     <CardHeader className="border-b bg-muted/5 p-8 px-10">
-                        <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>حالة مراحل الإنجاز الميداني</CardTitle>
+                        <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
+                            <Workflow className='text-primary h-6 w-6'/> حالة مراحل الإنجاز الميداني
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
                         {enrichedStages.map((stage) => (
@@ -254,6 +276,12 @@ export default function TransactionDetailPage() {
                                 </div>
                             </div>
                         ))}
+                        {enrichedStages.length === 0 && (
+                            <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] opacity-30">
+                                <AlertCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                                <p className="text-xl font-black">لم يتم تحديد مراحل عمل لهذا النوع من المعاملات في القوائم المرجعية.</p>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -263,7 +291,7 @@ export default function TransactionDetailPage() {
                     {transaction.boqId ? <LinkedBoqView boqId={transaction.boqId} /> : (
                         <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] bg-muted/5 space-y-6">
                             <Package className="h-16 w-16 mx-auto text-muted-foreground opacity-30" />
-                            <p className="text-xl font-black text-slate-400">لا يوجد جدول كميات مرتبط.</p>
+                            <p className="text-xl font-black text-slate-400">لا يوجد جدول كميات مرتبط حالياً.</p>
                             <Button asChild className="rounded-2xl font-black px-12 h-12 shadow-xl shadow-primary/20">
                                 <Link href={`/dashboard/construction/boq/new?projectId=${transaction.id}&clientId=${clientId}`}>إنشاء مقايسة جديدة +</Link>
                             </Button>
@@ -280,6 +308,22 @@ export default function TransactionDetailPage() {
                 <TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="log" showInput={false} title="سجل الأحداث الإجرائية" icon={<History className='text-primary h-6 w-6'/>} client={client} transaction={transaction} />
             </TabsContent>
         </Tabs>
+
+        <Dialog open={isSignDialogOpen} onOpenChange={setIsSignDialogOpen}>
+            <DialogContent className="max-w-lg rounded-[2.5rem] border-none shadow-2xl p-10 bg-white" dir="rtl">
+                <DialogHeader className="mb-6">
+                    <DialogTitle className="text-2xl font-black flex items-center gap-3">
+                        <FileSignature className="text-primary h-7 w-7" /> توقيع المالك المعتمد
+                    </DialogTitle>
+                    <DialogDescription className="font-bold text-slate-500">سيتم دمج هذا التوقيع في العقد الرسمي والأرشفة الفنية.</DialogDescription>
+                </DialogHeader>
+                <SignaturePad onSave={handleSaveSignature} />
+                <div className="mt-6 p-4 bg-muted/20 rounded-2xl border border-dashed text-xs text-muted-foreground flex gap-2">
+                    <Info className="h-4 w-4 shrink-0" />
+                    <p>هذا التوقيع يعتبر موافقة نهائية من المالك على بنود المعاملة والمواصفات الفنية المذكورة.</p>
+                </div>
+            </DialogContent>
+        </Dialog>
     </div>
   );
 }

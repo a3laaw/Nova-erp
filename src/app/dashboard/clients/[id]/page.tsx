@@ -1,8 +1,9 @@
+
 'use client';
-import { useEffect, useState, useMemo } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, writeBatch, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, writeBatch, serverTimestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -33,10 +34,11 @@ import {
     PlusCircle,
     Building2,
     Phone,
-    Home,
     BadgeInfo,
     History,
-    ShieldCheck
+    ShieldCheck,
+    Layers,
+    ArrowRight
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -99,6 +101,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
 
 export default function ClientProfilePage() {
   const params = useParams();
+  const router = useRouter();
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -110,32 +113,68 @@ export default function ClientProfilePage() {
   const [transactionToDelete, setTransactionToDelete] = useState<ClientTransaction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 🛡️ رادار المسارات المعتمدة
+  // 1. جلب بيانات العميل المعتمدة
   const clientPath = useMemo(() => getTenantPath(`clients/${id}`, tenantId), [id, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
+  // 2. جلب كافة المعاملات المرتبطة بالعميل
   const txPath = useMemo(() => getTenantPath(`clients/${id}/transactions`, tenantId), [id, tenantId]);
   const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, txPath);
   
   useEffect(() => {
     if (!firestore || !tenantId) return;
-    getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!))).then(snap => {
+    const empPath = getTenantPath('employees', tenantId);
+    getDocs(query(collection(firestore, empPath!))).then(snap => {
         const newMap = new Map<string, string>();
         snap.forEach(doc => newMap.set(doc.id, doc.data().fullName));
         setEmployeesMap(newMap);
     });
   }, [firestore, tenantId]);
 
+  // 🛡️ معالجة التجميد (Handle Freeze) المحصنة
   const handleToggleFreeze = async (tx: ClientTransaction) => {
     if (!firestore || !tenantId || !tx.id) return;
     setIsProcessing(true);
     const newStatus = tx.status === 'on-hold' ? 'new' : 'on-hold';
     try {
-        await updateDoc(doc(firestore, getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId)!), { status: newStatus });
-        toast({ title: 'نجاح التحديث' });
+        const docPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId);
+        await updateDoc(doc(firestore, docPath!), { 
+            status: newStatus,
+            updatedAt: serverTimestamp() 
+        });
+        toast({ title: 'نجاح التحديث', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'عائق صلاحيات', description: 'تأكد من أنك تملك حق التعديل على هذا السجل.' });
     } finally { setIsProcessing(false); }
   };
 
+  // 🛡️ معالجة الحذف المعتمدة (Handle Delete)
+  const handleConfirmDelete = async () => {
+    if (!firestore || !tenantId || !transactionToDelete?.id) return;
+    setIsProcessing(true);
+    try {
+        const docPath = getTenantPath(`clients/${id}/transactions/${transactionToDelete.id}`, tenantId);
+        await deleteDoc(doc(firestore, docPath!));
+        
+        // توثيق الحذف في السجل الموحد
+        const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
+        await addDoc(collection(firestore, historyPath!), {
+            type: 'log',
+            content: `قام ${currentUser?.fullName} بحذف المعاملة "${transactionToDelete.transactionType}" نهائياً.`,
+            createdAt: serverTimestamp(),
+            userId: currentUser?.id
+        });
+
+        toast({ title: 'تم الحذف النهائي', description: 'تم مسح سجل المعاملة من القاعدة الموحدة.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+    } finally { 
+        setIsProcessing(false); 
+        setTransactionToDelete(null); 
+    }
+  };
+
+  // محرك التجميع الثلاثي (Grouping Logic)
   const groupedTransactions = useMemo(() => {
     const groups = new Map<string, ClientTransaction[]>();
     transactions.forEach(tx => {
@@ -146,24 +185,25 @@ export default function ClientProfilePage() {
     return Array.from(groups.entries());
   }, [transactions]);
 
-  if (clientLoading) return <div className="p-8"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
-  if (!client) return <div className="text-center py-20 font-black opacity-30">الملف غير موجود.</div>;
+  if (clientLoading) return <div className="p-8 max-w-6xl mx-auto"><Skeleton className="h-96 w-full rounded-[3rem]" /></div>;
+  if (!client) return <div className="text-center py-20 font-black opacity-30">الملف الموحد غير متاح.</div>;
 
   return (
-    <div className='space-y-8 max-w-6xl mx-auto' dir='rtl'>
+    <div className='space-y-10 max-w-6xl mx-auto pb-20' dir='rtl'>
+        {/* الطبقة 1: بطاقة العميل الأساسية */}
         <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
             <CardHeader className="bg-primary/5 pb-8 px-10 border-b">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="text-right">
                         <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{client.nameAr}</CardTitle>
-                        <p className="text-slate-500 font-bold mt-1">{client.nameEn}</p>
+                        <p className="text-slate-500 font-bold mt-1 uppercase tracking-widest text-xs opacity-60">{client.nameEn}</p>
                     </div>
                     <div className="flex gap-3">
                         <Button asChild variant="outline" className="h-11 px-8 rounded-2xl border-2 font-black gap-2">
                             <Link href={`/dashboard/clients/${id}/edit`}><Pencil className="h-4 w-4" /> تعديل الملف</Link>
                         </Button>
                         <Button onClick={() => setIsFormOpen(true)} className="h-11 px-8 rounded-2xl font-black gap-2 shadow-lg shadow-primary/20 bg-primary text-white border-none">
-                            <PlusCircle className="h-5 w-5" /> إضافة معاملة
+                            <PlusCircle className="h-5 w-5" /> فتح معاملة جديدة
                         </Button>
                     </div>
                 </div>
@@ -175,53 +215,66 @@ export default function ClientProfilePage() {
             </CardContent>
         </Card>
 
+        {/* الطبقة 2 و 3: المعاملات الرئيسية والداخلية */}
         <div className="space-y-12">
             <h3 className="text-2xl font-black text-[#1e1b4b] border-r-8 border-primary pr-4 flex items-center gap-3">
-                <Workflow className="h-7 w-7 text-primary" /> مصفوفة الخدمات المعتمدة
+                <Workflow className="h-7 w-7 text-primary" /> هيكل الخدمات الميدانية المعتمدة
             </h3>
             
             {groupedTransactions.length === 0 ? (
-                <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] opacity-30">
+                <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] opacity-20 bg-white/40">
                     <PlusCircle className="mx-auto h-20 w-20 text-muted-foreground mb-4" />
-                    <p className="text-2xl font-black">لا توجد معاملات مسجلة بعد.</p>
+                    <p className="text-2xl font-black">لا توجد معاملات مسجلة لهذا الملف.</p>
                 </div>
             ) : (
                 groupedTransactions.map(([typeName, txs]) => (
-                    <section key={typeName} className="space-y-4 animate-in fade-in duration-500">
-                        <div className="flex items-center gap-3 px-4">
-                            <div className="p-2 bg-primary/10 rounded-xl text-primary"><Building2 className="h-5 w-5"/></div>
-                            <h4 className="text-xl font-black text-slate-800">{typeName}</h4>
+                    <section key={typeName} className="space-y-4 animate-in fade-in duration-700">
+                        <div className="flex items-center gap-3 px-6 py-2 bg-slate-900 text-white w-fit rounded-full shadow-lg">
+                            <Building2 className="h-4 w-4"/>
+                            <h4 className="text-sm font-black tracking-tight">{typeName}</h4>
                         </div>
                         
                         <div className="grid gap-4">
                             {txs.map(tx => (
-                                <Card key={tx.id} className="rounded-3xl border-2 border-transparent bg-white shadow-md hover:border-primary/20 transition-all group overflow-hidden">
+                                <Card key={tx.id} className="rounded-[2rem] border-2 border-transparent bg-white shadow-md hover:border-primary/20 transition-all group overflow-hidden">
                                     <div className="flex flex-col sm:flex-row items-center justify-between p-6 gap-6">
                                         <div className="flex items-center gap-6">
                                             <Badge variant="outline" className="font-mono font-black text-primary text-xs h-8 px-4 border-primary/20 bg-primary/5">{tx.transactionNumber}</Badge>
-                                            <div>
-                                                <p className="font-black text-lg text-slate-900 leading-tight">{tx.subServiceName || 'خدمة أساسية'}</p>
-                                                <p className="text-[10px] font-bold text-muted-foreground mt-1 flex items-center gap-1"><User className="h-3 w-3"/> المسؤول: {tx.assignedEngineerId ? employeesMap.get(tx.assignedEngineerId) : 'غير مسند'}</p>
+                                            <div className="text-right">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-black text-lg text-slate-900 leading-tight">{tx.subServiceName || 'خدمة تأسيسية'}</p>
+                                                    <Badge className={cn("px-4 py-0.5 rounded-full font-black text-[9px] border-none shadow-sm", transactionStatusColors[tx.status])}>
+                                                        {statusTranslations[tx.status]}
+                                                    </Badge>
+                                                </div>
+                                                <p className="text-[10px] font-bold text-muted-foreground mt-1 flex items-center gap-1">
+                                                    <User className="h-3 w-3"/> المهندس المختص: {tx.assignedEngineerId ? employeesMap.get(tx.assignedEngineerId) : 'غير مسند'}
+                                                </p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-6">
-                                            <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[10px] border-2 shadow-sm", transactionStatusColors[tx.status])}>
-                                                {statusTranslations[tx.status]}
-                                            </Badge>
-                                            <div className="flex gap-2">
-                                                <Button asChild variant="outline" className="rounded-xl h-10 px-6 font-black gap-2 border-2"><Link href={`/dashboard/clients/${id}/transactions/${tx.id}`}><Eye className="h-4 w-4"/> عرض ومتابعة</Link></Button>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                                                    <DropdownMenuContent dir="rtl" className="rounded-xl p-2 shadow-2xl border-none">
-                                                        <DropdownMenuItem onClick={() => handleToggleFreeze(tx)} className="rounded-lg py-3 font-bold gap-3">
-                                                            {tx.status === 'on-hold' ? <FolderOpen className="h-4 w-4 text-green-600"/> : <FolderLock className="h-4 w-4 text-orange-600"/>}
-                                                            {tx.status === 'on-hold' ? 'إلغاء التجميد' : 'تجميد المعاملة'}
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem onClick={() => setTransactionToDelete(tx)} className="text-red-600 font-black rounded-lg py-3 gap-3"><Trash2 className="h-4 w-4" /> حذف نهائي</DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
+                                        <div className="flex items-center gap-3">
+                                            <Button asChild variant="outline" className="rounded-xl h-10 px-8 font-black gap-2 border-2 hover:bg-primary hover:text-white transition-all shadow-sm">
+                                                <Link href={`/dashboard/clients/${id}/transactions/${tx.id}`}><Eye className="h-4 w-4"/> عرض التفاصيل</Link>
+                                            </Button>
+                                            
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border bg-slate-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <MoreHorizontal className="h-4 w-4"/>
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
+                                                    <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">إجراءات المعاملة</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => handleToggleFreeze(tx)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                                        {tx.status === 'on-hold' ? <FolderOpen className="h-4 w-4 text-green-600"/> : <FolderLock className="h-4 w-4 text-orange-600"/>}
+                                                        {tx.status === 'on-hold' ? 'إلغاء التجميد' : 'تجميد المعاملة'}
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator className="bg-slate-100" />
+                                                    <DropdownMenuItem onClick={() => setTransactionToDelete(tx)} className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50">
+                                                        <Trash2 className="h-4 w-4" /> حذف نهائي
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </div>
                                     </div>
                                 </Card>
@@ -232,20 +285,22 @@ export default function ClientProfilePage() {
             )}
         </div>
 
+        <Separator className="opacity-10" />
+
         <ClientHistoryTimeline clientId={id} />
 
         {isFormOpen && <ClientTransactionForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} clientId={id} clientName={client.nameAr} />}
         
         <AlertDialog open={!!transactionToDelete} onOpenChange={() => setTransactionToDelete(null)}>
-            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl">
+            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
                 <AlertDialogHeader>
                     <div className="p-4 bg-red-100 rounded-3xl w-fit mb-4"><Trash2 className="h-10 w-10 text-red-600"/></div>
                     <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tighter">تأكيد حذف المعاملة؟</AlertDialogTitle>
-                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">سيتم مسح كافة البيانات الفنية والمرفقات الخاصة بـ "{transactionToDelete?.transactionType}" نهائياً.</AlertDialogDescription>
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">سيتم مسح كافة البيانات الفنية والمراحل الموثقة لـ "{transactionToDelete?.subServiceName || transactionToDelete?.transactionType}" نهائياً من السجل الموحد.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-10 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => { if(transactionToDelete?.id) { setIsProcessing(true); deleteDoc(doc(firestore!, getTenantPath(`clients/${id}/transactions/${transactionToDelete.id}`, tenantId)!)).then(() => toast({title: 'تم الحذف'})).finally(() => {setIsProcessing(false); setTransactionToDelete(null);}); } }} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12">
+                    <AlertDialogAction onClick={handleConfirmDelete} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-100">
                         {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
