@@ -12,6 +12,10 @@ import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
+/**
+ * شعار نوفا المدمج (NOVA Simple Text):
+ * تصميم مطابق تماماً للصورة المطلوبة.
+ */
 const NovaLogo = () => (
   <svg width="120" height="40" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
     <text 
@@ -45,20 +49,27 @@ export default function DashboardLayout({
     setMounted(true);
   }, []);
 
+  // 1. معالجة حالة التحميل المطابقة للصورة الصحيحة
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-6 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
         <div className="relative flex flex-col items-center gap-4">
+            {/* حلقة التحميل الدائرية كما في الصورة */}
             <div className="h-20 w-20 rounded-full border-4 border-primary/5 border-t-primary animate-spin" />
+            
+            {/* شعار NOVA في المنتصف */}
             <div className="absolute inset-0 m-auto flex items-center justify-center">
                 <NovaLogo />
             </div>
+            
+            {/* النص الكحلي بالأسفل */}
             <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري التحميل...</p>
         </div>
       </div>
     );
   }
 
+  // 2. التحقق من وجود المستخدم
   if (!user) {
     const handleSafeExit = () => {
       logout();

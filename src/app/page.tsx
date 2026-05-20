@@ -113,7 +113,10 @@ export default function LoginPage() {
       <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-[#FF7A00]/10 rounded-full blur-[100px] animate-pulse" />
           <div className="relative">
+              {/* حلقة التحميل الدائرية المطابقة للصورة */}
               <div className="h-24 w-24 rounded-full border-4 border-primary/5 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.15)]" />
+              
+              {/* نص NOVA في المنتصف */}
               <div className="absolute inset-0 m-auto flex flex-col items-center justify-center">
                   <NovaLogo />
               </div>
