@@ -25,10 +25,11 @@ import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 
 /**
- * شعار نوفا المعتمد (NOVA Text Logo)
+ * شعار نوفا المعتمد (NOVA Text Logo):
+ * تم تكبير الخط بنسبة 25% (من 32 إلى 40) مع التوهج المداري.
  */
 const NovaLogo = () => (
-  <svg width="80" height="30" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="120" height="50" viewBox="0 0 120 50" fill="none" xmlns="http://www.w3.org/2000/svg">
     <text 
       x="50%" 
       y="50%" 
@@ -36,7 +37,7 @@ const NovaLogo = () => (
       textAnchor="middle" 
       fontFamily="inherit" 
       fontWeight="900" 
-      fontSize="32" 
+      fontSize="40" 
       fill="#FF7A00"
     >
       NOVA
@@ -103,10 +104,17 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
-          <div className="relative flex flex-col items-center">
-              <div className="h-32 w-32 rounded-full border-4 border-slate-100 border-t-[#FF7A00] animate-spin shadow-[0_0_30px_rgba(255,122,0,0.3)]" />
+          <div className="relative flex flex-col items-center justify-center">
+              {/* الدائرة المتوهجة */}
+              <div className="h-40 w-40 rounded-full border-4 border-slate-100 border-t-[#FF7A00] animate-spin-glow shadow-[0_0_30px_rgba(255,122,0,0.2)]" />
+              
               <div className="absolute inset-0 flex items-center justify-center">
-                  <NovaLogo />
+                  {/* الهالة الذهبية العكسية */}
+                  <div className="absolute h-24 w-24 gold-glow-filter animate-gold-reverse rounded-full" />
+                  
+                  <div className="relative z-10">
+                      <NovaLogo />
+                  </div>
               </div>
               <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter mt-12">جاري التحميل...</p>
           </div>

@@ -14,10 +14,10 @@ import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 /**
  * شعار نوفا المعتمد (NOVA Text Logo):
- * تم ضبط الحجم ليتوسط الدائرة المصغرة بدقة هندسية.
+ * تم تكبير الخط بنسبة 25% (من 32 إلى 40) لمركزية أعمق.
  */
 const NovaLogo = () => (
-  <svg width="80" height="30" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="120" height="50" viewBox="0 0 120 50" fill="none" xmlns="http://www.w3.org/2000/svg">
     <text 
       x="50%" 
       y="50%" 
@@ -25,7 +25,7 @@ const NovaLogo = () => (
       textAnchor="middle" 
       fontFamily="inherit" 
       fontWeight="900" 
-      fontSize="32" 
+      fontSize="40" 
       fill="#FF7A00"
     >
       NOVA
@@ -58,17 +58,22 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 🛡️ شاشة التحميل المعتمدة والمحدثة جمالياً (Glow & Center)
+  // 🛡️ شاشة التحميل المعتمدة والمحدثة (Golden Reverse Glow)
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-12 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        <div className="relative flex flex-col items-center">
-            {/* 🌟 الدائرة المصغرة والمتوهجة 🌟 */}
-            <div className="h-32 w-32 rounded-full border-4 border-slate-100 border-t-[#FF7A00] animate-spin shadow-[0_0_30px_rgba(255,122,0,0.3)]" />
+        <div className="relative flex flex-col items-center justify-center">
+            {/* 🌟 الدائرة المصغرة والمتوهجة (تدور مع عقارب الساعة) 🌟 */}
+            <div className="h-40 w-40 rounded-full border-4 border-slate-100 border-t-[#FF7A00] animate-spin-glow shadow-[0_0_30px_rgba(255,122,0,0.2)]" />
             
-            {/* التمركز المطلق لكلمة NOVA */}
+            {/* التمركز المطلق لاسم NOVA مع التوهج الذهبي العكسي */}
             <div className="absolute inset-0 flex items-center justify-center">
-                <NovaLogo />
+                {/* الهالة الذهبية (تدور عكس عقارب الساعة) */}
+                <div className="absolute h-24 w-24 gold-glow-filter animate-gold-reverse rounded-full" />
+                
+                <div className="relative z-10">
+                    <NovaLogo />
+                </div>
             </div>
             
             <div className="absolute -bottom-16 text-center w-64">
@@ -89,7 +94,7 @@ export default function DashboardLayout({
     );
   }
 
-  // 🛡️ الحماية القصوى: إذا انتهت الجلسة، نمنع الوصول للبيانات ونطلب الدخول
+  // 🛡️ الحماية القصوى للمنشأة الموحدة
   if (!user || !user.currentCompanyId) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]" dir="rtl">

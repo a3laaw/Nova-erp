@@ -117,3 +117,19 @@
 .animate-spin-glow {
   animation: spin-glow 1.2s linear infinite;
 }
+
+/* 🌟 توهج ذهبي عكسي لاسم نوفا 🌟 */
+@keyframes gold-reverse-aura {
+  0% { transform: rotate(360deg); opacity: 0.4; }
+  50% { opacity: 0.8; scale: 1.1; }
+  100% { transform: rotate(0deg); opacity: 0.4; }
+}
+
+.animate-gold-reverse {
+  animation: gold-reverse-aura 3s linear infinite;
+}
+
+.gold-glow-filter {
+  filter: blur(20px);
+  background: radial-gradient(circle, #FFD700 0%, transparent 70%);
+}
