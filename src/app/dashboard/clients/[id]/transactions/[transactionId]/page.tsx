@@ -40,15 +40,12 @@ import {
     History, 
     ClipboardList, 
     Sparkles, 
-    Coins, 
-    FileSignature, 
-    Loader2, 
-    Layers, 
-    Package, 
-    AlertCircle, 
     CheckCircle2,
     ArrowRight,
-    Info
+    Info,
+    AlertCircle,
+    Package,
+    Layers
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';

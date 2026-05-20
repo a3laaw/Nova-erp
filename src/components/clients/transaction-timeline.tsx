@@ -1,21 +1,23 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { useFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, writeBatch, doc } from 'firebase/firestore'; 
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore'; 
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Send, History, Loader2 } from 'lucide-react';
+import { Send, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
-import { cn } from '@/lib/utils';
+import { cn, getTenantPath } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 interface TimelineEvent {
   id: string;
@@ -41,7 +43,7 @@ interface TransactionTimelineProps {
 const formatDate = (dateValue: any): string => {
     if (!dateValue) return '';
     const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
-    if (isNaN(date.getTime())) return '';
+    if (!isValid(date)) return '';
     return formatDistanceToNow(date, { addSuffix: true, locale: ar });
 }
 
@@ -53,6 +55,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
   const [newComment, setNewComment] = useState('');
   const [isPosting, setIsPosting] = useState(false);
   
+  const relativePath = `clients/${clientId}/transactions/${transactionId}/timelineEvents`;
   const { 
     items: events, 
     setItems: setEvents, 
@@ -60,10 +63,18 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     loadingMore, 
     hasMore, 
     loaderRef 
-  } = useInfiniteScroll<TimelineEvent>(`clients/${clientId}/transactions/${transactionId}/timelineEvents`);
+  } = useInfiniteScroll<TimelineEvent>(relativePath);
 
   const handlePostComment = async () => {
     if (!newComment.trim() || !currentUser || !firestore) return;
+
+    const tenantId = currentUser.currentCompanyId;
+    const finalPath = getTenantPath(relativePath, tenantId);
+
+    if (!finalPath) {
+        toast({ variant: 'destructive', title: 'خطأ في الجلسة', description: 'يرجى إعادة تسجيل الدخول لتحديد المنشأة.' });
+        return;
+    }
 
     setIsPosting(true);
     const tempId = `temp_${Date.now()}`;
@@ -72,55 +83,59 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
         type: 'comment',
         content: newComment,
         userId: currentUser.id,
-        userName: currentUser.fullName,
+        userName: currentUser.fullName || currentUser.username,
         userAvatar: currentUser.avatarUrl,
         createdAt: new Date(),
     };
     
+    // التحديث المتفائل للواجهة (Optimistic Update)
     setEvents(prev => [optimisticComment, ...prev]);
     setNewComment('');
 
-    try {
-      const timelineCollection = collection(firestore, `clients/${clientId}/transactions/${transactionId}/timelineEvents`);
-      const commentData = {
-          type: 'comment' as const,
-          content: newComment,
-          userId: currentUser.id,
-          userName: currentUser.fullName,
-          userAvatar: currentUser.avatarUrl,
-          createdAt: serverTimestamp(),
-      };
+    const commentData = {
+        type: 'comment' as const,
+        content: optimisticComment.content,
+        userId: currentUser.id,
+        userName: optimisticComment.userName,
+        userAvatar: currentUser.avatarUrl || null,
+        createdAt: serverTimestamp(),
+        companyId: tenantId, // 🛡️ الإضافة السيادية لقواعد الأمان
+    };
 
-      await addDoc(timelineCollection, commentData);
-      
-      const clientName = client?.nameAr || 'عميل';
-      const transactionType = transaction?.transactionType || 'معاملة';
-      const recipients = new Set<string>();
-      if (currentUser.id) recipients.add(currentUser.id);
+    // 🚀 تنفيذ الإرسال السحابي
+    addDoc(collection(firestore, finalPath), commentData)
+        .then(async () => {
+            const clientName = client?.nameAr || 'عميل';
+            const transactionName = transaction?.transactionType || 'معاملة';
+            
+            // إخطار المهندس المسؤول (إذا وجد)
+            if (transaction?.assignedEngineerId && transaction.assignedEngineerId !== currentUser.employeeId) {
+                const assigneeUserId = await findUserIdByEmployeeId(firestore, transaction.assignedEngineerId);
+                if (assigneeUserId) {
+                    await createNotification(firestore, {
+                        userId: assigneeUserId,
+                        title: `تعليق جديد من ${currentUser.fullName}`,
+                        body: `أضاف زميلك تعليقاً على معاملة "${transactionName}" للعميل ${clientName}.`,
+                        link: `/dashboard/clients/${clientId}/transactions/${transactionId}`
+                    });
+                }
+            }
+        })
+        .catch(async (serverError) => {
+            // التراجع عن التحديث المتفائل في حال الفشل
+            setEvents(prev => prev.filter(e => e.id !== tempId));
+            setNewComment(optimisticComment.content);
 
-      if (transaction?.assignedEngineerId) {
-          const assigneeUserId = await findUserIdByEmployeeId(firestore, transaction.assignedEngineerId);
-          if (assigneeUserId && assigneeUserId !== currentUser.id) {
-              recipients.add(assigneeUserId);
-          }
-      }
-
-      for (const recipientId of recipients) {
-          const isCreator = recipientId === currentUser.id;
-          const title = isCreator ? 'تم إرسال تعليقك' : `تعليق جديد من ${currentUser.fullName}`;
-          const body = isCreator ? `تم إرسال تعليقك على معاملة العميل ${clientName} بنجاح.` : `أضاف ${currentUser.fullName} تعليقًا على المعاملة "${transactionType}" للعميل ${clientName}.`;
-          
-          createNotification(firestore, { userId: recipientId, title, body, link: `/dashboard/clients/${clientId}/transactions/${transactionId}` });
-      }
-      
-    } catch (err) {
-      setEvents(prev => prev.filter(e => e.id !== tempId));
-      setNewComment(optimisticComment.content);
-      console.error('Failed to post comment:', err);
-      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إرسال التعليق.' });
-    } finally {
-      setIsPosting(false);
-    }
+            const permissionError = new FirestorePermissionError({
+                path: finalPath,
+                operation: 'create',
+                requestResourceData: commentData
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        })
+        .finally(() => {
+            setIsPosting(false);
+        });
   };
 
   const filteredEvents = useMemo(() => {
@@ -128,28 +143,36 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
   }, [events, filterType]);
 
   return (
-    <Card className='lg:col-span-3'>
-      <CardHeader>
-        <CardTitle className='flex items-center gap-2'>{icon}{title}</CardTitle>
+    <Card className='lg:col-span-3 border-none shadow-xl rounded-[2.5rem] bg-white/60 backdrop-blur-xl'>
+      <CardHeader className="p-8 border-b">
+        <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
+            <div className="p-2 bg-primary/10 rounded-xl text-primary">{icon}</div>
+            {title}
+        </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="p-8 space-y-8">
         {showInput && currentUser && (
-          <div className="flex items-start gap-4">
-            <Avatar className="h-9 w-9 border">
-              <AvatarImage src={currentUser?.avatarUrl} />
-              <AvatarFallback>{currentUser?.fullName?.charAt(0)}</AvatarFallback>
+          <div className="flex items-start gap-4 p-6 bg-white rounded-[2rem] border-2 border-dashed border-primary/20 shadow-inner group focus-within:border-primary transition-all">
+            <Avatar className="h-12 w-12 border-2 border-white shadow-md">
+              <AvatarImage src={currentUser?.avatarUrl} className="object-cover" />
+              <AvatarFallback className="bg-primary/10 text-primary font-black">{currentUser?.fullName?.charAt(0)}</AvatarFallback>
             </Avatar>
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 space-y-4">
               <Textarea
-                placeholder="أكتب تعليقاً أو تحديثاً..."
+                placeholder="اكتب ملاحظاتك الميدانية أو ردك هنا..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 rows={3}
+                className="border-none shadow-none focus-visible:ring-0 text-base font-medium placeholder:italic bg-transparent p-0"
               />
               <div className="flex justify-end">
-                <Button onClick={handlePostComment} disabled={isPosting || !newComment.trim()}>
-                  <Send className="ml-2 h-4 w-4" />
-                  {isPosting ? 'جاري الإرسال...' : 'إرسال'}
+                <Button 
+                    onClick={handlePostComment} 
+                    disabled={isPosting || !newComment.trim()}
+                    className="rounded-xl h-10 px-8 font-black gap-2 shadow-lg shadow-primary/20"
+                >
+                  {isPosting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 rotate-180" />}
+                  {isPosting ? 'جاري الإرسال...' : 'نشر التعليق'}
                 </Button>
               </div>
             </div>
@@ -157,39 +180,46 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
         )}
 
         <div className="space-y-6">
-            {loading && Array.from({length: 3}).map((_, i) => (
-                <div key={i} className="flex gap-4">
-                    <Skeleton className="h-9 w-9 rounded-full" />
+            {loading && Array.from({length: 2}).map((_, i) => (
+                <div key={i} className="flex gap-4 p-4 animate-pulse">
+                    <Skeleton className="h-12 w-12 rounded-full" />
                     <div className='flex-1 space-y-2'>
-                        <Skeleton className="h-4 w-1/4" />
-                        <Skeleton className="h-8 w-full" />
+                        <Skeleton className="h-4 w-1/4 rounded-lg" />
+                        <Skeleton className="h-16 w-full rounded-2xl" />
                     </div>
                 </div>
             ))}
+            
             {!loading && filteredEvents.length === 0 && (
-                <div className="text-center text-muted-foreground pt-8">
-                  <p>{filterType === 'comment' ? 'لا توجد تعليقات بعد. كن أول من يضيف تعليقاً.' : 'لا توجد أحداث مسجلة في السجل.'}</p>
+                <div className="text-center text-muted-foreground py-20 opacity-30 italic font-black">
+                  <p>{filterType === 'comment' ? 'لا توجد تعليقات بعد. كن أول من يضيف لمسة في مسار العمل.' : 'لا توجد أحداث مسجلة في السجل التاريخي.'}</p>
                 </div>
             )}
-          {filteredEvents.map((event) => (
-            <div key={event.id} className="flex items-start gap-4">
-              <Avatar className="h-9 w-9 border">
-                <AvatarImage src={event.userAvatar} />
-                <AvatarFallback>{event.userName?.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 rounded-md border bg-muted/50 p-3">
-                <div className="flex justify-between items-center mb-1">
-                  <p className="font-semibold text-sm">{event.userName}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(event.createdAt)}</p>
+
+            {filteredEvents.map((event) => (
+                <div key={event.id} className="flex items-start gap-4 animate-in fade-in duration-500">
+                    <Avatar className="h-10 w-10 border shadow-sm">
+                        <AvatarImage src={event.userAvatar} className="object-cover" />
+                        <AvatarFallback className="font-bold bg-muted text-muted-foreground">{event.userName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className={cn(
+                        "flex-1 p-5 rounded-[1.8rem] border shadow-sm",
+                        event.type === 'log' ? "bg-muted/30 border-muted" : "bg-white border-slate-100"
+                    )}>
+                        <div className="flex justify-between items-center mb-2">
+                            <p className="font-black text-sm text-[#1e1b4b]">{event.userName}</p>
+                            <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                {formatDate(event.createdAt)}
+                            </p>
+                        </div>
+                        <p className="text-sm font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">{event.content}</p>
+                    </div>
                 </div>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{event.content}</p>
-              </div>
-            </div>
-          ))}
+            ))}
 
             <div ref={loaderRef} className="flex justify-center p-4">
-                {loadingMore && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
-                {!hasMore && filteredEvents.length > 0 && <p className="text-sm text-muted-foreground">وصلت إلى نهاية السجل</p>}
+                {loadingMore && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
             </div>
         </div>
       </CardContent>
