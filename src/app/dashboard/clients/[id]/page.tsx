@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { 
     Pencil, 
     User, 
@@ -38,7 +39,9 @@ import {
     History,
     ShieldCheck,
     Layers,
-    ArrowRight
+    ArrowRight,
+    Loader2,
+    AlertCircle
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -131,7 +134,7 @@ export default function ClientProfilePage() {
     });
   }, [firestore, tenantId]);
 
-  // 🛡️ معالجة التجميد (Handle Freeze) المحصنة - تم استبدال onClick بـ onSelect لضمان الاستجابة
+  // 🛡️ معالجة التجميد (Handle Freeze) المعتمدة
   const handleToggleFreeze = async (tx: ClientTransaction) => {
     if (!firestore || !tenantId || !tx.id) return;
     setIsProcessing(true);
@@ -144,11 +147,11 @@ export default function ClientProfilePage() {
         });
         toast({ title: 'نجاح التحديث', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'عائق صلاحيات', description: 'تأكد من أنك تملك حق التعديل على هذا السجل.' });
+        toast({ variant: 'destructive', title: 'خطأ في التحديث' });
     } finally { setIsProcessing(false); }
   };
 
-  // 🛡️ معالجة الحذف المعتمدة (Handle Delete)
+  // 🛡️ معالجة الحذف المعتمدة
   const handleConfirmDelete = async () => {
     if (!firestore || !tenantId || !transactionToDelete?.id) return;
     setIsProcessing(true);
@@ -156,16 +159,17 @@ export default function ClientProfilePage() {
         const docPath = getTenantPath(`clients/${id}/transactions/${transactionToDelete.id}`, tenantId);
         await deleteDoc(doc(firestore, docPath!));
         
-        // توثيق الحذف في السجل الموحد
         const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
         await addDoc(collection(firestore, historyPath!), {
             type: 'log',
             content: `قام ${currentUser?.fullName} بحذف المعاملة "${transactionToDelete.transactionType}" نهائياً.`,
             createdAt: serverTimestamp(),
-            userId: currentUser?.id
+            userId: currentUser?.id,
+            userName: currentUser?.fullName,
+            userAvatar: currentUser?.avatarUrl
         });
 
-        toast({ title: 'تم الحذف النهائي', description: 'تم مسح سجل المعاملة من القاعدة الموحدة.' });
+        toast({ title: 'تم الحذف', description: 'تم مسح سجل المعاملة نهائياً.' });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'خطأ في الحذف' });
     } finally { 
@@ -174,7 +178,7 @@ export default function ClientProfilePage() {
     }
   };
 
-  // محرك التجميع الثلاثي (Grouping Logic) لتطبيق نظام الطبقات الثلاث
+  // محرك التجميع الثلاثي للطبقات
   const groupedTransactions = useMemo(() => {
     const groups = new Map<string, ClientTransaction[]>();
     transactions.forEach(tx => {
@@ -186,7 +190,7 @@ export default function ClientProfilePage() {
   }, [transactions]);
 
   if (clientLoading) return <div className="p-8 max-w-6xl mx-auto"><Skeleton className="h-96 w-full rounded-[3rem]" /></div>;
-  if (!client) return <div className="text-center py-20 font-black opacity-30">الملف الموحد غير متاح.</div>;
+  if (!client) return <div className="text-center py-20 font-black opacity-30">الملف غير متاح.</div>;
 
   return (
     <div className='space-y-10 max-w-6xl mx-auto pb-20' dir='rtl'>
@@ -215,10 +219,10 @@ export default function ClientProfilePage() {
             </CardContent>
         </Card>
 
-        {/* الطبقة 2 و 3: المعاملات الرئيسية والداخلية المدمجة في جدول موحد */}
+        {/* الطبقة 2 و 3: المعاملات */}
         <div className="space-y-12">
             <h3 className="text-2xl font-black text-[#1e1b4b] border-r-8 border-primary pr-4 flex items-center gap-3">
-                <Workflow className="h-7 w-7 text-primary" /> هيكل الخدمات الميدانية والمعاملات
+                <Workflow className="h-7 w-7 text-primary" /> هيكل الخدمات والمعاملات
             </h3>
             
             {groupedTransactions.length === 0 ? (
@@ -296,11 +300,11 @@ export default function ClientProfilePage() {
                 <AlertDialogHeader>
                     <div className="p-4 bg-red-100 rounded-3xl w-fit mb-4"><Trash2 className="h-10 w-10 text-red-600"/></div>
                     <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tighter">تأكيد حذف المعاملة؟</AlertDialogTitle>
-                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">سيتم مسح كافة البيانات الفنية والمراحل الموثقة لـ "{transactionToDelete?.subServiceName || transactionToDelete?.transactionType}" نهائياً من السجل الموحد.</AlertDialogDescription>
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">سيتم مسح كافة البيانات الفنية والمراحل الموثقة لـ "{transactionToDelete?.subServiceName || transactionToDelete?.transactionType}" نهائياً.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-10 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmDelete} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-100">
+                    <AlertDialogAction onClick={handleConfirmDelete} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl">
                         {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
                     </AlertDialogAction>
                 </AlertDialogFooter>

@@ -72,7 +72,7 @@ export default function DashboardLayout({
             </div>
             
             <div className="absolute -bottom-16 text-center w-64">
-                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري التحميل...</p>
+                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter mt-12">جاري التحميل...</p>
                 {showEmergencyExit && (
                     <div className="mt-4 flex flex-col gap-2 animate-in zoom-in-95 duration-500 glass-effect p-4 rounded-2xl border-white/20 shadow-xl">
                         <Button onClick={() => window.location.reload()} variant="outline" className="h-9 rounded-xl font-bold gap-2 text-[#1e1b4b] border-orange-200 text-xs">

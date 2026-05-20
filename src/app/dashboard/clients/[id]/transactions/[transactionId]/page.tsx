@@ -1,9 +1,8 @@
-
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, writeBatch, serverTimestamp, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -28,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { 
     Pencil, 
     User, 
@@ -51,8 +51,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
-import type { Client, ClientTransaction, Employee, WorkStage, TransactionStage } from '@/lib/types';
+import type { Client, ClientTransaction, WorkStage, TransactionStage } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
@@ -120,7 +119,6 @@ export default function TransactionDetailPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSignDialogOpen, setIsSignDialogOpen] = useState(false);
 
-  // 🛡️ توجيه المسار المعتمد والتحصين ضد الرفض الأمني
   const transactionPath = useMemo(() => (firestore && clientId && transactionId && tenantId ? getTenantPath(`clients/${clientId}/transactions/${transactionId}`, tenantId) : null), [firestore, clientId, transactionId, tenantId]);
   const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(firestore, transactionPath);
   
@@ -141,7 +139,6 @@ export default function TransactionDetailPage() {
     if (!firestore || !transaction?.transactionTypeId || !tenantId) return;
     const fetchTemplates = async () => {
         try {
-            // جلب مراحل العمل من مسار الخدمة المرجعية الموحدة
             const stagesPath = getTenantPath(`transactionTypes/${transaction.transactionTypeId}/workStages`, tenantId);
             if (!stagesPath) return;
             const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
@@ -197,7 +194,7 @@ export default function TransactionDetailPage() {
   };
 
   if (transactionLoading || clientLoading) return <div className="p-8 max-w-5xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
-  if (!transaction || !client) return <div className="text-center py-20 text-destructive">فشل تحميل بيانات المعاملة المعتمدة.</div>;
+  if (!transaction || !client) return <div className="text-center py-20 text-destructive">فشل تحميل بيانات المعاملة.</div>;
 
   return (
     <div className='space-y-6 max-w-6xl mx-auto' dir='rtl'>
