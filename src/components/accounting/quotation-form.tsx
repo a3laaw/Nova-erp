@@ -53,8 +53,8 @@ import { CSS } from '@dnd-kit/utilities';
 
 const itemSchema = z.object({
   id: z.string(),
-  description: z.string(), // مسمى الدفعة التلقائي (الدفعة الأولى...)
-  triggerCondition: z.string().min(1, "شرط الاستحقاق مطلوب"), // الإدخال اليدوي (عند التعاقد...)
+  description: z.string(), 
+  triggerCondition: z.string().min(1, "شرط الاستحقاق مطلوب"), 
   quantity: z.preprocess((v) => parseFloat(String(v || '1')), z.number().min(0.01)),
   unitPrice: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)),
   percentage: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)).optional(),

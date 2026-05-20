@@ -67,14 +67,20 @@
   }
 }
 
-/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V138.0) 🛡️ */
+/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V140.0) 🛡️ */
+/* فرض السيادة البصرية المطلقة فوق كافة الجداول والمكونات الزجاجية */
+[data-radix-portal] {
+  z-index: 999999999 !important;
+  pointer-events: auto !important;
+}
+
 [data-radix-popper-content-wrapper], 
 .react-select__menu-portal, 
 [role="listbox"], 
 [role="menu"], 
 [data-radix-select-content], 
 [data-radix-popover-content] {
-  z-index: 99999999 !important;
+  z-index: 999999999 !important;
   pointer-events: auto !important;
   background-color: white !important;
   background-image: none !important;
@@ -83,7 +89,7 @@
   -webkit-backdrop-filter: none !important;
   border: 2px solid #FF7A00 !important;
   border-radius: 1rem !important;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.2) !important;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.3) !important;
 }
 
 [role="menuitem"], [role="option"], [cmdk-item], .react-select__option {

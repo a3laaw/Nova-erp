@@ -176,7 +176,7 @@ export default function ViewQuotationPage() {
                             {block.type === 'preamble' ? (
                                 <section className="space-y-4">
                                     <h4 className="text-2xl font-black text-primary border-r-8 border-primary pr-6">{block.title}</h4>
-                                    <div className="p-10 bg-slate-50/50 rounded-[3rem] border-2 border-slate-100">
+                                    <div className="p-10 bg-slate-50/50 rounded-[2rem] border-2 border-slate-100">
                                         <p className="text-xl leading-[1.8] font-medium text-slate-700 whitespace-pre-wrap">{block.content}</p>
                                     </div>
                                 </section>
@@ -198,21 +198,27 @@ export default function ViewQuotationPage() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {quotation.items.map((item, index) => (
-                                                    <TableRow key={index} className="h-24 border-b last:border-0 hover:bg-transparent">
-                                                        <TableCell className="text-center font-mono font-black text-slate-300 border-l">{index + 1}</TableCell>
-                                                        <TableCell className="px-10">
-                                                            <p className="font-black text-2xl text-slate-800 leading-tight">{item.description}</p>
-                                                            {item.triggerCondition && <p className="text-xs font-bold text-slate-400 mt-1">{item.triggerCondition}</p>}
-                                                        </TableCell>
-                                                        <TableCell className="text-center font-mono font-black text-3xl opacity-40">
-                                                            {quotation.financialsType === 'percentage' ? `${item.percentage}%` : formatCurrency(item.unitPrice || 0)}
-                                                        </TableCell>
-                                                        <TableCell className="text-left font-mono font-black text-3xl text-primary px-12 bg-primary/[0.02] border-r">
-                                                            {formatCurrency(item.total || 0)}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
+                                                {quotation.items.map((item, index) => {
+                                                    const rowTotal = quotation.financialsType === 'percentage' 
+                                                        ? (item.percentage / 100) * (quotation.totalAmount || 0)
+                                                        : item.total;
+                                                    
+                                                    return (
+                                                        <TableRow key={index} className="h-24 border-b last:border-0 hover:bg-transparent">
+                                                            <TableCell className="text-center font-mono font-black text-slate-300 border-l">{index + 1}</TableCell>
+                                                            <TableCell className="px-10">
+                                                                <p className="font-black text-2xl text-slate-800 leading-tight">{item.description}</p>
+                                                                <p className="text-xs font-bold text-slate-400 mt-1">{item.triggerCondition}</p>
+                                                            </TableCell>
+                                                            <TableCell className="text-center font-mono font-black text-3xl opacity-40">
+                                                                {quotation.financialsType === 'percentage' ? `${item.percentage}%` : formatCurrency(item.unitPrice || 0)}
+                                                            </TableCell>
+                                                            <TableCell className="text-left font-mono font-black text-3xl text-primary px-12 bg-primary/[0.02] border-r">
+                                                                {formatCurrency(rowTotal || 0)}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
                                             </TableBody>
                                             <TableFooter className="bg-primary text-white h-32">
                                                 <TableRow className="border-none hover:bg-primary">
@@ -250,21 +256,27 @@ export default function ViewQuotationPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {quotation.items.map((item, index) => (
-                                            <TableRow key={index} className="h-24 border-b last:border-0 hover:bg-transparent">
-                                                <TableCell className="text-center font-mono font-black text-slate-300 border-l">{index + 1}</TableCell>
-                                                <TableCell className="px-10">
-                                                    <p className="font-black text-2xl text-slate-800 leading-tight">{item.description}</p>
-                                                    {item.triggerCondition && <p className="text-xs font-bold text-slate-400 mt-1">{item.triggerCondition}</p>}
-                                                </TableCell>
-                                                <TableCell className="text-center font-mono font-black text-3xl opacity-40">
-                                                    {quotation.financialsType === 'percentage' ? `${item.percentage}%` : formatCurrency(item.unitPrice || 0)}
-                                                </TableCell>
-                                                <TableCell className="text-left font-mono font-black text-3xl text-primary px-12 bg-primary/[0.02] border-r">
-                                                    {formatCurrency(item.total || 0)}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {quotation.items.map((item, index) => {
+                                            const rowTotal = quotation.financialsType === 'percentage' 
+                                                ? (item.percentage / 100) * (quotation.totalAmount || 0)
+                                                : item.total;
+
+                                            return (
+                                                <TableRow key={index} className="h-24 border-b last:border-0 hover:bg-transparent">
+                                                    <TableCell className="text-center font-mono font-black text-slate-300 border-l">{index + 1}</TableCell>
+                                                    <TableCell className="px-10">
+                                                        <p className="font-black text-2xl text-slate-800 leading-tight">{item.description}</p>
+                                                        <p className="text-xs font-bold text-slate-400 mt-1">{item.triggerCondition}</p>
+                                                    </TableCell>
+                                                    <TableCell className="text-center font-mono font-black text-3xl opacity-40">
+                                                        {quotation.financialsType === 'percentage' ? `${item.percentage}%` : formatCurrency(item.unitPrice || 0)}
+                                                    </TableCell>
+                                                    <TableCell className="text-left font-mono font-black text-3xl text-primary px-12 bg-primary/[0.02] border-r">
+                                                        {formatCurrency(rowTotal || 0)}
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
                                     </TableBody>
                                     <TableFooter className="bg-primary text-white h-32">
                                         <TableRow className="border-none hover:bg-primary">
