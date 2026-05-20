@@ -39,6 +39,18 @@
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
   }
+
+  /* 🛡️ حذف أزرار الأرقام (Arrows/Spinners) لجعل الكتابة حرة 🛡️ */
+  /* Chrome, Safari, Edge, Opera */
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  /* Firefox */
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
 }
 
 @layer components {
@@ -67,7 +79,7 @@
   }
 }
 
-/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V140.0) 🛡️ */
+/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V142.0) 🛡️ */
 /* فرض السيادة البصرية المطلقة فوق كافة الجداول والمكونات الزجاجية */
 [data-radix-portal] {
   z-index: 999999999 !important;

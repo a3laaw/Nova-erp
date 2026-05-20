@@ -18,7 +18,7 @@ import { QuotationForm } from '@/components/accounting/quotation-form';
 import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calculator, Sparkles, AlertCircle, Building2, Layers, Zap, Droplets, Ruler } from 'lucide-react';
+import { Calculator, Sparkles, Layers } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const deptPrefixes: Record<string, string> = {
@@ -31,10 +31,6 @@ const deptPrefixes: Record<string, string> = {
     'general': 'GEN'
 };
 
-/**
- * صفحة إصدار عرض سعر جديد (Sovereign Quote Engine V15.0):
- * تم تفعيل الترقيم القطاعي (ARCH, FAC...) وإصلاح كافة أخطاء الـ Reference.
- */
 function NewQuotationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,7 +45,6 @@ function NewQuotationContent() {
   
   const tenantId = currentUser?.currentCompanyId;
 
-  // ✨ محرك توليد رقم عرض السعر الموحد والقطاعي ✨
   useEffect(() => {
     if (!firestore || !tenantId) return;
     setIsGeneratingNumber(true);
@@ -152,15 +147,14 @@ function NewQuotationContent() {
                     <CardDescription className="font-bold text-base pr-11">املأ التفاصيل الفنية والمالية بدقة لضمان تحويلها لعقد رسمي لاحقاً.</CardDescription>
                 </div>
                 <div className="text-left bg-white p-4 rounded-2xl border shadow-inner min-w-[160px]">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground block mb-1">رقم العرض المعتمد</Label>
-                    <div className={cn("font-mono text-2xl font-black", quotationNumber.includes('خطأ') ? "text-red-600" : "text-primary")}>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground block mb-1 text-center">رقم العرض المعتمد</Label>
+                    <div className={cn("font-mono text-2xl font-black text-center", quotationNumber.includes('خطأ') ? "text-red-600" : "text-primary")}>
                         {isGeneratingNumber ? <Skeleton className="h-8 w-24" /> : quotationNumber}
                     </div>
                 </div>
             </div>
         </CardHeader>
         <CardContent className="p-8 space-y-8">
-            {/* 🛡️ محرك اختيار القسم لتحديد الترقيم 🛡️ */}
             <div className="p-6 bg-white rounded-3xl border-2 border-dashed border-primary/20 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Layers className="h-6 w-6" /></div>
