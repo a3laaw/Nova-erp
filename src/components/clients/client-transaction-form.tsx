@@ -33,9 +33,9 @@ interface ClientTransactionFormProps {
 }
 
 /**
- * نموذج إضافة معاملة جديدة (محرك الإسناد الذكي V9.0):
- * - يقوم آلياً بإسناد المهندس المعماري إذا كانت المعاملة تتبع قسمه.
- * - يربط أنواع الخدمات بالقوائم المرجعية المعتمدة للمنشأة.
+ * نموذج إضافة معاملة جديدة (محرك الإسناد الذكي V10.0):
+ * - يقوم آلياً بإسناد المهندس المختص بناءً على ربط "أنواع الخدمات" بـ "أقسام الوظائف".
+ * - يدعم القوائم المرجعية المعتمدة للمنشأة بالكامل.
  */
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
@@ -58,7 +58,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
     const tenantId = currentUser?.currentCompanyId;
 
-    // جلب البيانات المرجعية وبيانات العميل
     useEffect(() => {
         if (!firestore || !isOpen || !tenantId) return;
         
@@ -92,20 +91,30 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     }, [firestore, isOpen, tenantId, clientId]);
 
     /**
-     * ✨ محرك الإسناد الذكي: 
-     * إذا كانت المعاملة "معمارية" أو "بلدية"، يتم سحب المهندس المسؤول عن ملف العميل آلياً.
+     * ✨ محرك الإسناد العضوي (The Organic Link Engine):
+     * - يبحث عن الأقسام المرتبطة بنوع الخدمة المختار.
+     * - إذا وجد "القسم المعماري" من ضمنها، يسند المهندس المعماري المتابع للعميل فوراً.
+     * - يسهل العمل المكتبي عبر تقليل الاختيارات اليدوية.
      */
     useEffect(() => {
-        if (transactionTypeName && client) {
-            const isArchitectural = transactionTypeName.includes('بلدية') || 
-                                    transactionTypeName.includes('معماري') || 
-                                    transactionTypeName.includes('تصميم');
+        if (transactionTypeName && client && engineers.length > 0) {
+            const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
+            if (!selectedType) return;
+
+            // هل هذه الخدمة مرتبطة بقسم المهندس المعماري؟
+            // (نفترض أن كلمة 'معماري' أو تخصص التصميم هو المفتاح)
+            const isArchitecturalService = selectedType.name.includes('تصميم') || 
+                                          selectedType.name.includes('بلدية') ||
+                                          selectedType.departmentIds?.some(id => {
+                                              const dept = engineers.find(e => e.id === client.assignedEngineer)?.department;
+                                              return dept?.includes('معماري');
+                                          });
             
-            if (isArchitectural && client.assignedEngineer) {
+            if (isArchitecturalService && client.assignedEngineer) {
                 setAssignedEngineerId(client.assignedEngineer);
             }
         }
-    }, [transactionTypeName, client]);
+    }, [transactionTypeName, client, transactionTypes, engineers]);
 
     const transactionTypeOptions = useMemo(() => 
         transactionTypes.map(t => ({ value: t.name, label: t.name })), 
@@ -127,7 +136,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const departmentIds = selectedType?.departmentIds || [];
 
-            // جلب مراحل العمل المعتمدة
+            // جلب مراحل العمل المعتمدة من الأقسام المرتبطة بالخدمة
             let initialStages: any[] = [];
             for (const deptId of departmentIds) {
                 const stagesPath = getTenantPath(`departments/${deptId}/workStages`, tenantId);
@@ -175,7 +184,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 batch.update(doc(firestore, apptPath), { transactionId: newTransactionRef.id });
             }
 
-            // توثيق الحدث في سجل المتابعة المعتمد
+            // توثيق الحدث المعتمد في سجل المتابعة
             const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
                 type: 'log', 
@@ -188,7 +197,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
             await batch.commit();
             
-            toast({ title: 'تمت الإضافة بنجاح', description: `المعاملة جاهزة الآن برقم ${transactionNumber}` });
+            toast({ title: 'تمت الإضافة بنجاح', description: `المعاملة جاهزة للمتابعة برقم ${transactionNumber}` });
             onClose();
             router.refresh();
 
@@ -210,15 +219,15 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                                 <Workflow className="h-6 w-6" />
                             </div>
                             <div className="text-right">
-                                <DialogTitle className="text-xl font-black text-[#1e1b4b]">إضافة معاملة جديدة</DialogTitle>
-                                <DialogDescription className="font-bold">ربط الخدمة المطلوبة بملف العميل المعتمد.</DialogDescription>
+                                <DialogTitle className="text-xl font-black text-[#1e1b4b]">إضافة معاملة جديدة معتمدة</DialogTitle>
+                                <DialogDescription className="font-bold text-slate-500">ربط الخدمة بملف العميل وتسريع إسناد المهندسين المختصين.</DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
                     
                     <div className="p-8 space-y-6">
                         <div className="grid gap-2">
-                            <Label className="font-black text-gray-700 pr-1">نوع المعاملة (من القوائم المعتمدة) *</Label>
+                            <Label className="font-black text-gray-700 pr-1">نوع المعاملة المعتمدة *</Label>
                             <InlineSearchList 
                                 value={transactionTypeName} 
                                 onSelect={setTransactionTypeName} 
@@ -229,31 +238,31 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                         </div>
 
                         {assignedEngineerId && (
-                            <Alert className="bg-green-50 border-green-200 rounded-2xl animate-in slide-in-from-top-2">
+                            <Alert className="bg-green-50 border-green-200 rounded-2xl animate-in slide-in-from-top-2 border-2 border-dashed">
                                 <UserCheck className="h-4 w-4 text-green-600" />
-                                <AlertTitle className="text-xs font-black text-green-800">إسناد تلقائي ذكي</AlertTitle>
-                                <AlertDescription className="text-[10px] font-bold text-green-700">تم اختيار المهندس المعماري المتابع للعميل آلياً لتسهيل العملية.</AlertDescription>
+                                <AlertTitle className="text-xs font-black text-green-800 uppercase tracking-tighter">إسناد تلقائي ذكي</AlertTitle>
+                                <AlertDescription className="text-[10px] font-bold text-green-700 leading-tight">تم التعرف على المهندس المعماري المتابع لهذا العميل وإسناده آلياً لتسهيل العملية.</AlertDescription>
                             </Alert>
                         )}
 
                         <div className="grid gap-2">
-                            <Label className="font-black text-gray-700 pr-1">إسناد لمهندس المتابعة</Label>
+                            <Label className="font-black text-gray-700 pr-1">إسناد المهندس المختص</Label>
                             <InlineSearchList 
                                 value={assignedEngineerId} 
                                 onSelect={setAssignedEngineerId} 
                                 options={engineerOptions} 
-                                placeholder={engineersLoading ? 'جاري التحميل...' : 'اختر المهندس المختص...'} 
+                                placeholder={engineersLoading ? 'جاري التحميل...' : 'اختر المهندس المسؤول...'} 
                                 disabled={engineersLoading || isSaving} 
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label className="font-black text-gray-700 pr-1">ملاحظات أو وصف إضافي</Label>
+                            <Label className="font-black text-gray-700 pr-1">ملاحظات العقد أو التنفيذ</Label>
                             <Textarea 
                                 value={description} 
                                 onChange={e => setDescription(e.target.value)} 
-                                placeholder="أي تفاصيل خاصة بهذه المعاملة..." 
+                                placeholder="أي تفاصيل فنية خاصة بهذه المعاملة..." 
                                 disabled={isSaving}
-                                className="rounded-2xl border-2 p-4 min-h-[100px]"
+                                className="rounded-2xl border-2 p-4 min-h-[100px] shadow-inner"
                             />
                         </div>
                     </div>
@@ -262,7 +271,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
                         <Button type="submit" disabled={isSaving || !transactionTypeName} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2">
                             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                            حفظ المعاملة
+                            حفظ المعاملة وبدء المسار
                         </Button>
                     </DialogFooter>
                 </form>

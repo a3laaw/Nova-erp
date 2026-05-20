@@ -84,7 +84,7 @@
   }
 }
 
-/* تحسين القوائم المنسدلة للتعامل مع الماوس ومنع الحجب */
+/* 🛡️ حماية سيادية للقوائم المنسدلة لضمان استجابة الماوس المطلقة 🛡️ */
 [data-radix-popper-content-wrapper] {
   z-index: 999999 !important;
   pointer-events: auto !important;

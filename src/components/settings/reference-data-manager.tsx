@@ -60,6 +60,7 @@ import { defaultDepartments, defaultGovernorates, defaultJobs, defaultWorkStages
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { useSubscription } from '@/hooks/use-subscription';
+import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 
 import {
   DndContext,
@@ -166,6 +167,7 @@ export function ReferenceDataManager() {
     const [editingItem, setEditingItem] = useState<any | null>(null);
     const [itemToDelete, setItemToDelete] = useState<any | null>(null);
     const [itemName, setItemName] = useState('');
+    const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
 
     const tenantId = currentUser?.currentCompanyId;
 
@@ -181,6 +183,7 @@ export function ReferenceDataManager() {
         setIsSecondaryDialogOpen(false);
         setEditingItem(null);
         setItemName('');
+        setSelectedDeptIds([]);
     }, []);
 
     const primaryCollectionName = useMemo(() => {
@@ -199,6 +202,10 @@ export function ReferenceDataManager() {
 
     const { data: rawPrimaryItems = [], loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null);
     
+    // جلب الأقسام لربطها بالمعاملات
+    const { data: allDepartments = [] } = useSubscription<Department>(firestore, 'departments');
+    const departmentOptions = useMemo(() => allDepartments.map(d => ({ value: d.id!, label: d.name })), [allDepartments]);
+
     const secondaryRelativePath = useMemo(() => {
         if (!selectedPrimaryId || !primaryCollectionName || !secondaryCollectionName) return null;
         return `${primaryCollectionName}/${selectedPrimaryId}/${secondaryCollectionName}`;
@@ -240,7 +247,7 @@ export function ReferenceDataManager() {
             });
 
             await batch.commit();
-            toast({ title: 'تم حفظ الترتيب' });
+            toast({ title: 'تم حفظ الترتيب المعتمد' });
         } catch (e) {
             toast({ variant: 'destructive', title: 'فشل الحفظ' });
         } finally {
@@ -264,6 +271,11 @@ export function ReferenceDataManager() {
                 updatedAt: serverTimestamp(),
                 companyId: tenantId
             };
+
+            // ربط الأقسام بأنواع الخدمات
+            if (view === 'transactions' && type === 'primary') {
+                payload.departmentIds = selectedDeptIds;
+            }
 
             if (type === 'secondary' && selectedPrimaryId) {
                 payload.parentId = selectedPrimaryId;
@@ -294,7 +306,7 @@ export function ReferenceDataManager() {
         try {
             const finalPath = getTenantPath(relativePath, tenantId);
             await deleteDoc(doc(firestore, finalPath, itemToDelete.id));
-            toast({ title: 'تم الحذف' });
+            toast({ title: 'تم الحذف النهائي' });
             setIsDeleteDialogOpen(false); 
             setItemToDelete(null);
         } catch (e) { toast({ variant: 'destructive', title: 'فشل الحذف' }); } finally { setIsSaving(false); }
@@ -340,7 +352,7 @@ export function ReferenceDataManager() {
                 }
             }
             await batch.commit();
-            toast({ title: 'نجاح الاستيراد الهرمي', description: 'تم استيراد القوائم مع كافة الوظائف والمراحل والمناطق التابعة لها.' });
+            toast({ title: 'نجاح الاستيراد الهيكلي', description: 'تم استيراد القوائم مع كافة الوظائف والمراحل والمناطق التابعة لها.' });
             setIsImportConfirmOpen(false);
         } catch (e) { toast({ variant: 'destructive', title: 'فشل الاستيراد' }); } finally { setIsImporting(false); }
     };
@@ -353,10 +365,10 @@ export function ReferenceDataManager() {
                     <CardHeader className="p-10 relative z-10 border-b border-white/10">
                         <div className="flex items-center gap-6">
                             <div className="text-right">
-                                <CardTitle className="text-3xl font-black text-white tracking-tighter">إدارة القوائم والبيانات المرجعية</CardTitle>
+                                <CardTitle className="text-3xl font-black text-white tracking-tighter">إدارة القوائم والبيانات المرجعية الموحدة</CardTitle>
                                 <div className="flex items-center gap-2 mt-1">
                                     <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
-                                    <CardDescription className="text-white/90 font-bold text-sm">تخصيص الأقسام، المواقع، وهيكل الخدمات المرجعي للمنصة.</CardDescription>
+                                    <CardDescription className="text-white/90 font-bold text-sm">تخصيص الأقسام، المواقع، وهيكل الخدمات المرجعي للمنصة لضمان الربط الذكي.</CardDescription>
                                 </div>
                             </div>
                             <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
@@ -374,7 +386,7 @@ export function ReferenceDataManager() {
                         onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} 
                         colorClass="bg-blue-600/10 text-blue-600" 
                         loading={loadingPrimary} 
-                        description="إدارة الهيكل التنظيمي والوظائف ومراحل العمل." 
+                        description="إدارة الهيكل التنظيمي والوظائف ومراحل العمل المعتمدة." 
                     />
                     <SummaryCard 
                         title="المناطق والمواقع" 
@@ -383,7 +395,7 @@ export function ReferenceDataManager() {
                         onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} 
                         colorClass="bg-emerald-600/10 text-emerald-600" 
                         loading={loadingPrimary} 
-                        description="إدارة المحافظات والمناطق الجغرافية." 
+                        description="إدارة المحافظات والمناطق الجغرافية الرسمية." 
                     />
                     <SummaryCard 
                         title="أنواع الخدمات" 
@@ -392,7 +404,7 @@ export function ReferenceDataManager() {
                         onNavigate={() => { setView('transactions'); setActiveSubTab('subServices'); setSelectedPrimaryId(null); }} 
                         colorClass="bg-orange-600/10 text-primary" 
                         loading={loadingPrimary} 
-                        description="قائمة المعاملات والخدمات المتاحة في النظام." 
+                        description="قائمة المعاملات والخدمات المتاحة وربطها بالأقسام الإدارية." 
                     />
                 </div>
             </div>
@@ -408,7 +420,7 @@ export function ReferenceDataManager() {
                         <div className="flex gap-4">
                             {view !== 'transactions' && (
                                 <Button variant="secondary" onClick={() => setIsImportConfirmOpen(true)} className="bg-white/20 hover:bg-white/30 text-white rounded-2xl font-black h-12 px-8 gap-3 backdrop-blur-md border-white/40 shadow-xl transition-all active:scale-95">
-                                    <DownloadCloud className="h-5 w-5"/> استيراد القوالب الكاملة
+                                    <DownloadCloud className="h-5 w-5"/> استيراد القوالب الرسمية
                                 </Button>
                             )}
                             <Button onClick={() => setView('main')} variant="outline" className="bg-white/10 text-white border-white/40 hover:bg-white/20 rounded-2xl font-black h-12 px-8 gap-2 backdrop-blur-md shadow-xl">
@@ -418,11 +430,11 @@ export function ReferenceDataManager() {
                         <div className="flex items-center gap-6">
                             <div className="text-right">
                                 <CardTitle className="text-3xl font-black tracking-tighter text-white">
-                                    {view === 'departments' ? 'إدارة الأقسام والوظائف' : view === 'locations' ? 'إدارة المواقع الجغرافية' : 'إدارة أنواع الخدمات'}
+                                    {view === 'departments' ? 'إدارة الأقسام والوظائف المعتمدة' : view === 'locations' ? 'إدارة المواقع الجغرافية المعتمدة' : 'إدارة أنواع الخدمات والربط'}
                                 </CardTitle>
                                 <div className="flex items-center gap-2 mt-2 justify-end">
                                     <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
-                                    <CardDescription className="text-white/90 font-black text-sm uppercase tracking-widest">قم بسحب وإفلات العناصر لترتيبها.</CardDescription>
+                                    <CardDescription className="text-white/90 font-black text-sm uppercase tracking-widest">قم بسحب وإفلات العناصر لترتيب الظهور.</CardDescription>
                                 </div>
                             </div>
                             <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
@@ -437,9 +449,9 @@ export function ReferenceDataManager() {
                 <Card className="md:col-span-4 border-none rounded-[2.5rem] shadow-xl bg-white/45 backdrop-blur-3xl overflow-hidden flex flex-col border-white/60">
                     <div className="p-10 border-b bg-primary/5 flex justify-between items-center">
                         <div className="space-y-0.5">
-                            <Label className="font-black text-[#1e1b4b] text-xl tracking-tight">القائمة الرئيسية</Label>
+                            <Label className="font-black text-[#1e1b4b] text-xl tracking-tight">القائمة الموحدة</Label>
                         </div>
-                        <Button onClick={() => { setEditingItem(null); setItemName(''); setIsPrimaryDialogOpen(true); }} className="h-12 w-12 rounded-[1.5rem] shadow-xl shadow-primary/20"><Plus className="h-6 w-6" /></Button>
+                        <Button onClick={() => { setEditingItem(null); setItemName(''); setSelectedDeptIds([]); setIsPrimaryDialogOpen(true); }} className="h-12 w-12 rounded-[1.5rem] shadow-xl shadow-primary/20"><Plus className="h-6 w-6" /></Button>
                     </div>
                     <ScrollArea className="flex-1 p-8">
                         {loadingPrimary ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-[1.8rem]"/><Skeleton className="h-16 w-full rounded-[1.8rem]"/></div> : 
@@ -450,9 +462,14 @@ export function ReferenceDataManager() {
                                     {primaryItems.map(item => (
                                         <SortableRefListItem key={item.id} id={item.id} isActive={selectedPrimaryId === item.id}>
                                             <div className="flex items-center justify-between flex-1" onClick={() => setSelectedPrimaryId(item.id)}>
-                                                <span className="font-black text-base truncate pr-2">{item.name}</span>
+                                                <div className="flex flex-col flex-1">
+                                                    <span className="font-black text-base truncate pr-2">{item.name}</span>
+                                                    {view === 'transactions' && item.departmentIds?.length > 0 && (
+                                                        <span className="text-[9px] font-bold text-primary opacity-60 pr-2">مربوط بـ {item.departmentIds.length} أقسام</span>
+                                                    )}
+                                                </div>
                                                 <div className={cn("flex gap-1.5 transition-all", selectedPrimaryId === item.id ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
-                                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white/30 text-current" onClick={(e) => { e.stopPropagation(); setEditingItem(item); setItemName(item.name); setIsPrimaryDialogOpen(true); }}><Pencil className="h-4 w-4"/></Button>
+                                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white/30 text-current" onClick={(e) => { e.stopPropagation(); setEditingItem(item); setItemName(item.name); setSelectedDeptIds(item.departmentIds || []); setIsPrimaryDialogOpen(true); }}><Pencil className="h-4 w-4"/></Button>
                                                     <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-red-500/20 text-current" onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, name: item.name, target: 'primary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-4 w-4"/></Button>
                                                 </div>
                                             </div>
@@ -475,11 +492,11 @@ export function ReferenceDataManager() {
                                         </div>
                                         <div className="space-y-1">
                                             <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{selectedPrimary?.name}</h3>
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">إدارة البنود الفرعية</p>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">إدارة البنود الفرعية الملحقة</p>
                                         </div>
                                     </div>
                                     <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3">
-                                        <PlusCircle className="h-6 w-6" /> إضافة
+                                        <PlusCircle className="h-6 w-6" /> إضافة بند فرعي
                                     </Button>
                                 </div>
                                 {view === 'departments' && (
@@ -529,7 +546,7 @@ export function ReferenceDataManager() {
                                 </div>
                             </div>
                             <h3 className="text-4xl font-black text-[#1e1b4b] tracking-tighter max-w-md leading-tight">
-                                اختر تصنيفاً من القائمة لعرض وتعديل بياناته
+                                اختر تصنيفاً من القائمة لعرض وتعديل بياناته الفرعية المعتمدة.
                             </h3>
                         </div>
                     )}
@@ -537,20 +554,36 @@ export function ReferenceDataManager() {
             </div>
 
             <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
-                <DialogContent dir="rtl" className="max-w-md rounded-[3rem] p-10 shadow-2xl border-none bg-white/95 backdrop-blur-2xl">
+                <DialogContent dir="rtl" className="max-w-xl rounded-[3rem] p-10 shadow-2xl border-none bg-white/95 backdrop-blur-2xl">
                     <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary'); }}>
                         <DialogHeader>
                             <div className="p-4 bg-primary/10 rounded-[1.8rem] text-primary w-fit mb-6 shadow-inner"><PlusCircle className="h-10 w-10"/></div>
-                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل' : 'إضافة'}</DialogTitle>
+                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل البيانات المعتمدة' : 'إضافة سجل جديد'}</DialogTitle>
                         </DialogHeader>
-                        <div className="py-10">
-                            <Label className="font-black text-[#1e1b4b] pr-3 block mb-4 text-sm uppercase tracking-widest">الاسم المعتمد *</Label>
-                            <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-16 rounded-[1.5rem] border-2 text-2xl font-black text-primary bg-slate-50/50 focus:bg-white shadow-inner transition-all" placeholder="اكتب هنا..." />
+                        <div className="py-10 space-y-8">
+                            <div className="grid gap-2">
+                                <Label className="font-black text-[#1e1b4b] pr-3 block mb-1 text-sm uppercase tracking-widest">الاسم المعتمد في المنظومة *</Label>
+                                <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-16 rounded-[1.5rem] border-2 text-2xl font-black text-primary bg-slate-50/50 focus:bg-white shadow-inner transition-all" placeholder="اكتب هنا..." />
+                            </div>
+
+                            {view === 'transactions' && isPrimaryDialogOpen && (
+                                <div className="grid gap-3 animate-in fade-in">
+                                    <Label className="font-black text-[#1e1b4b] pr-3 block text-sm">الربط مع الأقسام الفنية (الإسناد الذكي)</Label>
+                                    <MultiSelect 
+                                        options={departmentOptions}
+                                        selected={selectedDeptIds}
+                                        onChange={setSelectedDeptIds}
+                                        placeholder="اختر الأقسام التي تنجز هذه الخدمة..."
+                                        className="rounded-2xl"
+                                    />
+                                    <p className="text-[10px] font-bold text-muted-foreground pr-2">سيقوم النظام آلياً بإسناد المهندس المختص من هذه الأقسام عند فتح المعاملة.</p>
+                                </div>
+                            )}
                         </div>
                         <DialogFooter className="gap-4 pt-6 border-t">
-                            <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-2xl font-black h-12 px-10">إلغاء</Button>
+                            <Button type="button" variant="outline" onClick={closeDialog} className="rounded-2xl font-black h-12 px-10">إلغاء</Button>
                             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30 min-w-[200px]">
-                                {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>} حفظ
+                                {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>} اعتماد الحفظ
                             </Button>
                         </DialogFooter>
                     </form>
@@ -561,13 +594,13 @@ export function ReferenceDataManager() {
                 <AlertDialogContent dir="rtl" className="rounded-[3rem] border-none shadow-2xl p-12 glass-effect">
                     <AlertDialogHeader>
                         <div className="p-5 bg-red-100 text-red-600 rounded-[1.8rem] w-fit mb-6 shadow-inner"><Trash2 className="h-12 w-12"/></div>
-                        <AlertDialogTitle className="text-3xl font-black text-red-700 tracking-tighter">تأكيد الحذف؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-xl font-bold text-slate-600 leading-relaxed mt-4">سيتم مسح سجل <strong className="text-red-900">"{itemToDelete?.name}"</strong> نهائياً من النظام.</AlertDialogDescription>
+                        <AlertDialogTitle className="text-3xl font-black text-red-700 tracking-tighter">تأكيد الحذف المعتمد؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-xl font-bold text-slate-600 leading-relaxed mt-4">سيتم مسح سجل <strong className="text-red-900">"{itemToDelete?.name}"</strong> نهائياً من كافة عروق المنظومة.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="mt-10 gap-4">
                         <AlertDialogCancel className="rounded-2xl font-black h-12 px-10 border-2">تراجع</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 hover:bg-red-700 rounded-2xl font-black h-12 px-16 shadow-xl shadow-red-200">
-                            {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، تأكيد الحذف'}
+                            {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، تأكيد الحذف النهائي'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -577,13 +610,13 @@ export function ReferenceDataManager() {
                 <AlertDialogContent dir="rtl" className="rounded-[3rem] border-none shadow-2xl p-12">
                     <AlertDialogHeader>
                         <div className="p-5 bg-primary/10 text-primary rounded-[1.8rem] w-fit mb-6 shadow-inner"><DownloadCloud className="h-12 w-12"/></div>
-                        <AlertDialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">تأكيد استيراد القوالب الكاملة؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-4">سيقوم هذا الإجراء بإضافة الأقسام، الوظائف، مراحل العمل، والمدن مع كافة تفاصيلها الفرعية المعتمدة في النظام.</AlertDialogDescription>
+                        <AlertDialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">تأكيد استيراد القوالب الموحدة؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-4">سيقوم هذا الإجراء بإضافة الأقسام، الوظائف، مراحل العمل، والمدن مع كافة تفاصيلها الفرعية المعتمدة رسمياً لضمان توافق النظام.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="mt-10 gap-4">
                         <AlertDialogCancel className="rounded-2xl font-black h-12 px-10 border-2">تراجع</AlertDialogCancel>
                         <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30">
-                            {isImporting ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، ابدأ الاستيراد العميق'}
+                            {isImporting ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، ابدأ الاستيراد الموحد'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
