@@ -67,54 +67,43 @@
   }
 }
 
-/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V133.0) 🛡️ */
-[data-radix-popper-content-wrapper] {
-  z-index: 99999999 !important;
-  pointer-events: auto !important;
-}
-
+/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V137.0) 🛡️ */
+/* نلغي أي شفافية ونفرض لوناً أبيض مصمتاً لضمان الوضوح التام */
+[data-radix-popper-content-wrapper], 
+.react-select__menu-portal, 
 [role="listbox"], 
 [role="menu"], 
-[role="dialog"][data-state="open"],
 [data-radix-select-content], 
-[data-radix-popover-content],
-.react-select__menu,
-.rdp-dropdown {
+[data-radix-popover-content] {
+  z-index: 99999999 !important;
+  pointer-events: auto !important;
   background-color: white !important;
   background-image: none !important;
   opacity: 1 !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  border: 2px solid #e2e8f0 !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-  pointer-events: auto !important;
-  z-index: 99999999 !important;
 }
 
 [role="menuitem"], [role="option"], [cmdk-item], .react-select__option {
     cursor: pointer !important;
     pointer-events: auto !important;
-    font-weight: 900 !important;
+    font-weight: 700 !important;
     color: #1e1b4b !important;
-    padding: 12px 16px !important;
+    padding: 10px 14px !important;
     transition: all 0.2s ease !important;
+    background-color: transparent !important;
 }
 
-[role="menuitem"]:hover, [role="option"][aria-selected="true"], .react-select__option--is-focused {
+[role="menuitem"]:hover, 
+[role="option"][aria-selected="true"], 
+[role="option"]:hover,
+.react-select__option--is-focused,
+.react-select__option--is-selected {
     background-color: #FF7A00 !important;
     color: white !important;
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
 
 @keyframes spin-glow {
   0% { transform: rotate(0deg); filter: drop-shadow(0 0 5px #FF7A00); }

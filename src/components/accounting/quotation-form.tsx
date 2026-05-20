@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -11,14 +10,13 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { 
     Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, 
-    Calculator, Ruler, Building2, Layers, Droplets, 
-    Zap, Package, ArrowDownLeft, FileSignature, Sparkles,
+    Calculator, Ruler, Building2, Layers,
     GripVertical,
     ScrollText,
-    Target,
-    Banknote,
+    Sparkles,
     ArrowUpCircle,
-    ArrowDownCircle
+    ArrowDownCircle,
+    ListChecks
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import type { Client, Quotation, ContractTemplate } from '@/lib/types';
@@ -55,7 +53,8 @@ import { CSS } from '@dnd-kit/utilities';
 
 const itemSchema = z.object({
   id: z.string(),
-  description: z.string().min(1, "الوصف مطلوب"),
+  description: z.string(), // مسمى الدفعة التلقائي (الدفعة الأولى...)
+  triggerCondition: z.string().min(1, "شرط الاستحقاق مطلوب"), // الإدخال اليدوي (عند التعاقد...)
   quantity: z.preprocess((v) => parseFloat(String(v || '1')), z.number().min(0.01)),
   unitPrice: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)),
   percentage: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)).optional(),
@@ -89,6 +88,8 @@ const quotationSchema = z.object({
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
 
+const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
+
 function SortableBlock({ id, block, index, register, remove, children }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
@@ -108,7 +109,7 @@ function SortableBlock({ id, block, index, register, remove, children }: any) {
             block.type === 'financial_table' && "ring-4 ring-primary/5 border-primary/20"
         )}
     >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between no-print">
             <div className="flex items-center gap-4">
                 <button {...attributes} {...listeners} type="button" className="cursor-grab active:cursor-grabbing p-2 hover:bg-muted rounded-xl transition-colors">
                     <GripVertical className="h-5 w-5 text-slate-300 group-hover:text-primary transition-colors" />
@@ -161,7 +162,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         layoutBlocks: [
             { id: 'initial-table', type: 'financial_table' }
         ],
-        items: [{ id: generateStableId(), description: 'الدفعة الأولى عند توقيع العقد', quantity: 1, unitPrice: 0 }]
+        items: [{ id: generateStableId(), description: 'الدفعة الأولى', triggerCondition: 'عند توقيع العقد', quantity: 1, unitPrice: 0 }]
     }
   });
 
@@ -215,9 +216,10 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     setValue('financialsType', template.financials?.type || 'fixed');
     setValue('totalAmount', template.financials?.totalAmount || 0);
     
-    const newItems = template.financials?.milestones?.map(m => ({
+    const newItems = template.financials?.milestones?.map((m, idx) => ({
       id: generateStableId(), 
-      description: m.name, 
+      description: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
+      triggerCondition: m.name, 
       quantity: 1,
       unitPrice: template.financials?.type === 'fixed' ? Number(m.value) : 0,
       percentage: template.financials?.type === 'percentage' ? Number(m.value) : 0,
@@ -241,7 +243,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
   return (
     <form onSubmit={handleSubmit(onSave)} className="space-y-12 pb-20">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white/40 backdrop-blur-xl p-8 rounded-[2.5rem] border-2 border-white/60 shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white/40 backdrop-blur-xl p-8 rounded-[2.5rem] border-2 border-white/60 shadow-sm no-print">
           <div className="grid gap-2">
               <Label className="font-black text-[10px] uppercase text-slate-400 tracking-widest pr-2">العميل المستهدف *</Label>
               <Controller control={control} name="clientId" render={({ field }) => (
@@ -250,7 +252,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </div>
           <div className="grid gap-2">
               <Label className="font-black text-[10px] uppercase text-primary tracking-widest pr-2 flex items-center gap-2"><Sparkles className="h-3 w-3"/> جلب من القوالب</Label>
-              <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً للتعبئة..." className="h-12 border-2 border-primary/20 bg-primary/5 rounded-2xl" />
+              <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً للتعبئة آلياً..." className="h-12 border-2 border-primary/20 bg-primary/5 rounded-2xl" />
           </div>
       </div>
 
@@ -283,12 +285,12 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       </div>
 
       <div className="space-y-6">
-          <div className="flex justify-between items-center px-4">
+          <div className="flex justify-between items-center px-4 no-print">
             <h3 className="text-xl font-black text-[#1e1b4b] flex items-center gap-3">
                 <LayoutGrid className="h-5 w-5 text-primary" /> تنظيم هيكل الوثيقة
             </h3>
             <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateStableId(), type: 'preamble', title: '', content: '' })} className="rounded-xl h-10 px-6 font-bold gap-2 border-primary/20 text-primary hover:bg-primary/5">
-                <PlusCircle className="h-4 w-4" /> إضافة ديباجة / بند نصي +
+                <PlusCircle className="h-4 w-4" /> إضافة ديباجة أو بند نصي +
             </Button>
           </div>
           
@@ -323,9 +325,9 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/40 p-4 rounded-3xl border border-white/60">
                                           <div className="flex items-center gap-4">
                                               <div className="p-2 bg-primary/10 rounded-xl text-primary"><Calculator className="h-5 w-5"/></div>
-                                              <Label className="text-xl font-black text-[#1e1b4b]">جدول الدفعات المالية</Label>
+                                              <Label className="text-xl font-black text-[#1e1b4b]">جدول الدفعات المالية المعتمدة</Label>
                                           </div>
-                                          <div className="flex items-center gap-3">
+                                          <div className="flex items-center gap-3 no-print">
                                               <Controller name="financialsType" control={control} render={({ field }) => (
                                                   <Select value={field.value} onValueChange={(v: any) => { field.onChange(v); if(v === 'fixed') setValue('totalAmount', totalCalculatedValue); }}>
                                                       <SelectTrigger className="w-40 h-10 rounded-xl border-none bg-white font-bold text-primary shadow-sm"><SelectValue /></SelectTrigger>
@@ -345,7 +347,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                           <Table>
                                               <TableHeader className="bg-slate-50 h-12">
                                                 <TableRow className="border-none">
-                                                    <TableHead className="px-8 font-black text-slate-400 text-right">بيان الدفعة المستحقة</TableHead>
+                                                    <TableHead className="w-24 text-center font-black text-slate-400 border-l border-white/20">رقم الدفعة</TableHead>
+                                                    <TableHead className="px-8 font-black text-slate-400 text-right">شرط الاستحقاق / البيان</TableHead>
                                                     <TableHead className="text-center font-black text-slate-400 w-64">
                                                         {financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                                     </TableHead>
@@ -355,8 +358,11 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                               <TableBody>
                                                   {itemFields.map((field, itemIdx) => (
                                                       <TableRow key={field.id} className="h-20 border-b last:border-0 hover:bg-primary/[0.02] group/row transition-all">
+                                                          <TableCell className="text-center bg-slate-50/50 border-l">
+                                                              <Badge variant="secondary" className="font-black text-[10px] px-3">{watchedItems?.[itemIdx]?.description || `الدفعة ${itemIdx+1}`}</Badge>
+                                                          </TableCell>
                                                           <TableCell className="px-8">
-                                                            <Input {...register(`items.${itemIdx}.description`)} className="font-bold text-lg border-none shadow-none focus-visible:ring-0 bg-transparent text-[#1e1b4b]" placeholder="مسمى الدفعة..." />
+                                                            <Input {...register(`items.${itemIdx}.triggerCondition`)} className="font-bold text-lg border-none shadow-none focus-visible:ring-0 bg-transparent text-[#1e1b4b]" placeholder="مثال: عند صب خرسانة الدور الأرضي..." />
                                                           </TableCell>
                                                           <TableCell className="bg-primary/[0.01] border-r border-slate-50">
                                                             <div className="relative flex justify-center">
@@ -369,7 +375,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/20 font-black text-sm">{financials_type === 'percentage' ? '%' : 'KD'}</span>
                                                             </div>
                                                           </TableCell>
-                                                          <TableCell className="text-center">
+                                                          <TableCell className="text-center no-print">
                                                             <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(itemIdx)} disabled={itemFields.length <= 1} className="text-red-300 h-9 w-9 rounded-full hover:bg-red-50 hover:text-red-500 opacity-0 group-hover/row:opacity-100 transition-opacity">
                                                                 <Trash2 className="h-4 w-4"/>
                                                             </Button>
@@ -379,8 +385,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                               </TableBody>
                                               <TableFooter className="bg-slate-50 h-20">
                                                   <TableRow className="border-none hover:bg-transparent">
-                                                    <TableCell className="text-right px-10">
-                                                        <p className="text-xl font-black tracking-tight text-slate-800">إجمالي القيمة المعتمدة:</p>
+                                                    <TableCell colSpan={2} className="text-right px-10">
+                                                        <p className="text-xl font-black tracking-tight text-slate-800">إجمالي القيمة المعتمدة بالعرض:</p>
                                                     </TableCell>
                                                     <TableCell className="text-center border-r border-slate-100 bg-white">
                                                         <div className="flex flex-col items-center">
@@ -388,17 +394,17 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                                 {financials_type === 'fixed' ? formatCurrency(totalCalculatedValue) : `${totalCalculatedValue}%`}
                                                             </div>
                                                             {financials_type === 'percentage' && totalCalculatedValue !== 100 && (
-                                                                <span className="text-[8px] font-black text-red-500 animate-pulse mt-1">المجموع يجب أن يكون 100%</span>
+                                                                <span className="text-[8px] font-black text-red-500 animate-pulse mt-1 uppercase tracking-widest">يجب أن يكون المجموع 100%</span>
                                                             )}
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell />
+                                                    <TableCell className="no-print" />
                                                   </TableRow>
                                               </TableFooter>
                                           </Table>
-                                          <div className="p-6 flex justify-center bg-muted/5 border-t">
-                                            <Button type="button" variant="ghost" onClick={() => appendItem({ id: generateStableId(), description: `الدفعة رقم ${itemFields.length + 1}`, quantity: 1, unitPrice: 0 })} className="h-11 px-10 rounded-xl border-dashed border-2 font-bold text-primary gap-2 hover:bg-white transition-all">
-                                                <PlusCircle className="h-5 w-5" /> إضافة دفعة +
+                                          <div className="p-6 flex justify-center bg-muted/5 border-t no-print">
+                                            <Button type="button" variant="ghost" onClick={() => appendItem({ id: generateStableId(), description: `الدفعة ${arabicOrdinals[itemFields.length] || (itemFields.length + 1)}`, triggerCondition: '', quantity: 1, unitPrice: 0 })} className="h-11 px-12 rounded-xl border-dashed border-2 font-black text-primary gap-3 hover:bg-white transition-all hover:scale-105 active:scale-95 shadow-sm">
+                                                <PlusCircle className="h-5 w-5" /> إضافة دفعة استحقاق جديدة +
                                             </Button>
                                           </div>
                                       </div>
@@ -411,15 +417,15 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </DndContext>
       </div>
 
-      <DialogFooter className="pt-10 border-t flex flex-col md:flex-row gap-6">
+      <DialogFooter className="pt-10 border-t flex flex-col md:flex-row gap-6 no-print">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-14 px-10 rounded-2xl font-bold text-slate-400">إلغاء المراجعة</Button>
           <Button 
             type="submit" 
             disabled={isSaving || refDataLoading || (financials_type === 'percentage' && totalCalculatedValue !== 100)} 
-            className="h-14 px-16 rounded-[2rem] font-black text-xl shadow-xl flex-1 gap-3"
+            className="h-16 px-16 rounded-[2.2rem] font-black text-2xl shadow-2xl flex-1 gap-4 transition-all hover:scale-[1.02] active:scale-95"
           >
               {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-              اعتماد وإرسال عرض السعر
+              اعتماد وإرسال عرض السعر النهائي
           </Button>
       </DialogFooter>
     </form>
