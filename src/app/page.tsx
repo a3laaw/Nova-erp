@@ -26,13 +26,13 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * شعار نوفا المدمج (NOVA Simple Text):
- * تصميم فخم وبسيط يتناسب مع التوهج الذهبي.
+ * تصميم مطابق تماماً للصورة المطلوبة مع تمركز سيادي.
  */
 const NovaLogo = () => (
   <svg width="140" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg">
     <text 
       x="50%" 
-      y="60%" 
+      y="50%" 
       dominantBaseline="middle" 
       textAnchor="middle" 
       fontFamily="inherit" 
@@ -105,18 +105,17 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-[#FF7A00]/5 rounded-full blur-[100px]" />
-          <div className="relative flex flex-col items-center gap-8">
-              {/* 🛡️ تكبير الحلقة لمنع التداخل مع الكلمة 🛡️ */}
-              <div className="h-40 w-40 rounded-full border-2 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.1)]" />
+          <div className="relative flex flex-col items-center">
+              {/* 🛡️ حلقة التحميل مع التوهج المشع 🛡️ */}
+              <div className="h-48 w-48 rounded-full border-2 border-primary/5 border-t-primary animate-spin shadow-[0_0_30px_rgba(255,122,0,0.4)]" />
               
-              {/* نص NOVA في المنتصف المعزول تماماً */}
-              <div className="absolute inset-0 m-auto flex flex-col items-center justify-center mb-8">
+              {/* شعار NOVA في المركز الهندسي الدقيق للقطر */}
+              <div className="absolute inset-0 flex items-center justify-center">
                   <NovaLogo />
               </div>
 
               {/* النص الكحلي بالأسفل بمسافة كافية */}
-              <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter mt-4">جاري التحميل...</p>
+              <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter mt-12">جاري التحميل...</p>
           </div>
       </div>
     );

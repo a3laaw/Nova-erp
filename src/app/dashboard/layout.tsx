@@ -5,7 +5,7 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
-import { AlertCircle, LogOut } from 'lucide-react';
+import { AlertCircle, RefreshCcw, LogOut, Loader } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
@@ -14,13 +14,13 @@ import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 /**
  * شعار نوفا المدمج (NOVA Simple Text):
- * تصميم مطابق تماماً للصورة المطلوبة.
+ * تصميم مطابق تماماً للصورة المطلوبة مع تمركز سيادي.
  */
 const NovaLogo = () => (
   <svg width="140" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg">
     <text 
       x="50%" 
-      y="60%" 
+      y="50%" 
       dominantBaseline="middle" 
       textAnchor="middle" 
       fontFamily="inherit" 
@@ -44,26 +44,48 @@ export default function DashboardLayout({
   const { language } = useLanguage();
   
   const [mounted, setMounted] = useState(false);
+  const [showEmergencyExit, setShowEmergencyExit] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    const timer = setTimeout(() => {
+      setShowEmergencyExit(true);
+    }, 5000);
+    return () => clearTimeout(timer);
   }, []);
 
-  // 1. معالجة حالة التحميل المطابقة للصورة الصحيحة
+  const handleSafeExit = () => {
+    logout();
+    router.replace('/');
+  };
+
+  // 1. معالجة حالة التحميل المطابقة للصورة مع التوهج والتمركز
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        <div className="relative flex flex-col items-center gap-8">
-            {/* 🛡️ تكبير حلقة التحميل لمنع التداخل مع النص 🛡️ */}
-            <div className="h-40 w-40 rounded-full border-2 border-primary/10 border-t-primary animate-spin" />
+        <div className="relative flex flex-col items-center">
+            {/* 🛡️ حلقة التحميل مع التوهج المشع 🛡️ */}
+            <div className="h-48 w-48 rounded-full border-2 border-primary/5 border-t-primary animate-spin shadow-[0_0_30px_rgba(255,122,0,0.4)]" />
             
-            {/* شعار NOVA في المنتصف المعزول تماماً عن مسار الدائرة */}
-            <div className="absolute inset-0 m-auto flex items-center justify-center mb-8">
+            {/* شعار NOVA في المركز الهندسي الدقيق للقطر */}
+            <div className="absolute inset-0 flex items-center justify-center">
                 <NovaLogo />
             </div>
             
             {/* النص الكحلي بالأسفل بوضوح تام */}
-            <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter mt-4">جاري التحميل...</p>
+            <div className="mt-12 text-center space-y-4">
+                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري التحميل...</p>
+                {showEmergencyExit && (
+                    <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl">
+                        <Button onClick={() => window.location.reload()} variant="outline" className="h-11 rounded-xl font-bold gap-2 text-[#1e1b4b] border-orange-200">
+                            <RefreshCcw className="h-4 w-4" /> تحديث الصفحة
+                        </Button>
+                        <Button onClick={handleSafeExit} variant="ghost" className="h-11 rounded-xl font-black gap-2 text-red-600 hover:bg-red-50">
+                            <LogOut className="h-4 w-4" /> خروج آمن وإصلاح
+                        </Button>
+                    </div>
+                )}
+            </div>
         </div>
       </div>
     );
@@ -71,10 +93,6 @@ export default function DashboardLayout({
 
   // 2. التحقق من وجود المستخدم
   if (!user) {
-    const handleSafeExit = () => {
-      logout();
-      router.replace('/');
-    };
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]" dir="rtl">
         <AlertCircle className="h-12 w-12 text-red-600 animate-bounce" />
@@ -83,11 +101,6 @@ export default function DashboardLayout({
       </div>
     );
   }
-
-  const handleSafeExit = () => {
-    logout();
-    router.replace('/');
-  };
 
   return (
     <div className="relative min-h-screen">
