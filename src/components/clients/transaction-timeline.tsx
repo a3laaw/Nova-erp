@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -159,7 +160,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 rows={4}
-                className="border-none shadow-none focus-visible:ring-0 text-xl leading-relaxed font-bold placeholder:italic bg-transparent p-2 text-slate-900 min-h-[120px]"
+                className="border-none shadow-none focus-visible:ring-0 text-xl leading-relaxed font-black placeholder:italic bg-transparent p-4 text-slate-900 min-h-[140px]"
               />
               <div className="flex justify-end">
                 <Button 
@@ -222,3 +223,4 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     </Card>
   );
 }
+

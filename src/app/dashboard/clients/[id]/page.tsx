@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -55,7 +56,9 @@ import {
     Loader2,
     FileText,
     Calculator,
-    Sparkles
+    Sparkles,
+    FileSignature,
+    AlertCircle
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -322,11 +325,26 @@ export default function ClientProfilePage() {
                                                     <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
                                                         <Eye className="h-4 w-4 text-primary"/> فتح المسار الفني
                                                     </DropdownMenuItem>
+                                                    
+                                                    <DropdownMenuSeparator className="bg-slate-100" />
+                                                    
+                                                    <DropdownMenuItem onSelect={() => router.push(`/dashboard/contracts/new?clientId=${id}&transactionId=${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-indigo-700">
+                                                        <FileSignature className="h-4 w-4" /> توقيع عقد مباشر
+                                                    </DropdownMenuItem>
+                                                    
+                                                    <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/new?clientId=${id}&transactionId=${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-emerald-700">
+                                                        <Calculator className="h-4 w-4" /> إصدار عرض سعر
+                                                    </DropdownMenuItem>
+
+                                                    <DropdownMenuSeparator className="bg-slate-100" />
+
                                                     <DropdownMenuItem onSelect={() => handleToggleFreeze(tx)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
                                                         {tx.status === 'on-hold' ? <FolderOpen className="h-4 w-4 text-green-600"/> : <FolderLock className="h-4 w-4 text-orange-600"/>}
                                                         {tx.status === 'on-hold' ? 'إعادة تفعيل' : 'تجميد المعاملة'}
                                                     </DropdownMenuItem>
+                                                    
                                                     <DropdownMenuSeparator className="bg-slate-100" />
+                                                    
                                                     <DropdownMenuItem onSelect={() => setTransactionToDelete(tx)} className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50">
                                                         <Trash2 className="h-4 w-4" /> حذف نهائي
                                                     </DropdownMenuItem>
