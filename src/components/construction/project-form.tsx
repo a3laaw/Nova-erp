@@ -14,8 +14,7 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import type { ConstructionProject, Client, Employee, Governorate, Area } from '@/lib/types';
 import { Loader2, Save, Ruler, Building2, MapPin, Layers, Droplets, Zap, Package, FileSignature } from 'lucide-react';
 import { query, collection, orderBy, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { DialogFooter } from '@/components/ui/dialog';
+import { Card, CardHeader, CardTitle, CardContent, DialogFooter } from '@/components/ui/card';
 import { Separator } from '../ui/separator';
 import { Switch } from '../ui/switch';
 

@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useMe
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, getIdToken } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { useFirebase } from '@/firebase/provider'; // 🛡️ Fix: Import from provider directly to avoid circular dependency
+import { useFirebase } from '@/firebase/provider';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
 import { setSessionIndicators, clearSessionIndicators, mapFirebaseAuthError } from '@/lib/auth/utils';
@@ -84,24 +84,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const globalRef = doc(masterFirestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
+        // 🛡️ طرد المستخدم فوراً إذا لم يكن مسجلاً في الفهرس العالمي (أمان SaaS)
         if (!globalSnap.exists()) {
-          throw new Error("الحساب غير مربوط بمنشأة.");
+          console.warn("🚫 Orphan session detected. Force logging out.");
+          await signOut(masterAuth);
+          throw new Error("عذراً، هذا الحساب غير مربوط بأي منشأة حالياً.");
         }
 
         const { companyId } = globalSnap.data();
-        await getIdToken(firebaseUser, true);
-
+        
         const [compDoc, userDoc] = await Promise.all([
           getDoc(doc(masterFirestore, 'companies', companyId)),
           getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid))
         ]);
 
-        if (!userDoc.exists()) throw new Error("الملف الشخصي غير موجود.");
+        if (!userDoc.exists()) {
+            console.warn("🚫 Profile missing for current session.");
+            await signOut(masterAuth);
+            throw new Error("الملف الشخصي غير موجود.");
+        }
 
         const userData = userDoc.data();
-        const companyData = compDoc.exists() ? { id: compDoc.id, ...compDoc.data() } as Company : null;
+        if (!userData.isActive) {
+            await signOut(masterAuth);
+            throw new Error("الحساب معطل من قبل الإدارة.");
+        }
 
-        if (!userData.isActive) throw new Error("الحساب معطل.");
+        const companyData = compDoc.exists() ? { id: compDoc.id, ...compDoc.data() } as Company : null;
 
         const finalUser = {
           ...userData,

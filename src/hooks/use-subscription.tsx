@@ -38,12 +38,13 @@ export function useSubscription<T extends { id?: string }>(
     }, [constraintsHash]);
 
     useEffect(() => {
-        if (!firestore || !collectionPath || authLoading) {
+        // 🛡️ صمام أمان: لا تطلب البيانات أبداً إذا كانت الجلسة قيد التحميل أو غير موجودة
+        if (!firestore || !collectionPath || authLoading || !user?.currentCompanyId) {
             setLoading(!firestore || !collectionPath ? false : true);
             return;
         }
 
-        const tenantId = user?.currentCompanyId || null;
+        const tenantId = user.currentCompanyId;
         const finalPath = getTenantPath(collectionPath, tenantId);
         
         if (!finalPath) {
@@ -56,8 +57,9 @@ export function useSubscription<T extends { id?: string }>(
         
         let finalConstraints = [...constraintsRef.current];
         
-        if (isGroup && tenantId) {
+        if (isGroup) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
+            // فرض فلترة المنشأة في الاستعلام المجمع لضمان العبور من جدار الحماية
             finalConstraints.push(where('companyId', '==', tenantId));
             
             try {
@@ -67,7 +69,8 @@ export function useSubscription<T extends { id?: string }>(
                     setData(newData);
                     setLoading(false);
                 }, (err) => {
-                    if (tenantId && !authLoading) {
+                    // لا تطلق الخطأ في الواجهة إلا إذا كان الطلب حقيقياً ومرفوضاً بعد استقرار الجلسة
+                    if (data.length === 0 && !authLoading) {
                         const permissionError = new FirestorePermissionError({
                             path: `[GROUP] ${collectionName}`,
                             operation: 'list'
@@ -89,7 +92,7 @@ export function useSubscription<T extends { id?: string }>(
                 setData(newData);
                 setLoading(false);
             }, (err) => {
-                if (tenantId && !authLoading) {
+                if (data.length === 0 && !authLoading) {
                     const permissionError = new FirestorePermissionError({
                         path: finalPath,
                         operation: 'list'
