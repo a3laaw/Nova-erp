@@ -74,30 +74,6 @@ export interface PaymentVoucher extends BaseEntity {
     transactionId?: string;
 }
 
-export interface Payslip extends BaseEntity {
-    id?: string;
-    employeeId: string;
-    employeeName: string;
-    employeeNumber?: string;
-    year: number;
-    month: number;
-    type?: 'Monthly' | 'Leave';
-    earnings: {
-        basicSalary: number;
-        housingAllowance: number;
-        transportAllowance: number;
-        commission: number;
-    };
-    deductions: {
-        absenceDeduction: number;
-        lateDeduction: number;
-        otherDeductions: number;
-    };
-    netSalary: number;
-    status: 'draft' | 'processed' | 'paid';
-    paidAt?: Timestamp | any;
-}
-
 export interface TechnicalSpecifications {
     totalArea: number;
     floorsCount: number;
@@ -118,6 +94,31 @@ export interface TechnicalSpecifications {
     ordinaryShowerCount?: number;
     electricalPointsCount?: number;
     planReferenceNumber?: string;
+}
+
+export interface Quotation extends BaseEntity {
+    id?: string;
+    quotationNumber: string;
+    quotationSequence: number;
+    quotationYear: number;
+    quotationDept: string;
+    clientId: string;
+    clientName: string;
+    subject: string;
+    date: Timestamp | any;
+    validUntil: Timestamp | any;
+    totalAmount: number;
+    status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+    items: any[];
+    layoutBlocks?: any[];
+    financialsType: 'fixed' | 'percentage';
+    totalArea?: number;
+    floorsCount?: number;
+    basementType: 'none' | 'full' | 'half' | 'vault';
+    roofExtension: 'none' | 'quarter' | 'half';
+    workNature: 'labor_only' | 'with_materials';
+    transactionTypeId?: string;
+    subServiceId?: string;
 }
 
 export interface Client extends BaseEntity {
@@ -382,4 +383,28 @@ export interface Notification extends BaseEntity {
   isRead: boolean;
   link?: string;
   createdAt?: any;
+}
+
+export interface Payslip extends BaseEntity {
+    id?: string;
+    employeeId: string;
+    employeeName: string;
+    employeeNumber?: string;
+    year: number;
+    month: number;
+    type?: 'Monthly' | 'Leave';
+    earnings: {
+        basicSalary: number;
+        housingAllowance: number;
+        transportAllowance: number;
+        commission: number;
+    };
+    deductions: {
+        absenceDeduction: number;
+        lateDeduction: number;
+        otherDeductions: number;
+    };
+    netSalary: number;
+    status: 'draft' | 'processed' | 'paid';
+    paidAt?: Timestamp | any;
 }

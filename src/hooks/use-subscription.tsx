@@ -16,9 +16,9 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * خطاف اشتراك لحظي محصن (V70.0):
- * تم تحويله ليعتمد على tenantId الجلسة مباشرة لضمان ظهور البيانات فوراً
- * دون انتظار تحديث التوكن المعقد، مع تحصين ضد أخطاء الصلاحيات الوهمية.
+ * خطاف اشتراك لحظي محصن (V75.0):
+ * تم تحويله ليعتمد على tenantId الجلسة مباشرة لضمان ظهور البيانات فوراً.
+ * تم تحصين معالجة الأخطاء لمنع ظهور الشاشة الحمراء خلال ثواني التحميل الأولى.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -71,8 +71,8 @@ export function useSubscription<T extends { id?: string }>(
                     setLoading(false);
                     setError(null);
                 }, (err) => {
-                    // رصد أخطاء الصلاحيات الحقيقية فقط
-                    if (!authLoading) {
+                    // رصد أخطاء الصلاحيات الحقيقية فقط بعد استقرار الجلسة
+                    if (!authLoading && err.message?.includes('permission-denied')) {
                         const permissionError = new FirestorePermissionError({
                             path: `[GROUP] ${collectionName}`,
                             operation: 'list'
@@ -95,16 +95,13 @@ export function useSubscription<T extends { id?: string }>(
                 setLoading(false);
                 setError(null);
             }, (err) => {
-                if (!authLoading) {
+                if (!authLoading && err.message?.includes('permission-denied')) {
                     const permissionError = new FirestorePermissionError({
                         path: finalPath,
                         operation: 'list'
                     });
-                    // إطلاق الخطأ للرادار العالمي فقط إذا كان هناك منع حقيقي
-                    if (err.message?.includes('permission-denied')) {
-                        errorEmitter.emit('permission-error', permissionError);
-                        setError(permissionError);
-                    }
+                    errorEmitter.emit('permission-error', permissionError);
+                    setError(permissionError);
                 }
                 setLoading(false);
             });

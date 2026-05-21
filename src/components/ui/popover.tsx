@@ -11,7 +11,6 @@ const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
 >(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
-    // 🛡️ التطهير الجذري: استخدام Portal لضمان عدم حدوث Clipping ولكن مع تعطيل تنسيقات الحاوية في CSS
     <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
             ref={ref}

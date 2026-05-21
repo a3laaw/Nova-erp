@@ -31,7 +31,7 @@ import { Badge } from '../ui/badge';
 import { useAuth } from '@/context/auth-context';
 import { Separator } from '../ui/separator';
 
-// --- DnD Kit Imports ---
+// --- dnd-kit Imports ---
 import {
   DndContext,
   closestCenter,
@@ -95,11 +95,11 @@ type QuotationFormValues = z.infer<typeof quotationSchema>;
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 function SortableBlock({ id, block, index, register, remove, children }: any) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: 'transform 200ms cubic-bezier(0, 0, 0.2, 1)',
+    transition,
     zIndex: isDragging ? 50 : 'auto',
     opacity: isDragging ? 0.4 : 1,
   };
@@ -416,7 +416,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                       step="any" 
                                                       {...register('totalAmount')} 
                                                       readOnly={financials_type === 'fixed'}
-                                                      onChange={e => setFinancials({...financials, totalAmount: Number(e.target.value)})} 
                                                       className={cn(
                                                           "w-32 h-11 border-none text-center font-black text-xl text-primary rounded-xl shadow-sm",
                                                           financials_type === 'fixed' ? "bg-muted/50 cursor-not-allowed" : "bg-white"
@@ -479,7 +478,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                           </TableCell>
                                                           <TableCell className="text-center no-print">
                                                             <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(itemIdx)} disabled={itemFields.length <= 1} className="text-red-400 hover:text-red-600 rounded-full opacity-0 group-hover/row:opacity-100 transition-opacity">
-                                                                <Trash2 className="h-5 w-5"/>
+                                                                <Trash2 className="h-4 w-4"/>
                                                             </Button>
                                                           </TableCell>
                                                       </TableRow>
