@@ -59,6 +59,12 @@
     border: 1px solid rgba(255, 122, 0, 0.1);
     box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
   }
+
+  /* 🌟 أنيميشن التوهج الذهبي الخفيف */
+  .active-glow {
+    box-shadow: 0 0 40px rgba(255, 122, 0, 0.1);
+    border-color: rgba(255, 122, 0, 0.3) !important;
+  }
 }
 
 /* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة 🛡️ */
@@ -84,7 +90,7 @@
   background-image: none !important;
   opacity: 1 !important;
   border: 2px solid #FF7A00 !important;
-  border-radius: 1rem !important;
+  border-radius: 1.5rem !important;
   box-shadow: 0 25px 60px rgba(255, 122, 0, 0.3) !important;
 }
 
@@ -119,3 +125,19 @@
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* NOVA Centering Animations */
+@keyframes spin-glow {
+  0% { transform: rotate(0deg); border-top-color: #FF7A00; }
+  50% { border-top-color: #FFB000; }
+  100% { transform: rotate(360deg); border-top-color: #FF7A00; }
+}
+
+.animate-spin-glow {
+  animation: spin-glow 2s linear infinite;
+}
+
+.gold-glow-filter {
+  filter: blur(20px);
+  background: radial-gradient(circle, rgba(255,183,0,0.2) 0%, transparent 70%);
+}

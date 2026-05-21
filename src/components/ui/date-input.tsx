@@ -112,7 +112,7 @@ export function DateInput({
           {...props}
         />
       </div>
-      <PopoverContent className="w-auto p-0 z-[999999] rounded-[2.5rem] border-none shadow-2xl overflow-hidden" align="start">
+      <PopoverContent className="w-auto p-0 z-[999999999] rounded-[2.5rem] border-none shadow-2xl overflow-hidden" align="start">
         <Calendar
           mode="single"
           selected={dateValue}

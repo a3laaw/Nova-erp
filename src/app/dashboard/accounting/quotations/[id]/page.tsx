@@ -13,7 +13,7 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Logo } from '@/components/layout/logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Printer, Pencil, ArrowRight, FileSignature, Ruler, Building2, Layers, ScrollText, Calculator } from 'lucide-react';
+import { Printer, Pencil, ArrowRight, FileSignature, Ruler, Building2, Layers, ScrollText, Calculator, SeparatorHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
@@ -49,6 +49,8 @@ const basementLabels: Record<string, string> = {
     half: 'سرداب نص',
     vault: 'قبو'
 };
+
+const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 export default function ViewQuotationPage() {
   const router = useRouter();
@@ -113,11 +115,11 @@ export default function ViewQuotationPage() {
                 </div>
             </div>
 
-            <div id="printable-area" className="p-12 md:p-20 space-y-12">
+            <div id="printable-area" className="p-12 md:p-20 space-y-12 bg-white">
                 <header className="flex justify-between items-start pb-8 border-b-8 border-primary">
                     <div className="flex items-center gap-8">
                         <Logo className="h-28 w-24 !p-3 shadow-inner border rounded-[2rem]" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                        <div className="space-y-1">
+                        <div className="space-y-1 text-right">
                             <h1 className="text-3xl font-black text-[#1e1b4b]">{branding?.company_name || 'Nova ERP'}</h1>
                             <p className="text-sm text-muted-foreground font-bold">{branding?.address}</p>
                             <p className="text-xs font-mono opacity-60">REF: {quotation.quotationNumber}</p>
@@ -135,7 +137,7 @@ export default function ViewQuotationPage() {
                 </header>
 
                 <section className="grid grid-cols-2 gap-12 p-10 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 shadow-inner">
-                    <div>
+                    <div className="text-right">
                         <p className='text-[10px] uppercase font-black text-slate-400 mb-2 tracking-widest'>السيد المالك المحترم / Client Name:</p>
                         <p className='text-3xl font-black text-slate-900'>{quotation.clientName}</p>
                     </div>
@@ -152,19 +154,19 @@ export default function ViewQuotationPage() {
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8 p-10 border-4 border-slate-50 rounded-[3rem] bg-white shadow-xl relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-2 h-full bg-indigo-100" />
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1"><Ruler className="h-3 w-3" /> المساحة الإجمالية</Label>
+                        <div className="space-y-2 text-right">
+                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1 justify-end"><Ruler className="h-3 w-3" /> المساحة الإجمالية</Label>
                             <p className="text-3xl font-black text-indigo-600 font-mono">{quotation.totalArea} <span className="text-sm">م²</span></p>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1"><Building2 className="h-3 w-3" /> عدد الأدوار</Label>
+                        <div className="space-y-2 text-right">
+                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1 justify-end"><Building2 className="h-3 w-3" /> عدد الأدوار</Label>
                             <p className="text-3xl font-black text-slate-800">{quotation.floorsCount}</p>
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-2 text-right">
                             <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">خيار السرداب</Label>
                             <p className="text-xl font-bold">{basementLabels[quotation.basementType]}</p>
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-2 text-right">
                             <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">توسعة السطح</Label>
                             <p className="text-xl font-bold">{roofExtensionLabels[quotation.roofExtension]}</p>
                         </div>
@@ -178,7 +180,7 @@ export default function ViewQuotationPage() {
                                 <section className="space-y-4">
                                     <h4 className="text-2xl font-black text-primary border-r-8 border-primary pr-6">{block.title}</h4>
                                     <div className="p-10 bg-slate-50/50 rounded-[2rem] border-2 border-slate-100">
-                                        <p className="text-xl leading-[1.8] font-medium text-slate-700 whitespace-pre-wrap">{block.content}</p>
+                                        <p className="text-xl leading-[1.8] font-medium text-slate-700 whitespace-pre-wrap text-right">{block.content}</p>
                                     </div>
                                 </section>
                             ) : (
@@ -206,10 +208,12 @@ export default function ViewQuotationPage() {
                                                     
                                                     return (
                                                         <TableRow key={index} className="h-24 border-b last:border-0 hover:bg-transparent">
-                                                            <TableCell className="text-center font-mono font-black text-slate-300 border-l">{index + 1}</TableCell>
-                                                            <TableCell className="px-10">
-                                                                <p className="font-black text-2xl text-slate-800 leading-tight">{item.description}</p>
-                                                                <p className="text-xs font-bold text-slate-400 mt-1">{item.triggerCondition}</p>
+                                                            <TableCell className="text-center font-mono font-black text-slate-300 border-l">
+                                                                {index + 1}
+                                                            </TableCell>
+                                                            <TableCell className="px-10 text-right">
+                                                                <p className="font-black text-2xl text-slate-800 leading-tight">الدفعة {arabicOrdinals[index] || (index + 1)}</p>
+                                                                <p className="text-sm font-bold text-primary mt-1">{item.triggerCondition}</p>
                                                             </TableCell>
                                                             <TableCell className="text-center font-mono font-black text-3xl opacity-40">
                                                                 {quotation.financialsType === 'percentage' ? `${item.percentage}%` : formatCurrency(item.unitPrice || 0)}
@@ -225,7 +229,7 @@ export default function ViewQuotationPage() {
                                                 <TableRow className="border-none hover:bg-primary">
                                                     <TableCell colSpan={3} className="text-right px-16">
                                                         <p className="text-4xl font-black tracking-tighter">إجمالي قيمة التعاقد:</p>
-                                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mt-1">Total Fixed Contract Sum</p>
+                                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mt-1 text-right">Total Fixed Contract Sum</p>
                                                     </TableCell>
                                                     <TableCell className="text-left font-mono text-5xl font-black px-12 bg-white/10 border-r border-white/20">
                                                         {formatCurrency(quotation.totalAmount || 0)}

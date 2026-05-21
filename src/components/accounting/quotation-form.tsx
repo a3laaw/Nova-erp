@@ -14,10 +14,11 @@ import {
     GripVertical,
     ScrollText,
     Sparkles,
-    AlertCircle
+    AlertCircle,
+    AlertTriangle
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import type { Client, Quotation, ContractTemplate } from '@/lib/types';
+import type { Client, Quotation, ContractTemplate, SubService, TransactionType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -74,6 +75,9 @@ const quotationSchema = z.object({
   date: z.date({ required_error: "التاريخ مطلوب." }),
   validUntil: z.date({ required_error: "تاريخ الانتهاء مطلوب." }),
   
+  transactionTypeId: z.string().min(1, "الخدمة الرئيسية مطلوبة"),
+  subServiceId: z.string().min(1, "الخدمة التفصيلية مطلوبة"),
+  
   totalArea: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
   basementType: z.enum(['none', 'full', 'half', 'vault']).default('none'),
   floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
@@ -91,7 +95,7 @@ type QuotationFormValues = z.infer<typeof quotationSchema>;
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 function SortableBlock({ id, block, index, register, remove, children }: any) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({ id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -105,7 +109,7 @@ function SortableBlock({ id, block, index, register, remove, children }: any) {
         ref={setNodeRef} 
         style={style} 
         className={cn(
-            "group relative flex flex-col gap-4 p-8 rounded-[2.5rem] border-2 transition-all mb-8 animate-in fade-in slide-in-from-right-4 bg-white/60 backdrop-blur-xl border-white/80 shadow-lg hover:border-primary/20",
+            "group relative flex flex-col gap-4 p-8 rounded-[2.5rem] border-2 transition-all mb-8 bg-white/60 backdrop-blur-xl border-white/80 shadow-lg hover:border-primary/20",
             block.type === 'financial_table' && "ring-4 ring-primary/5 border-primary/20"
         )}
     >
@@ -144,7 +148,11 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   
   const [allTemplates, setAllTemplates] = useState<ContractTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
+  const [subServices, setSubServices] = useState<SubService[]>([]);
+  const [specificWorkStages, setSpecificWorkStages] = useState<{ value: string, label: string }[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
+  const [isPathLoading, setIsPathLoading] = useState(false);
 
   const tenantId = currentUser?.currentCompanyId;
 
@@ -154,6 +162,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         date: new Date(),
         validUntil: new Date(new Date().setDate(new Date().getDate() + 30)),
         financialsType: 'fixed',
+        transactionTypeId: '',
+        subServiceId: '',
         totalArea: 0,
         floorsCount: 1,
         basementType: 'none',
@@ -171,7 +181,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
   const watchedItems = useWatch({ control, name: "items" });
   const financials_type = watch("financialsType");
-  const watchedTotalAmount = watch("totalAmount") || 0;
+  const selectedTransactionTypeId = watch("transactionTypeId");
+  const selectedSubServiceId = watch("subServiceId");
 
   const totalCalculatedValue = useMemo(() => {
     const items = watchedItems || [];
@@ -195,17 +206,51 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       try {
         const clientPath = getTenantPath('clients', tenantId);
         const templatePath = getTenantPath('contractTemplates', tenantId);
+        const typesPath = getTenantPath('transactionTypes', tenantId);
 
-        const [clientsSnap, templatesSnapshot] = await Promise.all([
+        const [clientsSnap, templatesSnapshot, typesSnap] = await Promise.all([
           getDocs(query(collection(firestore, clientPath!), where('isActive', '==', true), limit(200))),
           getDocs(query(collection(firestore, templatePath!), orderBy('title'))),
+          getDocs(query(collection(firestore, typesPath!), orderBy('order'))),
         ]);
         setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
         setAllTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
+        setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
       } catch (error) { console.error(error); } finally { setRefDataLoading(false); }
     };
     fetchRefData();
   }, [firestore, tenantId]);
+
+  useEffect(() => {
+      if (!selectedTransactionTypeId || !firestore || !tenantId) {
+          setSubServices([]);
+          return;
+      }
+      const fetchSubServices = async () => {
+          setIsPathLoading(true);
+          try {
+              const subsPath = getTenantPath(`transactionTypes/${selectedTransactionTypeId}/subServices`, tenantId);
+              const snap = await getDocs(query(collection(firestore, subsPath!), orderBy('order')));
+              setSubServices(snap.docs.map(d => ({ id: d.id, ...d.data() } as SubService)));
+          } finally { setIsPathLoading(false); }
+      };
+      fetchSubServices();
+  }, [selectedTransactionTypeId, firestore, tenantId]);
+
+  useEffect(() => {
+      if (!selectedSubServiceId || !selectedTransactionTypeId || !firestore || !tenantId) {
+          setSpecificWorkStages([]);
+          return;
+      }
+      const fetchStages = async () => {
+          try {
+              const stagesPath = getTenantPath(`transactionTypes/${selectedTransactionTypeId}/subServices/${selectedSubServiceId}/workStages`, tenantId);
+              const snap = await getDocs(query(collection(firestore, stagesPath!), orderBy('order')));
+              setSpecificWorkStages(snap.docs.map(d => ({ value: d.data().name, label: d.data().name })));
+          } catch (e) { console.error(e); }
+      };
+      fetchStages();
+  }, [selectedSubServiceId, selectedTransactionTypeId, firestore, tenantId]);
 
   const handleTemplateSelect = (templateId: string) => {
     const template = allTemplates.find(t => t.id === templateId);
@@ -215,16 +260,20 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     setValue('workNature', template.workNature || 'labor_only');
     setValue('financialsType', template.financials?.type || 'fixed');
     setValue('totalAmount', template.financials?.totalAmount || 0);
+    setValue('transactionTypeId', template.transactionTypeId || '');
+    setValue('subServiceId', template.subServiceId || '');
     
-    const newItems = template.financials?.milestones?.map((m, idx) => ({
-      id: generateId(), 
-      description: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-      triggerCondition: m.name, 
-      quantity: 1,
-      unitPrice: template.financials?.type === 'fixed' ? Number(m.value) : 0,
-      percentage: template.financials?.type === 'percentage' ? Number(m.value) : 0,
-    })) || [];
-    replaceItems(newItems);
+    if (template.financials?.milestones) {
+        const newItems = template.financials.milestones.map((m, idx) => ({
+            id: generateId(), 
+            description: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
+            triggerCondition: m.name, 
+            quantity: 1,
+            unitPrice: template.financials?.type === 'fixed' ? Number(m.value) : 0,
+            percentage: template.financials?.type === 'percentage' ? Number(m.value) : 0,
+        }));
+        replaceItems(newItems);
+    }
   };
 
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
@@ -240,6 +289,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
   const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
   const templateOptions = useMemo(() => allTemplates.map(t => ({ value: t.id!, label: t.title })), [allTemplates]);
+  const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.id!, label: t.name })), [transactionTypes]);
 
   return (
     <form onSubmit={handleSubmit(onSave)} className="space-y-12 pb-20">
@@ -251,13 +301,13 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
               )} />
           </div>
           <div className="grid gap-2">
-              <Label className="font-black text-[11px] uppercase text-primary tracking-widest pr-2 flex items-center gap-2 no-print"><Sparkles className="h-3 w-3"/> جلب من القوالب</Label>
+              <Label className="font-black text-[11px] uppercase text-primary tracking-widest pr-2 flex items-center gap-2 no-print"><Sparkles className="h-3 w-3"/> جلب من قوالب العقود</Label>
               <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً للتعبئة آلياً..." className="h-12 border-2 border-primary/20 bg-primary/5 rounded-2xl" />
           </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="grid gap-2 md:col-span-1">
+          <div className="grid gap-2">
               <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 no-print">موضوع العرض *</Label>
               <Input {...register('subject')} placeholder="عنوان العرض..." className="h-12 rounded-2xl border-2 font-black text-lg text-[#1e1b4b]" />
           </div>
@@ -272,25 +322,49 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       </div>
 
       <div className="space-y-4">
-          <h3 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-3 pr-2">
-            <Layers className="h-6 w-6 text-indigo-600" /> المواصفات والمساحات
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 bg-white/60 backdrop-blur-xl p-10 rounded-[2.5rem] border-2 border-white shadow-xl items-end relative overflow-hidden">
+          <div className="flex items-center justify-between px-2">
+             <h3 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-3">
+                <Layers className="h-6 w-6 text-indigo-600" /> المواصفات والمسار الفني
+            </h3>
+            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 font-black px-4 h-7 no-print">WBS Hierarchy</Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white/60 backdrop-blur-xl p-10 rounded-[2.5rem] border-2 border-white shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500" />
-              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400 no-print">المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-12 font-black text-2xl font-mono border-2 rounded-xl text-center text-indigo-600" /></div>
-              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400 no-print">الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-12 font-black text-xl border-2 rounded-xl text-center" /></div>
-              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400 no-print">السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-12 border-2 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
-              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400 no-print">السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-12 border-2 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">بدون</SelectItem><SelectItem value="full">كامل</SelectItem><SelectItem value="half">نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-3">
+                  <Label className="font-black text-[10px] uppercase text-slate-400 pr-1 no-print">نوع المعاملة الرئيسية (Layer 1) *</Label>
+                  <Controller control={control} name="transactionTypeId" render={({ field }) => (
+                      <InlineSearchList value={field.value} onSelect={(v) => { field.onChange(v); setValue('subServiceId', ''); }} options={transactionTypeOptions} placeholder="اختر الخدمة..." className="h-12 rounded-2xl" />
+                  )} />
+              </div>
+              <div className="grid gap-3">
+                  <Label className="font-black text-[10px] uppercase text-primary pr-1 no-print">الخدمة التفصيلية (Layer 2) *</Label>
+                  <Controller control={control} name="subServiceId" render={({ field }) => (
+                      <InlineSearchList 
+                        value={field.value} 
+                        onSelect={field.onChange} 
+                        options={subServices.map(s => ({ value: s.id!, label: s.name }))} 
+                        placeholder={isPathLoading ? "جاري التحميل..." : "حدد النوع الفرعي..."} 
+                        disabled={!selectedTransactionTypeId || isPathLoading}
+                        className="h-12 rounded-2xl border-primary/20 bg-primary/5 text-primary" 
+                      />
+                  )} />
+              </div>
+              <div className="grid grid-cols-2 gap-4 md:col-span-2">
+                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-slate-400 no-print">المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-11 font-black text-xl font-mono border-2 rounded-xl text-center text-indigo-600" /></div>
+                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-slate-400 no-print">الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-11 font-black text-xl border-2 rounded-xl text-center" /></div>
+                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-slate-400 no-print">السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 border-2 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
+                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-slate-400 no-print">السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 font-bold border-2 rounded-xl"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">بدون</SelectItem><SelectItem value="full">كامل</SelectItem><SelectItem value="half">نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
+              </div>
           </div>
       </div>
 
       <div className="space-y-8">
           <div className="flex justify-between items-center px-4 no-print">
             <h3 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-3">
-                <LayoutGrid className="h-6 w-6 text-primary" /> تنظيم هيكل الوثيقة
+                <LayoutGrid className="h-6 w-6 text-primary" /> تنظيم محتوى العرض
             </h3>
-            <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateId(), type: 'preamble', title: '', content: '' })} className="rounded-xl h-12 px-8 font-bold gap-2 border-primary/20 text-primary hover:bg-primary/5">
-                <PlusCircle className="h-4 w-4" /> إضافة ديباجة أو بند نصي +
+            <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateId(), type: 'preamble', title: '', content: '' })} className="rounded-xl h-12 px-8 font-bold gap-2 border-primary/20 text-primary hover:bg-primary/5 shadow-sm">
+                <PlusCircle className="h-4 w-4" /> إضافة قسم نصي جديد +
             </Button>
           </div>
           
@@ -310,7 +384,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                   <div className="space-y-6">
                                       <Input 
                                           {...register(`layoutBlocks.${index}.title`)} 
-                                          placeholder="عنوان البند (مثال: الشروط العامة)" 
+                                          placeholder="عنوان البند (مثال: الشروط القانونية)" 
                                           className="h-12 border-none shadow-none font-black text-2xl text-[#1e1b4b] bg-transparent focus-visible:ring-0"
                                       />
                                       <Textarea 
@@ -324,7 +398,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                   <div className="space-y-8">
                                       <div className="flex flex-col sm:flex-row justify-between items-center gap-6 bg-white/40 p-6 rounded-[2.5rem] border border-white/60">
                                           <div className="flex items-center gap-4">
-                                              <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Calculator className="h-6 w-6"/></div>
+                                              <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Calculator className="h-6 w-6"/></div>
                                               <Label className="text-2xl font-black text-[#1e1b4b]">جدول الدفعات المالية المعتمدة</Label>
                                           </div>
                                           <div className="flex items-center gap-4 no-print">
@@ -357,7 +431,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                               <TableHeader className="bg-slate-50 h-14">
                                                 <TableRow className="border-none">
                                                     <TableHead className="w-32 text-center font-black text-slate-400 border-l border-white/20">رقم الدفعة</TableHead>
-                                                    <TableHead className="px-10 font-black text-slate-400 text-right">شرط الاستحقاق / بيان الإنجاز (كتابة حرة)</TableHead>
+                                                    <TableHead className="px-10 font-black text-slate-400 text-right">شرط الاستحقاق الميداني (Layer 3)</TableHead>
                                                     <TableHead className="text-center font-black text-slate-400 w-72">
                                                         {financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                                     </TableHead>
@@ -373,11 +447,23 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                               </Badge>
                                                           </TableCell>
                                                           <TableCell className="px-10">
-                                                            <Input 
-                                                                {...register(`items.${itemIdx}.triggerCondition`)} 
-                                                                className="font-black text-xl border-none shadow-none focus-visible:ring-0 bg-transparent text-[#1e1b4b] placeholder:italic placeholder:opacity-30" 
-                                                                placeholder="مثال: عند توقيع العقد، عند صب خرسانة الدور الأرضي..." 
-                                                            />
+                                                              {!selectedSubServiceId ? (
+                                                                  <p className="text-xs text-red-500 font-bold flex items-center gap-1 animate-pulse"><AlertTriangle className="h-3 w-3" /> حدد Layer 2 أولاً</p>
+                                                              ) : (
+                                                                  <Controller
+                                                                    control={control}
+                                                                    name={`items.${itemIdx}.triggerCondition`}
+                                                                    render={({ field: condField }) => (
+                                                                        <InlineSearchList 
+                                                                            value={condField.value} 
+                                                                            onSelect={condField.onChange} 
+                                                                            options={specificWorkStages} 
+                                                                            placeholder="اربط بمرحلة إنجاز..." 
+                                                                            className="font-black text-lg border-dashed bg-transparent border-primary/20 text-primary" 
+                                                                        />
+                                                                    )}
+                                                                  />
+                                                              )}
                                                           </TableCell>
                                                           <TableCell className="bg-primary/[0.01] border-r border-slate-50">
                                                             <div className="relative flex justify-center">
@@ -386,7 +472,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                                     {...register(financials_type === 'percentage' ? `items.${itemIdx}.percentage` : `items.${itemIdx}.unitPrice`)} 
                                                                     className="text-center font-black text-3xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono"
                                                                     placeholder="0"
-                                                                    onWheel={(e) => e.currentTarget.blur()}
                                                                 />
                                                                 <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/20 font-black text-base">{financials_type === 'percentage' ? '%' : 'KD'}</span>
                                                             </div>
@@ -426,6 +511,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                 variant="ghost" 
                                                 onClick={() => appendItem({ id: generateId(), description: `الدفعة ${arabicOrdinals[itemFields.length] || (itemFields.length + 1)}`, triggerCondition: '', quantity: 1, unitPrice: 0, percentage: 0 })} 
                                                 className="h-14 px-16 rounded-[1.5rem] border-dashed border-2 font-black text-primary gap-4 hover:bg-white transition-all hover:scale-105 active:scale-95 shadow-md"
+                                                disabled={!selectedSubServiceId}
                                             >
                                                 <PlusCircle className="h-6 w-6 text-primary" /> إضافة دفعة استحقاق جديدة +
                                             </Button>
