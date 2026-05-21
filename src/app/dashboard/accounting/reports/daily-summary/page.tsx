@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -13,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Printer, ArrowUp, ArrowDown, Scale } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { PrintableDocument } from '@/components/layout/printable-document';
 import { Separator } from '@/components/ui/separator';
