@@ -14,12 +14,11 @@ import { useAuth } from '@/context/auth-context';
 import { getTenantPath } from '@/lib/utils';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { getIdTokenResult } from 'firebase/auth';
 
 /**
- * خطاف اشتراك لحظي محصن (Protected Real-time Hook):
- * تم تحديثه بنظام "رادار التوكن" لضمان عدم إطلاق طلبات مجموعة (Group) 
- * إلا بعد التأكد من وجود Claim الشركة في التوكن لتجنب الرفض الأمني.
+ * خطاف اشتراك لحظي محصن (V70.0):
+ * تم تحويله ليعتمد على tenantId الجلسة مباشرة لضمان ظهور البيانات فوراً
+ * دون انتظار تحديث التوكن المعقد، مع تحصين ضد أخطاء الصلاحيات الوهمية.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -31,7 +30,6 @@ export function useSubscription<T extends { id?: string }>(
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
     const { user, loading: authLoading } = useAuth();
-    const [isTokenReady, setIsTokenReady] = useState(false);
 
     const constraintsHash = JSON.stringify(constraints.map(c => c.toString()));
     const constraintsRef = useRef(constraints);
@@ -40,39 +38,9 @@ export function useSubscription<T extends { id?: string }>(
         constraintsRef.current = constraints;
     }, [constraintsHash]);
 
-    // 🛡️ رادار التحقق من جاهزية التوكن (Sovereign Token Radar)
     useEffect(() => {
-        if (!user?.id) {
-            setIsTokenReady(false);
-            return;
-        }
-
-        let isMounted = true;
-        const checkToken = async () => {
-            try {
-                const { auth } = await import('@/firebase');
-                if (auth?.currentUser) {
-                    const tokenResult = await getIdTokenResult(auth.currentUser, true);
-                    // ننتظر حتى نجد رقم الشركة داخل التوكن نفسه وليس فقط في الكود
-                    if (tokenResult.claims.companyId && isMounted) {
-                        setIsTokenReady(true);
-                    } else if (isMounted) {
-                        // إذا لم يتوفر بعد، ننتظر ثانية ونحاول مرة أخرى
-                        setTimeout(checkToken, 2000);
-                    }
-                }
-            } catch (e) {
-                if (isMounted) setIsTokenReady(true); // Fallback
-            }
-        };
-
-        checkToken();
-        return () => { isMounted = false; };
-    }, [user?.id]);
-
-    useEffect(() => {
-        // 🛡️ الحماية القصوى: لا تطلب البيانات إذا كان التوكن لم يجهز بعد (أو الجلسة لم تستقر)
-        if (!firestore || !collectionPath || authLoading || !user?.currentCompanyId || !isTokenReady) {
+        // 🛡️ الحماية: لا تطلب البيانات إذا لم تتوفر الجلسة أو المعرف
+        if (!firestore || !collectionPath || authLoading || !user?.currentCompanyId) {
             setLoading(true);
             return;
         }
@@ -92,7 +60,7 @@ export function useSubscription<T extends { id?: string }>(
         
         if (isGroup) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
-            // فرض فلترة المنشأة في الاستعلام المجمع لضمان العبور من جدار الحماية
+            // فرض فلترة المنشأة برمجياً لضمان عبور جدار الحماية
             finalConstraints.push(where('companyId', '==', tenantId));
             
             try {
@@ -103,8 +71,8 @@ export function useSubscription<T extends { id?: string }>(
                     setLoading(false);
                     setError(null);
                 }, (err) => {
-                    // لا تطلق الخطأ في الواجهة إلا إذا كان الطلب حقيقياً ومرفوضاً بعد استقرار الجلسة والتوكن
-                    if (!authLoading && isTokenReady) {
+                    // رصد أخطاء الصلاحيات الحقيقية فقط
+                    if (!authLoading) {
                         const permissionError = new FirestorePermissionError({
                             path: `[GROUP] ${collectionName}`,
                             operation: 'list'
@@ -127,13 +95,16 @@ export function useSubscription<T extends { id?: string }>(
                 setLoading(false);
                 setError(null);
             }, (err) => {
-                if (!authLoading && isTokenReady) {
+                if (!authLoading) {
                     const permissionError = new FirestorePermissionError({
                         path: finalPath,
                         operation: 'list'
                     });
-                    errorEmitter.emit('permission-error', permissionError);
-                    setError(permissionError);
+                    // إطلاق الخطأ للرادار العالمي فقط إذا كان هناك منع حقيقي
+                    if (err.message?.includes('permission-denied')) {
+                        errorEmitter.emit('permission-error', permissionError);
+                        setError(permissionError);
+                    }
                 }
                 setLoading(false);
             });
@@ -143,7 +114,7 @@ export function useSubscription<T extends { id?: string }>(
             setError(err);
             setLoading(false);
         }
-    }, [firestore, collectionPath, isGroup, user?.currentCompanyId, authLoading, constraintsHash, isTokenReady]);
+    }, [firestore, collectionPath, isGroup, user?.currentCompanyId, authLoading, constraintsHash]);
 
     return { data, loading, error };
 }

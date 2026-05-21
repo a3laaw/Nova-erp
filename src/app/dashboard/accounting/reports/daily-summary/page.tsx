@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import type { CashReceipt, PaymentVoucher, Account, JournalEntry } from '@/lib/types';
@@ -86,8 +86,8 @@ export default function DailyFinancialReportPage() {
                     }, 0);
                 };
 
-                const cashBalance = calculateBalance(['110101']); // 'الصندوق'
-                const bankBalance = calculateBalance(['110103']); // 'حسابات البنوك'
+                const cashBalance = calculateBalance(['110101']); 
+                const bankBalance = calculateBalance(['110102']); 
 
                 setReportData({
                     receipts,
@@ -118,7 +118,7 @@ export default function DailyFinancialReportPage() {
             <Card className="no-print border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-l from-white to-sky-50">
                  <CardHeader>
                     <CardTitle className="text-xl font-black">التقرير المالي اليومي (تدقيق فوري)</CardTitle>
-                    <CardDescription>اختر يوماً لعرض ملخص الإيرادات والمصروفات والأرصدة النقدية في تلك اللحظة.</CardDescription>
+                    <CardDescription>ملخص الإيرادات والمصروفات والأرصدة النقدية في لحظة زمنية محددة.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex items-end gap-4">
                     <div className="grid gap-2">

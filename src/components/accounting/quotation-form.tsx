@@ -416,6 +416,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                       step="any" 
                                                       {...register('totalAmount')} 
                                                       readOnly={financials_type === 'fixed'}
+                                                      onChange={e => setFinancials({...financials, totalAmount: Number(e.target.value)})} 
                                                       className={cn(
                                                           "w-32 h-11 border-none text-center font-black text-xl text-primary rounded-xl shadow-sm",
                                                           financials_type === 'fixed' ? "bg-muted/50 cursor-not-allowed" : "bg-white"
@@ -442,7 +443,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                   {itemFields.map((field, itemIdx) => (
                                                       <TableRow key={field.id} className="h-24 border-b last:border-0 hover:bg-primary/[0.02] group/row transition-all">
                                                           <TableCell className="text-center bg-slate-50/50 border-l">
-                                                              <Badge variant="secondary" className="font-black text-xs px-4 h-8 rounded-full border-none shadow-sm bg-white text-slate-900">
+                                                              <Badge variant="secondary" className="font-black text-xs px-4 h-8 rounded-full border-none shadow-sm bg-slate-50 text-slate-900">
                                                                   الدفعة {arabicOrdinals[itemIdx] || (itemIdx + 1)}
                                                               </Badge>
                                                           </TableCell>
@@ -477,7 +478,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                             </div>
                                                           </TableCell>
                                                           <TableCell className="text-center no-print">
-                                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(itemIdx)} disabled={itemFields.length <= 1} className="text-red-300 h-10 w-10 rounded-full hover:bg-red-50 hover:text-red-500 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(itemIdx)} disabled={itemFields.length <= 1} className="text-red-400 hover:text-red-600 rounded-full opacity-0 group-hover/row:opacity-100 transition-opacity">
                                                                 <Trash2 className="h-5 w-5"/>
                                                             </Button>
                                                           </TableCell>
