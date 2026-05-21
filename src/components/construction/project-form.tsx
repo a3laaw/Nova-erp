@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
@@ -12,10 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateInput } from '@/components/ui/date-input';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import type { ConstructionProject, Client, Employee, Governorate, Area } from '@/lib/types';
-import { Loader2, Save, Ruler, Building2, MapPin, Layers, Droplets, Zap, Package, FileSignature } from 'lucide-react';
+import { Loader2, Save, Ruler, Building2, Layers, Droplets, Package, FileSignature, Zap } from 'lucide-react';
 import { query, collection, orderBy, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { DialogFooter } from '@/components/ui/dialog';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Separator } from '../ui/separator';
 import { Switch } from '../ui/switch';
 
@@ -30,8 +30,8 @@ const projectSchema = z.object({
   workNature: z.enum(['labor_only', 'with_materials']).default('labor_only'),
   
   bathroomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
-  kitchensCount: z.preprocess((v) => parseInt(String(v || '0'), 10), v.number().min(0)).optional(),
-  laundryRoomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), v.number().min(0)).optional(),
+  kitchensCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  laundryRoomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   sanitaryMaterialsIncluded: z.boolean().default(false),
   sanitaryExtensionType: z.enum(['ordinary', 'suspended']).default('ordinary'),
   
@@ -130,13 +130,13 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         }
     }, [initialData, reset]);
 
-    const onSubmit = (data: ProjectFormValues) => {
+    const onSubmitInternal = (data: ProjectFormValues) => {
         const client = clients.find(c => c.id === data.clientId);
         onSave({ ...data, clientName: client?.nameAr });
     };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={handleSubmit(onSubmitInternal)} className="space-y-8">
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2"><Label>اسم المشروع *</Label><Input {...register('projectName')} /></div>

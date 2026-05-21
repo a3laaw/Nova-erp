@@ -666,6 +666,7 @@ export type TechnicalSpecifications = {
     floorsCount: number;
     hasBasement: boolean;
     basementType: 'none' | 'full' | 'half' | 'vault';
+    radius?: string;
     roofExtension: 'none' | 'quarter' | 'half';
     workNature: 'labor_only' | 'with_materials';
     bathroomsCount?: number;

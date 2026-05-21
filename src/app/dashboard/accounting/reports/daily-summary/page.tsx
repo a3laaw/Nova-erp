@@ -196,7 +196,7 @@ export default function DailyFinancialReportPage() {
                     </PrintableDocument>
                     <div className="flex justify-end mt-4 no-print pb-10">
                         <Button onClick={handlePrint} className="h-12 px-10 rounded-xl font-bold gap-2 shadow-xl shadow-primary/20">
-                            <Printer className="h-5 w-5" /> طباعة وتوقيع التقرير
+                            <Printer className="h-4 w-4" /> طباعة وتوقيع التقرير
                         </Button>
                     </div>
                 </div>
