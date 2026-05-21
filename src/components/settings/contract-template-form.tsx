@@ -21,23 +21,19 @@ import {
   Save, 
   Loader2, 
   Calculator,
-  FileText,
-  Briefcase,
-  Construction,
-  ShieldCheck,
-  AlertTriangle,
   FileSignature,
   Sparkles,
   Layers,
-  Clock
+  Workflow,
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs, query, collectionGroup, orderBy, where } from 'firebase/firestore';
-import type { ContractTemplate, ContractScopeItem, ContractTerm, ContractFinancialMilestone, Department, TransactionType, ConstructionType } from '@/lib/types';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
+import type { ContractTemplate, TransactionType, SubService, WorkStage } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
-import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Badge } from '../ui/badge';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { Separator } from '../ui/separator';
@@ -64,9 +60,12 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [templateType] = useState<'Consulting' | 'Execution'>(template?.templateType || initialType);
   const [workNature, setWorkNature] = useState<'labor_only' | 'with_materials'>(template?.workNature || 'labor_only');
   
-  const [constructionTypeId, setConstructionTypeId] = useState('');
-  const [selectedTransactionTypes, setSelectedTransactionTypes] = useState<string[]>([]);
-  const [termsAndConditions, setTermsAndConditions] = useState<ContractTerm[]>([]);
+  // ✨ الربط الثلاثي المطور
+  const [selectedTransactionTypeId, setSelectedTransactionTypeId] = useState(template?.transactionTypeId || '');
+  const [selectedSubServiceId, setSelectedSubServiceId] = useState(template?.subServiceId || '');
+  const [subServices, setSubServices] = useState<SubService[]>([]);
+  const [specificWorkStages, setSpecificWorkStages] = useState<{ value: string, label: string }[]>([]);
+  
   const [financials, setFinancials] = useState<ContractTemplate['financials']>({
     type: 'fixed',
     totalAmount: 0,
@@ -74,9 +73,9 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
+  const [isLoadingPath, setIsLoadingPath] = useState(false);
 
-  // 🛡️ الربط السيادي: جلب أنواع المعاملات المعتمدة من مسار المنشأة 🛡️
+  // جلب أنواع المعاملات (Layer 1)
   const { data: transactionTypesData, loading: typesLoading } = useSubscription<TransactionType>(
       firestore, 
       tenantId ? 'transactionTypes' : null,
@@ -84,36 +83,46 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   );
 
   const transactionTypeOptions = useMemo(() => 
-    transactionTypesData.map(t => ({ value: t.name, label: t.name }))
+    transactionTypesData.map(t => ({ value: t.id!, label: t.name }))
   , [transactionTypesData]);
 
-  // جلب مراحل العمل المجمعة لربط دفعات الاستحقاق
+  // ✨ جلب الخدمات الفرعية (Layer 2) عند اختيار الخدمة الرئيسية
   useEffect(() => {
-    if (!firestore || !isOpen || !tenantId) return;
+    if (!selectedTransactionTypeId || !firestore || !tenantId) {
+        setSubServices([]);
+        return;
+    }
+    const fetchSubServices = async () => {
+        setIsLoadingPath(true);
+        try {
+            const subsPath = getTenantPath(`transactionTypes/${selectedTransactionTypeId}/subServices`, tenantId);
+            const snap = await getDocs(query(collection(firestore, subsPath!), orderBy('order')));
+            setSubServices(snap.docs.map(d => ({ id: d.id, ...d.data() } as SubService)));
+        } finally { setIsLoadingPath(false); }
+    };
+    fetchSubServices();
+  }, [selectedTransactionTypeId, firestore, tenantId]);
+
+  // ✨ جلب مراحل العمل (Layer 3) عند اختيار الخدمة التفصيلية
+  useEffect(() => {
+    if (!selectedSubServiceId || !selectedTransactionTypeId || !firestore || !tenantId) {
+        setSpecificWorkStages([]);
+        return;
+    }
     const fetchStages = async () => {
         try {
-            const stagesSnap = await getDocs(query(
-                collectionGroup(firestore, 'workStages'), 
-                where('companyId', '==', tenantId)
-            ));
-            const uniqueStages = new Map();
-            stagesSnap.forEach(d => {
-                const name = d.data().name;
-                if (name) uniqueStages.set(name, { value: name, label: name });
-            });
-            setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')));
+            const stagesPath = getTenantPath(`transactionTypes/${selectedTransactionTypeId}/subServices/${selectedSubServiceId}/workStages`, tenantId);
+            const snap = await getDocs(query(collection(firestore, stagesPath!), orderBy('order')));
+            setSpecificWorkStages(snap.docs.map(d => ({ value: d.data().name, label: d.data().name })));
         } catch (e) { console.error(e); }
     };
     fetchStages();
-  }, [firestore, isOpen, tenantId]);
+  }, [selectedSubServiceId, selectedTransactionTypeId, firestore, tenantId]);
 
   useEffect(() => {
     if (template && isOpen) {
         setTitle(template.title);
         setDescription(template.description || '');
-        setConstructionTypeId(template.constructionTypeId || '');
-        setSelectedTransactionTypes(template.transactionTypes || []);
-        setTermsAndConditions(template.termsAndConditions || []);
         setFinancials(template.financials || { type: 'fixed', totalAmount: 0, milestones: [] });
         setWorkNature(template.workNature || 'labor_only');
     }
@@ -132,9 +141,9 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     try {
         const payload = {
             title, description, templateType, workNature,
-            constructionTypeId: templateType === 'Execution' ? constructionTypeId : null,
-            transactionTypes: templateType === 'Consulting' ? selectedTransactionTypes : [],
-            termsAndConditions, financials,
+            transactionTypeId: selectedTransactionTypeId,
+            subServiceId: selectedSubServiceId,
+            financials,
             updatedAt: serverTimestamp(),
             companyId: tenantId
         };
@@ -167,22 +176,41 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
 
             <ScrollArea className="flex-1 bg-muted/5">
                 <div className="p-8 space-y-10">
-                    <section className="grid md:grid-cols-2 gap-8">
-                        <div className="grid gap-3">
-                            <Label className="font-black text-xs uppercase text-slate-400 tracking-widest pr-1">عنوان القالب *</Label>
-                            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: عقد هيكل أسود مصنعية..." className="h-12 rounded-xl text-lg font-bold border-2" />
+                    <section className="space-y-6">
+                        <div className="grid md:grid-cols-2 gap-8">
+                            <div className="grid gap-3">
+                                <Label className="font-black text-xs uppercase text-slate-400 tracking-widest pr-1">عنوان القالب المرجعي *</Label>
+                                <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: عقد هيكل أسود مصنعية..." className="h-12 rounded-xl text-lg font-bold border-2" />
+                            </div>
+                            <div className="grid gap-3">
+                                <Label className="font-black text-xs uppercase text-slate-400 tracking-widest pr-1">نوع المعاملة الرئيسية (Layer 1)</Label>
+                                <InlineSearchList 
+                                    value={selectedTransactionTypeId} 
+                                    onSelect={v => { setSelectedTransactionTypeId(v); setSelectedSubServiceId(''); }} 
+                                    options={transactionTypeOptions} 
+                                    placeholder={typesLoading ? "جاري جلب بيانات المنشأة..." : "اختر الخدمة الرئيسية..."} 
+                                    disabled={typesLoading}
+                                    className="rounded-xl border-2"
+                                />
+                            </div>
                         </div>
-                        <div className="grid gap-3">
-                            <Label className="font-black text-xs uppercase text-slate-400 tracking-widest pr-1">المعاملات المرتبطة (القوائم المرجعية)</Label>
-                            <MultiSelect 
-                                options={transactionTypeOptions} 
-                                selected={selectedTransactionTypes} 
-                                onChange={setSelectedTransactionTypes} 
-                                placeholder={typesLoading ? "جاري جلب بيانات المنشأة..." : "اختر أنواع العمل..."} 
-                                disabled={typesLoading}
-                                className="rounded-xl border-2"
-                            />
-                        </div>
+
+                        {selectedTransactionTypeId && (
+                            <div className="grid md:grid-cols-2 gap-8 animate-in slide-in-from-top-2">
+                                <div className="grid gap-3">
+                                    <Label className="font-black text-xs uppercase text-primary tracking-widest pr-1 flex items-center gap-2">
+                                        <Layers className="h-4 w-4" /> نوع الخدمة التفصيلي (Layer 2) *
+                                    </Label>
+                                    <InlineSearchList 
+                                        value={selectedSubServiceId} 
+                                        onSelect={setSelectedSubServiceId} 
+                                        options={subServices.map(s => ({ value: s.id!, label: s.name }))} 
+                                        placeholder={isLoadingPath ? "جاري التحميل..." : "اختر التفصيل الفرعي..."} 
+                                        className="rounded-xl border-primary/20 bg-primary/5 font-black text-primary"
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </section>
 
                     <Separator className="opacity-10" />
@@ -190,60 +218,67 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                     <section className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black flex items-center gap-3 text-[#1e1b4b]">
-                                <Calculator className="h-6 w-6 text-primary"/> الدفعات المالية المبرمجة
+                                <Calculator className="h-6 w-6 text-primary"/> الدفعات المالية المبرمجة بناءً على الإنجاز
                             </h3>
                             <Button onClick={addMilestone} variant="outline" className="rounded-xl border-dashed border-2 border-primary/40 text-primary font-black gap-2 h-11 px-6 hover:bg-primary/5">
-                                <PlusCircle className="h-4 w-4"/> إضافة دفعة +
+                                <PlusCircle className="h-4 w-4"/> إضافة دفعة استحقاق +
                             </Button>
                         </div>
                         
-                        <div className="grid md:grid-cols-2 gap-6 bg-white/60 p-6 rounded-3xl border-2 border-primary/10 shadow-inner mb-6">
-                            <div className="grid gap-2">
-                                <Label className="text-[10px] font-black uppercase text-slate-400">نظام التسعير</Label>
-                                <Select value={financials?.type} onValueChange={(v: any) => setFinancials({...financials!, type: v, milestones: []})}>
-                                    <SelectTrigger className="h-11 rounded-xl border-2 font-black bg-white text-primary"><SelectValue /></SelectTrigger>
-                                    <SelectContent dir="rtl">
-                                        <SelectItem value="fixed">مبلغ ثابت (KWD)</SelectItem>
-                                        <SelectItem value="percentage">نسب مئوية (%)</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                        {!selectedSubServiceId ? (
+                            <div className="p-10 border-4 border-dashed rounded-[2.5rem] bg-muted/5 flex flex-col items-center justify-center text-center gap-3 opacity-40">
+                                <AlertTriangle className="h-10 w-10 text-slate-400" />
+                                <p className="font-black text-lg">يرجى اختيار نوع الخدمة التفصيلي (Layer 2) أولاً لتمكين ربط الدفعات بمراحل العمل.</p>
                             </div>
-                            <div className="grid gap-2">
-                                <Label className="text-[10px] font-black uppercase text-slate-400">إجمالي المبلغ التقريبي (للتحقق)</Label>
-                                <Input type="number" value={financials?.totalAmount} onChange={e => setFinancials({...financials!, totalAmount: Number(e.target.value)})} className="h-11 rounded-xl font-black text-xl text-primary bg-white border-2" />
-                            </div>
-                        </div>
+                        ) : (
+                            <>
+                                <div className="grid md:grid-cols-2 gap-6 bg-white/60 p-6 rounded-3xl border-2 border-primary/10 shadow-inner mb-6">
+                                    <div className="grid gap-2">
+                                        <Label className="text-[10px] font-black uppercase text-slate-400">نظام التسعير المعتمد</Label>
+                                        <Select value={financials?.type} onValueChange={(v: any) => setFinancials({...financials!, type: v, milestones: []})}>
+                                            <SelectTrigger className="h-11 rounded-xl border-2 font-black bg-white text-primary"><SelectValue /></SelectTrigger>
+                                            <SelectContent dir="rtl">
+                                                <SelectItem value="fixed">مبلغ ثابت (KWD)</SelectItem>
+                                                <SelectItem value="percentage">نسب مئوية (%)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label className="text-[10px] font-black uppercase text-slate-400">إجمالي قيمة العقد التقريبية (للتحقق)</Label>
+                                        <Input type="number" value={financials?.totalAmount} onChange={e => setFinancials({...financials!, totalAmount: Number(e.target.value)})} className="h-11 rounded-xl font-black text-xl text-primary bg-white border-2" />
+                                    </div>
+                                </div>
 
-                        <div className="space-y-4">
-                            {financials?.milestones.map((m, i) => (
-                                <div key={m.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center p-5 border-2 rounded-2xl bg-white hover:border-primary/30 transition-all group shadow-sm">
-                                    <div className="md:col-span-1 flex justify-center"><Badge variant="secondary" className="font-mono font-black">{i + 1}</Badge></div>
-                                    <div className="md:col-span-3">
-                                        <Label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">اسم الدفعة</Label>
-                                        <Input value={m.name} onChange={e => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, name: e.target.value} : x)})} className="h-10 border-none font-bold text-base shadow-none bg-transparent" />
-                                    </div>
-                                    <div className="md:col-span-5">
-                                        <Label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">شرط الاستحقاق الميداني</Label>
-                                        <InlineSearchList value={m.condition} onSelect={v => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, condition: v} : x)})} options={allWorkStages} placeholder="اختر مرحلة إنجاز..." className="h-10 border-dashed bg-primary/[0.02]" />
-                                    </div>
-                                    <div className="md:col-span-2 flex flex-col items-center gap-1">
-                                        <Label className="text-[9px] font-black text-slate-400 uppercase">القيمة ({financials.type === 'fixed' ? 'د.ك' : '%'})</Label>
-                                        <div className="relative">
-                                            <Input type="number" value={m.value} onChange={e => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, value: Number(e.target.value)} : x)})} className="h-10 w-24 text-center font-black text-primary text-lg border-2 rounded-lg" />
+                                <div className="space-y-4">
+                                    {financials?.milestones.map((m, i) => (
+                                        <div key={m.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center p-5 border-2 rounded-2xl bg-white hover:border-primary/30 transition-all group shadow-sm animate-in fade-in">
+                                            <div className="md:col-span-1 flex justify-center"><Badge variant="secondary" className="font-mono font-black">{i + 1}</Badge></div>
+                                            <div className="md:col-span-3">
+                                                <Label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">اسم الدفعة</Label>
+                                                <Input value={m.name} onChange={e => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, name: e.target.value} : x)})} className="h-10 border-none font-bold text-base shadow-none bg-transparent" />
+                                            </div>
+                                            <div className="md:col-span-5">
+                                                <Label className="text-[9px] font-black text-primary uppercase mb-1 block">مرحلة الإنجاز الميداني (Layer 3)</Label>
+                                                <InlineSearchList 
+                                                    value={m.condition} 
+                                                    onSelect={v => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, condition: v} : x)})} 
+                                                    options={specificWorkStages} 
+                                                    placeholder="اختر مرحلة من سير عمل الخدمة..." 
+                                                    className="h-10 border-dashed bg-primary/[0.02] border-primary/20 text-primary" 
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2 flex flex-col items-center gap-1">
+                                                <Label className="text-[9px] font-black text-slate-400 uppercase">القيمة ({financials.type === 'fixed' ? 'د.ك' : '%'})</Label>
+                                                <Input type="number" value={m.value} onChange={e => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, value: Number(e.target.value)} : x)})} className="h-10 w-24 text-center font-black text-primary text-lg border-2 rounded-lg" />
+                                            </div>
+                                            <div className="md:col-span-1 flex justify-end">
+                                                <Button variant="ghost" size="icon" onClick={() => setFinancials({...financials!, milestones: financials!.milestones.filter((x: any) => x.id !== m.id)})} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full"><Trash2 className="h-4 w-4"/></Button>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="md:col-span-1 flex justify-end">
-                                        <Button variant="ghost" size="icon" onClick={() => setFinancials({...financials!, milestones: financials!.milestones.filter((x: any) => x.id !== m.id)})} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full"><Trash2 className="h-4 w-4"/></Button>
-                                    </div>
+                                    ))}
                                 </div>
-                            ))}
-                            {financials?.milestones.length === 0 && (
-                                <div className="p-12 text-center border-4 border-dashed rounded-3xl opacity-20 bg-white">
-                                    <Calculator className="h-12 w-12 mx-auto mb-2" />
-                                    <p className="font-black">لا توجد دفعات مالية مبرمجة بعد.</p>
-                                </div>
-                            )}
-                        </div>
+                            </>
+                        )}
                     </section>
                 </div>
             </ScrollArea>
@@ -252,11 +287,11 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                 <div className="flex w-full justify-between items-center">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-white rounded-xl border shadow-inner"><ShieldCheck className="h-4 w-4 text-primary" /></div>
-                        <p className="text-[10px] font-bold text-slate-500 max-w-[200px] leading-tight">سيتم استخدام هذا القالب لتوحيد المطالبات المالية في كافة العقود الجديدة.</p>
+                        <p className="text-[10px] font-bold text-slate-500 max-w-[200px] leading-tight">سيتم ربط الدفعات آلياً بمراحل الإنجاز الميدانية (WBS) عند توقيع العقد.</p>
                     </div>
                     <div className="flex gap-4">
                         <Button variant="ghost" onClick={onClose} disabled={isSaving} className="font-bold h-12 px-8 rounded-xl">إلغاء</Button>
-                        <Button onClick={handleSave} disabled={isSaving || !title.trim()} className="h-14 px-20 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 gap-3 min-w-[320px]">
+                        <Button onClick={handleSave} disabled={isSaving || !title.trim() || !selectedSubServiceId} className="h-14 px-20 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 gap-3 min-w-[320px]">
                             {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6"/>} حفظ القالب المرجعي
                         </Button>
                     </div>

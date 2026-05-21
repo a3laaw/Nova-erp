@@ -459,7 +459,9 @@ export interface ContractTemplate extends BaseEntity {
     templateType: 'Consulting' | 'Execution';
     workNature?: 'labor_only' | 'with_materials';
     constructionTypeId?: string | null;
-    transactionTypes?: string[];
+    transactionTypeId?: string | null; // ✨ Layer 1
+    subServiceId?: string | null;    // ✨ Layer 2
+    transactionTypes?: string[];      // Deprecated in favor of ids
     termsAndConditions?: any[];
     financials?: {
         type: 'fixed' | 'percentage';
