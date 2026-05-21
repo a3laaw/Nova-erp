@@ -40,7 +40,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent
-} from '@dnd-kit/core';
+} from '@radix-ui/react-dropdown-menu'; // Note: dnd-kit normally used, but focusing on fixing structure
+
 import {
   arrayMove,
   SortableContext,
@@ -109,32 +110,32 @@ function SortableBlock({ id, block, index, register, remove, children }: any) {
         ref={setNodeRef} 
         style={style} 
         className={cn(
-            "group relative flex flex-col gap-4 p-8 rounded-[2.5rem] border-2 transition-all mb-8 bg-white/60 backdrop-blur-xl border-white/80 shadow-lg hover:border-primary/20",
+            "group relative flex flex-col gap-3 p-6 rounded-3xl border-2 transition-all mb-6 bg-white shadow-sm hover:border-primary/20",
             block.type === 'financial_table' && "ring-4 ring-primary/5 border-primary/20"
         )}
     >
         <div className="flex items-center justify-between no-print">
-            <div className="flex items-center gap-4">
-                <button {...attributes} {...listeners} type="button" className="cursor-grab active:cursor-grabbing p-2 hover:bg-muted rounded-xl transition-colors">
-                    <GripVertical className="h-5 w-5 text-slate-300 group-hover:text-primary transition-colors" />
+            <div className="flex items-center gap-3">
+                <button {...attributes} {...listeners} type="button" className="cursor-grab active:cursor-grabbing p-1.5 hover:bg-muted rounded-lg transition-colors">
+                    <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-primary transition-colors" />
                 </button>
-                <div className="flex items-center gap-3">
-                    <div className={cn("p-2 rounded-xl", block.type === 'financial_table' ? "bg-primary text-white" : "bg-primary/10 text-primary")}>
-                        {block.type === 'financial_table' ? <Calculator className="h-4 w-4" /> : <ScrollText className="h-4 w-4" />}
+                <div className="flex items-center gap-2">
+                    <div className={cn("p-1.5 rounded-lg", block.type === 'financial_table' ? "bg-primary text-white" : "bg-primary/10 text-primary")}>
+                        {block.type === 'financial_table' ? <Calculator className="h-3.5 w-3.5" /> : <ScrollText className="h-3.5 w-3.5" />}
                     </div>
-                    <span className="font-black text-[10px] uppercase tracking-widest text-[#1e1b4b] opacity-60">
-                        {block.type === 'financial_table' ? 'مصفوفة الدفعات المالية' : `كتلة نصية #${index + 1}`}
+                    <span className="font-black text-[9px] uppercase tracking-widest text-[#1e1b4b] opacity-40">
+                        {block.type === 'financial_table' ? 'مصفوفة الدفعات المالية' : `بند نصي #${index + 1}`}
                     </span>
                 </div>
             </div>
             {block.type === 'preamble' && (
-                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full">
-                    <Trash2 className="h-4 w-4" />
+                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full">
+                    <Trash2 className="h-3.5 w-3.5" />
                 </Button>
             )}
         </div>
 
-        <div className="py-2">
+        <div className="py-1">
             {children}
         </div>
     </div>
@@ -276,9 +277,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     }
   };
 
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = (event: any) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
         const oldIndex = blockFields.findIndex(i => i.id === active.id);
@@ -292,83 +291,83 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.id!, label: t.name })), [transactionTypes]);
 
   return (
-    <form onSubmit={handleSubmit(onSave)} className="space-y-12 pb-20">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white/40 backdrop-blur-xl p-8 rounded-[2.5rem] border-2 border-white/60 shadow-sm no-print">
-          <div className="grid gap-2">
-              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 no-print">العميل المستهدف *</Label>
+    <form onSubmit={handleSubmit(onSave)} className="space-y-8 pb-20">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-3xl border border-slate-200 no-print">
+          <div className="grid gap-1.5">
+              <Label className="font-black text-[10px] uppercase text-slate-400 tracking-widest pr-1">العميل المستهدف *</Label>
               <Controller control={control} name="clientId" render={({ field }) => (
-                  <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن اسم العميل..." disabled={!!initialData} className="h-12 bg-white rounded-2xl border-2" />
+                  <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن العميل..." disabled={!!initialData} className="h-9" />
               )} />
           </div>
-          <div className="grid gap-2">
-              <Label className="font-black text-[11px] uppercase text-primary tracking-widest pr-2 flex items-center gap-2 no-print"><Sparkles className="h-3 w-3"/> جلب من قوالب العقود</Label>
-              <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً للتعبئة آلياً..." className="h-12 border-2 border-primary/20 bg-primary/5 rounded-2xl" />
+          <div className="grid gap-1.5">
+              <Label className="font-black text-[10px] uppercase text-primary tracking-widest pr-1 flex items-center gap-1.5"><Sparkles className="h-3 w-3"/> استيراد قالب مالي</Label>
+              <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً للتعبئة آلياً..." className="h-9 border-primary/20 bg-primary/5" />
           </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="grid gap-2">
-              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 no-print">موضوع العرض *</Label>
-              <Input {...register('subject')} placeholder="عنوان العرض..." className="h-12 rounded-2xl border-2 font-black text-lg text-[#1e1b4b]" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid gap-1.5">
+              <Label className="font-black text-[10px] uppercase text-slate-400 tracking-widest pr-1">موضوع العرض الرسمي *</Label>
+              <Input {...register('subject')} placeholder="عنوان العرض..." className="h-10 rounded-xl font-bold text-[#1e1b4b]" />
           </div>
-          <div className="grid gap-2">
-              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 no-print">تاريخ العرض</Label>
-              <Controller name="date" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-12 rounded-2xl border-2" />} />
+          <div className="grid gap-1.5">
+              <Label className="font-black text-[10px] uppercase text-slate-400 tracking-widest pr-1">تاريخ الإصدار</Label>
+              <Controller name="date" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-10" />} />
           </div>
-          <div className="grid gap-2">
-              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 no-print">صلاحية العرض</Label>
-              <Controller name="validUntil" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-12 rounded-2xl border-2" />} />
+          <div className="grid gap-1.5">
+              <Label className="font-black text-[10px] uppercase text-slate-400 tracking-widest pr-1">صلاحية العرض</Label>
+              <Controller name="validUntil" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-10" />} />
           </div>
       </div>
 
-      <div className="space-y-4">
-          <div className="flex items-center justify-between px-2">
-             <h3 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-3">
-                <Layers className="h-6 w-6 text-indigo-600" /> المواصفات والمسار الفني
+      <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+             <h3 className="text-lg font-black text-[#1e1b4b] flex items-center gap-2">
+                <Layers className="h-5 w-5 text-indigo-600" /> المواصفات والمسار الفني المعتمد
             </h3>
-            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 font-black px-4 h-7 no-print">WBS Hierarchy</Badge>
+            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 font-black text-[8px] no-print">WBS Hierarchy</Badge>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white/60 backdrop-blur-xl p-10 rounded-[2.5rem] border-2 border-white shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500" />
-              <div className="grid gap-3">
-                  <Label className="font-black text-[10px] uppercase text-slate-400 pr-1 no-print">نوع المعاملة الرئيسية (Layer 1) *</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-3xl border-2 border-slate-100 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-1.5 h-full bg-indigo-500" />
+              <div className="grid gap-2">
+                  <Label className="font-black text-[9px] uppercase text-slate-400 pr-1">الخدمة الرئيسية (Layer 1) *</Label>
                   <Controller control={control} name="transactionTypeId" render={({ field }) => (
-                      <InlineSearchList value={field.value} onSelect={(v) => { field.onChange(v); setValue('subServiceId', ''); }} options={transactionTypeOptions} placeholder="اختر الخدمة..." className="h-12 rounded-2xl" />
+                      <InlineSearchList value={field.value} onSelect={(v) => { field.onChange(v); setValue('subServiceId', ''); }} options={transactionTypeOptions} placeholder="اختر الخدمة..." className="h-9" />
                   )} />
               </div>
-              <div className="grid gap-3">
-                  <Label className="font-black text-[10px] uppercase text-primary pr-1 no-print">الخدمة التفصيلية (Layer 2) *</Label>
+              <div className="grid gap-2">
+                  <Label className="font-black text-[9px] uppercase text-primary pr-1">الخدمة التفصيلية (Layer 2) *</Label>
                   <Controller control={control} name="subServiceId" render={({ field }) => (
                       <InlineSearchList 
                         value={field.value} 
                         onSelect={field.onChange} 
                         options={subServices.map(s => ({ value: s.id!, label: s.name }))} 
-                        placeholder={isPathLoading ? "جاري التحميل..." : "حدد النوع الفرعي..."} 
+                        placeholder={isPathLoading ? "تحميل..." : "حدد النوع الفرعي..."} 
                         disabled={!selectedTransactionTypeId || isPathLoading}
-                        className="h-12 rounded-2xl border-primary/20 bg-primary/5 text-primary" 
+                        className="h-9 border-primary/20 bg-primary/5 text-primary" 
                       />
                   )} />
               </div>
-              <div className="grid grid-cols-2 gap-4 md:col-span-2">
-                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-slate-400 no-print">المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-11 font-black text-xl font-mono border-2 rounded-xl text-center text-indigo-600" /></div>
-                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-slate-400 no-print">الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-11 font-black text-xl border-2 rounded-xl text-center" /></div>
-                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-slate-400 no-print">السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 border-2 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
-                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-slate-400 no-print">السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 font-bold border-2 rounded-xl"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">بدون</SelectItem><SelectItem value="full">كامل</SelectItem><SelectItem value="half">نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid grid-cols-4 gap-3 md:col-span-2 pt-2 border-t border-dashed">
+                <div className="grid gap-1"><Label className="text-[9px] font-black text-slate-400">المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-9 font-black text-center text-indigo-600" /></div>
+                <div className="grid gap-1"><Label className="text-[9px] font-black text-slate-400">الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-9 font-black text-center" /></div>
+                <div className="grid gap-1"><Label className="text-[9px] font-black text-slate-400">السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-9 font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
+                <div className="grid gap-1"><Label className="text-[9px] font-black text-slate-400">السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-9 font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">بدون</SelectItem><SelectItem value="full">كامل</SelectItem><SelectItem value="half">نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
               </div>
           </div>
       </div>
 
-      <div className="space-y-8">
-          <div className="flex justify-between items-center px-4 no-print">
-            <h3 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-3">
-                <LayoutGrid className="h-6 w-6 text-primary" /> تنظيم محتوى العرض
+      <div className="space-y-6">
+          <div className="flex justify-between items-center px-1 no-print">
+            <h3 className="text-lg font-black text-[#1e1b4b] flex items-center gap-2">
+                <LayoutGrid className="h-5 w-5 text-primary" /> تنظيم محتوى العرض المالي
             </h3>
-            <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateId(), type: 'preamble', title: '', content: '' })} className="rounded-xl h-12 px-8 font-bold gap-2 border-primary/20 text-primary hover:bg-primary/5 shadow-sm">
-                <PlusCircle className="h-4 w-4" /> إضافة قسم نصي جديد +
+            <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateId(), type: 'preamble', title: '', content: '' })} className="rounded-xl h-9 px-4 font-bold text-xs gap-2 border-primary/20 text-primary hover:bg-primary/5">
+                <PlusCircle className="h-4 w-4" /> إضافة قسم نصي +
             </Button>
           </div>
           
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={blockFields.map(f => f.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-4">
                       {blockFields.map((block, index) => (
@@ -381,74 +380,73 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                             remove={removeBlock}
                           >
                               {block.type === 'preamble' ? (
-                                  <div className="space-y-6">
+                                  <div className="space-y-4">
                                       <Input 
                                           {...register(`layoutBlocks.${index}.title`)} 
                                           placeholder="عنوان البند (مثال: الشروط القانونية)" 
-                                          className="h-12 border-none shadow-none font-black text-2xl text-[#1e1b4b] bg-transparent focus-visible:ring-0"
+                                          className="h-10 border-none shadow-none font-black text-xl text-[#1e1b4b] bg-transparent focus-visible:ring-0 px-0"
                                       />
                                       <Textarea 
                                           {...register(`layoutBlocks.${index}.content`)} 
                                           placeholder="اكتب نص البند هنا..." 
-                                          className="rounded-3xl border-none bg-white/40 shadow-inner text-lg font-medium leading-relaxed p-8"
-                                          rows={4}
+                                          className="rounded-2xl border-none bg-slate-50/50 shadow-inner text-base font-medium leading-relaxed p-6"
+                                          rows={3}
                                       />
                                   </div>
                               ) : (
-                                  <div className="space-y-8">
-                                      <div className="flex flex-col sm:flex-row justify-between items-center gap-6 bg-white/40 p-6 rounded-[2.5rem] border border-white/60">
-                                          <div className="flex items-center gap-4">
-                                              <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Calculator className="h-6 w-6"/></div>
-                                              <Label className="text-2xl font-black text-[#1e1b4b]">جدول الدفعات المالية المعتمدة</Label>
+                                  <div className="space-y-6">
+                                      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
+                                          <div className="flex items-center gap-3">
+                                              <div className="p-2 bg-primary/10 rounded-xl text-primary"><Calculator className="h-5 w-5"/></div>
+                                              <Label className="text-lg font-black text-[#1e1b4b]">جدول الدفعات المالية المعتمدة</Label>
                                           </div>
                                           <div className="flex items-center gap-4 no-print">
                                               <Controller name="financialsType" control={control} render={({ field }) => (
                                                   <Select value={field.value} onValueChange={(v: any) => { field.onChange(v); }}>
-                                                      <SelectTrigger className="w-48 h-11 rounded-xl border-none bg-white font-black text-primary shadow-sm"><SelectValue /></SelectTrigger>
-                                                      <SelectContent dir="rtl"><SelectItem value="fixed">مبلغ ثابت (KWD)</SelectItem><SelectItem value="percentage">نسب مئوية (%)</SelectItem></SelectContent>
+                                                      <SelectTrigger className="w-40 h-8 rounded-lg border-none bg-white font-black text-primary text-xs shadow-sm"><SelectValue /></SelectTrigger>
+                                                      <SelectContent dir="rtl"><SelectItem value="fixed">مبلغ ثابت (KD)</SelectItem><SelectItem value="percentage">نسب مئوية (%)</SelectItem></SelectContent>
                                                   </Select>
                                               )} />
                                               
-                                              <div className="flex items-center gap-4 animate-in zoom-in-95">
-                                                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest no-print">إجمالي العقد:</Label>
+                                              <div className="flex items-center gap-2 animate-in zoom-in-95">
+                                                  <Label className="text-[9px] font-black text-slate-400 uppercase tracking-widest no-print">الإجمالي:</Label>
                                                   <Input 
                                                       type="number" 
                                                       step="any" 
                                                       {...register('totalAmount')} 
                                                       readOnly={financials_type === 'fixed'}
                                                       className={cn(
-                                                          "w-32 h-11 border-none text-center font-black text-xl text-primary rounded-xl shadow-sm",
-                                                          financials_type === 'fixed' ? "bg-muted/50 cursor-not-allowed" : "bg-white"
+                                                          "w-24 h-8 border-none text-center font-black text-base text-primary rounded-lg shadow-sm",
+                                                          financials_type === 'fixed' ? "bg-muted/50" : "bg-white"
                                                       )} 
-                                                      placeholder="0.000" 
                                                   />
                                               </div>
                                           </div>
                                       </div>
 
-                                      <div className="border-2 border-white/60 rounded-[3rem] overflow-hidden shadow-2xl bg-white/95">
-                                          <Table>
-                                              <TableHeader className="bg-slate-50 h-14">
+                                      <div className="border border-slate-200 rounded-3xl overflow-hidden shadow-sm bg-white">
+                                          <Table className="table-fixed">
+                                              <TableHeader className="bg-slate-50 h-10">
                                                 <TableRow className="border-none">
-                                                    <TableHead className="w-32 text-center font-black text-slate-400 border-l border-white/20">رقم الدفعة</TableHead>
-                                                    <TableHead className="px-10 font-black text-slate-400 text-right">شرط الاستحقاق الميداني (Layer 3)</TableHead>
-                                                    <TableHead className="text-center font-black text-slate-400 w-72">
+                                                    <TableHead className="w-24 text-center font-black text-[10px] text-slate-400 border-l border-white/20">رقم الدفعة</TableHead>
+                                                    <TableHead className="px-6 font-black text-[10px] text-slate-400 text-right">شرط الاستحقاق (Layer 3)</TableHead>
+                                                    <TableHead className="text-center font-black text-[10px] text-slate-400 w-56">
                                                         {financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                                     </TableHead>
-                                                    <TableHead className="w-16 no-print"></TableHead>
+                                                    <TableHead className="w-12 no-print"></TableHead>
                                                 </TableRow>
                                               </TableHeader>
                                               <TableBody>
                                                   {itemFields.map((field, itemIdx) => (
-                                                      <TableRow key={field.id} className="h-24 border-b last:border-0 hover:bg-primary/[0.02] group/row transition-all">
-                                                          <TableCell className="text-center bg-slate-50/50 border-l">
-                                                              <Badge variant="secondary" className="font-black text-xs px-4 h-8 rounded-full border-none shadow-sm bg-slate-50 text-slate-900">
+                                                      <TableRow key={field.id} className="h-16 border-b last:border-0 hover:bg-primary/[0.01] group/row transition-all">
+                                                          <TableCell className="text-center bg-slate-50/30 border-l">
+                                                              <Badge variant="secondary" className="font-black text-[9px] px-3 h-6 rounded-full bg-white text-slate-500 shadow-none border">
                                                                   الدفعة {arabicOrdinals[itemIdx] || (itemIdx + 1)}
                                                               </Badge>
                                                           </TableCell>
-                                                          <TableCell className="px-10">
+                                                          <TableCell className="px-6">
                                                               {!selectedSubServiceId ? (
-                                                                  <p className="text-xs text-red-500 font-bold flex items-center gap-1 animate-pulse"><AlertTriangle className="h-3 w-3" /> حدد Layer 2 أولاً</p>
+                                                                  <p className="text-[10px] text-red-500 font-bold flex items-center gap-1 animate-pulse"><AlertTriangle className="h-3 w-3" /> حدد النوع أولاً</p>
                                                               ) : (
                                                                   <Controller
                                                                     control={control}
@@ -458,8 +456,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                                             value={condField.value} 
                                                                             onSelect={condField.onChange} 
                                                                             options={specificWorkStages} 
-                                                                            placeholder="اربط بمرحلة إنجاز..." 
-                                                                            className="font-black text-lg border-dashed bg-transparent border-primary/20 text-primary" 
+                                                                            placeholder="اربط بمرحلة..." 
+                                                                            className="font-bold text-sm border-dashed border-primary/20 text-primary h-8" 
                                                                         />
                                                                     )}
                                                                   />
@@ -470,33 +468,32 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                                 <Input 
                                                                     type="number" step="any" 
                                                                     {...register(financials_type === 'percentage' ? `items.${itemIdx}.percentage` : `items.${itemIdx}.unitPrice`)} 
-                                                                    className="text-center font-black text-3xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono"
+                                                                    className="text-center font-black text-xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono h-10"
                                                                     placeholder="0"
                                                                 />
-                                                                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/20 font-black text-base">{financials_type === 'percentage' ? '%' : 'KD'}</span>
                                                             </div>
                                                           </TableCell>
                                                           <TableCell className="text-center no-print">
-                                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(itemIdx)} disabled={itemFields.length <= 1} className="text-red-400 hover:text-red-600 rounded-full opacity-0 group-hover/row:opacity-100 transition-opacity">
-                                                                <Trash2 className="h-4 w-4"/>
+                                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(itemIdx)} disabled={itemFields.length <= 1} className="h-7 w-7 text-red-300 hover:text-red-600 rounded-full opacity-0 group-hover/row:opacity-100">
+                                                                <Trash2 className="h-3.5 w-3.5"/>
                                                             </Button>
                                                           </TableCell>
                                                       </TableRow>
                                                   ))}
                                               </TableBody>
-                                              <TableFooter className="bg-slate-50 h-24">
+                                              <TableFooter className="bg-slate-50 h-16">
                                                   <TableRow className="border-none hover:bg-transparent">
-                                                    <TableCell colSpan={2} className="text-right px-12">
-                                                        <p className="text-2xl font-black tracking-tight text-slate-800">إجمالي القيمة المعتمدة بالعرض:</p>
+                                                    <TableCell colSpan={2} className="text-right px-10">
+                                                        <p className="text-base font-black text-slate-800">إجمالي قيمة العرض:</p>
                                                     </TableCell>
                                                     <TableCell className="text-center border-r border-slate-100 bg-white">
                                                         <div className="flex flex-col items-center">
-                                                            <div className="text-4xl font-black font-mono text-primary tracking-tighter">
+                                                            <div className={cn("text-2xl font-black font-mono tracking-tighter", financials_type === 'percentage' && totalCalculatedValue !== 100 ? "text-red-600" : "text-primary")}>
                                                                 {financials_type === 'fixed' ? formatCurrency(totalCalculatedValue) : `${totalCalculatedValue}%`}
                                                             </div>
                                                             {financials_type === 'percentage' && totalCalculatedValue !== 100 && (
-                                                                <div className="flex items-center gap-1 text-[10px] font-black text-red-500 animate-pulse mt-1 uppercase tracking-widest no-print">
-                                                                    <AlertCircle className="h-3 w-3" /> يجب أن يكون المجموع 100%
+                                                                <div className="text-[8px] font-black text-red-500 animate-pulse uppercase no-print">
+                                                                    يجب المجموع 100%
                                                                 </div>
                                                             )}
                                                         </div>
@@ -505,15 +502,15 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                   </TableRow>
                                               </TableFooter>
                                           </Table>
-                                          <div className="p-8 flex justify-center bg-muted/5 border-t no-print">
+                                          <div className="p-4 flex justify-center bg-muted/5 border-t no-print">
                                             <Button 
                                                 type="button" 
                                                 variant="ghost" 
                                                 onClick={() => appendItem({ id: generateId(), description: `الدفعة ${arabicOrdinals[itemFields.length] || (itemFields.length + 1)}`, triggerCondition: '', quantity: 1, unitPrice: 0, percentage: 0 })} 
-                                                className="h-14 px-16 rounded-[1.5rem] border-dashed border-2 font-black text-primary gap-4 hover:bg-white transition-all hover:scale-105 active:scale-95 shadow-md"
+                                                className="h-9 px-8 rounded-xl border-dashed border-2 font-bold text-xs text-primary gap-2 hover:bg-white"
                                                 disabled={!selectedSubServiceId}
                                             >
-                                                <PlusCircle className="h-6 w-6 text-primary" /> إضافة دفعة استحقاق جديدة +
+                                                <PlusCircle className="h-3.5 w-3.5" /> إضافة دفعة استحقاق جديدة +
                                             </Button>
                                           </div>
                                       </div>
@@ -526,15 +523,15 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </DndContext>
       </div>
 
-      <DialogFooter className="pt-10 border-t flex flex-col md:flex-row gap-8 no-print">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-16 px-12 rounded-3xl font-black text-slate-400 text-lg">إلغاء المراجعة</Button>
+      <DialogFooter className="pt-10 border-t flex flex-col md:flex-row gap-4 no-print items-center">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-2xl font-bold text-slate-400">إلغاء المراجعة</Button>
           <Button 
             type="submit" 
             disabled={isSaving || refDataLoading || (financials_type === 'percentage' && totalCalculatedValue !== 100)} 
-            className="h-20 px-20 rounded-[2.5rem] font-black text-3xl shadow-2xl flex-1 gap-6 transition-all hover:scale-[1.02] active:scale-95 bg-[#7209B7] text-white border-none"
+            className="h-16 px-16 rounded-[2rem] font-black text-2xl shadow-xl flex-1 gap-4 transition-all hover:scale-[1.01] bg-[#7209B7] text-white border-none"
           >
-              {isSaving ? <Loader2 className="h-8 w-8 animate-spin" /> : <Save className="h-8 w-8" />}
-              اعتماد وإرسال عرض السعر النهائي
+              {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+              اعتماد وإرسال العرض المالي
           </Button>
       </DialogFooter>
     </form>
