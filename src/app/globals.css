@@ -67,7 +67,7 @@
   }
 }
 
-/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة 🛡️ */
+/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (Sovereign Opaque Guard) 🛡️ */
 [data-radix-portal] {
   z-index: 999999999 !important;
 }
@@ -77,6 +77,9 @@
   z-index: 999999999 !important;
   pointer-events: auto !important;
   background-color: transparent !important;
+  /* حذف أي براويز أو ظلال خارجية تسبب التكرار */
+  border: none !important;
+  box-shadow: none !important;
 }
 
 [role="listbox"], 
@@ -86,10 +89,10 @@
 .react-select__menu {
   z-index: 999999999 !important;
   pointer-events: auto !important;
-  background-color: white !important;
+  background-color: white !important; /* خلفية مصمتة 100% */
   background-image: none !important;
   opacity: 1 !important;
-  border: 2px solid #FF7A00 !important;
+  border: 2px solid #FF7A00 !important; /* برواز برتقالي وحيد */
   border-radius: 1.5rem !important;
   box-shadow: 0 25px 60px rgba(255, 122, 0, 0.3) !important;
 }
@@ -116,11 +119,6 @@
     margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
-  }
-  
-  /* إخفاء الهوامش التقنية تماماً */
-  .internal-label, .layer-tag {
-    display: none !important;
   }
 }
 
