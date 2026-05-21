@@ -40,7 +40,7 @@
     min-height: 100vh;
   }
 
-  /* 🛡️ حذف أزرار الأرقام (Arrows/Spinners) لجعل الكتابة حرة 🛡️ */
+  /* 🛡️ حذف أزرار الأرقام لجعل الكتابة حرة 🛡️ */
   input::-webkit-outer-spin-button,
   input::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -77,14 +77,11 @@
   }
 }
 
-/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (V146.0) 🛡️ */
-/* فرض السيادة الوظيفية فقط دون تكرار البراويز أو الظلال المزدوجة */
-
+/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة 🛡️ */
 [data-radix-portal] {
   z-index: 999999999 !important;
 }
 
-/* منع تكرار البرواز والظل في الغلاف الخارجي لضمان مظهر نظيف */
 [data-radix-popper-content-wrapper], 
 .react-select__menu-portal {
   z-index: 999999999 !important;
@@ -94,7 +91,6 @@
   box-shadow: none !important;
 }
 
-/* تطهير محتوى القوائم المباشر ليكون مصمتاً وأنيقاً بقطعة واحدة */
 [role="listbox"], 
 [role="menu"], 
 [data-radix-select-content], 
@@ -136,26 +132,25 @@
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
 @keyframes spin-glow {
-  0% { transform: rotate(0deg); filter: drop-shadow(0 0 5px #FF7A00); }
-  50% { filter: drop-shadow(0 0 15px #FFB000); }
-  100% { transform: rotate(360deg); filter: drop-shadow(0 0 5px #FF7A00); }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .animate-spin-glow {
-  animation: spin-glow 1.2s linear infinite;
+  animation: spin-glow 1.5s linear infinite;
 }
 
 @keyframes gold-reverse-aura {
-  0% { transform: rotate(360deg); opacity: 0.4; }
-  50% { opacity: 0.8; scale: 1.1; }
-  100% { transform: rotate(0deg); opacity: 0.4; }
+  0% { transform: rotate(360deg); opacity: 0.2; }
+  50% { opacity: 0.5; scale: 1.05; }
+  100% { transform: rotate(0deg); opacity: 0.2; }
 }
 
 .animate-gold-reverse {
-  animation: gold-reverse-aura 3s linear infinite;
+  animation: gold-reverse-aura 4s linear infinite;
 }
 
 .gold-glow-filter {
-  filter: blur(20px);
+  filter: blur(12px); /* Reduced for performance */
   background: radial-gradient(circle, #FFD700 0%, transparent 70%);
 }

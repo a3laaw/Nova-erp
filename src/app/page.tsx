@@ -26,18 +26,18 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * شعار نوفا المعتمد (NOVA Text Logo):
- * تم تكبير الخط بنسبة 25% (من 32 إلى 40) مع التوهج المداري.
+ * تمركز مطلق وتصميم خفيف.
  */
 const NovaLogo = () => (
-  <svg width="120" height="50" viewBox="0 0 120 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="100" height="40" viewBox="0 0 100 40" fill="none" xmlns="http://www.w3.org/2000/svg">
     <text 
       x="50%" 
-      y="50%" 
+      y="55%" 
       dominantBaseline="middle" 
       textAnchor="middle" 
       fontFamily="inherit" 
       fontWeight="900" 
-      fontSize="40" 
+      fontSize="32" 
       fill="#FF7A00"
     >
       NOVA
@@ -104,19 +104,16 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
-          <div className="relative flex flex-col items-center justify-center">
-              {/* الدائرة المتوهجة */}
-              <div className="h-40 w-40 rounded-full border-4 border-slate-100 border-t-[#FF7A00] animate-spin-glow shadow-[0_0_30px_rgba(255,122,0,0.2)]" />
+          <div className="relative flex items-center justify-center w-48 h-48">
+              {/* الدائرة المتوهجة الخفيفة */}
+              <div className="absolute inset-0 rounded-full border-2 border-slate-100 border-t-[#FF7A00] animate-spin-glow" />
               
-              <div className="absolute inset-0 flex items-center justify-center">
-                  {/* الهالة الذهبية العكسية */}
-                  <div className="absolute h-24 w-24 gold-glow-filter animate-gold-reverse rounded-full" />
-                  
-                  <div className="relative z-10">
-                      <NovaLogo />
-                  </div>
+              <div className="absolute h-24 w-24 gold-glow-filter animate-gold-reverse rounded-full" />
+              
+              <div className="relative z-10">
+                  <NovaLogo />
               </div>
-              <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter mt-12">جاري التحميل...</p>
+              <p className="absolute -bottom-16 text-[#1e1b4b] font-black text-xl tracking-tighter">جاري التحميل...</p>
           </div>
       </div>
     );
@@ -124,10 +121,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-white/10 relative overflow-hidden" dir="rtl">
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#FFB000]/10 rounded-full blur-[100px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/10 rounded-full blur-[100px] animate-pulse" />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#FFB000]/5 rounded-full blur-[80px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/5 rounded-full blur-[80px] pointer-events-none" />
 
-      <div className="p-1.5 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#FF7A00] shadow-[0_25px_80px_-15px_rgba(255,122,0,0.25)] animate-in zoom-in-95 duration-1000 relative z-10">
+      <div className="p-1 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#FF7A00] shadow-2xl animate-in zoom-in-95 duration-1000 relative z-10">
         <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
             <CardHeader className="py-10 px-8 text-center">
                 <div className="bg-gradient-to-br from-[#FF7A00] to-[#E66D00] p-6 rounded-[2.2rem] w-fit mx-auto mb-6 shadow-xl border-4 border-white/30 transition-transform hover:scale-105 duration-500">
