@@ -12,10 +12,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Printer, ArrowUp, ArrowDown, Scale } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { PrintableDocument } from '@/components/layout/printable-document';
 import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/context/auth-context';
 import {
   Table,
   TableBody,
@@ -40,13 +41,15 @@ interface DailyReportData {
 
 export default function DailyFinancialReportPage() {
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const { branding, loading: brandingLoading } = useBranding();
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [reportData, setReportData] = useState<DailyReportData | null>(null);
     const [loading, setLoading] = useState(false);
+    const tenantId = currentUser?.currentCompanyId;
 
     useEffect(() => {
-        if (!firestore || !date) return;
+        if (!firestore || !date || !tenantId) return;
         
         const fetchReportData = async () => {
             setLoading(true);
@@ -56,11 +59,16 @@ export default function DailyFinancialReportPage() {
                 const dayEnd = new Date(date);
                 dayEnd.setHours(23, 59, 59, 999);
 
+                const receiptsPath = getTenantPath('cashReceipts', tenantId);
+                const paymentsPath = getTenantPath('paymentVouchers', tenantId);
+                const coaPath = getTenantPath('chartOfAccounts', tenantId);
+                const jesPath = getTenantPath('journalEntries', tenantId);
+
                 const [receiptsSnap, paymentsSnap, accountsSnap, entriesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'cashReceipts'), where('receiptDate', '>=', Timestamp.fromDate(dayStart)), where('receiptDate', '<=', Timestamp.fromDate(dayEnd)))),
-                    getDocs(query(collection(firestore, 'paymentVouchers'), where('paymentDate', '>=', Timestamp.fromDate(dayStart)), where('paymentDate', '<=', Timestamp.fromDate(dayEnd)))),
-                    getDocs(query(collection(firestore, 'chartOfAccounts'))),
-                    getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted'))),
+                    getDocs(query(collection(firestore, receiptsPath!), where('receiptDate', '>=', Timestamp.fromDate(dayStart)), where('receiptDate', '<=', Timestamp.fromDate(dayEnd)))),
+                    getDocs(query(collection(firestore, paymentsPath!), where('paymentDate', '>=', Timestamp.fromDate(dayStart)), where('paymentDate', '<=', Timestamp.fromDate(dayEnd)))),
+                    getDocs(query(collection(firestore, coaPath!))),
+                    getDocs(query(collection(firestore, jesPath!), where('status', '==', 'posted'))),
                 ]);
 
                 const receipts = receiptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CashReceipt));
@@ -101,7 +109,7 @@ export default function DailyFinancialReportPage() {
         };
 
         fetchReportData();
-    }, [firestore, date]);
+    }, [firestore, date, tenantId]);
 
     const handlePrint = () => { window.print(); };
 
