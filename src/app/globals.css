@@ -41,8 +41,8 @@
   }
 
   /* 🛡️ حذف أزرار الأرقام لجعل الكتابة حرة 🛡️ */
-  input::-webkit-outer-spin-button,
-  input::-webkit-inner-spin-button {
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
   }
@@ -59,22 +59,6 @@
     border: 1px solid rgba(255, 122, 0, 0.1);
     box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
   }
-  
-  .nav-item-box {
-    @apply flex items-center gap-4 p-4 rounded-[1.8rem] transition-all duration-300;
-  }
-
-  .nav-item-box-active {
-    background: #FF7A00 !important;
-    color: white !important;
-    box-shadow: 0 10px 30px -5px rgba(255, 122, 0, 0.4) !important;
-    @apply scale-[1.02];
-  }
-
-  .glass-3d-button {
-    background: linear-gradient(135deg, #FFB000 0%, #FF7A00 100%);
-    @apply border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 transition-all shadow-xl shadow-orange-500/20 text-white font-black;
-  }
 }
 
 /* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة 🛡️ */
@@ -87,8 +71,6 @@
   z-index: 999999999 !important;
   pointer-events: auto !important;
   background-color: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
 }
 
 [role="listbox"], 
@@ -101,56 +83,39 @@
   background-color: white !important;
   background-image: none !important;
   opacity: 1 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
   border: 2px solid #FF7A00 !important;
   border-radius: 1rem !important;
-  box-shadow: 0 25px 60px rgba(255, 122, 0, 0.2) !important;
+  box-shadow: 0 25px 60px rgba(255, 122, 0, 0.3) !important;
 }
 
-[role="menuitem"], [role="option"], [cmdk-item], .react-select__option {
-    cursor: pointer !important;
-    pointer-events: auto !important;
-    font-weight: 700 !important;
-    color: #1e1b4b !important;
-    padding: 12px 16px !important;
-    transition: all 0.2s ease !important;
-    background-color: transparent !important;
-    border-radius: 0.75rem !important;
-    margin: 2px 4px !important;
-}
+/* 🛡️ محرك التطهير من الطباعة (Sovereign Print Guard) 🛡️ */
+@media print {
+  .no-print, 
+  button, 
+  .sidebar-trigger,
+  [data-sidebar],
+  .dropdown-menu,
+  .alert-circle,
+  .trash-icon {
+    display: none !important;
+  }
 
-[role="menuitem"]:hover, 
-[role="option"][aria-selected="true"], 
-[role="option"]:hover,
-.react-select__option--is-focused,
-.react-select__option--is-selected {
-    background-color: #FF7A00 !important;
-    color: white !important;
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .printable-area {
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  /* إخفاء الهوامش التقنية تماماً */
+  .internal-label, .layer-tag {
+    display: none !important;
+  }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
-
-@keyframes spin-glow {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.animate-spin-glow {
-  animation: spin-glow 1.5s linear infinite;
-}
-
-@keyframes gold-reverse-aura {
-  0% { transform: rotate(360deg); opacity: 0.2; }
-  50% { opacity: 0.5; scale: 1.05; }
-  100% { transform: rotate(0deg); opacity: 0.2; }
-}
-
-.animate-gold-reverse {
-  animation: gold-reverse-aura 4s linear infinite;
-}
-
-.gold-glow-filter {
-  filter: blur(12px); /* Reduced for performance */
-  background: radial-gradient(circle, #FFD700 0%, transparent 70%);
-}

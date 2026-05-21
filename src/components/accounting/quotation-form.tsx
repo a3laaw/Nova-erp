@@ -159,7 +159,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         layoutBlocks: [
             { id: 'initial-table', type: 'financial_table' }
         ],
-        items: [{ id: generateStableId(), description: 'الدفعة الأولى', triggerCondition: '', quantity: 1, unitPrice: 0 }]
+        items: [{ id: generateId(), description: 'الدفعة الأولى', triggerCondition: '', quantity: 1, unitPrice: 0 }]
     }
   });
 
@@ -214,7 +214,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     setValue('totalAmount', template.financials?.totalAmount || 0);
     
     const newItems = template.financials?.milestones?.map((m, idx) => ({
-      id: generateStableId(), 
+      id: generateId(), 
       description: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
       triggerCondition: m.name, 
       quantity: 1,
@@ -242,28 +242,28 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     <form onSubmit={handleSubmit(onSave)} className="space-y-12 pb-20">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white/40 backdrop-blur-xl p-8 rounded-[2.5rem] border-2 border-white/60 shadow-sm no-print">
           <div className="grid gap-2">
-              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2">العميل المستهدف *</Label>
+              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 no-print">العميل المستهدف *</Label>
               <Controller control={control} name="clientId" render={({ field }) => (
                   <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن اسم العميل..." disabled={!!initialData} className="h-12 bg-white rounded-2xl border-2" />
               )} />
           </div>
           <div className="grid gap-2">
-              <Label className="font-black text-[11px] uppercase text-primary tracking-widest pr-2 flex items-center gap-2"><Sparkles className="h-3 w-3"/> جلب من القوالب</Label>
+              <Label className="font-black text-[11px] uppercase text-primary tracking-widest pr-2 flex items-center gap-2 no-print"><Sparkles className="h-3 w-3"/> جلب من القوالب</Label>
               <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً للتعبئة آلياً..." className="h-12 border-2 border-primary/20 bg-primary/5 rounded-2xl" />
           </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="grid gap-2 md:col-span-1">
-              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2">موضوع العرض *</Label>
+              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 no-print">موضوع العرض *</Label>
               <Input {...register('subject')} placeholder="عنوان العرض..." className="h-12 rounded-2xl border-2 font-black text-lg text-[#1e1b4b]" />
           </div>
           <div className="grid gap-2">
-              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2">تاريخ العرض</Label>
+              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 no-print">تاريخ العرض</Label>
               <Controller name="date" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-12 rounded-2xl border-2" />} />
           </div>
           <div className="grid gap-2">
-              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2">صلاحية العرض</Label>
+              <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 no-print">صلاحية العرض</Label>
               <Controller name="validUntil" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-12 rounded-2xl border-2" />} />
           </div>
       </div>
@@ -274,10 +274,10 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 bg-white/60 backdrop-blur-xl p-10 rounded-[2.5rem] border-2 border-white shadow-xl items-end relative overflow-hidden">
               <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500" />
-              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400">المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-12 font-black text-2xl font-mono border-2 rounded-xl text-center text-indigo-600" /></div>
-              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400">الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-12 font-black text-xl border-2 rounded-xl text-center" /></div>
-              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400">السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-12 border-2 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
-              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400">السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-12 border-2 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">بدون</SelectItem><SelectItem value="full">كامل</SelectItem><SelectItem value="half">نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400 no-print">المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-12 font-black text-2xl font-mono border-2 rounded-xl text-center text-indigo-600" /></div>
+              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400 no-print">الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-12 font-black text-xl border-2 rounded-xl text-center" /></div>
+              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400 no-print">السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-12 border-2 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-2"><Label className="text-[11px] font-black uppercase text-slate-400 no-print">السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-12 border-2 rounded-xl font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">بدون</SelectItem><SelectItem value="full">كامل</SelectItem><SelectItem value="half">نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
           </div>
       </div>
 
@@ -286,7 +286,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
             <h3 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-3">
                 <LayoutGrid className="h-6 w-6 text-primary" /> تنظيم هيكل الوثيقة
             </h3>
-            <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateStableId(), type: 'preamble', title: '', content: '' })} className="rounded-xl h-12 px-8 font-bold gap-2 border-primary/20 text-primary hover:bg-primary/5">
+            <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateId(), type: 'preamble', title: '', content: '' })} className="rounded-xl h-12 px-8 font-bold gap-2 border-primary/20 text-primary hover:bg-primary/5">
                 <PlusCircle className="h-4 w-4" /> إضافة ديباجة أو بند نصي +
             </Button>
           </div>
@@ -333,7 +333,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                               )} />
                                               {financials_type === 'percentage' && (
                                                   <div className="flex items-center gap-4 animate-in zoom-in-95">
-                                                      <Label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">قيمة العقد:</Label>
+                                                      <Label className="text-[11px] font-black text-slate-400 uppercase tracking-widest no-print">قيمة العقد:</Label>
                                                       <Input type="number" step="any" {...register('totalAmount')} className="w-32 h-11 bg-white border-none text-center font-black text-xl text-primary rounded-xl shadow-sm" placeholder="0.000" />
                                                   </div>
                                               )}
@@ -349,7 +349,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                     <TableHead className="text-center font-black text-slate-400 w-72">
                                                         {financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                                     </TableHead>
-                                                    <TableHead className="w-16"></TableHead>
+                                                    <TableHead className="w-16 no-print"></TableHead>
                                                 </TableRow>
                                               </TableHeader>
                                               <TableBody>
@@ -398,7 +398,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                                 {financials_type === 'fixed' ? formatCurrency(totalCalculatedValue) : `${totalCalculatedValue}%`}
                                                             </div>
                                                             {financials_type === 'percentage' && totalCalculatedValue !== 100 && (
-                                                                <span className="text-[10px] font-black text-red-500 animate-pulse mt-1 uppercase tracking-widest">يجب أن يكون المجموع 100%</span>
+                                                                <span className="text-[10px] font-black text-red-500 animate-pulse mt-1 uppercase tracking-widest no-print">يجب أن يكون المجموع 100%</span>
                                                             )}
                                                         </div>
                                                     </TableCell>
@@ -410,7 +410,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                             <Button 
                                                 type="button" 
                                                 variant="ghost" 
-                                                onClick={() => appendItem({ id: generateStableId(), description: `الدفعة ${arabicOrdinals[itemFields.length] || (itemFields.length + 1)}`, triggerCondition: '', quantity: 1, unitPrice: 0 })} 
+                                                onClick={() => appendItem({ id: generateId(), description: `الدفعة ${arabicOrdinals[itemFields.length] || (itemFields.length + 1)}`, triggerCondition: '', quantity: 1, unitPrice: 0 })} 
                                                 className="h-14 px-16 rounded-[1.5rem] border-dashed border-2 font-black text-primary gap-4 hover:bg-white transition-all hover:scale-105 active:scale-95 shadow-md"
                                             >
                                                 <PlusCircle className="h-6 w-6 text-primary" /> إضافة دفعة استحقاق جديدة +

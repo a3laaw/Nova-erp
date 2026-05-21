@@ -165,7 +165,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent dir="rtl" className="max-w-5xl h-[90vh] flex flex-col p-0 rounded-2xl border-none shadow-2xl overflow-hidden bg-white">
-            <DialogHeader className={cn("p-8 border-b text-white shrink-0", templateType === 'Consulting' ? "bg-primary" : "bg-amber-600")}>
+            <DialogHeader className={cn("p-8 border-b text-white shrink-0 no-print", templateType === 'Consulting' ? "bg-primary" : "bg-amber-600")}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 text-right">
                         <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/20">
@@ -184,11 +184,11 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                     <section className="space-y-6">
                         <div className="grid md:grid-cols-2 gap-8">
                             <div className="grid gap-3">
-                                <Label className="font-black text-xs uppercase text-slate-400 tracking-widest pr-1">عنوان القالب المرجعي *</Label>
+                                <Label className="font-black text-xs uppercase text-slate-400 tracking-widest pr-1 no-print">عنوان القالب المرجعي *</Label>
                                 <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: عقد هيكل أسود مصنعية..." className="h-12 rounded-xl text-lg font-bold border-2" />
                             </div>
                             <div className="grid gap-3">
-                                <Label className="font-black text-xs uppercase text-slate-400 tracking-widest pr-1">نوع المعاملة الرئيسية (Layer 1)</Label>
+                                <Label className="font-black text-xs uppercase text-slate-400 tracking-widest pr-1 no-print">نوع المعاملة الرئيسية (Layer 1)</Label>
                                 <InlineSearchList 
                                     value={selectedTransactionTypeId} 
                                     onSelect={v => { setSelectedTransactionTypeId(v); setSelectedSubServiceId(''); }} 
@@ -203,7 +203,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                         {selectedTransactionTypeId && (
                             <div className="grid md:grid-cols-2 gap-8 animate-in slide-in-from-top-2">
                                 <div className="grid gap-3">
-                                    <Label className="font-black text-xs uppercase text-primary tracking-widest pr-1 flex items-center gap-2">
+                                    <Label className="font-black text-xs uppercase text-primary tracking-widest pr-1 flex items-center gap-2 no-print">
                                         <Layers className="h-4 w-4" /> نوع الخدمة التفصيلي (Layer 2) *
                                     </Label>
                                     <InlineSearchList 
@@ -218,10 +218,10 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                         )}
                     </section>
 
-                    <Separator className="opacity-10" />
+                    <Separator className="opacity-10 no-print" />
 
                     <section className="space-y-6">
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center no-print">
                             <h3 className="text-xl font-black flex items-center gap-3 text-[#1e1b4b]">
                                 <Calculator className="h-6 w-6 text-primary"/> الدفعات المالية المبرمجة بناءً على الإنجاز
                             </h3>
@@ -231,13 +231,13 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                         </div>
                         
                         {!selectedSubServiceId ? (
-                            <div className="p-10 border-4 border-dashed rounded-[2.5rem] bg-muted/5 flex flex-col items-center justify-center text-center gap-3 opacity-40">
+                            <div className="p-10 border-4 border-dashed rounded-[2.5rem] bg-muted/5 flex flex-col items-center justify-center text-center gap-3 opacity-40 no-print">
                                 <AlertTriangle className="h-10 w-10 text-slate-400" />
                                 <p className="font-black text-lg">يرجى اختيار نوع الخدمة التفصيلي (Layer 2) أولاً لتمكين ربط الدفعات بمراحل العمل.</p>
                             </div>
                         ) : (
                             <>
-                                <div className="grid md:grid-cols-2 gap-6 bg-white/60 p-6 rounded-3xl border-2 border-primary/10 shadow-inner mb-6">
+                                <div className="grid md:grid-cols-2 gap-6 bg-white/60 p-6 rounded-3xl border-2 border-primary/10 shadow-inner mb-6 no-print">
                                     <div className="grid gap-2">
                                         <Label className="text-[10px] font-black uppercase text-slate-400">نظام التسعير المعتمد</Label>
                                         <Select value={financials?.type} onValueChange={(v: any) => setFinancials({...financials!, type: v, milestones: []})}>
@@ -259,11 +259,11 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                         <div key={m.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center p-5 border-2 rounded-2xl bg-white hover:border-primary/30 transition-all group shadow-sm animate-in fade-in">
                                             <div className="md:col-span-1 flex justify-center"><Badge variant="secondary" className="font-mono font-black">{i + 1}</Badge></div>
                                             <div className="md:col-span-3">
-                                                <Label className="text-[9px] font-black text-slate-400 uppercase mb-1 block">اسم الدفعة</Label>
+                                                <Label className="text-[9px] font-black text-slate-400 uppercase mb-1 block no-print">اسم الدفعة</Label>
                                                 <Input value={m.name} onChange={e => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, name: e.target.value} : x)})} className="h-10 border-none font-bold text-base shadow-none bg-transparent" />
                                             </div>
                                             <div className="md:col-span-5">
-                                                <Label className="text-[9px] font-black text-primary uppercase mb-1 block">مرحلة الإنجاز الميداني (Layer 3)</Label>
+                                                <Label className="text-[9px] font-black text-primary uppercase mb-1 block no-print">مرحلة الإنجاز الميداني (Layer 3)</Label>
                                                 <InlineSearchList 
                                                     value={m.condition} 
                                                     onSelect={v => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, condition: v} : x)})} 
@@ -273,10 +273,10 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                                 />
                                             </div>
                                             <div className="md:col-span-2 flex flex-col items-center gap-1">
-                                                <Label className="text-[9px] font-black text-slate-400 uppercase">القيمة ({financials.type === 'fixed' ? 'د.ك' : '%'})</Label>
+                                                <Label className="text-[9px] font-black text-slate-400 uppercase no-print">القيمة ({financials.type === 'fixed' ? 'د.ك' : '%'})</Label>
                                                 <Input type="number" value={m.value} onChange={e => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, value: Number(e.target.value)} : x)})} className="h-10 w-24 text-center font-black text-primary text-lg border-2 rounded-lg" />
                                             </div>
-                                            <div className="md:col-span-1 flex justify-end">
+                                            <div className="md:col-span-1 flex justify-end no-print">
                                                 <Button variant="ghost" size="icon" onClick={() => setFinancials({...financials!, milestones: financials!.milestones.filter((x: any) => x.id !== m.id)})} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full"><Trash2 className="h-4 w-4"/></Button>
                                             </div>
                                         </div>
@@ -288,7 +288,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                 </div>
             </ScrollArea>
 
-            <DialogFooter className="p-8 border-t bg-muted/10 shrink-0">
+            <DialogFooter className="p-8 border-t bg-muted/10 shrink-0 no-print">
                 <div className="flex w-full justify-between items-center">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-white rounded-xl border shadow-inner"><ShieldCheck className="h-4 w-4 text-primary" /></div>
