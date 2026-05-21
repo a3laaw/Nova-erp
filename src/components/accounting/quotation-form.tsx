@@ -13,12 +13,13 @@ import {
     Calculator, Ruler, Building2, Layers,
     GripVertical,
     ScrollText,
-    Sparkles
+    Sparkles,
+    AlertCircle
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import type { Client, Quotation, ContractTemplate } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData, cn, getTenantPath, generateStableId } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -45,8 +46,10 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable
-} from '@dnd-kit/sortable';
+} from '@radix-ui/react-sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+const generateId = () => Math.random().toString(36).substring(2, 9);
 
 const itemSchema = z.object({
   id: z.string(),
@@ -326,17 +329,26 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                           </div>
                                           <div className="flex items-center gap-4 no-print">
                                               <Controller name="financialsType" control={control} render={({ field }) => (
-                                                  <Select value={field.value} onValueChange={(v: any) => { field.onChange(v); if(v === 'fixed') setValue('totalAmount', totalCalculatedValue); }}>
+                                                  <Select value={field.value} onValueChange={(v: any) => { field.onChange(v); }}>
                                                       <SelectTrigger className="w-48 h-11 rounded-xl border-none bg-white font-black text-primary shadow-sm"><SelectValue /></SelectTrigger>
                                                       <SelectContent dir="rtl"><SelectItem value="fixed">مبلغ ثابت (KWD)</SelectItem><SelectItem value="percentage">نسب مئوية (%)</SelectItem></SelectContent>
                                                   </Select>
                                               )} />
-                                              {financials_type === 'percentage' && (
-                                                  <div className="flex items-center gap-4 animate-in zoom-in-95">
-                                                      <Label className="text-[11px] font-black text-slate-400 uppercase tracking-widest no-print">قيمة العقد:</Label>
-                                                      <Input type="number" step="any" {...register('totalAmount')} className="w-32 h-11 bg-white border-none text-center font-black text-xl text-primary rounded-xl shadow-sm" placeholder="0.000" />
-                                                  </div>
-                                              )}
+                                              
+                                              <div className="flex items-center gap-4 animate-in zoom-in-95">
+                                                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest no-print">إجمالي العقد:</Label>
+                                                  <Input 
+                                                      type="number" 
+                                                      step="any" 
+                                                      {...register('totalAmount')} 
+                                                      readOnly={financials_type === 'fixed'}
+                                                      className={cn(
+                                                          "w-32 h-11 border-none text-center font-black text-xl text-primary rounded-xl shadow-sm",
+                                                          financials_type === 'fixed' ? "bg-muted/50 cursor-not-allowed" : "bg-white"
+                                                      )} 
+                                                      placeholder="0.000" 
+                                                  />
+                                              </div>
                                           </div>
                                       </div>
 
@@ -356,8 +368,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                   {itemFields.map((field, itemIdx) => (
                                                       <TableRow key={field.id} className="h-24 border-b last:border-0 hover:bg-primary/[0.02] group/row transition-all">
                                                           <TableCell className="text-center bg-slate-50/50 border-l">
-                                                              <Badge variant="secondary" className="font-black text-xs px-4 h-8 rounded-full border-none shadow-sm">
-                                                                  {watchedItems?.[itemIdx]?.description || `الدفعة ${itemIdx+1}`}
+                                                              <Badge variant="secondary" className="font-black text-xs px-4 h-8 rounded-full border-none shadow-sm bg-white text-slate-900">
+                                                                  الدفعة {arabicOrdinals[itemIdx] || (itemIdx + 1)}
                                                               </Badge>
                                                           </TableCell>
                                                           <TableCell className="px-10">
@@ -398,7 +410,9 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                                 {financials_type === 'fixed' ? formatCurrency(totalCalculatedValue) : `${totalCalculatedValue}%`}
                                                             </div>
                                                             {financials_type === 'percentage' && totalCalculatedValue !== 100 && (
-                                                                <span className="text-[10px] font-black text-red-500 animate-pulse mt-1 uppercase tracking-widest no-print">يجب أن يكون المجموع 100%</span>
+                                                                <div className="flex items-center gap-1 text-[10px] font-black text-red-500 animate-pulse mt-1 uppercase tracking-widest no-print">
+                                                                    <AlertCircle className="h-3 w-3" /> يجب أن يكون المجموع 100%
+                                                                </div>
                                                             )}
                                                         </div>
                                                     </TableCell>
@@ -410,7 +424,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                             <Button 
                                                 type="button" 
                                                 variant="ghost" 
-                                                onClick={() => appendItem({ id: generateId(), description: `الدفعة ${arabicOrdinals[itemFields.length] || (itemFields.length + 1)}`, triggerCondition: '', quantity: 1, unitPrice: 0 })} 
+                                                onClick={() => appendItem({ id: generateId(), description: `الدفعة ${arabicOrdinals[itemFields.length] || (itemFields.length + 1)}`, triggerCondition: '', quantity: 1, unitPrice: 0, percentage: 0 })} 
                                                 className="h-14 px-16 rounded-[1.5rem] border-dashed border-2 font-black text-primary gap-4 hover:bg-white transition-all hover:scale-105 active:scale-95 shadow-md"
                                             >
                                                 <PlusCircle className="h-6 w-6 text-primary" /> إضافة دفعة استحقاق جديدة +

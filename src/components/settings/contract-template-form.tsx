@@ -40,7 +40,7 @@ import { InlineSearchList } from '../ui/inline-search-list';
 import { Separator } from '../ui/separator';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
-const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
+const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 interface ContractTemplateFormProps {
   isOpen: boolean;
@@ -61,13 +61,12 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [templateType] = useState<'Consulting' | 'Execution'>(template?.templateType || initialType);
   const [workNature, setWorkNature] = useState<'labor_only' | 'with_materials'>(template?.workNature || 'labor_only');
   
-  // ✨ الربط الثلاثي المطور
   const [selectedTransactionTypeId, setSelectedTransactionTypeId] = useState(template?.transactionTypeId || '');
   const [selectedSubServiceId, setSelectedSubServiceId] = useState(template?.subServiceId || '');
   const [subServices, setSubServices] = useState<SubService[]>([]);
   const [specificWorkStages, setSpecificWorkStages] = useState<{ value: string, label: string }[]>([]);
   
-  const [financials, setFinancials] = useState<ContractTemplate['financials']>({
+  const [financials, setFinancials] = useState<any>({
     type: 'fixed',
     totalAmount: 0,
     milestones: [],
@@ -76,7 +75,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingPath, setIsLoadingPath] = useState(false);
 
-  // جلب أنواع المعاملات (Layer 1)
   const { data: transactionTypesData, loading: typesLoading } = useSubscription<TransactionType>(
       firestore, 
       tenantId ? 'transactionTypes' : null,
@@ -87,7 +85,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     transactionTypesData.map(t => ({ value: t.id!, label: t.name }))
   , [transactionTypesData]);
 
-  // ✨ جلب الخدمات الفرعية (Layer 2) عند اختيار الخدمة الرئيسية
   useEffect(() => {
     if (!selectedTransactionTypeId || !firestore || !tenantId) {
         setSubServices([]);
@@ -106,7 +103,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     fetchSubServices();
   }, [selectedTransactionTypeId, firestore, tenantId]);
 
-  // ✨ جلب مراحل العمل (Layer 3) عند اختيار الخدمة التفصيلية
   useEffect(() => {
     if (!selectedSubServiceId || !selectedTransactionTypeId || !firestore || !tenantId) {
         setSpecificWorkStages([]);
@@ -134,11 +130,21 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   }, [template, isOpen]);
 
   const addMilestone = () => {
-    setFinancials(prev => ({
-      ...prev!,
-      milestones: [...prev!.milestones, { id: generateId(), name: `الدفعة ${milestoneNames[prev!.milestones.length] || ''}`, condition: '', value: 0 }]
+    setFinancials((prev: any) => ({
+      ...prev,
+      milestones: [...prev.milestones, { id: generateId(), name: `الدفعة ${arabicOrdinals[prev.milestones.length] || ''}`, condition: '', value: 0 }]
     }));
   };
+
+  const totalCalculated = useMemo(() => {
+    return financials.milestones.reduce((sum: number, m: any) => sum + (Number(m.value) || 0), 0);
+  }, [financials.milestones]);
+
+  useEffect(() => {
+    if (financials.type === 'fixed') {
+        setFinancials((prev: any) => ({ ...prev, totalAmount: totalCalculated }));
+    }
+  }, [totalCalculated, financials.type]);
 
   const handleSave = async () => {
     if (!firestore || !currentUser || !tenantId || !title.trim()) return;
@@ -188,14 +194,13 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                 <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: عقد هيكل أسود مصنعية..." className="h-12 rounded-xl text-lg font-bold border-2" />
                             </div>
                             <div className="grid gap-3">
-                                <Label className="font-black text-xs uppercase text-slate-400 tracking-widest pr-1 no-print">نوع المعاملة الرئيسية (Layer 1)</Label>
+                                <Label className="font-black text-xs uppercase text-slate-400 tracking-widest pr-1 no-print">نوع المعاملة الرئيسية</Label>
                                 <InlineSearchList 
                                     value={selectedTransactionTypeId} 
                                     onSelect={v => { setSelectedTransactionTypeId(v); setSelectedSubServiceId(''); }} 
                                     options={transactionTypeOptions} 
-                                    placeholder={typesLoading ? "جاري جلب بيانات المنشأة..." : "اختر الخدمة الرئيسية..."} 
+                                    placeholder={typesLoading ? "جاري التحميل..." : "اختر الخدمة الرئيسية..."} 
                                     disabled={typesLoading}
-                                    className="rounded-xl border-2"
                                 />
                             </div>
                         </div>
@@ -204,7 +209,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                             <div className="grid md:grid-cols-2 gap-8 animate-in slide-in-from-top-2">
                                 <div className="grid gap-3">
                                     <Label className="font-black text-xs uppercase text-primary tracking-widest pr-1 flex items-center gap-2 no-print">
-                                        <Layers className="h-4 w-4" /> نوع الخدمة التفصيلي (Layer 2) *
+                                        <Layers className="h-4 w-4" /> نوع الخدمة التفصيلي *
                                     </Label>
                                     <InlineSearchList 
                                         value={selectedSubServiceId} 
@@ -223,24 +228,24 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                     <section className="space-y-6">
                         <div className="flex justify-between items-center no-print">
                             <h3 className="text-xl font-black flex items-center gap-3 text-[#1e1b4b]">
-                                <Calculator className="h-6 w-6 text-primary"/> الدفعات المالية المبرمجة بناءً على الإنجاز
+                                <Calculator className="h-6 w-6 text-primary"/> الدفعات المالية المبرمجة
                             </h3>
                             <Button onClick={addMilestone} variant="outline" className="rounded-xl border-dashed border-2 border-primary/40 text-primary font-black gap-2 h-11 px-6 hover:bg-primary/5">
-                                <PlusCircle className="h-4 w-4"/> إضافة دفعة استحقاق +
+                                <PlusCircle className="h-4 w-4"/> إضافة دفعة +
                             </Button>
                         </div>
                         
                         {!selectedSubServiceId ? (
                             <div className="p-10 border-4 border-dashed rounded-[2.5rem] bg-muted/5 flex flex-col items-center justify-center text-center gap-3 opacity-40 no-print">
                                 <AlertTriangle className="h-10 w-10 text-slate-400" />
-                                <p className="font-black text-lg">يرجى اختيار نوع الخدمة التفصيلي (Layer 2) أولاً لتمكين ربط الدفعات بمراحل العمل.</p>
+                                <p className="font-black text-lg">يرجى اختيار نوع الخدمة التفصيلي أولاً لتمكين ربط الدفعات.</p>
                             </div>
                         ) : (
                             <>
                                 <div className="grid md:grid-cols-2 gap-6 bg-white/60 p-6 rounded-3xl border-2 border-primary/10 shadow-inner mb-6 no-print">
                                     <div className="grid gap-2">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400">نظام التسعير المعتمد</Label>
-                                        <Select value={financials?.type} onValueChange={(v: any) => setFinancials({...financials!, type: v, milestones: []})}>
+                                        <Label className="text-[10px] font-black uppercase text-slate-400">نظام التسعير</Label>
+                                        <Select value={financials.type} onValueChange={(v: any) => setFinancials({...financials, type: v, milestones: []})}>
                                             <SelectTrigger className="h-11 rounded-xl border-2 font-black bg-white text-primary"><SelectValue /></SelectTrigger>
                                             <SelectContent dir="rtl">
                                                 <SelectItem value="fixed">مبلغ ثابت (KWD)</SelectItem>
@@ -249,39 +254,53 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                         </Select>
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400">إجمالي قيمة العقد التقريبية (للتحقق)</Label>
-                                        <Input type="number" value={financials?.totalAmount} onChange={e => setFinancials({...financials!, totalAmount: Number(e.target.value)})} className="h-11 rounded-xl font-black text-xl text-primary bg-white border-2" />
+                                        <Label className="text-[10px] font-black uppercase text-slate-400">إجمالي قيمة العقد المعتمدة</Label>
+                                        <Input 
+                                            type="number" 
+                                            value={financials.totalAmount} 
+                                            readOnly={financials.type === 'fixed'}
+                                            onChange={e => setFinancials({...financials, totalAmount: Number(e.target.value)})} 
+                                            className={cn("h-11 rounded-xl font-black text-xl text-primary border-2", financials.type === 'fixed' ? "bg-muted/50" : "bg-white")} 
+                                        />
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
-                                    {financials?.milestones.map((m, i) => (
-                                        <div key={m.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center p-5 border-2 rounded-2xl bg-white hover:border-primary/30 transition-all group shadow-sm animate-in fade-in">
-                                            <div className="md:col-span-1 flex justify-center"><Badge variant="secondary" className="font-mono font-black">{i + 1}</Badge></div>
-                                            <div className="md:col-span-3">
-                                                <Label className="text-[9px] font-black text-slate-400 uppercase mb-1 block no-print">اسم الدفعة</Label>
-                                                <Input value={m.name} onChange={e => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, name: e.target.value} : x)})} className="h-10 border-none font-bold text-base shadow-none bg-transparent" />
+                                    {financials.milestones.map((m: any, i: number) => (
+                                        <div key={m.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center p-5 border-2 rounded-2xl bg-white hover:border-primary/30 transition-all group shadow-sm">
+                                            <div className="md:col-span-1 flex justify-center">
+                                                <Badge variant="secondary" className="font-black text-xs px-4 h-8 rounded-full border-none shadow-sm bg-slate-50 text-slate-900">
+                                                    الدفعة {arabicOrdinals[i] || (i + 1)}
+                                                </Badge>
                                             </div>
-                                            <div className="md:col-span-5">
-                                                <Label className="text-[9px] font-black text-primary uppercase mb-1 block no-print">مرحلة الإنجاز الميداني (Layer 3)</Label>
+                                            <div className="md:col-span-8">
+                                                <Label className="text-[9px] font-black text-primary uppercase mb-1 block no-print">مرحلة الإنجاز الميداني</Label>
                                                 <InlineSearchList 
                                                     value={m.condition} 
-                                                    onSelect={v => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, condition: v} : x)})} 
+                                                    onSelect={v => setFinancials({...financials, milestones: financials.milestones.map((x: any) => x.id === m.id ? {...x, condition: v} : x)})} 
                                                     options={specificWorkStages} 
-                                                    placeholder="اختر مرحلة من سير عمل الخدمة..." 
+                                                    placeholder="اختر مرحلة..." 
                                                     className="h-10 border-dashed bg-primary/[0.02] border-primary/20 text-primary" 
                                                 />
                                             </div>
                                             <div className="md:col-span-2 flex flex-col items-center gap-1">
-                                                <Label className="text-[9px] font-black text-slate-400 uppercase no-print">القيمة ({financials.type === 'fixed' ? 'د.ك' : '%'})</Label>
-                                                <Input type="number" value={m.value} onChange={e => setFinancials({...financials!, milestones: financials!.milestones.map(x => x.id === m.id ? {...x, value: Number(e.target.value)} : x)})} className="h-10 w-24 text-center font-black text-primary text-lg border-2 rounded-lg" />
+                                                <Label className="text-[9px] font-black text-slate-400 uppercase no-print">القيمة</Label>
+                                                <Input type="number" value={m.value} onChange={e => setFinancials({...financials, milestones: financials.milestones.map((x: any) => x.id === m.id ? {...x, value: Number(e.target.value)} : x)})} className="h-10 w-24 text-center font-black text-primary text-lg border-2 rounded-lg" />
                                             </div>
                                             <div className="md:col-span-1 flex justify-end no-print">
-                                                <Button variant="ghost" size="icon" onClick={() => setFinancials({...financials!, milestones: financials!.milestones.filter((x: any) => x.id !== m.id)})} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full"><Trash2 className="h-4 w-4"/></Button>
+                                                <Button variant="ghost" size="icon" onClick={() => setFinancials({...financials, milestones: financials.milestones.filter((x: any) => x.id !== m.id)})} className="text-red-400 hover:text-red-600 rounded-full"><Trash2 className="h-4 w-4"/></Button>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
+                                
+                                {financials.type === 'percentage' && totalCalculated !== 100 && financials.milestones.length > 0 && (
+                                    <Alert variant="destructive" className="mt-4 rounded-2xl border-2">
+                                        <AlertTriangle className="h-4 w-4" />
+                                        <AlertTitle className="font-black">خلل في النسب المئوية</AlertTitle>
+                                        <AlertDescription className="font-bold">مجموع النسب الحالية هو {totalCalculated}%؛ يجب أن يكون المجموع 100% بالضبط.</AlertDescription>
+                                    </Alert>
+                                )}
                             </>
                         )}
                     </section>
@@ -289,18 +308,10 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
             </ScrollArea>
 
             <DialogFooter className="p-8 border-t bg-muted/10 shrink-0 no-print">
-                <div className="flex w-full justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-white rounded-xl border shadow-inner"><ShieldCheck className="h-4 w-4 text-primary" /></div>
-                        <p className="text-[10px] font-bold text-slate-500 max-w-[200px] leading-tight">سيتم ربط الدفعات آلياً بمراحل الإنجاز الميدانية (WBS) عند توقيع العقد.</p>
-                    </div>
-                    <div className="flex gap-4">
-                        <Button variant="ghost" onClick={onClose} disabled={isSaving} className="font-bold h-12 px-8 rounded-xl">إلغاء</Button>
-                        <Button onClick={handleSave} disabled={isSaving || !title.trim() || !selectedSubServiceId} className="h-14 px-20 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 gap-3 min-w-[320px]">
-                            {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6"/>} حفظ القالب المرجعي
-                        </Button>
-                    </div>
-                </div>
+                <Button variant="ghost" onClick={onClose} disabled={isSaving} className="font-bold h-12 px-8 rounded-xl">إلغاء</Button>
+                <Button onClick={handleSave} disabled={isSaving || !title.trim() || !selectedSubServiceId || (financials.type === 'percentage' && totalCalculated !== 100)} className="h-14 px-20 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 gap-3 min-w-[320px]">
+                    {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6"/>} حفظ القالب المرجعي
+                </Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
