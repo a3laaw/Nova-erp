@@ -40,7 +40,6 @@
     min-height: 100vh;
   }
 
-  /* 🛡️ حذف أزرار الأرقام لجعل الكتابة حرة 🛡️ */
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -59,17 +58,13 @@
     border: 1px solid rgba(255, 122, 0, 0.1);
     box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
   }
-
-  /* 🌟 أنيميشن التوهج الذهبي الخفيف */
-  .active-glow {
-    box-shadow: 0 0 40px rgba(255, 122, 0, 0.1);
-    border-color: rgba(255, 122, 0, 0.3) !important;
-  }
 }
 
-/* 🛡️ التطهير البصري والرقابي للقوائم المنسدلة (Sovereign Opaque Guard) 🛡️ */
-[data-radix-portal] {
-  z-index: 999999999 !important;
+/* 🛡️ محرك فرض الاستجابة للقوائم المنسدلة (Selection Logic Overrides) 🛡️ */
+
+/* منع حجب النقر الناتج عن طبقات Radix الشفافة */
+body[style*="pointer-events: none"] {
+  pointer-events: auto !important;
 }
 
 [data-radix-popper-content-wrapper], 
@@ -77,9 +72,6 @@
   z-index: 999999999 !important;
   pointer-events: auto !important;
   background-color: transparent !important;
-  /* حذف أي براويز أو ظلال خارجية تسبب التكرار */
-  border: none !important;
-  box-shadow: none !important;
 }
 
 [role="listbox"], 
@@ -89,53 +81,24 @@
 .react-select__menu {
   z-index: 999999999 !important;
   pointer-events: auto !important;
-  background-color: white !important; /* خلفية مصمتة 100% */
-  background-image: none !important;
+  background-color: white !important;
   opacity: 1 !important;
-  border: 2px solid #FF7A00 !important; /* برواز برتقالي وحيد */
+  border: 2px solid #FF7A00 !important;
   border-radius: 1.5rem !important;
   box-shadow: 0 25px 60px rgba(255, 122, 0, 0.3) !important;
 }
 
-/* 🛡️ محرك التطهير من الطباعة (Sovereign Print Guard) 🛡️ */
+[role="option"], 
+[role="menuitem"], 
+[cmdk-item] {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+/* 🛡️ التطهير من الطباعة 🛡️ */
 @media print {
-  .no-print, 
-  button, 
-  .sidebar-trigger,
-  [data-sidebar],
-  .dropdown-menu,
-  .alert-circle,
-  .trash-icon {
-    display: none !important;
-  }
-
-  body {
-    background: white !important;
-    color: black !important;
-  }
-
-  .printable-area {
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-  }
+  .no-print, button, .sidebar-trigger, [data-sidebar] { display: none !important; }
+  body { background: white !important; color: black !important; }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
-
-/* NOVA Centering Animations */
-@keyframes spin-glow {
-  0% { transform: rotate(0deg); border-top-color: #FF7A00; }
-  50% { border-top-color: #FFB000; }
-  100% { transform: rotate(360deg); border-top-color: #FF7A00; }
-}
-
-.animate-spin-glow {
-  animation: spin-glow 2s linear infinite;
-}
-
-.gold-glow-filter {
-  filter: blur(20px);
-  background: radial-gradient(circle, rgba(255,183,0,0.2) 0%, transparent 70%);
-}

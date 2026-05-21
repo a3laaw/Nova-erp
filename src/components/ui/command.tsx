@@ -120,9 +120,8 @@ const CommandItem = React.forwardRef<
       "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none aria-selected:bg-primary/10 aria-selected:text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 text-foreground font-bold",
       className
     )}
+    // 🛡️ التعديل الجوهري: السماح للحدث بالمرور لضمان تسجيل النقرة بالماوس
     onMouseDown={(e) => {
-      // 🛡️ صمام أمان: نمنع التركيز من الهروب لضمان تسجيل النقرة
-      e.preventDefault();
       onMouseDown?.(e);
     }}
     {...props}

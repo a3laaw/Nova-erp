@@ -408,3 +408,61 @@ export interface Payslip extends BaseEntity {
     status: 'draft' | 'processed' | 'paid';
     paidAt?: Timestamp | any;
 }
+
+export interface HubPost extends BaseEntity {
+    id?: string;
+    userId: string;
+    userName: string;
+    userAvatar?: string;
+    postType: 'system_achievement' | 'employee_idea' | 'kudos' | 'birthday';
+    content: string;
+    moodIcon?: string;
+    votesCount: number;
+    voters?: string[];
+    pointsAwarded: number;
+}
+
+export interface UserProductivityItem extends BaseEntity {
+    id?: string;
+    userId: string;
+    entryType: 'task' | 'bookmark';
+    title: string;
+    actionType?: 'review' | 'decision' | 'design' | 'redesign' | 'meeting' | 'general';
+    status: 'pending' | 'in-progress' | 'completed' | 'cancelled' | null;
+    startDate?: Timestamp | any;
+    dueDate?: Timestamp | any;
+    sourceModule: string;
+    sourceId: string;
+    sourceSubId?: string;
+    sourceUrl?: string;
+    completedAt?: Timestamp | any;
+    viewCounter?: number;
+    lastViewedAt?: Timestamp | any;
+}
+
+export interface AppointmentAuditLog extends BaseEntity {
+    id?: string;
+    action: 'created' | 'rescheduled' | 'cancelled' | 'confirmed';
+    details: string;
+    userName: string;
+    userAvatar?: string;
+}
+
+export interface ContractTemplate extends BaseEntity {
+    id?: string;
+    title: string;
+    description?: string;
+    templateType: 'Consulting' | 'Execution';
+    workNature: 'labor_only' | 'with_materials';
+    transactionTypeId?: string;
+    subServiceId?: string;
+    financials?: {
+        type: 'fixed' | 'percentage';
+        totalAmount: number;
+        milestones: Array<{
+            name: string;
+            condition: string;
+            value: number;
+        }>;
+    };
+}

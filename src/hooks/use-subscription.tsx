@@ -16,9 +16,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * خطاف اشتراك لحظي محصن (V75.0):
- * تم تحويله ليعتمد على tenantId الجلسة مباشرة لضمان ظهور البيانات فوراً.
- * تم تحصين معالجة الأخطاء لمنع ظهور الشاشة الحمراء خلال ثواني التحميل الأولى.
+ * خطاف اشتراك لحظي محصن (V80.0):
+ * تم تحسين "رادار الانتظار" لضمان عدم إطلاق أي طلب قبل استقرار هوية المنشأة.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -39,7 +38,7 @@ export function useSubscription<T extends { id?: string }>(
     }, [constraintsHash]);
 
     useEffect(() => {
-        // 🛡️ الحماية: لا تطلب البيانات إذا لم تتوفر الجلسة أو المعرف
+        // 🛡️ الحماية القصوى: لا نطلق أي طلب إذا كانت الجلسة قيد التحميل أو غير موجودة
         if (!firestore || !collectionPath || authLoading || !user?.currentCompanyId) {
             setLoading(true);
             return;
@@ -60,7 +59,6 @@ export function useSubscription<T extends { id?: string }>(
         
         if (isGroup) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
-            // فرض فلترة المنشأة برمجياً لضمان عبور جدار الحماية
             finalConstraints.push(where('companyId', '==', tenantId));
             
             try {
@@ -71,8 +69,7 @@ export function useSubscription<T extends { id?: string }>(
                     setLoading(false);
                     setError(null);
                 }, (err) => {
-                    // رصد أخطاء الصلاحيات الحقيقية فقط بعد استقرار الجلسة
-                    if (!authLoading && err.message?.includes('permission-denied')) {
+                    if (err.message?.includes('permission-denied')) {
                         const permissionError = new FirestorePermissionError({
                             path: `[GROUP] ${collectionName}`,
                             operation: 'list'
@@ -95,7 +92,7 @@ export function useSubscription<T extends { id?: string }>(
                 setLoading(false);
                 setError(null);
             }, (err) => {
-                if (!authLoading && err.message?.includes('permission-denied')) {
+                if (err.message?.includes('permission-denied')) {
                     const permissionError = new FirestorePermissionError({
                         path: finalPath,
                         operation: 'list'
