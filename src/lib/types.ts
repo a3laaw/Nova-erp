@@ -86,6 +86,7 @@ export interface PermissionRequest extends BaseEntity {
 }
 
 export interface CashReceipt extends BaseEntity {
+    id?: string;
     voucherNumber: string;
     voucherSequence: number;
     voucherYear: number;
@@ -105,6 +106,7 @@ export interface CashReceipt extends BaseEntity {
 }
 
 export interface PaymentVoucher extends BaseEntity {
+    id?: string;
     voucherNumber: string;
     voucherSequence: number;
     voucherYear: number;
@@ -124,9 +126,12 @@ export interface PaymentVoucher extends BaseEntity {
     journalEntryId?: string;
     employeeId?: string;
     renewalExpiryDate?: any;
+    clientId?: string;
+    transactionId?: string;
 }
 
 export interface Payslip extends BaseEntity {
+    id?: string;
     employeeId: string;
     employeeName: string;
     employeeNumber?: string;
@@ -150,6 +155,7 @@ export interface Payslip extends BaseEntity {
 }
 
 export interface Company extends BaseEntity {
+  id: string;
   name: string;
   nameEn?: string;
   firebaseConfig: {
@@ -255,6 +261,7 @@ export interface BoqItem extends BaseEntity {
 }
 
 export interface JournalEntry extends BaseEntity {
+  id?: string;
   entryNumber: string;
   date: Timestamp | any;
   narration: string;
@@ -338,6 +345,7 @@ export interface Vendor extends BaseEntity {
 }
 
 export interface PurchaseOrder extends BaseEntity {
+  id?: string;
   poNumber: string;
   orderDate: Timestamp | any;
   vendorId: string;
@@ -430,14 +438,17 @@ export interface Holiday extends BaseEntity {
 }
 
 export interface Notification extends BaseEntity {
+  id?: string;
   userId: string;
   title: string;
   body: string;
   isRead: boolean;
   link?: string;
+  createdAt?: any;
 }
 
 export interface ClientTransaction extends BaseEntity {
+    id?: string;
     transactionNumber: string;
     clientId: string;
     transactionType: string;
@@ -490,6 +501,7 @@ export interface WorkTeam extends BaseEntity {
 }
 
 export interface ContractTemplate extends BaseEntity {
+    id?: string;
     title: string;
     description?: string;
     templateType: 'Consulting' | 'Execution';
@@ -504,6 +516,7 @@ export interface ContractTemplate extends BaseEntity {
 }
 
 export interface Subcontractor extends BaseEntity {
+    id?: string;
     name: string;
     type: string;
     specialization?: string;
@@ -524,6 +537,7 @@ export interface Subcontractor extends BaseEntity {
 }
 
 export interface SubcontractorCertificate extends BaseEntity {
+    id?: string;
     certificateNumber: string;
     subcontractorId: string;
     subcontractorName: string;
@@ -537,6 +551,7 @@ export interface SubcontractorCertificate extends BaseEntity {
 }
 
 export interface RecurringObligation extends BaseEntity {
+    id?: string;
     title: string;
     type: 'rent' | 'installment' | 'vendor_debt' | 'daily_labor';
     amount: number;
@@ -551,6 +566,7 @@ export interface RecurringObligation extends BaseEntity {
 }
 
 export interface UserProductivityItem extends BaseEntity {
+  id?: string;
   userId: string;
   entryType: 'task' | 'bookmark';
   title: string;
@@ -568,6 +584,7 @@ export interface UserProductivityItem extends BaseEntity {
 }
 
 export interface RequestForQuotation extends BaseEntity {
+    id?: string;
     rfqNumber: string;
     date: Timestamp | any;
     vendorIds: string[];
@@ -581,6 +598,7 @@ export interface RequestForQuotation extends BaseEntity {
 }
 
 export interface SupplierQuotation extends BaseEntity {
+    id?: string;
     rfqId: string;
     vendorId: string;
     quotationReference?: string;
@@ -593,6 +611,7 @@ export interface SupplierQuotation extends BaseEntity {
 }
 
 export interface ItemCategory extends BaseEntity {
+    id?: string;
     name: string;
     parentCategoryId?: string | null;
     order?: number;
@@ -607,6 +626,7 @@ export interface BoqReferenceItem extends BaseEntity {
 }
 
 export interface InventoryAdjustment extends BaseEntity {
+    id?: string;
     adjustmentNumber: string;
     date: Timestamp | any;
     type: 'material_issue' | 'damage' | 'theft' | 'transfer' | 'opening_balance' | 'purchase_return' | 'sales_return' | 'other';
@@ -626,6 +646,7 @@ export interface InventoryAdjustment extends BaseEntity {
 }
 
 export interface PaymentApplication extends BaseEntity {
+    id?: string;
     applicationNumber: string;
     date: Timestamp | any;
     projectId: string;
@@ -639,3 +660,25 @@ export interface PaymentApplication extends BaseEntity {
     status: 'draft' | 'submitted' | 'approved' | 'paid' | 'cancelled';
     journalEntryId?: string;
 }
+
+export type TechnicalSpecifications = {
+    totalArea: number;
+    floorsCount: number;
+    hasBasement: boolean;
+    basementType: 'none' | 'full' | 'half' | 'vault';
+    roofExtension: 'none' | 'quarter' | 'half';
+    workNature: 'labor_only' | 'with_materials';
+    bathroomsCount?: number;
+    kitchensCount?: number;
+    laundryRoomsCount?: number;
+    sanitaryMaterialsIncluded?: boolean;
+    sanitaryExtensionType?: 'ordinary' | 'suspended';
+    suspendedExtensionCount?: number;
+    ordinaryExtensionCount?: number;
+    suspendedToiletCount?: number;
+    ordinaryToiletCount?: number;
+    hiddenShowerCount?: number;
+    ordinaryShowerCount?: number;
+    electricalPointsCount?: number;
+    planReferenceNumber?: string;
+};

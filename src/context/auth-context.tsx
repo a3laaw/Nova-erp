@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, getIdToken } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, getIdToken, getIdTokenResult } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase/provider';
 import { useCompany } from './company-context';
@@ -63,6 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const email = firebaseUser.email?.toLowerCase().trim() || '';
 
+      // 🛡️ المطور الرئيسي (Sovereign Root)
       if (email === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
           uid: firebaseUser.uid,
@@ -84,15 +85,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const globalRef = doc(masterFirestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
-        // 🛡️ طرد المستخدم فوراً إذا لم يكن مسجلاً في الفهرس العالمي (أمان SaaS)
+        // 🛡️ التحقق من الوجود الفعلي للموظف (منع الدخول التلقائي العشوائي)
         if (!globalSnap.exists()) {
           console.warn("🚫 Orphan session detected. Force logging out.");
           await signOut(masterAuth);
-          throw new Error("عذراً، هذا الحساب غير مربوط بأي منشأة حالياً.");
+          setUser(null);
+          setLoading(false);
+          return;
         }
 
         const { companyId } = globalSnap.data();
         
+        // جلب الملف الشخصي والمنشأة
         const [compDoc, userDoc] = await Promise.all([
           getDoc(doc(masterFirestore, 'companies', companyId)),
           getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid))
@@ -101,13 +105,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!userDoc.exists()) {
             console.warn("🚫 Profile missing for current session.");
             await signOut(masterAuth);
-            throw new Error("الملف الشخصي غير موجود.");
+            setUser(null);
+            setLoading(false);
+            return;
         }
 
         const userData = userDoc.data();
         if (!userData.isActive) {
             await signOut(masterAuth);
-            throw new Error("الحساب معطل من قبل الإدارة.");
+            setUser(null);
+            setError("هذا الحساب معطل حالياً.");
+            setLoading(false);
+            return;
+        }
+
+        // 🛡️ محرك انتظار التوكن السيادي: ننتظر حتى نجد companyId داخل التوكن
+        const tokenResult = await getIdTokenResult(firebaseUser, true);
+        if (!tokenResult.claims.companyId) {
+            console.log("⏳ Refreshing token to sync claims...");
+            await getIdToken(firebaseUser, true);
         }
 
         const companyData = compDoc.exists() ? { id: compDoc.id, ...compDoc.data() } as Company : null;
@@ -126,7 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSessionIndicators(firebaseUser.uid, finalUser.role);
 
       } catch (err: any) {
-        setError(err.message);
+        console.error("Auth System Error:", err);
         setUser(null);
         clearSessionIndicators();
       } finally {

@@ -23,6 +23,7 @@ export interface BrandingSettings {
   financial_statement_notes?: string;
   work_hours?: any;
   payment_methods?: any[];
+  nameEn?: string;
 }
 
 interface BrandingContextType {

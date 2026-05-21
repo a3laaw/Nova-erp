@@ -42,8 +42,8 @@ export function useSubscription<T extends { id?: string }>(
 
     // 🛡️ رادار التحقق من جاهزية التوكن (Sovereign Token Radar)
     useEffect(() => {
-        if (!user?.id || !isGroup) {
-            setIsTokenReady(true);
+        if (!user?.id) {
+            setIsTokenReady(false);
             return;
         }
 
@@ -58,7 +58,7 @@ export function useSubscription<T extends { id?: string }>(
                         setIsTokenReady(true);
                     } else if (isMounted) {
                         // إذا لم يتوفر بعد، ننتظر ثانية ونحاول مرة أخرى
-                        setTimeout(checkToken, 1500);
+                        setTimeout(checkToken, 2000);
                     }
                 }
             } catch (e) {
@@ -68,11 +68,11 @@ export function useSubscription<T extends { id?: string }>(
 
         checkToken();
         return () => { isMounted = false; };
-    }, [user?.id, isGroup]);
+    }, [user?.id]);
 
     useEffect(() => {
-        // 🛡️ الحماية القصوى: لا تطلب البيانات إذا كان التوكن لم يجهز بعد (للمجموعات)
-        if (!firestore || !collectionPath || authLoading || !user?.currentCompanyId || (isGroup && !isTokenReady)) {
+        // 🛡️ الحماية القصوى: لا تطلب البيانات إذا كان التوكن لم يجهز بعد (أو الجلسة لم تستقر)
+        if (!firestore || !collectionPath || authLoading || !user?.currentCompanyId || !isTokenReady) {
             setLoading(true);
             return;
         }
@@ -127,7 +127,7 @@ export function useSubscription<T extends { id?: string }>(
                 setLoading(false);
                 setError(null);
             }, (err) => {
-                if (!authLoading) {
+                if (!authLoading && isTokenReady) {
                     const permissionError = new FirestorePermissionError({
                         path: finalPath,
                         operation: 'list'

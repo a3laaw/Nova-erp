@@ -79,7 +79,7 @@ export default function DailyFinancialReportPage() {
                 };
 
                 const cashBalance = calculateBalance(['110101']); // 'الصندوق'
-                const bankBalance = calculateBalance(['110102']); // 'البنك'
+                const bankBalance = calculateBalance(['110103']); // 'حسابات البنوك'
 
                 setReportData({
                     receipts,
@@ -124,8 +124,8 @@ export default function DailyFinancialReportPage() {
                  <Card>
                     <CardHeader><Skeleton className="h-8 w-48" /></CardHeader>
                     <CardContent className="space-y-4">
-                        <Skeleton className="h-32 w-full" />
-                        <Skeleton className="h-32 w-full" />
+                        <Skeleton className="h-32 w-full rounded-2xl" />
+                        <Skeleton className="h-32 w-full rounded-2xl" />
                     </CardContent>
                 </Card>
             ) : reportData && date && (

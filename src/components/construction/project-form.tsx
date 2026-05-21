@@ -14,7 +14,8 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import type { ConstructionProject, Client, Employee, Governorate, Area } from '@/lib/types';
 import { Loader2, Save, Ruler, Building2, MapPin, Layers, Droplets, Zap, Package, FileSignature } from 'lucide-react';
 import { query, collection, orderBy, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { Card, CardHeader, CardTitle, CardContent, DialogFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { DialogFooter } from '@/components/ui/dialog';
 import { Separator } from '../ui/separator';
 import { Switch } from '../ui/switch';
 
@@ -29,8 +30,8 @@ const projectSchema = z.object({
   workNature: z.enum(['labor_only', 'with_materials']).default('labor_only'),
   
   bathroomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
-  kitchensCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
-  laundryRoomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  kitchensCount: z.preprocess((v) => parseInt(String(v || '0'), 10), v.number().min(0)).optional(),
+  laundryRoomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), v.number().min(0)).optional(),
   sanitaryMaterialsIncluded: z.boolean().default(false),
   sanitaryExtensionType: z.enum(['ordinary', 'suspended']).default('ordinary'),
   
@@ -155,7 +156,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                     <div className="grid gap-2"><Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-11 font-mono font-bold" /></div>
                     <div className="grid gap-2"><Label>عدد الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-11" /></div>
                     <div className="grid gap-2"><Label>توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
-                    <div className="grid gap-2"><Label>خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">سرداب كامل</SelectItem><SelectItem value="half">سرداب نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
+                    <div className="grid gap-2"><Label>خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">كامل</SelectItem><SelectItem value="half">نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
                     
                     {watchedWorkNature !== 'labor_only' && (
                         <div className="grid gap-2">
