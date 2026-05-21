@@ -11,12 +11,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import type { ConstructionProject, Client, Employee, AreaRange, Governorate, Area, Item } from '@/lib/types';
-import { Loader2, Save, ShieldCheck, Ruler, Building2, MapPin, Layers, Droplets, Zap, Package, FileSignature } from 'lucide-react';
+import type { ConstructionProject, Client, Employee, Governorate, Area } from '@/lib/types';
+import { Loader2, Save, Ruler, Building2, MapPin, Layers, Droplets, Zap, Package, FileSignature } from 'lucide-react';
 import { query, collection, orderBy, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { DialogFooter } from '@/components/ui/dialog';
 import { Separator } from '../ui/separator';
-import { useToast } from '@/hooks/use-toast';
 import { Switch } from '../ui/switch';
 
 const projectSchema = z.object({
@@ -70,7 +70,6 @@ interface ProjectFormProps {
 
 export function ProjectForm({ onSave, onClose, initialData = null, isSaving = false }: ProjectFormProps) {
     const { firestore } = useFirebase();
-    const { toast } = useToast();
 
     const { data: clients = [] } = useSubscription<Client>(firestore, 'clients');
     const { data: engineers = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
@@ -180,7 +179,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
             {showSanitary && (
                 <div className="space-y-6 animate-in fade-in zoom-in-95">
-                    {/* إجمالي الأعداد أولاً */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-blue-50/20 p-4 rounded-2xl border border-blue-100 items-center">
                         <div className="grid gap-1.5">
                             <Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label>
@@ -199,7 +197,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                         )}
                     </div>
 
-                    {/* كروت التوزيع ثانياً */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
                             <CardHeader className="pb-4 border-b border-blue-100 bg-blue-50/50">

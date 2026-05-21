@@ -7,6 +7,8 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
 import { getTenantPath } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
  * خطاف استماع لوثيقة واحدة محصن (Standard Document Hook):
@@ -34,7 +36,6 @@ export function useDocument<T extends { id?: string }>(
 
     const finalPath = getTenantPath(docPath, tenantId);
     
-    // 🛡️ صمام أمان راداري: إذا لم يتم استنتاج المسار النهائي المعزول، نتوقف
     if (!finalPath) {
         setLoading(true);
         return;
@@ -54,8 +55,14 @@ export function useDocument<T extends { id?: string }>(
             setError(null);
           },
           (err) => {
-            console.warn(`[Permission Guard] Document Deferred: ${finalPath}`);
-            setError(err);
+            if (tenantId && !authLoading) {
+                const permissionError = new FirestorePermissionError({
+                    path: finalPath,
+                    operation: 'get'
+                });
+                errorEmitter.emit('permission-error', permissionError);
+                setError(permissionError);
+            }
             setLoading(false);
           }
         );

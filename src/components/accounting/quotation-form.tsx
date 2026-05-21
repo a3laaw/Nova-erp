@@ -47,7 +47,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable
-} from '@radix-ui/react-sortable';
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -99,7 +99,7 @@ function SortableBlock({ id, block, index, register, remove, children }: any) {
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: 'transform 200ms cubic-bezier(0, 0, 0.2, 1)',
     zIndex: isDragging ? 50 : 'auto',
     opacity: isDragging ? 0.4 : 1,
   };

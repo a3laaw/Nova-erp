@@ -12,6 +12,8 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
 import { getTenantPath } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
  * خطاف اشتراك لحظي محصن (Protected Real-time Hook):
@@ -28,7 +30,6 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user, loading: authLoading } = useAuth();
 
-    // 🛡️ استخدام مرجع للقيود لضمان ثبات الاستعلام ومنع حلقات التكرار
     const constraintsHash = JSON.stringify(constraints.map(c => c.toString()));
     const constraintsRef = useRef(constraints);
     
@@ -37,7 +38,6 @@ export function useSubscription<T extends { id?: string }>(
     }, [constraintsHash]);
 
     useEffect(() => {
-        // 1. الانتظار حتى استقرار الجلسة تماماً
         if (!firestore || !collectionPath || authLoading) {
             setLoading(!firestore || !collectionPath ? false : true);
             return;
@@ -46,7 +46,6 @@ export function useSubscription<T extends { id?: string }>(
         const tenantId = user?.currentCompanyId || null;
         const finalPath = getTenantPath(collectionPath, tenantId);
         
-        // 🛡️ صمام أمان راداري: إذا لم يتم استنتاج المسار النهائي المعزول، نتوقف
         if (!finalPath) {
             setLoading(true); 
             return;
@@ -68,8 +67,14 @@ export function useSubscription<T extends { id?: string }>(
                     setData(newData);
                     setLoading(false);
                 }, (err) => {
-                    console.warn(`[Permission Guard] CG Access Deferred: ${collectionName}`);
-                    setError(err);
+                    if (tenantId && !authLoading) {
+                        const permissionError = new FirestorePermissionError({
+                            path: `[GROUP] ${collectionName}`,
+                            operation: 'list'
+                        });
+                        errorEmitter.emit('permission-error', permissionError);
+                        setError(permissionError);
+                    }
                     setLoading(false);
                 });
                 return () => unsubscribe();
@@ -84,8 +89,14 @@ export function useSubscription<T extends { id?: string }>(
                 setData(newData);
                 setLoading(false);
             }, (err) => {
-                console.warn(`[Permission Guard] Access Deferred: ${finalPath}`);
-                setError(err);
+                if (tenantId && !authLoading) {
+                    const permissionError = new FirestorePermissionError({
+                        path: finalPath,
+                        operation: 'list'
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                    setError(permissionError);
+                }
                 setLoading(false);
             });
 

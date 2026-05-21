@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
@@ -16,11 +15,14 @@ export interface BrandingSettings {
   email?: string | null;
   tax_number?: string | null;
   header_image_url?: string | null;
+  letterhead_image_url?: string | null;
   footer_image_url?: string | null;
   watermark_image_url?: string | null;
   header_color?: string;
   use_custom_image?: boolean;
   financial_statement_notes?: string;
+  work_hours?: any;
+  payment_methods?: any[];
 }
 
 interface BrandingContextType {
@@ -32,7 +34,7 @@ const defaultBranding: BrandingSettings = {
     id: 'default',
     company_name: 'Nova ERP',
     activity_type: 'general',
-    header_color: '#F5820D'
+    header_color: '#FF7A00'
 };
 
 const BrandingContext = createContext<BrandingContextType>({
@@ -47,7 +49,6 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 🛡️ انتظار تحميل المستخدم تماماً قبل البدء
     if (authLoading) return;
 
     const tenantId = user?.currentCompanyId;
@@ -59,7 +60,6 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setLoading(true);
-    // 🏰 المسار المرجعي السيادي المعتمد
     const brandingRef = doc(firestore, `companies/${tenantId}/settings/branding`);
     
     const unsubscribe = onSnapshot(brandingRef, (snapshot) => {
@@ -73,8 +73,6 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
         }
         setLoading(false);
     }, (error) => {
-        console.error("Critical: Branding sync failed:", error);
-        // في حال فشل القواعد، نعتمد الافتراضي لضمان استقرار التطبيق
         setBranding(defaultBranding);
         setLoading(false);
     });
