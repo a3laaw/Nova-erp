@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -121,10 +122,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     // ✨ محرك الإسناد التلقائي الذكي
     useEffect(() => {
         if (transactionTypeName && client && engineers.length > 0) {
-            const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
-            if (!selectedType) return;
-
-            // إذا كانت الخدمة تتبع القسم المعماري أو مرتبطة بمهندس العميل
             if (client.assignedEngineer) {
                 setAssignedEngineerId(client.assignedEngineer);
             }
@@ -160,12 +157,18 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const selectedSub = subServices.find(s => s.id === selectedSubServiceId);
 
-            // جلب مراحل العمل المعتمدة
+            // ✨ جلب مراحل العمل المعتمدة من مستوى الخدمة الفرعية (Level 3) ✨
             let initialStages: any[] = [];
-            const stagesPath = getTenantPath(`transactionTypes/${selectedType?.id}/workStages`, tenantId);
+            const stagesPath = getTenantPath(`transactionTypes/${selectedType?.id}/subServices/${selectedSubServiceId}/workStages`, tenantId);
+            
             if (stagesPath) {
                 const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
-                initialStages = stagesSnap.docs.map(d => ({ stageId: d.id, name: d.data().name, status: 'pending' }));
+                initialStages = stagesSnap.docs.map(d => ({ 
+                    stageId: d.id, 
+                    name: d.data().name, 
+                    status: 'pending',
+                    order: d.data().order || 0
+                }));
             }
 
             const batch = writeBatch(firestore);

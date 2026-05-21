@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -52,12 +53,13 @@ import {
     ArrowRight, ListTree, Settings2,
     MapPin, X, Layers, Activity, GripVertical,
     Sparkles,
-    Zap
+    Zap,
+    ChevronLeft,
+    GitBranch
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { defaultDepartments, defaultGovernorates, defaultJobs, defaultWorkStages, defaultAreas } from '@/lib/default-reference-data';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { useSubscription } from '@/hooks/use-subscription';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
@@ -156,11 +158,13 @@ export function ReferenceDataManager() {
     const [activeSubTab, setActiveSubTab] = useState<'jobs' | 'stages' | 'areas' | 'subServices'>('jobs');
     
     const [selectedPrimaryId, setSelectedPrimaryId] = useState<string | null>(null);
+    const [selectedSecondaryId, setSelectedSecondaryId] = useState<string | null>(null); // ✨ معرف المستوى الثاني (للخدمات الفرعية)
     const [isSaving, setIsSaving] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     
     const [isPrimaryDialogOpen, setIsPrimaryDialogOpen] = useState(false);
     const [isSecondaryDialogOpen, setIsSecondaryDialogOpen] = useState(false);
+    const [isTertiaryDialogOpen, setIsTertiaryDialogOpen] = useState(false); // ✨ نافذة المستوى الثالث (مراحل العمل)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
     
@@ -173,14 +177,13 @@ export function ReferenceDataManager() {
 
     const sensors = useSensors(
       useSensor(PointerSensor),
-      useSensor(KeyboardSensor, {
-        coordinateGetter: sortableKeyboardCoordinates,
-      })
+      useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
     const closeDialog = useCallback(() => {
         setIsPrimaryDialogOpen(false);
         setIsSecondaryDialogOpen(false);
+        setIsTertiaryDialogOpen(false);
         setEditingItem(null);
         setItemName('');
         setSelectedDeptIds([]);
@@ -200,18 +203,26 @@ export function ReferenceDataManager() {
         return '';
     }, [view, activeSubTab]);
 
+    const tertiaryCollectionName = 'workStages'; // ✨ حصراً للخدمات الفرعية
+
+    // 1. جلب المستوى الأول
     const { data: rawPrimaryItems = [], loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null);
     
-    // جلب الأقسام لربطها بالمعاملات
-    const { data: allDepartments = [] } = useSubscription<Department>(firestore, 'departments');
-    const departmentOptions = useMemo(() => allDepartments.map(d => ({ value: d.id!, label: d.name })), [allDepartments]);
-
+    // 2. جلب المستوى الثاني
     const secondaryRelativePath = useMemo(() => {
         if (!selectedPrimaryId || !primaryCollectionName || !secondaryCollectionName) return null;
         return `${primaryCollectionName}/${selectedPrimaryId}/${secondaryCollectionName}`;
     }, [selectedPrimaryId, primaryCollectionName, secondaryCollectionName]);
     
     const { data: rawSecondaryItems = [], loading: loadingSecondary } = useSubscription<any>(firestore, secondaryRelativePath);
+
+    // 3. ✨ جلب المستوى الثالث (مراحل العمل للخدمة الفرعية)
+    const tertiaryRelativePath = useMemo(() => {
+        if (view !== 'transactions' || !selectedPrimaryId || !selectedSecondaryId) return null;
+        return `transactionTypes/${selectedPrimaryId}/subServices/${selectedSecondaryId}/workStages`;
+    }, [view, selectedPrimaryId, selectedSecondaryId]);
+
+    const { data: rawTertiaryItems = [], loading: loadingTertiary } = useSubscription<any>(firestore, tertiaryRelativePath);
 
     const primaryItems = useMemo(() => {
         return [...rawPrimaryItems].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name, 'ar'));
@@ -221,50 +232,52 @@ export function ReferenceDataManager() {
         return [...rawSecondaryItems].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name, 'ar'));
     }, [rawSecondaryItems]);
 
-    const selectedPrimary = useMemo(() => (primaryItems || []).find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
+    const tertiaryItems = useMemo(() => {
+        return [...rawTertiaryItems].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name, 'ar'));
+    }, [rawTertiaryItems]);
 
-    const handleDragEnd = async (event: DragEndEvent, type: 'primary' | 'secondary') => {
+    const selectedPrimary = useMemo(() => (primaryItems || []).find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
+    const selectedSecondary = useMemo(() => (secondaryItems || []).find(i => i.id === selectedSecondaryId), [secondaryItems, selectedSecondaryId]);
+
+    // جلب الأقسام لربطها بالمعاملات
+    const { data: allDepartments = [] } = useSubscription<Department>(firestore, 'departments');
+    const departmentOptions = useMemo(() => allDepartments.map(d => ({ value: d.id!, label: d.name })), [allDepartments]);
+
+    const handleDragEnd = async (event: DragEndEvent, type: 'primary' | 'secondary' | 'tertiary') => {
         const { active, over } = event;
         if (!over || active.id === over.id || !firestore || !tenantId) return;
 
-        const list = type === 'primary' ? primaryItems : secondaryItems;
-        const relativePath = type === 'primary' ? primaryCollectionName : secondaryRelativePath;
-        if (!relativePath) return;
+        const list = type === 'primary' ? primaryItems : type === 'secondary' ? secondaryItems : tertiaryItems;
+        const relPath = type === 'primary' ? primaryCollectionName : type === 'secondary' ? secondaryRelativePath : tertiaryRelativePath;
+        if (!relPath) return;
 
         const oldIndex = list.findIndex((item) => item.id === active.id);
         const newIndex = list.findIndex((item) => item.id === over.id);
-
         const newOrderedList = arrayMove(list, oldIndex, newIndex);
         
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
-            const finalPath = getTenantPath(relativePath, tenantId);
-
+            const finalPath = getTenantPath(relPath, tenantId);
             newOrderedList.forEach((item, idx) => {
-                const itemRef = doc(firestore, finalPath, item.id);
+                const itemRef = doc(firestore, finalPath!, item.id);
                 batch.update(itemRef, { order: idx });
             });
-
             await batch.commit();
             toast({ title: 'تم حفظ الترتيب المعتمد' });
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'فشل الحفظ' });
-        } finally {
-            setIsSaving(false);
-        }
+        } catch (e) { toast({ variant: 'destructive', title: 'فشل الحفظ' }); } finally { setIsSaving(false); }
     };
 
-    const handleSave = async (type: 'primary' | 'secondary') => {
+    const handleSave = async (type: 'primary' | 'secondary' | 'tertiary') => {
         if (!firestore || !itemName.trim() || !tenantId) return;
 
-        const relativePath = type === 'primary' ? primaryCollectionName : secondaryRelativePath;
-        if (!relativePath) return;
+        const relPath = type === 'primary' ? primaryCollectionName : type === 'secondary' ? secondaryRelativePath : tertiaryRelativePath;
+        if (!relPath) return;
 
         setIsSaving(true);
         try {
-            const finalPath = getTenantPath(relativePath, tenantId);
-            const currentList = type === 'primary' ? primaryItems : secondaryItems;
+            const finalPath = getTenantPath(relPath, tenantId);
+            const currentList = type === 'primary' ? primaryItems : type === 'secondary' ? secondaryItems : tertiaryItems;
             
             const payload: any = { 
                 name: itemName, 
@@ -272,40 +285,32 @@ export function ReferenceDataManager() {
                 companyId: tenantId
             };
 
-            // ربط الأقسام بأنواع الخدمات
-            if (view === 'transactions' && type === 'primary') {
-                payload.departmentIds = selectedDeptIds;
-            }
-
-            if (type === 'secondary' && selectedPrimaryId) {
-                payload.parentId = selectedPrimaryId;
-            }
+            if (view === 'transactions' && type === 'primary') payload.departmentIds = selectedDeptIds;
+            if (type === 'secondary' && selectedPrimaryId) payload.parentId = selectedPrimaryId;
+            if (type === 'tertiary' && selectedSecondaryId) payload.parentId = selectedSecondaryId;
 
             if (editingItem) {
-                await updateDoc(doc(firestore, finalPath, editingItem.id), cleanFirestoreData(payload));
+                await updateDoc(doc(firestore, finalPath!, editingItem.id), cleanFirestoreData(payload));
             } else {
                 payload.order = currentList.length;
-                await addDoc(collection(firestore, finalPath), { ...payload, createdAt: serverTimestamp() });
+                await addDoc(collection(firestore, finalPath!), { ...payload, createdAt: serverTimestamp() });
             }
             
             toast({ title: 'تم الحفظ بنجاح' });
             closeDialog();
-        } catch (e: any) { 
-            toast({ variant: 'destructive', title: 'فشل الحفظ' }); 
-        } finally { 
-            setIsSaving(false); 
-        }
+        } catch (e) { toast({ variant: 'destructive', title: 'فشل الحفظ' }); } finally { setIsSaving(false); }
     };
 
     const handleDelete = async () => {
         if (!firestore || !itemToDelete || !tenantId) return;
-        const relativePath = itemToDelete.target === 'primary' ? primaryCollectionName : secondaryRelativePath;
-        if (!relativePath) return;
+        const relPath = itemToDelete.target === 'primary' ? primaryCollectionName : 
+                          itemToDelete.target === 'secondary' ? secondaryRelativePath : tertiaryRelativePath;
+        if (!relPath) return;
 
         setIsSaving(true);
         try {
-            const finalPath = getTenantPath(relativePath, tenantId);
-            await deleteDoc(doc(firestore, finalPath, itemToDelete.id));
+            const finalPath = getTenantPath(relPath, tenantId);
+            await deleteDoc(doc(firestore, finalPath!, itemToDelete.id));
             toast({ title: 'تم الحذف النهائي' });
             setIsDeleteDialogOpen(false); 
             setItemToDelete(null);
@@ -321,38 +326,38 @@ export function ReferenceDataManager() {
             
             if (view === 'departments') {
                 for (const [idx, d] of defaultDepartments.entries()) {
-                    const newDeptRef = doc(collection(firestore, finalPrimaryPath));
+                    const newDeptRef = doc(collection(firestore, finalPrimaryPath!));
                     batch.set(newDeptRef, { ...d, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
                     
                     const deptJobs = defaultJobs[d.name] || [];
                     const jobsPath = getTenantPath(`departments/${newDeptRef.id}/jobs`, tenantId);
                     deptJobs.forEach((job, jIdx) => {
-                        const jobRef = doc(collection(firestore, jobsPath));
+                        const jobRef = doc(collection(firestore, jobsPath!));
                         batch.set(jobRef, { ...job, order: jIdx, companyId: tenantId, parentId: newDeptRef.id });
                     });
 
                     const deptStages = defaultWorkStages[d.name] || [];
                     const stagesPath = getTenantPath(`departments/${newDeptRef.id}/workStages`, tenantId);
                     deptStages.forEach((stage, sIdx) => {
-                        const stageRef = doc(collection(firestore, stagesPath));
+                        const stageRef = doc(collection(firestore, stagesPath!));
                         batch.set(stageRef, { ...stage, order: sIdx, companyId: tenantId, parentId: newDeptRef.id });
                     });
                 }
             } else if (view === 'locations') {
                 for (const [idx, g] of defaultGovernorates.entries()) {
-                    const newGovRef = doc(collection(firestore, finalPrimaryPath));
+                    const newGovRef = doc(collection(firestore, finalPrimaryPath!));
                     batch.set(newGovRef, { ...g, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
 
                     const govAreas = defaultAreas[g.name] || [];
                     const areasPath = getTenantPath(`governorates/${newGovRef.id}/areas`, tenantId);
                     govAreas.forEach((area, aIdx) => {
-                        const areaRef = doc(collection(firestore, areasPath));
+                        const areaRef = doc(collection(firestore, areasPath!));
                         batch.set(areaRef, { ...area, order: aIdx, companyId: tenantId, parentId: newGovRef.id });
                     });
                 }
             }
             await batch.commit();
-            toast({ title: 'نجاح الاستيراد الهيكلي', description: 'تم استيراد القوائم مع كافة الوظائف والمراحل والمناطق التابعة لها.' });
+            toast({ title: 'نجاح الاستيراد الهيكلي' });
             setIsImportConfirmOpen(false);
         } catch (e) { toast({ variant: 'destructive', title: 'فشل الاستيراد' }); } finally { setIsImporting(false); }
     };
@@ -401,7 +406,7 @@ export function ReferenceDataManager() {
                         title="أنواع الخدمات" 
                         count={primaryItems?.length || 0} 
                         icon={<Workflow className="h-10 w-10"/>} 
-                        onNavigate={() => { setView('transactions'); setActiveSubTab('subServices'); setSelectedPrimaryId(null); }} 
+                        onNavigate={() => { setView('transactions'); setActiveSubTab('subServices'); setSelectedPrimaryId(null); setSelectedSecondaryId(null); }} 
                         colorClass="bg-orange-600/10 text-primary" 
                         loading={loadingPrimary} 
                         description="قائمة المعاملات والخدمات المتاحة وربطها بالأقسام الإدارية." 
@@ -461,7 +466,7 @@ export function ReferenceDataManager() {
                                 <div className="space-y-3">
                                     {primaryItems.map(item => (
                                         <SortableRefListItem key={item.id} id={item.id} isActive={selectedPrimaryId === item.id}>
-                                            <div className="flex items-center justify-between flex-1" onClick={() => setSelectedPrimaryId(item.id)}>
+                                            <div className="flex items-center justify-between flex-1" onClick={() => { setSelectedPrimaryId(item.id); setSelectedSecondaryId(null); }}>
                                                 <div className="flex flex-col flex-1">
                                                     <span className="font-black text-base truncate pr-2">{item.name}</span>
                                                     {view === 'transactions' && item.departmentIds?.length > 0 && (
@@ -487,16 +492,20 @@ export function ReferenceDataManager() {
                             <div className="p-10 border-b bg-muted/5">
                                 <div className="flex justify-between items-center mb-8">
                                     <div className="flex items-center gap-5">
-                                        <div className="p-4 bg-white rounded-[1.5rem] shadow-xl border border-primary/10">
-                                            {view === 'transactions' ? <Zap className="h-8 w-8 text-primary"/> : <ListTree className="h-8 w-8 text-primary"/>}
-                                        </div>
+                                        {selectedSecondaryId ? (
+                                             <Button variant="ghost" size="icon" onClick={() => setSelectedSecondaryId(null)} className="h-10 w-10 rounded-full border bg-white shadow-sm"><ChevronLeft className="h-5 w-5"/></Button>
+                                        ) : (
+                                            <div className="p-4 bg-white rounded-[1.5rem] shadow-xl border border-primary/10">
+                                                {view === 'transactions' ? <Zap className="h-8 w-8 text-primary"/> : <ListTree className="h-8 w-8 text-primary"/>}
+                                            </div>
+                                        )}
                                         <div className="space-y-1">
-                                            <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{selectedPrimary?.name}</h3>
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">إدارة البنود الفرعية الملحقة</p>
+                                            <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{selectedSecondaryId ? selectedSecondary?.name : selectedPrimary?.name}</h3>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{selectedSecondaryId ? 'مراحل الإنجاز (Level 3)' : 'إدارة البنود الفرعية الملحقة'}</p>
                                         </div>
                                     </div>
-                                    <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3">
-                                        <PlusCircle className="h-6 w-6" /> إضافة بند فرعي
+                                    <Button onClick={() => { setEditingItem(null); setItemName(''); if(selectedSecondaryId) setIsTertiaryDialogOpen(true); else setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3">
+                                        <PlusCircle className="h-6 w-6" /> {selectedSecondaryId ? 'إضافة مرحلة عمل' : 'إضافة بند فرعي'}
                                     </Button>
                                 </div>
                                 {view === 'departments' && (
@@ -507,26 +516,33 @@ export function ReferenceDataManager() {
                                 )}
                             </div>
                             <ScrollArea className="flex-1 p-10">
-                                {loadingSecondary ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-[1.8rem]"/><Skeleton className="h-16 w-full rounded-[1.8rem]"/></div> :
-                                secondaryItems.length === 0 ? (
+                                {(selectedSecondaryId ? loadingTertiary : loadingSecondary) ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-[1.8rem]"/><Skeleton className="h-16 w-full rounded-[1.8rem]"/></div> :
+                                (selectedSecondaryId ? tertiaryItems : secondaryItems).length === 0 ? (
                                     <div className="h-96 flex flex-col items-center justify-center grayscale opacity-10 border-4 border-dashed rounded-[3.5rem] border-primary/5 m-8">
                                         <PlusCircle className="h-24 w-24 mb-6 text-primary animate-pulse"/>
                                         <p className="font-black text-3xl">لا توجد بيانات فرعية.</p>
                                     </div>
                                 ) : (
-                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'secondary')}>
-                                    <SortableContext items={secondaryItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, selectedSecondaryId ? 'tertiary' : 'secondary')}>
+                                    <SortableContext items={(selectedSecondaryId ? tertiaryItems : secondaryItems).map(i => i.id)} strategy={verticalListSortingStrategy}>
                                         <div className="grid grid-cols-1 gap-4">
-                                            {secondaryItems.map(item => (
+                                            {(selectedSecondaryId ? tertiaryItems : secondaryItems).map(item => (
                                                 <SortableRefListItem key={item.id} id={item.id}>
                                                     <div className="flex items-center justify-between flex-1">
                                                         <div className="flex items-center gap-6">
-                                                            <div className="p-3.5 bg-primary/5 rounded-[1.2rem] border border-primary/10 shadow-inner"><Activity className="h-5 w-5 text-primary opacity-60"/></div>
+                                                            <div className="p-3.5 bg-primary/5 rounded-[1.2rem] border border-primary/10 shadow-inner">
+                                                                {selectedSecondaryId ? <Activity className="h-5 w-5 text-primary opacity-60"/> : <GitBranch className="h-5 w-5 text-primary opacity-60"/>}
+                                                            </div>
                                                             <span className="font-black text-xl text-[#1e1b4b] tracking-tight">{item.name}</span>
                                                         </div>
-                                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                                                            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl border-2 border-primary/10 bg-white hover:bg-primary hover:text-white shadow-sm" onClick={() => { setEditingItem(item); setItemName(item.name); setIsSecondaryDialogOpen(true); }}><Pencil className="h-6 w-6"/></Button>
-                                                            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl border-2 border-red-100 bg-white text-red-600 hover:bg-red-600 hover:text-white shadow-sm" onClick={() => { setItemToDelete({ id: item.id, name: item.name, target: 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-6 w-6"/></Button>
+                                                        <div className="flex gap-2">
+                                                            {view === 'transactions' && !selectedSecondaryId && (
+                                                                <Button variant="outline" className="rounded-xl border-dashed border-primary/50 text-primary font-black gap-2 h-10 px-6" onClick={() => setSelectedSecondaryId(item.id)}>
+                                                                    <Workflow className="h-4 w-4"/> إدارة المراحل
+                                                                </Button>
+                                                            )}
+                                                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl border-2 border-primary/10 bg-white hover:bg-primary hover:text-white shadow-sm" onClick={() => { setEditingItem(item); setItemName(item.name); if(selectedSecondaryId) setIsTertiaryDialogOpen(true); else setIsSecondaryDialogOpen(true); }}><Pencil className="h-5 w-5"/></Button>
+                                                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl border-2 border-red-100 bg-white text-red-600 hover:bg-red-600 hover:text-white shadow-sm" onClick={() => { setItemToDelete({ id: item.id, name: item.name, target: selectedSecondaryId ? 'tertiary' : 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-5 w-5"/></Button>
                                                         </div>
                                                     </div>
                                                 </SortableRefListItem>
@@ -553,9 +569,9 @@ export function ReferenceDataManager() {
                 </Card>
             </div>
 
-            <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
+            <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen || isTertiaryDialogOpen} onOpenChange={closeDialog}>
                 <DialogContent dir="rtl" className="max-w-xl rounded-[3rem] p-10 shadow-2xl border-none bg-white/95 backdrop-blur-2xl">
-                    <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary'); }}>
+                    <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : isSecondaryDialogOpen ? 'secondary' : 'tertiary'); }}>
                         <DialogHeader>
                             <div className="p-4 bg-primary/10 rounded-[1.8rem] text-primary w-fit mb-6 shadow-inner"><PlusCircle className="h-10 w-10"/></div>
                             <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل البيانات المعتمدة' : 'إضافة سجل جديد'}</DialogTitle>

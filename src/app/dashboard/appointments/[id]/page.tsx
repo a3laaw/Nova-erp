@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -57,27 +58,27 @@ export default function AppointmentDetailsPage() {
     const [notes, setNotes] = useState('');
 
     useEffect(() => {
-        if (!firestore || !tenantId || !transaction?.transactionTypeId) return;
+        if (!firestore || !tenantId || !transaction?.transactionTypeId || !transaction?.subServiceId) return;
 
         const fetchStages = async () => {
             try {
-                const txTypeSnap = await getDoc(doc(firestore, getTenantPath(`transactionTypes/${transaction.transactionTypeId}`, tenantId)));
-                if (!txTypeSnap.exists()) return;
+                // ✨ جلب مراحل العمل المخصصة للخدمة الفرعية (Level 3) ✨
+                const stagesPath = getTenantPath(
+                    `transactionTypes/${transaction.transactionTypeId}/subServices/${transaction.subServiceId}/workStages`, 
+                    tenantId
+                );
                 
-                const deptIds = txTypeSnap.data().departmentIds || [];
-                const allStages: WorkStage[] = [];
+                if (!stagesPath) return;
                 
-                for (const deptId of deptIds) {
-                    const stagesSnap = await getDocs(query(collection(firestore, getTenantPath(`departments/${deptId}/workStages`, tenantId)), orderBy('order')));
-                    stagesSnap.docs.forEach(d => allStages.push({ id: d.id, ...d.data() } as WorkStage));
-                }
+                const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
+                const allStages = stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage));
                 setWorkStages(allStages);
             } catch (e) {
                 console.error("Error fetching stages:", e);
             }
         };
         fetchStages();
-    }, [firestore, tenantId, transaction?.transactionTypeId]);
+    }, [firestore, tenantId, transaction?.transactionTypeId, transaction?.subServiceId]);
 
     const handleUpdateVisitStatus = async () => {
         if (!firestore || !currentUser || !tenantId || !appointment || !selectedStageId) return;
