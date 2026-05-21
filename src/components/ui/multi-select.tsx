@@ -18,7 +18,22 @@ interface MultiSelectProps {
   disabled?: boolean;
 }
 
+/**
+ * مكون الاختيار المتعدد السيادي (MultiSelect V12.0):
+ * - تم تفعيل نظام الـ Portal لضمان عدم حدوث Clipping في النوافذ المنبثقة.
+ * - فرض خلفية بيضاء مصمتة 100% لمنع تداخل النصوص الخلفية.
+ * - وضوح تقني مطلق بـ z-index سيادي.
+ */
 export function MultiSelect({ options, selected, onChange, placeholder = 'اختر...', className, disabled = false }: MultiSelectProps) {
+  // استخدام Portal لمنع القص البصري (Clipping) داخل الـ Modals
+  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
+  
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setPortalTarget(document.body);
+    }
+  }, []);
+
   const handleChange = (newSelected: MultiValue<MultiSelectOption>) => {
     const values = newSelected ? newSelected.map(opt => opt.value) : [];
     onChange(values);
@@ -31,10 +46,10 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       ...base,
       backgroundColor: 'white', 
       borderColor: state.isFocused ? 'hsl(var(--ring))' : 'hsl(var(--border))',
-      minHeight: '40px',
+      minHeight: '44px',
       boxShadow: state.isFocused ? '0 0 0 1px hsl(var(--ring))' : 'none',
       cursor: 'pointer',
-      borderRadius: '0.75rem',
+      borderRadius: '1rem',
       '&:hover': {
         borderColor: 'hsl(var(--ring))',
       },
@@ -48,31 +63,35 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
         ...base,
         color: 'hsl(var(--foreground))',
     }),
+    menuPortal: (base) => ({
+        ...base,
+        zIndex: 999999999, // سيادة مطلقة فوق كافة الطبقات
+    }),
     menu: (base) => ({
       ...base,
       backgroundColor: 'white', 
-      zIndex: 999999,
-      position: 'absolute',
-      borderRadius: '1rem',
-      boxShadow: '0 20px 50px rgba(0,0,0,0.15)', 
-      border: '1px solid hsl(var(--border))',
+      zIndex: 999999999,
+      borderRadius: '1.25rem',
+      boxShadow: '0 25px 60px rgba(0,0,0,0.2)', 
+      border: '2px solid hsl(var(--primary))',
+      overflow: 'hidden',
       marginTop: '4px',
     }),
     menuList: (base) => ({
       ...base,
-      maxHeight: '250px',
-      padding: '4px',
+      maxHeight: '280px',
+      padding: '6px',
     }),
     option: (base, state) => ({
       ...base,
       cursor: 'pointer',
-      borderRadius: '0.5rem',
-      marginBottom: '2px',
+      borderRadius: '0.75rem',
+      marginBottom: '3px',
       fontWeight: '700',
       backgroundColor: state.isSelected 
         ? 'hsl(var(--primary))' 
         : state.isFocused 
-        ? 'hsl(var(--primary) / 0.05)' 
+        ? 'hsl(var(--primary) / 0.08)' 
         : 'transparent',
       color: state.isSelected 
         ? 'white' 
@@ -85,7 +104,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       ...base,
       backgroundColor: 'hsl(var(--primary) / 0.1)',
       borderRadius: '9999px',
-      padding: '1px 4px',
+      padding: '2px 8px',
     }),
     multiValueLabel: (base) => ({
       ...base,
@@ -106,7 +125,8 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
     noOptionsMessage: (base) => ({
       ...base,
       color: 'hsl(var(--muted-foreground))',
-      fontWeight: '700',
+      fontWeight: '800',
+      padding: '20px',
     }),
   };
 
@@ -123,6 +143,8 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'اخت
       isSearchable={true}
       noOptionsMessage={() => "لا توجد نتائج مطابقة"}
       styles={customStyles}
+      menuPortalTarget={portalTarget}
+      menuPosition="fixed"
       menuPlacement="auto"
       closeMenuOnSelect={false}
       blurInputOnSelect={false}
