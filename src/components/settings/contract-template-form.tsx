@@ -26,7 +26,8 @@ import {
   Layers,
   Workflow,
   ArrowRight,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -98,6 +99,8 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
             const subsPath = getTenantPath(`transactionTypes/${selectedTransactionTypeId}/subServices`, tenantId);
             const snap = await getDocs(query(collection(firestore, subsPath!), orderBy('order')));
             setSubServices(snap.docs.map(d => ({ id: d.id, ...d.data() } as SubService)));
+        } catch (e) {
+            console.error("Error fetching sub-services:", e);
         } finally { setIsLoadingPath(false); }
     };
     fetchSubServices();
@@ -125,6 +128,8 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
         setDescription(template.description || '');
         setFinancials(template.financials || { type: 'fixed', totalAmount: 0, milestones: [] });
         setWorkNature(template.workNature || 'labor_only');
+        setSelectedTransactionTypeId(template.transactionTypeId || '');
+        setSelectedSubServiceId(template.subServiceId || '');
     }
   }, [template, isOpen]);
 
