@@ -1,17 +1,16 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
-import type { Appointment, Client, WorkStage, ClientTransaction, AppointmentAuditLog } from '@/lib/types';
+import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
+import type { Appointment, Client, WorkStage, ClientTransaction, AppointmentAuditLog, TransactionStage } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Link2, Plus, ShieldCheck, UserPlus, FileText, Target, History } from 'lucide-react';
+import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Link2, Plus, ShieldCheck, UserPlus, FileText, Target, History, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -52,64 +51,51 @@ export default function AppointmentDetailsPage() {
     const transactionPath = useMemo(() => (appointment?.clientId && appointment?.transactionId) ? `clients/${appointment.clientId}/transactions/${appointment.transactionId}` : null, [appointment]);
     const { data: transaction } = useDocument<ClientTransaction>(firestore, transactionPath);
 
-    const [workStages, setWorkStages] = useState<WorkStage[]>([]);
     const [selectedStageId, setSelectedStageId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [notes, setNotes] = useState('');
 
-    useEffect(() => {
-        if (!firestore || !tenantId || !transaction?.transactionTypeId || !transaction?.subServiceId) return;
-
-        const fetchStages = async () => {
-            try {
-                // ✨ جلب مراحل العمل المخصصة للخدمة الفرعية (Level 3) ✨
-                const stagesPath = getTenantPath(
-                    `transactionTypes/${transaction.transactionTypeId}/subServices/${transaction.subServiceId}/workStages`, 
-                    tenantId
-                );
-                
-                if (!stagesPath) return;
-                
-                const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
-                const allStages = stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage));
-                setWorkStages(allStages);
-            } catch (e) {
-                console.error("Error fetching stages:", e);
-            }
-        };
-        fetchStages();
-    }, [firestore, tenantId, transaction?.transactionTypeId, transaction?.subServiceId]);
+    const enrichedStages = useMemo(() => {
+        if (!transaction?.stages) return [];
+        return transaction.stages.filter(s => s.status !== 'completed');
+    }, [transaction?.stages]);
 
     const handleUpdateVisitStatus = async () => {
-        if (!firestore || !currentUser || !tenantId || !appointment || !selectedStageId) return;
+        if (!firestore || !currentUser || !tenantId || !appointment || !selectedStageId || !transaction) return;
         setIsSaving(true);
-        const stageTemplate = workStages.find(s => s.id === selectedStageId);
+        const stageToUpdate = transaction.stages?.find(s => s.stageId === selectedStageId);
         
         try {
             const batch = writeBatch(firestore);
             const txPath = getTenantPath(`clients/${appointment.clientId}/transactions/${appointment.transactionId}`, tenantId);
             const finalApptPath = getTenantPath(`appointments/${appointment.id}`, tenantId);
+            const txRef = doc(firestore, txPath!);
             
-            const txRef = doc(firestore, txPath);
+            const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
+            const stageIdx = currentStages.findIndex(s => s.stageId === selectedStageId);
             
-            if (transaction) {
-                const stages = [...(transaction.stages || [])];
-                const stageIdx = stages.findIndex(s => s.stageId === selectedStageId);
-                
-                const stageUpdate = { 
-                    stageId: selectedStageId, 
-                    name: stageTemplate?.name, 
-                    status: 'completed', 
-                    endDate: serverTimestamp() 
-                };
-                
-                if (stageIdx > -1) stages[stageIdx] = { ...stages[stageIdx], ...stageUpdate };
-                else stages.push(stageUpdate);
+            if (stageIdx > -1) {
+                const stage = currentStages[stageIdx];
+                const now = new Date();
 
+                if (stage.trackingType === 'occurrence') {
+                    const newCount = (stage.currentCount || 0) + 1;
+                    stage.currentCount = newCount;
+                    if (stage.maxOccurrences && newCount >= stage.maxOccurrences) {
+                        stage.status = 'completed';
+                        stage.endDate = now;
+                    } else {
+                        stage.status = 'in-progress';
+                    }
+                } else {
+                    stage.status = 'completed';
+                    stage.endDate = now;
+                }
+                
                 let financeComment = "";
                 if (transaction.contract?.clauses) {
                     const updatedClauses = transaction.contract.clauses.map((clause: any) => {
-                        if (clause.condition === stageTemplate?.name && clause.status === 'غير مستحقة') {
+                        if (clause.condition === stage.name && clause.status === 'غير مستحقة') {
                             financeComment = `\n\n**[إشعار مالي]** استحقت دفعة "${clause.name}" بقيمة **${formatCurrency(clause.amount)}**.`;
                             return { ...clause, status: 'مستحقة' };
                         }
@@ -118,12 +104,12 @@ export default function AppointmentDetailsPage() {
                     batch.update(txRef, { 'contract.clauses': updatedClauses });
                 }
 
-                batch.update(txRef, { stages, status: 'in-progress', updatedAt: serverTimestamp() });
+                batch.update(txRef, { stages: currentStages, status: 'in-progress', updatedAt: serverTimestamp() });
                 
                 const timelineRef = doc(collection(txRef, 'timelineEvents'));
                 batch.set(timelineRef, {
                     type: 'comment', 
-                    content: `**[محضر زيارة]**\nتم إنجاز مرحلة: ${stageTemplate?.name}\n\n**ملاحظات المهندس:**\n${notes}${financeComment}`, 
+                    content: `**[محضر زيارة]**\nتم تسجيل إنجاز في مرحلة: ${stage.name}${stage.trackingType === 'occurrence' ? ` (المرة رقم ${stage.currentCount})` : ''}\n\n**ملاحظات المهندس:**\n${notes}${financeComment}`, 
                     userId: currentUser.id, 
                     userName: currentUser.fullName, 
                     userAvatar: currentUser.avatarUrl,
@@ -132,7 +118,7 @@ export default function AppointmentDetailsPage() {
                 });
             }
 
-            const apptRef = doc(firestore, finalApptPath);
+            const apptRef = doc(firestore, finalApptPath!);
             batch.update(apptRef, { 
                 workStageUpdated: true, 
                 notes, 
@@ -144,7 +130,7 @@ export default function AppointmentDetailsPage() {
             const auditRef = doc(collection(apptRef, 'auditLogs'));
             batch.set(auditRef, {
                 action: 'confirmed',
-                details: `قام المهندس ${currentUser.fullName} بتوثيق إنجاز مرحلة "${stageTemplate?.name}" وإغلاق الزيارة.`,
+                details: `قام المهندس ${currentUser.fullName} بتوثيق إنجاز مرحلة "${stageToUpdate?.name}" وإغلاق الزيارة.`,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp(),
@@ -232,11 +218,14 @@ export default function AppointmentDetailsPage() {
                                             توثيق إنجاز الأعمال الميدانية
                                         </h3>
                                         <div className="grid gap-3">
-                                            <Label className="font-black text-slate-700 pr-2">ما هي المرحلة التي تم إكمالها؟ *</Label>
+                                            <Label className="font-black text-slate-700 pr-2">ما هي المرحلة التي تم إنجازها اليوم؟ *</Label>
                                             <InlineSearchList 
                                                 value={selectedStageId} 
                                                 onSelect={setSelectedStageId} 
-                                                options={workStages.map(s => ({ value: s.id!, label: s.name }))} 
+                                                options={enrichedStages.map(s => ({ 
+                                                    value: s.stageId, 
+                                                    label: `${s.name} ${s.trackingType === 'occurrence' ? `(المرة ${ (s.currentCount || 0) + 1 })` : ''}` 
+                                                }))} 
                                                 placeholder="ابحث عن مرحلة الإنجاز المخططة..." 
                                                 className="h-12 bg-white rounded-2xl border-2"
                                             />
@@ -257,7 +246,7 @@ export default function AppointmentDetailsPage() {
                                             className="w-full h-14 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/30"
                                         >
                                             {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <ShieldCheck className="h-6 w-6" />}
-                                            اعتماد الإنجاز وتفعيل المطالبة المالية
+                                            اعتماد الإنجاز وإغلاق الزيارة
                                         </Button>
                                     </div>
                                 ) : appointment.workStageUpdated ? (
@@ -265,7 +254,7 @@ export default function AppointmentDetailsPage() {
                                         <Check className="h-8 w-8 text-green-600"/>
                                         <AlertTitle className="text-green-800 font-black text-2xl mb-2">تم توثيق الزيارة بنجاح</AlertTitle>
                                         <AlertDescription className="text-green-700 font-bold text-lg">
-                                            تم إغلاق ملف الزيارة، تحديث سجل العميل التاريخي، وتفعيل الدفعات المالية المرتبطة آلياً.
+                                            تم إغلاق ملف الزيارة وتحديث مسار الـ WBS بنجاح.
                                         </AlertDescription>
                                     </Alert>
                                 ) : (
@@ -275,8 +264,8 @@ export default function AppointmentDetailsPage() {
                                             <AlertTitle className="text-red-900 font-black text-2xl mb-2">إجراء مطلوب لربط البيانات</AlertTitle>
                                             <AlertDescription className="text-red-800 font-bold text-lg leading-relaxed">
                                                 {isProspective 
-                                                    ? "هذا الشخص (عميل محتمل)؛ يجب تحويله لملف رسمي لتمكين إدارة معاملاته وتفعيل الدفعات المالية المعتمدة."
-                                                    : "يرجى ربط هذه الزيارة بإحدى المعاملات المفتوحة لهذا العميل لتتمكن من تحديث مراحل الإنجاز الميدانية."}
+                                                    ? "هذا الشخص (عميل محتمل)؛ يجب تحويله لملف رسمي لتمكين إدارة معاملاته."
+                                                    : "يرجى ربط هذه الزيارة بإحدى المعاملات المفتوحة لهذا العميل لتتمكن من تحديث مراحل الإنجاز."}
                                             </AlertDescription>
                                         </Alert>
                                         

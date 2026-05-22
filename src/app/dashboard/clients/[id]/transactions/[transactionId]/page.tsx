@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, increment } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -49,12 +48,15 @@ import {
     Layers,
     FileSignature,
     Loader2,
-    Target
+    Target,
+    RotateCcw,
+    Clock,
+    Plus
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import type { Client, ClientTransaction, WorkStage, TransactionStage } from '@/lib/types';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 import { useAuth } from '@/context/auth-context';
@@ -65,6 +67,7 @@ import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SignaturePad } from '@/components/ui/signature-pad';
 import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
+import { Progress } from '@/components/ui/progress';
 
 const transactionStatusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -117,7 +120,6 @@ export default function TransactionDetailPage() {
   const tenantId = currentUser?.currentCompanyId;
 
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
-  const [workStageTemplates, setWorkStageTemplates] = useState<WorkStage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSignDialogOpen, setIsSignDialogOpen] = useState(false);
 
@@ -136,19 +138,6 @@ export default function TransactionDetailPage() {
         setEmployeesMap(newMap);
     });
   }, [firestore, tenantId]);
-  
-  useEffect(() => {
-    if (!firestore || !transaction?.transactionTypeId || !tenantId) return;
-    const fetchTemplates = async () => {
-        try {
-            const stagesPath = getTenantPath(`transactionTypes/${transaction.transactionTypeId}/workStages`, tenantId);
-            if (!stagesPath) return;
-            const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
-            setWorkStageTemplates(stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage)));
-        } catch (e) { console.error(e); }
-    };
-    fetchTemplates();
-  }, [firestore, transaction?.transactionTypeId, tenantId]);
 
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
         if (!firestore || !currentUser || !transaction || !transactionPath) return;
@@ -161,22 +150,44 @@ export default function TransactionDetailPage() {
             const stage = currentStages[stageIndex];
             stage.status = newStatus;
             const now = new Date();
-            if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = now;
+            
+            if (newStatus === 'in-progress' && !stage.startDate) {
+                stage.startDate = now;
+                if (stage.trackingType === 'duration' && stage.expectedDurationDays) {
+                    const expectedEnd = new Date(now.getTime() + stage.expectedDurationDays * 24 * 60 * 60 * 1000);
+                    stage.expectedEndDate = expectedEnd;
+                }
+            }
             if (newStatus === 'completed') stage.endDate = now;
 
-            await updateDoc(doc(firestore, transactionPath), { stages: currentStages });
+            await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
             toast({ title: 'نجاح التحديث' });
         } finally { setIsProcessing(false); }
   };
 
-  const enrichedStages = useMemo(() => {
-        if (!transaction || !workStageTemplates) return [];
-        const progressStages = transaction.stages || [];
-        return workStageTemplates.map(template => {
-            const progress = progressStages.find(p => p.stageId === template.id);
-            return { ...template, ...progress, status: progress?.status || 'pending' };
-        }).sort((a,b) => (a.order ?? 99) - (b.order ?? 99));
-  }, [transaction, workStageTemplates]);
+  const handleIncrementOccurrence = async (stageId: string) => {
+        if (!firestore || !currentUser || !transaction || !transactionPath) return;
+        setIsProcessing(true);
+        try {
+            const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
+            const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
+            if (stageIndex === -1) throw new Error("Stage not found");
+            
+            const stage = currentStages[stageIndex];
+            const newCount = (stage.currentCount || 0) + 1;
+            stage.currentCount = newCount;
+            
+            if (stage.maxOccurrences && newCount >= stage.maxOccurrences) {
+                stage.status = 'completed';
+                stage.endDate = new Date();
+            } else {
+                stage.status = 'in-progress';
+            }
+
+            await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
+            toast({ title: `تم تسجيل التعديل رقم ${newCount}` });
+        } finally { setIsProcessing(false); }
+  };
 
   const handleSaveSignature = async (signatureDataUrl: string) => {
     if (!firestore || !transactionPath || !transaction) return;
@@ -262,29 +273,59 @@ export default function TransactionDetailPage() {
                 <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
                     <CardHeader className="border-b bg-muted/5 p-8 px-10">
                         <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
-                            <Workflow className='text-primary h-6 w-6'/> حالة مراحل الإنجاز الميداني
+                            <Workflow className='text-primary h-6 w-6'/> حالة مراحل الإنجاز الميداني (WBS)
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
-                        {enrichedStages.map((stage) => (
-                            <div key={stage.id} className="flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent bg-muted/20 rounded-[2rem] hover:bg-white hover:border-primary/20 hover:shadow-md transition-all">
-                                <div className="flex items-center gap-6">
-                                    <Badge variant="outline" className={cn("w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2", stageStatusColors[stage.status])}>
-                                        {stageStatusTranslations[stage.status]}
-                                    </Badge>
-                                    <span className="font-black text-lg text-slate-800">{stage.name}</span>
+                        {(transaction.stages || []).map((stage) => {
+                            const isOccurrence = stage.trackingType === 'occurrence';
+                            const isDuration = stage.trackingType === 'duration';
+                            const currentCount = stage.currentCount || 0;
+                            const maxCount = stage.maxOccurrences || 0;
+                            const progress = isOccurrence ? (currentCount / maxCount) * 100 : 0;
+
+                            return (
+                                <div key={stage.stageId} className="flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent bg-muted/20 rounded-[2rem] hover:bg-white hover:border-primary/20 hover:shadow-md transition-all">
+                                    <div className="flex items-center gap-6">
+                                        <Badge variant="outline" className={cn("w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2", stageStatusColors[stage.status])}>
+                                            {stageStatusTranslations[stage.status]}
+                                        </Badge>
+                                        <div className="space-y-1">
+                                            <span className="font-black text-lg text-slate-800">{stage.name}</span>
+                                            {isDuration && stage.status === 'in-progress' && stage.expectedEndDate && (
+                                                <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" /> التسليم المتوقع: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}
+                                                </p>
+                                            )}
+                                            {isOccurrence && (
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    <p className="text-[10px] font-black text-orange-600 uppercase tracking-tighter">سجل التعديلات: {currentCount} / {maxCount}</p>
+                                                    <Progress value={progress} className="h-1.5 w-24" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4 mt-4 sm:mt-0">
+                                        {stage.status === 'pending' && <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 border-2 px-6"><Play className="ml-2 h-4 w-4"/> بدء العمل</Button>}
+                                        {isOccurrence && stage.status === 'in-progress' && (
+                                            <Button size="sm" variant="outline" onClick={() => handleIncrementOccurrence(stage.stageId)} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 border-orange-200 text-orange-600 bg-white gap-2 shadow-sm">
+                                                <Plus className="h-4 w-4"/> تسجيل تعديل جديد
+                                            </Button>
+                                        )}
+                                        {stage.status === 'in-progress' && (!isOccurrence || currentCount >= maxCount) && (
+                                            <Button size="sm" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 text-white gap-2">
+                                                <Check className="ml-2 h-4 w-4"/> تأكيد الإنجاز النهائي
+                                            </Button>
+                                        )}
+                                        {stage.status === 'completed' && <CheckCircle2 className="h-8 w-8 text-green-600" />}
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-4 mt-4 sm:mt-0">
-                                    {stage.status === 'pending' && <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.id!, 'in-progress')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 border-2 px-6"><Play className="ml-2 h-4 w-4"/> بدء العمل</Button>}
-                                    {stage.status === 'in-progress' && <Button size="sm" onClick={() => handleStageStatusChange(stage.id!, 'completed')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 text-white gap-2"><Check className="ml-2 h-4 w-4"/> تأكيد الإنجاز</Button>}
-                                    {stage.status === 'completed' && <CheckCircle2 className="h-8 w-8 text-green-600" />}
-                                </div>
-                            </div>
-                        ))}
-                        {enrichedStages.length === 0 && (
+                            )
+                        })}
+                        {(!transaction.stages || transaction.stages.length === 0) && (
                             <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] opacity-30">
                                 <AlertCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                                <p className="text-xl font-black">لم يتم تحديد مراحل عمل لهذا النوع من المعاملات في القوائم المرجعية.</p>
+                                <p className="text-xl font-black">بانتظار تحديد مراحل العمل لهذه الخدمة.</p>
                             </div>
                         )}
                     </CardContent>

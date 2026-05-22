@@ -29,96 +29,43 @@ export interface UserProfile extends BaseEntity {
   companyName?: string;
 }
 
-export interface CashReceipt extends BaseEntity {
-    id?: string;
-    voucherNumber: string;
-    voucherSequence: number;
-    voucherYear: number;
-    clientId: string | null;
-    clientNameAr: string;
-    projectId?: string | null;
-    projectNameAr?: string | null;
-    amount: number;
-    amountInWords: string;
-    receiptDate: Timestamp | any;
-    paymentMethod: string;
-    description: string;
-    reference?: string;
-    journalEntryId?: string;
-    commissionAmount?: number;
-    isBypassed?: boolean;
+export interface WorkStage extends BaseEntity {
+  name: string;
+  order: number;
+  parentId: string; // Linked to SubService ID
+  trackingType: 'duration' | 'occurrence' | 'none';
+  expectedDurationDays?: number;
+  maxOccurrences?: number;
 }
 
-export interface PaymentVoucher extends BaseEntity {
-    id?: string;
-    voucherNumber: string;
-    voucherSequence: number;
-    voucherYear: number;
-    payeeName: string;
-    payeeType: string;
-    amount: number;
-    amountInWords: string;
-    paymentDate: Timestamp | any;
-    paymentMethod: string;
-    description: string;
-    reference?: string;
-    debitAccountId: string;
-    debitAccountName: string;
-    creditAccountId: string;
-    creditAccountName: string;
-    status: 'draft' | 'paid' | 'cancelled';
-    journalEntryId?: string;
-    employeeId?: string;
-    renewalExpiryDate?: any;
-    clientId?: string;
-    transactionId?: string;
+export interface TransactionStage {
+  stageId: string;
+  name: string;
+  status: 'pending' | 'in-progress' | 'completed';
+  trackingType: 'duration' | 'occurrence' | 'none';
+  startDate?: Timestamp | any;
+  endDate?: Timestamp | any;
+  expectedEndDate?: Timestamp | any;
+  currentCount?: number;
+  maxOccurrences?: number;
+  order: number;
 }
 
-export interface TechnicalSpecifications {
-    totalArea: number;
-    floorsCount: number;
-    hasBasement: boolean;
-    basementType: 'none' | 'full' | 'half' | 'vault';
-    roofExtension: 'none' | 'quarter' | 'half';
-    workNature: 'labor_only' | 'with_materials';
-    bathroomsCount?: number;
-    kitchensCount?: number;
-    laundryRoomsCount?: number;
-    sanitaryMaterialsIncluded?: boolean;
-    sanitaryExtensionType?: 'ordinary' | 'suspended';
-    suspendedExtensionCount?: number;
-    ordinaryExtensionCount?: number;
-    suspendedToiletCount?: number;
-    ordinaryToiletCount?: number;
-    hiddenShowerCount?: number;
-    ordinaryShowerCount?: number;
-    electricalPointsCount?: number;
-    planReferenceNumber?: string;
-}
-
-export interface Quotation extends BaseEntity {
+export interface ClientTransaction extends BaseEntity {
     id?: string;
-    quotationNumber: string;
-    quotationSequence: number;
-    quotationYear: number;
-    quotationDept: string;
+    transactionNumber: string;
     clientId: string;
-    clientName: string;
-    subject: string;
-    date: Timestamp | any;
-    validUntil: Timestamp | any;
-    totalAmount: number;
-    status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
-    items: any[];
-    layoutBlocks?: any[];
-    financialsType: 'fixed' | 'percentage';
-    totalArea?: number;
-    floorsCount?: number;
-    basementType: 'none' | 'full' | 'half' | 'vault';
-    roofExtension: 'none' | 'quarter' | 'half';
-    workNature: 'labor_only' | 'with_materials';
-    transactionTypeId?: string;
-    subServiceId?: string;
+    transactionType: string;
+    subServiceId?: string | null;
+    subServiceName?: string | null;
+    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
+    assignedEngineerId?: string | null;
+    transactionTypeId?: string | null;
+    departmentId?: string | null;
+    stages?: TransactionStage[];
+    contract?: any;
+    boqId?: string;
+    projectId?: string;
 }
 
 export interface Client extends BaseEntity {
@@ -176,7 +123,7 @@ export interface ConstructionProject extends BaseEntity {
   subcontractorName?: string | null;
   subsidyQuotas?: any[];
   contract?: any;
-  specs?: TechnicalSpecifications;
+  specs?: any;
 }
 
 export interface JournalEntry extends BaseEntity {
@@ -307,23 +254,6 @@ export interface SupplierQuotation extends BaseEntity {
     discountAmount?: number;
     deliveryFees?: number;
     items: { rfqItemId: string; unitPrice: number }[];
-}
-
-export interface ClientTransaction extends BaseEntity {
-    id?: string;
-    transactionNumber: string;
-    clientId: string;
-    transactionType: string;
-    subServiceId?: string | null;
-    subServiceName?: string | null;
-    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
-    assignedEngineerId?: string | null;
-    transactionTypeId?: string | null;
-    departmentId?: string | null;
-    stages?: any[];
-    contract?: any;
-    boqId?: string;
-    projectId?: string;
 }
 
 export interface ItemCategory extends BaseEntity {

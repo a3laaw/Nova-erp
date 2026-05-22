@@ -54,13 +54,16 @@ import {
     Sparkles,
     Zap,
     ChevronLeft,
-    GitBranch
+    GitBranch,
+    Clock,
+    RotateCcw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { defaultDepartments, defaultGovernorates, defaultJobs, defaultWorkStages, defaultAreas } from '@/lib/default-reference-data';
 import { useAuth } from '@/context/auth-context';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import {
   DndContext,
@@ -104,20 +107,20 @@ function SortableRefListItem({ id, children, isActive }: { id: string, children:
         ref={setNodeRef} 
         style={style} 
         className={cn(
-            "group relative flex items-center justify-between p-5 rounded-[2.2rem] cursor-default transition-all border-2 mb-3",
+            "group relative flex items-center justify-between p-4 rounded-[1.8rem] cursor-default transition-all border-2 mb-2",
             isActive 
-              ? "bg-primary border-primary text-white shadow-2xl scale-[1.02] ring-8 ring-orange-500/10" 
+              ? "bg-primary border-primary text-white shadow-xl scale-[1.01]" 
               : "bg-white/60 hover:bg-white hover:border-primary/20 border-transparent shadow-sm"
         )}
     >
-        <div className="flex items-center gap-5 flex-1">
+        <div className="flex items-center gap-4 flex-1">
             <button 
                 {...attributes} 
                 {...listeners} 
-                className="cursor-grab active:cursor-grabbing p-2 rounded-xl hover:bg-primary/10 transition-colors"
+                className="cursor-grab active:cursor-grabbing p-1.5 rounded-xl hover:bg-primary/10 transition-colors"
                 type="button"
             >
-                <GripVertical className={cn("h-5 w-5", isActive ? "text-white" : "text-primary opacity-30 group-hover:opacity-100")} />
+                <GripVertical className={cn("h-4 w-4", isActive ? "text-white" : "text-primary opacity-30 group-hover:opacity-100")} />
             </button>
             {children}
         </div>
@@ -153,7 +156,6 @@ export function ReferenceDataManager() {
     const { toast } = useToast();
 
     const [view, setView] = useState<'main' | 'departments' | 'locations' | 'transactions'>('main');
-    const activeSubTab = 'jobs'; // ✨ تم تثبيت هذا للـ Departments لعدم وجود مراحل عمل فيها بعد الآن
     
     const [selectedPrimaryId, setSelectedPrimaryId] = useState<string | null>(null);
     const [selectedSecondaryId, setSelectedSecondaryId] = useState<string | null>(null); 
@@ -170,6 +172,11 @@ export function ReferenceDataManager() {
     const [itemToDelete, setItemToDelete] = useState<any | null>(null);
     const [itemName, setItemName] = useState('');
     const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
+    
+    // Stage-specific fields
+    const [trackingType, setTrackingType] = useState<'duration' | 'occurrence' | 'none'>('duration');
+    const [expectedDuration, setExpectedDuration] = useState('7');
+    const [maxOccurrences, setMaxOccurrences] = useState('3');
 
     const tenantId = currentUser?.currentCompanyId;
 
@@ -185,6 +192,9 @@ export function ReferenceDataManager() {
         setEditingItem(null);
         setItemName('');
         setSelectedDeptIds([]);
+        setTrackingType('duration');
+        setExpectedDuration('7');
+        setMaxOccurrences('3');
     }, []);
 
     const primaryCollectionName = useMemo(() => {
@@ -195,13 +205,11 @@ export function ReferenceDataManager() {
     }, [view]);
 
     const secondaryCollectionName = useMemo(() => {
-        if (view === 'departments') return 'jobs'; // ✨ مراحل العمل تم نقلها للمعاملات حصراً
+        if (view === 'departments') return 'jobs'; 
         if (view === 'locations') return 'areas';
         if (view === 'transactions') return 'subServices';
         return '';
     }, [view]);
-
-    const tertiaryCollectionName = 'workStages';
 
     const { data: rawPrimaryItems = [], loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null);
     
@@ -281,7 +289,12 @@ export function ReferenceDataManager() {
 
             if (view === 'transactions' && type === 'primary') payload.departmentIds = selectedDeptIds;
             if (type === 'secondary' && selectedPrimaryId) payload.parentId = selectedPrimaryId;
-            if (type === 'tertiary' && selectedSecondaryId) payload.parentId = selectedSecondaryId;
+            if (type === 'tertiary') {
+                payload.parentId = selectedSecondaryId;
+                payload.trackingType = trackingType;
+                if (trackingType === 'duration') payload.expectedDurationDays = parseInt(expectedDuration);
+                if (trackingType === 'occurrence') payload.maxOccurrences = parseInt(maxOccurrences);
+            }
 
             if (editingItem) {
                 await updateDoc(doc(firestore, finalPath!, editingItem.id), cleanFirestoreData(payload));
@@ -292,7 +305,7 @@ export function ReferenceDataManager() {
             
             toast({ title: 'تم الحفظ بنجاح' });
             closeDialog();
-        } catch (e) { toast({ variant: 'destructive', title: 'فشل الحفظ' }); } finally { setIsSaving(false); }
+        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الحفظ' }); } finally { setIsSaving(false); }
     };
 
     const handleDelete = async () => {
@@ -311,44 +324,6 @@ export function ReferenceDataManager() {
         } catch (e) { toast({ variant: 'destructive', title: 'فشل الحذف' }); } finally { setIsSaving(false); }
     };
 
-    const handleImportDefaults = async () => {
-        if (!firestore || !tenantId) return;
-        setIsImporting(true);
-        try {
-            const batch = writeBatch(firestore);
-            const finalPrimaryPath = getTenantPath(primaryCollectionName, tenantId);
-            
-            if (view === 'departments') {
-                for (const [idx, d] of defaultDepartments.entries()) {
-                    const newDeptRef = doc(collection(firestore, finalPrimaryPath!));
-                    batch.set(newDeptRef, { ...d, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
-                    
-                    const deptJobs = defaultJobs[d.name] || [];
-                    const jobsPath = getTenantPath(`departments/${newDeptRef.id}/jobs`, tenantId);
-                    deptJobs.forEach((job, jIdx) => {
-                        const jobRef = doc(collection(firestore, jobsPath!));
-                        batch.set(jobRef, { ...job, order: jIdx, companyId: tenantId, parentId: newDeptRef.id });
-                    });
-                }
-            } else if (view === 'locations') {
-                for (const [idx, g] of defaultGovernorates.entries()) {
-                    const newGovRef = doc(collection(firestore, finalPrimaryPath!));
-                    batch.set(newGovRef, { ...g, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
-
-                    const govAreas = defaultAreas[g.name] || [];
-                    const areasPath = getTenantPath(`governorates/${newGovRef.id}/areas`, tenantId);
-                    govAreas.forEach((area, aIdx) => {
-                        const areaRef = doc(collection(firestore, areasPath!));
-                        batch.set(areaRef, { ...area, order: aIdx, companyId: tenantId, parentId: newGovRef.id });
-                    });
-                }
-            }
-            await batch.commit();
-            toast({ title: 'نجاح الاستيراد الهيكلي' });
-            setIsImportConfirmOpen(false);
-        } catch (e) { toast({ variant: 'destructive', title: 'فشل الاستيراد' }); } finally { setIsImporting(false); }
-    };
-
     if (view === 'main') {
         return (
             <div className="space-y-12" dir="rtl">
@@ -357,10 +332,10 @@ export function ReferenceDataManager() {
                     <CardHeader className="p-10 relative z-10 border-b border-white/10">
                         <div className="flex items-center gap-6">
                             <div className="text-right">
-                                <CardTitle className="text-3xl font-black text-white tracking-tighter">إدارة القوائم والبيانات المرجعية الموحدة</CardTitle>
+                                <CardTitle className="text-3xl font-black text-white tracking-tighter">إدارة القوائم والبيانات المرجعية</CardTitle>
                                 <div className="flex items-center gap-2 mt-1">
                                     <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
-                                    <CardDescription className="text-white/90 font-bold text-sm">تخصيص الأقسام، المواقع، وهيكل الخدمات المرجعي للمنصة لضمان الربط الذكي.</CardDescription>
+                                    <CardDescription className="text-white/90 font-bold text-sm">تخصيص الأقسام، المواقع، وهيكل مراحل العمل (WBS).</CardDescription>
                                 </div>
                             </div>
                             <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
@@ -378,7 +353,7 @@ export function ReferenceDataManager() {
                         onNavigate={() => { setView('departments'); setSelectedPrimaryId(null); }} 
                         colorClass="bg-blue-600/10 text-blue-600" 
                         loading={loadingPrimary} 
-                        description="إدارة الهيكل التنظيمي والوظائف المعتمدة لكل قسم." 
+                        description="إدارة الهيكل التنظيمي والوظائف المعتمدة." 
                     />
                     <SummaryCard 
                         title="المناطق والمواقع" 
@@ -387,16 +362,16 @@ export function ReferenceDataManager() {
                         onNavigate={() => { setView('locations'); setSelectedPrimaryId(null); }} 
                         colorClass="bg-emerald-600/10 text-emerald-600" 
                         loading={loadingPrimary} 
-                        description="إدارة المحافظات والمناطق الجغرافية الرسمية." 
+                        description="إدارة المحافظات والمناطق الجغرافية." 
                     />
                     <SummaryCard 
-                        title="أنواع الخدمات" 
+                        title="أنواع الخدمات والمراحل" 
                         count={primaryItems?.length || 0} 
                         icon={<Workflow className="h-10 w-10"/>} 
                         onNavigate={() => { setView('transactions'); setSelectedPrimaryId(null); setSelectedSecondaryId(null); }} 
                         colorClass="bg-orange-600/10 text-primary" 
                         loading={loadingPrimary} 
-                        description="قائمة المعاملات والخدمات المتاحة وربطها بالأقسام والمراحل الإجرائية." 
+                        description="قائمة المعاملات المتاحة وربطها بمراحل الإنجاز (WBS)." 
                     />
                 </div>
             </div>
@@ -410,11 +385,6 @@ export function ReferenceDataManager() {
                 <CardHeader className="p-10 relative z-10 border-b border-white/10">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-8">
                         <div className="flex gap-4">
-                            {view !== 'transactions' && (
-                                <Button variant="secondary" onClick={() => setIsImportConfirmOpen(true)} className="bg-white/20 hover:bg-white/30 text-white rounded-2xl font-black h-12 px-8 gap-3 backdrop-blur-md border-white/40 shadow-xl transition-all active:scale-95">
-                                    <DownloadCloud className="h-5 w-5"/> استيراد القوالب الرسمية
-                                </Button>
-                            )}
                             <Button onClick={() => setView('main')} variant="outline" className="bg-white/10 text-white border-white/40 hover:bg-white/20 rounded-2xl font-black h-12 px-8 gap-2 backdrop-blur-md shadow-xl">
                                 <X className="h-5 w-5" /> إغلاق
                             </Button>
@@ -422,7 +392,7 @@ export function ReferenceDataManager() {
                         <div className="flex items-center gap-6">
                             <div className="text-right">
                                 <CardTitle className="text-3xl font-black tracking-tighter text-white">
-                                    {view === 'departments' ? 'إدارة الأقسام والوظائف' : view === 'locations' ? 'إدارة المواقع الجغرافية' : 'إدارة أنواع الخدمات والربط'}
+                                    {view === 'departments' ? 'إدارة الأقسام' : view === 'locations' ? 'إدارة المواقع' : 'إدارة الخدمات والمراحل'}
                                 </CardTitle>
                                 <div className="flex items-center gap-2 mt-2 justify-end">
                                     <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
@@ -437,30 +407,25 @@ export function ReferenceDataManager() {
                 </CardHeader>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-12 min-h-[650px] gap-6">
-                <Card className="md:col-span-4 border-none rounded-[2.5rem] shadow-xl bg-white/45 backdrop-blur-3xl overflow-hidden flex flex-col border-white/60">
-                    <div className="p-10 border-b bg-primary/5 flex justify-between items-center">
-                        <Label className="font-black text-[#1e1b4b] text-xl tracking-tight">القائمة الموحدة</Label>
-                        <Button onClick={() => { setEditingItem(null); setItemName(''); setSelectedDeptIds([]); setIsPrimaryDialogOpen(true); }} className="h-12 w-12 rounded-[1.5rem] shadow-xl shadow-primary/20"><Plus className="h-6 w-6" /></Button>
+            <div className="grid grid-cols-1 md:grid-cols-12 min-h-[600px] gap-6">
+                <Card className="md:col-span-4 border-none rounded-[2rem] shadow-xl bg-white/45 backdrop-blur-xl overflow-hidden flex flex-col border-white/60">
+                    <div className="p-8 border-b bg-primary/5 flex justify-between items-center">
+                        <Label className="font-black text-[#1e1b4b] text-lg tracking-tight">القائمة الرئيسية</Label>
+                        <Button onClick={() => { setEditingItem(null); setItemName(''); setIsPrimaryDialogOpen(true); }} className="h-10 w-10 rounded-xl shadow-xl shadow-primary/20"><Plus className="h-5 w-5" /></Button>
                     </div>
-                    <ScrollArea className="flex-1 p-8">
-                        {loadingPrimary ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-[1.8rem]"/><Skeleton className="h-16 w-full rounded-[1.8rem]"/></div> : 
+                    <ScrollArea className="flex-1 p-6">
+                        {loadingPrimary ? <div className="space-y-4"><Skeleton className="h-12 w-full rounded-xl"/><Skeleton className="h-12 w-full rounded-xl"/></div> : 
                         primaryItems.length === 0 ? <p className="text-center p-20 text-muted-foreground italic font-black opacity-20">لا توجد سجلات.</p> :
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'primary')}>
                             <SortableContext items={primaryItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     {primaryItems.map(item => (
                                         <SortableRefListItem key={item.id} id={item.id} isActive={selectedPrimaryId === item.id}>
                                             <div className="flex items-center justify-between flex-1" onClick={() => { setSelectedPrimaryId(item.id); setSelectedSecondaryId(null); }}>
-                                                <div className="flex flex-col flex-1">
-                                                    <span className="font-black text-base truncate pr-2">{item.name}</span>
-                                                    {view === 'transactions' && item.departmentIds?.length > 0 && (
-                                                        <span className="text-[9px] font-bold text-primary opacity-60 pr-2">مربوط بـ {item.departmentIds.length} أقسام</span>
-                                                    )}
-                                                </div>
+                                                <span className="font-black text-sm truncate pr-2">{item.name}</span>
                                                 <div className={cn("flex gap-1.5 transition-all", selectedPrimaryId === item.id ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
-                                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white/30 text-current" onClick={(e) => { e.stopPropagation(); setEditingItem(item); setItemName(item.name); setSelectedDeptIds(item.departmentIds || []); setIsPrimaryDialogOpen(true); }}><Pencil className="h-4 w-4"/></Button>
-                                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-red-500/20 text-current" onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, name: item.name, target: 'primary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-4 w-4"/></Button>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-white/30 text-current" onClick={(e) => { e.stopPropagation(); setEditingItem(item); setItemName(item.name); setSelectedDeptIds(item.departmentIds || []); setIsPrimaryDialogOpen(true); }}><Pencil className="h-4 w-4"/></Button>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-red-500/20 text-current" onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, name: item.name, target: 'primary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-4 w-4"/></Button>
                                                 </div>
                                             </div>
                                         </SortableRefListItem>
@@ -471,57 +436,82 @@ export function ReferenceDataManager() {
                     </ScrollArea>
                 </Card>
 
-                <Card className="md:col-span-8 border-none rounded-[2.5rem] shadow-xl bg-white/45 backdrop-blur-3xl overflow-hidden flex flex-col border-white/60">
+                <Card className="md:col-span-8 border-none rounded-[2rem] shadow-xl bg-white/45 backdrop-blur-xl overflow-hidden flex flex-col border-white/60">
                     {selectedPrimaryId ? (
                         <>
-                            <div className="p-10 border-b bg-muted/5">
+                            <div className="p-8 border-b bg-muted/5">
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-5">
                                         {selectedSecondaryId ? (
-                                             <Button variant="ghost" size="icon" onClick={() => setSelectedSecondaryId(null)} className="h-10 w-10 rounded-full border bg-white shadow-sm"><ChevronLeft className="h-5 w-5"/></Button>
+                                             <Button variant="ghost" size="icon" onClick={() => setSelectedSecondaryId(null)} className="h-9 w-9 rounded-full border bg-white shadow-sm"><ChevronLeft className="h-4 w-4"/></Button>
                                         ) : (
-                                            <div className="p-4 bg-white rounded-[1.5rem] shadow-xl border border-primary/10">
-                                                {view === 'transactions' ? <Zap className="h-8 w-8 text-primary"/> : <ListTree className="h-8 w-8 text-primary"/>}
+                                            <div className="p-3 bg-white rounded-xl shadow-xl border border-primary/10">
+                                                {view === 'transactions' ? <Zap className="h-6 w-6 text-primary"/> : <ListTree className="h-6 w-6 text-primary"/>}
                                             </div>
                                         )}
-                                        <div className="space-y-1">
-                                            <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{selectedSecondaryId ? selectedSecondary?.name : selectedPrimary?.name}</h3>
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{selectedSecondaryId ? 'مراحل الإنجاز (Level 3)' : 'إدارة البنود الفرعية الملحقة'}</p>
+                                        <div className="space-y-0.5">
+                                            <h3 className="text-2xl font-black text-[#1e1b4b] tracking-tight">{selectedSecondaryId ? selectedSecondary?.name : selectedPrimary?.name}</h3>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedSecondaryId ? 'مراحل الإنجاز (WBS)' : 'إدارة البنود الفرعية'}</p>
                                         </div>
                                     </div>
-                                    <Button onClick={() => { setEditingItem(null); setItemName(''); if(selectedSecondaryId) setIsTertiaryDialogOpen(true); else setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3">
-                                        <PlusCircle className="h-6 w-6" /> {selectedSecondaryId ? 'إضافة مرحلة عمل' : 'إضافة بند فرعي'}
+                                    <Button onClick={() => { setEditingItem(null); setItemName(''); if(selectedSecondaryId) setIsTertiaryDialogOpen(true); else setIsSecondaryDialogOpen(true); }} className="rounded-xl font-black h-11 px-8 shadow-xl shadow-primary/20 gap-2">
+                                        <PlusCircle className="h-5 w-5" /> {selectedSecondaryId ? 'إضافة مرحلة' : 'إضافة بند'}
                                     </Button>
                                 </div>
                             </div>
-                            <ScrollArea className="flex-1 p-10">
-                                {(selectedSecondaryId ? loadingTertiary : loadingSecondary) ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-[1.8rem]"/><Skeleton className="h-16 w-full rounded-[1.8rem]"/></div> :
+                            <ScrollArea className="flex-1 p-8">
+                                {(selectedSecondaryId ? loadingTertiary : loadingSecondary) ? <div className="space-y-4"><Skeleton className="h-12 w-full rounded-xl"/><Skeleton className="h-12 w-full rounded-xl"/></div> :
                                 (selectedSecondaryId ? tertiaryItems : secondaryItems).length === 0 ? (
-                                    <div className="h-96 flex flex-col items-center justify-center grayscale opacity-10 border-4 border-dashed rounded-[3.5rem] border-primary/5 m-8">
-                                        <PlusCircle className="h-24 w-24 mb-6 text-primary animate-pulse"/>
-                                        <p className="font-black text-3xl">لا توجد بيانات فرعية.</p>
+                                    <div className="h-64 flex flex-col items-center justify-center grayscale opacity-10 border-4 border-dashed rounded-[2.5rem] border-primary/5 m-8">
+                                        <PlusCircle className="h-16 w-16 mb-4 text-primary animate-pulse"/>
+                                        <p className="font-black text-xl">لا توجد بيانات فرعية.</p>
                                     </div>
                                 ) : (
                                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, selectedSecondaryId ? 'tertiary' : 'secondary')}>
                                     <SortableContext items={(selectedSecondaryId ? tertiaryItems : secondaryItems).map(i => i.id)} strategy={verticalListSortingStrategy}>
-                                        <div className="grid grid-cols-1 gap-4">
+                                        <div className="grid grid-cols-1 gap-3">
                                             {(selectedSecondaryId ? tertiaryItems : secondaryItems).map(item => (
                                                 <SortableRefListItem key={item.id} id={item.id}>
                                                     <div className="flex items-center justify-between flex-1">
-                                                        <div className="flex items-center gap-6">
-                                                            <div className="p-3.5 bg-primary/5 rounded-[1.2rem] border border-primary/10 shadow-inner">
-                                                                {selectedSecondaryId ? <Activity className="h-5 w-5 text-primary opacity-60"/> : <GitBranch className="h-5 w-5 text-primary opacity-60"/>}
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="p-2.5 bg-primary/5 rounded-xl border border-primary/10">
+                                                                {selectedSecondaryId ? (
+                                                                    item.trackingType === 'duration' ? <Clock className="h-4 w-4 text-blue-600"/> :
+                                                                    item.trackingType === 'occurrence' ? <RotateCcw className="h-4 w-4 text-orange-600"/> :
+                                                                    <Activity className="h-4 w-4 text-slate-400"/>
+                                                                ) : <GitBranch className="h-4 w-4 text-primary opacity-60"/>}
                                                             </div>
-                                                            <span className="font-black text-xl text-[#1e1b4b] tracking-tight">{item.name}</span>
+                                                            <div>
+                                                                <span className="font-black text-lg text-[#1e1b4b]">{item.name}</span>
+                                                                {selectedSecondaryId && (
+                                                                    <div className="flex gap-2 mt-0.5">
+                                                                        <Badge variant="secondary" className="text-[8px] h-4 font-black">
+                                                                            {item.trackingType === 'duration' ? `زمني: ${item.expectedDurationDays} يوم` : 
+                                                                             item.trackingType === 'occurrence' ? `عددي: ${item.maxOccurrences} مرات` : 'معيار نصوص'}
+                                                                        </Badge>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                         <div className="flex gap-2">
                                                             {view === 'transactions' && !selectedSecondaryId && (
-                                                                <Button variant="outline" className="rounded-xl border-dashed border-primary/50 text-primary font-black gap-2 h-10 px-6" onClick={() => setSelectedSecondaryId(item.id)}>
-                                                                    <Workflow className="h-4 w-4"/> إدارة المراحل
+                                                                <Button variant="outline" className="rounded-xl border-dashed border-primary/50 text-primary font-black gap-2 h-9 px-4 text-xs" onClick={() => setSelectedSecondaryId(item.id)}>
+                                                                    <Workflow className="h-3 w-3"/> مسار الـ WBS
                                                                 </Button>
                                                             )}
-                                                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl border-2 border-primary/10 bg-white hover:bg-primary hover:text-white shadow-sm" onClick={() => { setEditingItem(item); setItemName(item.name); if(selectedSecondaryId) setIsTertiaryDialogOpen(true); else setIsSecondaryDialogOpen(true); }}><Pencil className="h-5 w-5"/></Button>
-                                                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl border-2 border-red-100 bg-white text-red-600 hover:bg-red-600 hover:text-white shadow-sm" onClick={() => { setItemToDelete({ id: item.id, name: item.name, target: selectedSecondaryId ? 'tertiary' : 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-5 w-5"/></Button>
+                                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border-2 border-primary/10 bg-white hover:bg-primary hover:text-white" onClick={() => { 
+                                                                setEditingItem(item); 
+                                                                setItemName(item.name); 
+                                                                if(selectedSecondaryId) {
+                                                                    setTrackingType(item.trackingType || 'duration');
+                                                                    setExpectedDuration(String(item.expectedDurationDays || '7'));
+                                                                    setMaxOccurrences(String(item.maxOccurrences || '3'));
+                                                                    setIsTertiaryDialogOpen(true);
+                                                                } else {
+                                                                    setIsSecondaryDialogOpen(true); 
+                                                                }
+                                                            }}><Pencil className="h-4 w-4"/></Button>
+                                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border-2 border-red-100 bg-white text-red-600 hover:bg-red-600 hover:text-white" onClick={() => { setItemToDelete({ id: item.id, name: item.name, target: selectedSecondaryId ? 'tertiary' : 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-4 w-4"/></Button>
                                                         </div>
                                                     </div>
                                                 </SortableRefListItem>
@@ -534,50 +524,72 @@ export function ReferenceDataManager() {
                         </>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center p-20 text-center">
-                            <div className="p-16 bg-gradient-to-b from-primary/10 to-transparent rounded-full mb-10 relative">
-                                <Layers className="h-40 w-40 text-primary/5 animate-pulse" />
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    {view === 'transactions' ? <Zap className="h-16 w-16 text-primary opacity-30" /> : <ListTree className="h-16 w-16 text-primary opacity-30" />}
-                                </div>
+                            <div className="p-12 bg-primary/5 rounded-full mb-8">
+                                {view === 'transactions' ? <Workflow className="h-24 w-24 text-primary opacity-20" /> : <ListTree className="h-24 w-24 text-primary opacity-20" />}
                             </div>
-                            <h3 className="text-4xl font-black text-[#1e1b4b] tracking-tighter max-w-md leading-tight">
-                                اختر تصنيفاً من القائمة لعرض وتعديل بياناته الفرعية المعتمدة.
-                            </h3>
+                            <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">اختر تصنيفاً للبدء بالتحرير.</h3>
                         </div>
                     )}
                 </Card>
             </div>
 
             <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen || isTertiaryDialogOpen} onOpenChange={closeDialog}>
-                <DialogContent dir="rtl" className="max-w-xl rounded-[3rem] p-10 shadow-2xl border-none bg-white/95 backdrop-blur-2xl">
+                <DialogContent dir="rtl" className="max-w-xl rounded-[2.5rem] p-0 shadow-2xl border-none bg-white overflow-hidden">
                     <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : isSecondaryDialogOpen ? 'secondary' : 'tertiary'); }}>
-                        <DialogHeader>
-                            <div className="p-4 bg-primary/10 rounded-[1.8rem] text-primary w-fit mb-6 shadow-inner"><PlusCircle className="h-10 w-10"/></div>
-                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل البيانات المعتمدة' : 'إضافة سجل جديد'}</DialogTitle>
+                        <DialogHeader className="p-8 bg-primary/5 border-b">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><PlusCircle className="h-8 w-8"/></div>
+                                <DialogTitle className="text-2xl font-black text-[#1e1b4b]">{editingItem ? 'تعديل السجل' : 'إضافة سجل جديد'}</DialogTitle>
+                            </div>
                         </DialogHeader>
-                        <div className="py-10 space-y-8">
+                        
+                        <div className="p-8 space-y-6">
                             <div className="grid gap-2">
-                                <Label className="font-black text-[#1e1b4b] pr-3 block mb-1 text-sm uppercase tracking-widest">الاسم المعتمد في المنظومة *</Label>
-                                <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-16 rounded-[1.5rem] border-2 text-2xl font-black text-primary bg-slate-50/50 focus:bg-white shadow-inner transition-all" placeholder="اكتب هنا..." />
+                                <Label className="font-black text-[#1e1b4b] pr-2 text-xs uppercase">الاسم المعتمد *</Label>
+                                <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-xl border-2 font-black text-lg bg-slate-50 focus:bg-white transition-all shadow-inner" placeholder="اكتب هنا..." />
                             </div>
 
                             {view === 'transactions' && isPrimaryDialogOpen && (
                                 <div className="grid gap-3 animate-in fade-in">
-                                    <Label className="font-black text-[#1e1b4b] pr-3 block text-sm">الربط مع الأقسام الفنية (الإسناد الذكي)</Label>
-                                    <MultiSelect 
-                                        options={departmentOptions}
-                                        selected={selectedDeptIds}
-                                        onChange={setSelectedDeptIds}
-                                        placeholder="اختر الأقسام التي تنجز هذه الخدمة..."
-                                        className="rounded-2xl"
-                                    />
-                                    <p className="text-[10px] font-bold text-muted-foreground pr-2">سيقوم النظام آلياً بإسناد المهندس المختص من هذه الأقسام عند فتح المعاملة.</p>
+                                    <Label className="font-black text-[#1e1b4b] pr-2 text-xs">الأقسام الفنية المنفذة (الإسناد الذكي)</Label>
+                                    <MultiSelect options={departmentOptions} selected={selectedDeptIds} onChange={setSelectedDeptIds} placeholder="اختر الأقسام..." className="rounded-xl" />
+                                </div>
+                            )}
+
+                            {isTertiaryDialogOpen && (
+                                <div className="space-y-6 animate-in slide-in-from-top-4">
+                                    <div className="grid gap-2">
+                                        <Label className="font-black text-[#1e1b4b] pr-2 text-xs">نوع التتبع الرقابي</Label>
+                                        <Select value={trackingType} onValueChange={(v: any) => setTrackingType(v)}>
+                                            <SelectTrigger className="h-11 rounded-xl border-2 font-black"><SelectValue /></SelectTrigger>
+                                            <SelectContent dir="rtl">
+                                                <SelectItem value="duration">تتبع زمني (أيام عمل)</SelectItem>
+                                                <SelectItem value="occurrence">تتبع عددي (مرات حدوث)</SelectItem>
+                                                <SelectItem value="none">معيار نصوص فقط</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    
+                                    {trackingType === 'duration' && (
+                                        <div className="grid gap-2 animate-in zoom-in-95">
+                                            <Label className="font-black text-blue-700 pr-2 text-xs">المدة المتوقعة للإنجاز (يوم) *</Label>
+                                            <Input type="number" value={expectedDuration} onChange={e => setExpectedDuration(e.target.value)} className="h-11 rounded-xl border-2 font-mono font-black text-xl text-center text-blue-600 bg-blue-50/30" />
+                                        </div>
+                                    )}
+
+                                    {trackingType === 'occurrence' && (
+                                        <div className="grid gap-2 animate-in zoom-in-95">
+                                            <Label className="font-black text-orange-700 pr-2 text-xs">الحد الأقصى للحدوث (مرات) *</Label>
+                                            <Input type="number" value={maxOccurrences} onChange={e => setMaxOccurrences(e.target.value)} className="h-11 rounded-xl border-2 font-mono font-black text-xl text-center text-orange-600 bg-orange-50/30" />
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
-                        <DialogFooter className="gap-4 pt-6 border-t">
-                            <Button type="button" variant="outline" onClick={closeDialog} className="rounded-2xl font-black h-12 px-10">إلغاء</Button>
-                            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30 min-w-[200px]">
+
+                        <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
+                            <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                            <Button type="submit" disabled={isSaving} className="rounded-xl font-black h-12 px-12 shadow-xl shadow-primary/30 min-w-[200px]">
                                 {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>} اعتماد الحفظ
                             </Button>
                         </DialogFooter>
@@ -586,15 +598,15 @@ export function ReferenceDataManager() {
             </Dialog>
 
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent dir="rtl" className="rounded-[3rem] border-none shadow-2xl p-12 glass-effect">
+                <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">
                     <AlertDialogHeader>
-                        <div className="p-5 bg-red-100 text-red-600 rounded-[1.8rem] w-fit mb-6 shadow-inner"><Trash2 className="h-12 w-12"/></div>
-                        <AlertDialogTitle className="text-3xl font-black text-red-700 tracking-tighter">تأكيد الحذف المعتمد؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-xl font-bold text-slate-600 leading-relaxed mt-4">سيتم مسح سجل <strong className="text-red-900">"{itemToDelete?.name}"</strong> نهائياً من كافة عروق المنظومة.</AlertDialogDescription>
+                        <div className="p-4 bg-red-100 text-red-600 rounded-2xl w-fit mb-4 shadow-inner"><Trash2 className="h-10 w-10"/></div>
+                        <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tighter">تأكيد الحذف المعتمد؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-lg font-bold text-slate-600 leading-relaxed mt-2">سيتم مسح سجل <strong className="text-red-900">"{itemToDelete?.name}"</strong> نهائياً من كافة عروق المنظومة.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter className="mt-10 gap-4">
-                        <AlertDialogCancel className="rounded-2xl font-black h-12 px-10 border-2">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 hover:bg-red-700 rounded-2xl font-black h-12 px-16 shadow-xl shadow-red-200">
+                    <AlertDialogFooter className="mt-8 gap-3">
+                        <AlertDialogCancel className="rounded-xl font-black h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
                             {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، تأكيد الحذف النهائي'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -602,15 +614,15 @@ export function ReferenceDataManager() {
             </AlertDialog>
 
             <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
-                <AlertDialogContent dir="rtl" className="rounded-[3rem] border-none shadow-2xl p-12">
+                <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">
                     <AlertDialogHeader>
-                        <div className="p-5 bg-primary/10 text-primary rounded-[1.8rem] w-fit mb-6 shadow-inner"><DownloadCloud className="h-12 w-12"/></div>
-                        <AlertDialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">تأكيد استيراد القوالب الموحدة؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-4">سيقوم هذا الإجراء بإضافة الأقسام، الوظائف، مراحل العمل، والمدن مع كافة تفاصيلها الفرعية المعتمدة رسمياً لضمان توافق النظام.</AlertDialogDescription>
+                        <div className="p-4 bg-primary/10 text-primary rounded-2xl w-fit mb-4 shadow-inner"><DownloadCloud className="h-10 w-10"/></div>
+                        <AlertDialogTitle className="text-2xl font-black text-[#1e1b4b] tracking-tighter">تأكيد استيراد القوالب الموحدة؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-2">سيقوم هذا الإجراء بإضافة الأقسام، الوظائف، ومراحل العمل المعتمدة رسمياً لضمان توافق النظام.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter className="mt-10 gap-4">
-                        <AlertDialogCancel className="rounded-2xl font-black h-12 px-10 border-2">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30">
+                    <AlertDialogFooter className="mt-8 gap-3">
+                        <AlertDialogCancel className="rounded-xl font-black h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-xl font-black h-12 px-12 shadow-xl shadow-primary/30">
                             {isImporting ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، ابدأ الاستيراد الموحد'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -619,3 +631,4 @@ export function ReferenceDataManager() {
         </div>
     );
 }
+
