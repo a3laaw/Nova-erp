@@ -51,7 +51,8 @@ import {
     Target,
     RotateCcw,
     Clock,
-    Plus
+    Plus,
+    Undo2
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -129,6 +130,8 @@ export default function TransactionDetailPage() {
   const clientPath = useMemo(() => (firestore && clientId && tenantId ? getTenantPath(`clients/${clientId}`, tenantId) : null), [firestore, clientId, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
+  const isAdmin = useMemo(() => ['Admin', 'HR', 'Developer'].includes(currentUser?.role || ''), [currentUser]);
+
   useEffect(() => {
     if (!firestore || !tenantId) return;
     const empPath = getTenantPath('employees', tenantId);
@@ -153,15 +156,45 @@ export default function TransactionDetailPage() {
             
             if (newStatus === 'in-progress' && !stage.startDate) {
                 stage.startDate = now;
-                if (stage.trackingType === 'duration' && stage.expectedDurationDays) {
+                if ((stage.trackingType === 'duration' || stage.trackingType === 'hybrid') && stage.expectedDurationDays) {
                     const expectedEnd = new Date(now.getTime() + stage.expectedDurationDays * 24 * 60 * 60 * 1000);
                     stage.expectedEndDate = expectedEnd;
                 }
             }
-            if (newStatus === 'completed') stage.endDate = now;
+            if (newStatus === 'completed') {
+                stage.endDate = now;
+                
+                // ✨ ذكاء التبعية: تشغيل المرحلة التالية آلياً إذا كانت تسلسلية ✨
+                const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                if (nextStage && nextStage.status === 'pending') {
+                    nextStage.status = 'in-progress';
+                    nextStage.startDate = now;
+                    if (nextStage.expectedDurationDays) {
+                        const nextExpEnd = new Date(now.getTime() + nextStage.expectedDurationDays * 24 * 60 * 60 * 1000);
+                        nextStage.expectedEndDate = nextExpEnd;
+                    }
+                }
+            }
 
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: 'نجاح التحديث' });
+            toast({ title: 'نجاح التحديث', description: newStatus === 'completed' ? 'تم إنجاز المرحلة وتفعيل التالية.' : 'تم بدء العمل في المرحلة.' });
+        } finally { setIsProcessing(false); }
+  };
+
+  const handleUndoStage = async (stageId: string) => {
+        if (!firestore || !currentUser || !transaction || !transactionPath || !isAdmin) return;
+        setIsProcessing(true);
+        try {
+            const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
+            const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
+            if (stageIndex === -1) throw new Error("Stage not found");
+            
+            const stage = currentStages[stageIndex];
+            stage.status = 'in-progress';
+            stage.endDate = null;
+            
+            await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
+            toast({ title: 'تم التراجع', description: 'تمت إعادة المرحلة لوضع التنفيذ.' });
         } finally { setIsProcessing(false); }
   };
 
@@ -177,7 +210,8 @@ export default function TransactionDetailPage() {
             const newCount = (stage.currentCount || 0) + 1;
             stage.currentCount = newCount;
             
-            if (stage.maxOccurrences && newCount >= stage.maxOccurrences) {
+            // في وضع التكرار فقط، نغلق المرحلة عند الوصول للحد
+            if (stage.trackingType === 'occurrence' && stage.maxOccurrences && newCount >= stage.maxOccurrences) {
                 stage.status = 'completed';
                 stage.endDate = new Date();
             } else {
@@ -185,7 +219,7 @@ export default function TransactionDetailPage() {
             }
 
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: `تم تسجيل التعديل رقم ${newCount}` });
+            toast({ title: `تم تسجيل التكرار رقم ${newCount}` });
         } finally { setIsProcessing(false); }
   };
 
@@ -278,11 +312,11 @@ export default function TransactionDetailPage() {
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
                         {(transaction.stages || []).map((stage) => {
-                            const isOccurrence = stage.trackingType === 'occurrence';
-                            const isDuration = stage.trackingType === 'duration';
+                            const isOccurrence = stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid';
+                            const isDuration = stage.trackingType === 'duration' || stage.trackingType === 'hybrid';
                             const currentCount = stage.currentCount || 0;
                             const maxCount = stage.maxOccurrences || 0;
-                            const progress = isOccurrence ? (currentCount / maxCount) * 100 : 0;
+                            const progress = isOccurrence && maxCount > 0 ? (currentCount / maxCount) * 100 : 0;
 
                             return (
                                 <div key={stage.stageId} className="flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent bg-muted/20 rounded-[2rem] hover:bg-white hover:border-primary/20 hover:shadow-md transition-all">
@@ -299,25 +333,37 @@ export default function TransactionDetailPage() {
                                             )}
                                             {isOccurrence && (
                                                 <div className="flex items-center gap-3 mt-1">
-                                                    <p className="text-[10px] font-black text-orange-600 uppercase tracking-tighter">سجل التعديلات: {currentCount} / {maxCount}</p>
-                                                    <Progress value={progress} className="h-1.5 w-24" />
+                                                    <p className="text-[10px] font-black text-orange-600 uppercase tracking-tighter">سجل العداد: {currentCount} / {maxCount}</p>
+                                                    {maxCount > 0 && <Progress value={progress} className="h-1.5 w-24" />}
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-4 mt-4 sm:mt-0">
                                         {stage.status === 'pending' && <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 border-2 px-6"><Play className="ml-2 h-4 w-4"/> بدء العمل</Button>}
+                                        
                                         {isOccurrence && stage.status === 'in-progress' && (
                                             <Button size="sm" variant="outline" onClick={() => handleIncrementOccurrence(stage.stageId)} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 border-orange-200 text-orange-600 bg-white gap-2 shadow-sm">
-                                                <Plus className="h-4 w-4"/> تسجيل تعديل جديد
+                                                <Plus className="h-4 w-4"/> تسجيل {stage.trackingType === 'hybrid' ? 'تعديل' : 'مرة'}
                                             </Button>
                                         )}
-                                        {stage.status === 'in-progress' && (!isOccurrence || currentCount >= maxCount) && (
+                                        
+                                        {stage.status === 'in-progress' && (stage.trackingType !== 'occurrence' || currentCount >= maxCount) && (
                                             <Button size="sm" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 text-white gap-2">
                                                 <Check className="ml-2 h-4 w-4"/> تأكيد الإنجاز النهائي
                                             </Button>
                                         )}
-                                        {stage.status === 'completed' && <CheckCircle2 className="h-8 w-8 text-green-600" />}
+                                        
+                                        {stage.status === 'completed' && (
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className="h-8 w-8 text-green-600" />
+                                                {isAdmin && (
+                                                    <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-8 w-8 text-orange-400 hover:text-orange-600" title="تراجع عن الإغلاق (صلاحية المدير)">
+                                                        <Undo2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )

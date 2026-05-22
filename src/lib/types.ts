@@ -33,7 +33,7 @@ export interface WorkStage extends BaseEntity {
   name: string;
   order: number;
   parentId: string; // Linked to SubService ID
-  trackingType: 'duration' | 'occurrence' | 'none';
+  trackingType: 'duration' | 'occurrence' | 'hybrid' | 'none'; // Added Hybrid
   expectedDurationDays?: number;
   maxOccurrences?: number;
 }
@@ -42,7 +42,7 @@ export interface TransactionStage {
   stageId: string;
   name: string;
   status: 'pending' | 'in-progress' | 'completed';
-  trackingType: 'duration' | 'occurrence' | 'none';
+  trackingType: 'duration' | 'occurrence' | 'hybrid' | 'none';
   startDate?: Timestamp | any;
   endDate?: Timestamp | any;
   expectedEndDate?: Timestamp | any;
@@ -395,4 +395,165 @@ export interface ContractTemplate extends BaseEntity {
             value: number;
         }>;
     };
+}
+
+export interface CashReceipt extends BaseEntity {
+    voucherNumber: string;
+    receiptDate: Timestamp | any;
+    clientId: string | null;
+    clientNameAr: string;
+    projectId: string | null;
+    projectNameAr?: string;
+    amount: number;
+    amountInWords: string;
+    description: string;
+    paymentMethod: string;
+    reference?: string;
+    journalEntryId?: string;
+    visitCount?: number;
+    color?: string;
+}
+
+export interface PaymentVoucher extends BaseEntity {
+    voucherNumber: string;
+    paymentDate: Timestamp | any;
+    payeeName: string;
+    payeeType: string;
+    amount: number;
+    amountInWords: string;
+    description: string;
+    paymentMethod: string;
+    reference?: string;
+    debitAccountId: string;
+    creditAccountId: string;
+    status: 'draft' | 'paid' | 'cancelled';
+    journalEntryId?: string;
+    employeeId?: string;
+    renewalExpiryDate?: Timestamp | any;
+}
+
+export interface TechnicalSpecifications {
+    totalArea: number;
+    floorsCount: number;
+    hasBasement: boolean;
+    basementType: 'none' | 'full' | 'half' | 'vault';
+    roofExtension: 'none' | 'quarter' | 'half';
+    bathroomsCount?: number;
+    kitchensCount?: number;
+    laundryRoomsCount?: number;
+    electricalPointsCount?: number;
+    planReferenceNumber?: string;
+    workNature?: 'labor_only' | 'with_materials';
+    sanitaryExtensionType?: 'ordinary' | 'suspended';
+    suspendedExtensionCount?: number;
+    ordinaryExtensionCount?: number;
+    suspendedToiletCount?: number;
+    ordinaryToiletCount?: number;
+    hiddenShowerCount?: number;
+    ordinaryShowerCount?: number;
+}
+
+export interface Quotation extends BaseEntity {
+    quotationNumber: string;
+    clientId: string;
+    clientName: string;
+    subject: string;
+    date: Timestamp | any;
+    validUntil: Timestamp | any;
+    totalAmount: number;
+    status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+    items: any[];
+    financialsType: 'fixed' | 'percentage';
+    totalArea?: number;
+    floorsCount?: number;
+    basementType: 'none' | 'full' | 'half' | 'vault';
+    roofExtension: 'none' | 'quarter' | 'half';
+    workNature: 'labor_only' | 'with_materials';
+    layoutBlocks?: any[];
+}
+
+export interface InventoryAdjustment extends BaseEntity {
+    adjustmentNumber: string;
+    date: Timestamp | any;
+    type: 'damage' | 'theft' | 'opening_balance' | 'material_issue' | 'purchase_return' | 'sales_return' | 'other' | 'transfer';
+    issueType?: 'project_site' | 'direct_sale';
+    notes?: string;
+    items: any[];
+    warehouseId?: string;
+    fromWarehouseId?: string;
+    toWarehouseId?: string;
+    projectId?: string;
+    projectName?: string;
+    clientId?: string;
+    clientName?: string;
+    journalEntryId?: string;
+}
+
+export interface GoodsReceiptNote extends BaseEntity {
+    grnNumber: string;
+    date: Timestamp | any;
+    vendorId: string;
+    vendorName: string;
+    purchaseOrderId?: string;
+    warehouseId: string;
+    totalValue: number;
+    itemsReceived: any[];
+    status: 'received' | 'cancelled';
+    journalEntryId?: string;
+}
+
+export interface Subcontractor extends BaseEntity {
+    name: string;
+    type: string;
+    specialization?: string;
+    contactPerson?: string;
+    phone: string;
+    mobile?: string;
+    email?: string;
+    address?: string;
+    isActive: boolean;
+    blacklisted: boolean;
+    blacklistedReason?: string;
+    performanceRating?: number;
+    bankAccount?: {
+        bankName: string;
+        accountNumber: string;
+        iban: string;
+    };
+}
+
+export interface SubcontractorCertificate extends BaseEntity {
+    certificateNumber: string;
+    date: Timestamp | any;
+    subcontractorId: string;
+    subcontractorName: string;
+    projectId: string;
+    projectName: string;
+    amount: number;
+    description?: string;
+    status: 'draft' | 'approved' | 'cancelled';
+    journalEntryId?: string;
+}
+
+export interface SubcontractorType extends BaseEntity {
+    name: string;
+    order?: number;
+}
+
+export interface SubcontractorSpecialization extends BaseEntity {
+    name: string;
+    order?: number;
+    parentTypeId: string;
+}
+
+export interface MonthlyAttendance extends BaseEntity {
+    employeeId: string;
+    year: number;
+    month: number;
+    summary: {
+        presentDays: number;
+        absentDays: number;
+        lateDays: number;
+    };
+    records: any[];
 }

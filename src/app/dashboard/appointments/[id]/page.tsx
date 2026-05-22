@@ -78,20 +78,38 @@ export default function AppointmentDetailsPage() {
                 const stage = currentStages[stageIdx];
                 const now = new Date();
 
-                if (stage.trackingType === 'occurrence') {
+                // ✨ منطق التحديث الهجين / المتعدد ✨
+                if (stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') {
                     const newCount = (stage.currentCount || 0) + 1;
                     stage.currentCount = newCount;
-                    if (stage.maxOccurrences && newCount >= stage.maxOccurrences) {
+                    
+                    // إذا كان تتبع عددي بحت، نغلق عند الحد
+                    if (stage.trackingType === 'occurrence' && stage.maxOccurrences && newCount >= stage.maxOccurrences) {
                         stage.status = 'completed';
                         stage.endDate = now;
                     } else {
+                        // في المسار الهجين أو إذا لم يصل للحد، يبقى قيد التنفيذ
                         stage.status = 'in-progress';
                     }
                 } else {
+                    // المسار الزمني أو العادي يغلق فوراً عند التوثيق من الزيارة
                     stage.status = 'completed';
                     stage.endDate = now;
                 }
                 
+                // ✨ ذكاء التبعية: تفعيل المرحلة التالية آلياً إذا أغلقت الحالية ✨
+                if (stage.status === 'completed') {
+                    const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                    if (nextStage && nextStage.status === 'pending') {
+                        nextStage.status = 'in-progress';
+                        nextStage.startDate = now;
+                        if ((nextStage.trackingType === 'duration' || nextStage.trackingType === 'hybrid') && (nextStage as any).expectedDurationDays) {
+                            const expEnd = new Date(now.getTime() + (nextStage as any).expectedDurationDays * 24 * 60 * 60 * 1000);
+                            nextStage.expectedEndDate = expEnd;
+                        }
+                    }
+                }
+
                 let financeComment = "";
                 if (transaction.contract?.clauses) {
                     const updatedClauses = transaction.contract.clauses.map((clause: any) => {
@@ -109,7 +127,7 @@ export default function AppointmentDetailsPage() {
                 const timelineRef = doc(collection(txRef, 'timelineEvents'));
                 batch.set(timelineRef, {
                     type: 'comment', 
-                    content: `**[محضر زيارة]**\nتم تسجيل إنجاز في مرحلة: ${stage.name}${stage.trackingType === 'occurrence' ? ` (المرة رقم ${stage.currentCount})` : ''}\n\n**ملاحظات المهندس:**\n${notes}${financeComment}`, 
+                    content: `**[محضر زيارة]**\nتم تسجيل إنجاز في مرحلة: ${stage.name}${isOccurrenceOrHybrid(stage.trackingType) ? ` (المرة رقم ${stage.currentCount})` : ''}\n\n**ملاحظات المهندس:**\n${notes}${financeComment}`, 
                     userId: currentUser.id, 
                     userName: currentUser.fullName, 
                     userAvatar: currentUser.avatarUrl,
@@ -144,6 +162,8 @@ export default function AppointmentDetailsPage() {
             toast({ variant: 'destructive', title: 'خطأ في التوثيق' }); 
         } finally { setIsSaving(false); }
     };
+
+    const isOccurrenceOrHybrid = (type: string) => type === 'occurrence' || type === 'hybrid';
 
     if (apptLoading || clientLoading) return <div className="p-8 max-w-2xl mx-auto"><Skeleton className="h-[500px] w-full rounded-[3.5rem]" /></div>;
     if (!appointment) return <div className="p-20 text-center font-black opacity-30">الزيارة غير موجودة.</div>;
@@ -224,7 +244,7 @@ export default function AppointmentDetailsPage() {
                                                 onSelect={setSelectedStageId} 
                                                 options={enrichedStages.map(s => ({ 
                                                     value: s.stageId, 
-                                                    label: `${s.name} ${s.trackingType === 'occurrence' ? `(المرة ${ (s.currentCount || 0) + 1 })` : ''}` 
+                                                    label: `${s.name} ${isOccurrenceOrHybrid(s.trackingType) ? `(المرة ${ (s.currentCount || 0) + 1 })` : ''}` 
                                                 }))} 
                                                 placeholder="ابحث عن مرحلة الإنجاز المخططة..." 
                                                 className="h-12 bg-white rounded-2xl border-2"

@@ -113,7 +113,7 @@ function SortableRefListItem({ id, children, isActive }: { id: string, children:
               : "bg-white/60 hover:bg-white hover:border-primary/20 border-transparent shadow-sm"
         )}
     >
-        <div className="flex items-center gap-4 flex-1">
+        <div className="flex items-center gap-4 flex-1" onClick={isActive ? undefined : (attributes as any).onClick}>
             <button 
                 {...attributes} 
                 {...listeners} 
@@ -174,7 +174,7 @@ export function ReferenceDataManager() {
     const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
     
     // Stage-specific fields
-    const [trackingType, setTrackingType] = useState<'duration' | 'occurrence' | 'none'>('duration');
+    const [trackingType, setTrackingType] = useState<'duration' | 'occurrence' | 'hybrid' | 'none'>('duration');
     const [expectedDuration, setExpectedDuration] = useState('7');
     const [maxOccurrences, setMaxOccurrences] = useState('3');
 
@@ -292,8 +292,8 @@ export function ReferenceDataManager() {
             if (type === 'tertiary') {
                 payload.parentId = selectedSecondaryId;
                 payload.trackingType = trackingType;
-                if (trackingType === 'duration') payload.expectedDurationDays = parseInt(expectedDuration);
-                if (trackingType === 'occurrence') payload.maxOccurrences = parseInt(maxOccurrences);
+                if (trackingType === 'duration' || trackingType === 'hybrid') payload.expectedDurationDays = parseInt(expectedDuration);
+                if (trackingType === 'occurrence' || trackingType === 'hybrid') payload.maxOccurrences = parseInt(maxOccurrences);
             }
 
             if (editingItem) {
@@ -478,6 +478,7 @@ export function ReferenceDataManager() {
                                                                 {selectedSecondaryId ? (
                                                                     item.trackingType === 'duration' ? <Clock className="h-4 w-4 text-blue-600"/> :
                                                                     item.trackingType === 'occurrence' ? <RotateCcw className="h-4 w-4 text-orange-600"/> :
+                                                                    item.trackingType === 'hybrid' ? <Sparkles className="h-4 w-4 text-purple-600"/> :
                                                                     <Activity className="h-4 w-4 text-slate-400"/>
                                                                 ) : <GitBranch className="h-4 w-4 text-primary opacity-60"/>}
                                                             </div>
@@ -487,7 +488,9 @@ export function ReferenceDataManager() {
                                                                     <div className="flex gap-2 mt-0.5">
                                                                         <Badge variant="secondary" className="text-[8px] h-4 font-black">
                                                                             {item.trackingType === 'duration' ? `زمني: ${item.expectedDurationDays} يوم` : 
-                                                                             item.trackingType === 'occurrence' ? `عددي: ${item.maxOccurrences} مرات` : 'معيار نصوص'}
+                                                                             item.trackingType === 'occurrence' ? `عددي: ${item.maxOccurrences} مرات` : 
+                                                                             item.trackingType === 'hybrid' ? `هجين: ${item.expectedDurationDays}ي / ${item.maxOccurrences}م` :
+                                                                             'معيار نصوص'}
                                                                         </Badge>
                                                                     </div>
                                                                 )}
@@ -565,21 +568,22 @@ export function ReferenceDataManager() {
                                             <SelectContent dir="rtl">
                                                 <SelectItem value="duration">تتبع زمني (أيام عمل)</SelectItem>
                                                 <SelectItem value="occurrence">تتبع عددي (مرات حدوث)</SelectItem>
+                                                <SelectItem value="hybrid">مسار هجين (زمن + تكرار)</SelectItem>
                                                 <SelectItem value="none">معيار نصوص فقط</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                     
-                                    {trackingType === 'duration' && (
+                                    {(trackingType === 'duration' || trackingType === 'hybrid') && (
                                         <div className="grid gap-2 animate-in zoom-in-95">
                                             <Label className="font-black text-blue-700 pr-2 text-xs">المدة المتوقعة للإنجاز (يوم) *</Label>
                                             <Input type="number" value={expectedDuration} onChange={e => setExpectedDuration(e.target.value)} className="h-11 rounded-xl border-2 font-mono font-black text-xl text-center text-blue-600 bg-blue-50/30" />
                                         </div>
                                     )}
 
-                                    {trackingType === 'occurrence' && (
+                                    {(trackingType === 'occurrence' || trackingType === 'hybrid') && (
                                         <div className="grid gap-2 animate-in zoom-in-95">
-                                            <Label className="font-black text-orange-700 pr-2 text-xs">الحد الأقصى للحدوث (مرات) *</Label>
+                                            <Label className="font-black text-orange-700 pr-2 text-xs">الحد الأقصى للتعديلات / الحدوث (مرات) *</Label>
                                             <Input type="number" value={maxOccurrences} onChange={e => setMaxOccurrences(e.target.value)} className="h-11 rounded-xl border-2 font-mono font-black text-xl text-center text-orange-600 bg-orange-50/30" />
                                         </div>
                                     )}
@@ -588,7 +592,7 @@ export function ReferenceDataManager() {
                         </div>
 
                         <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
-                            <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                            <Button type="button" variant="outline" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
                             <Button type="submit" disabled={isSaving} className="rounded-xl font-black h-12 px-12 shadow-xl shadow-primary/30 min-w-[200px]">
                                 {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>} اعتماد الحفظ
                             </Button>
@@ -631,4 +635,3 @@ export function ReferenceDataManager() {
         </div>
     );
 }
-
