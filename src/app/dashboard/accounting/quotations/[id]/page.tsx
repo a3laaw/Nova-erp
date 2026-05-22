@@ -115,89 +115,89 @@ export default function ViewQuotationPage() {
                 </div>
             </div>
 
-            <div id="printable-area" className="p-12 md:p-20 space-y-12 bg-white">
+            <div id="printable-area" className="p-12 md:p-16 space-y-10 bg-white">
                 <header className="flex justify-between items-start pb-8 border-b-8 border-primary">
-                    <div className="flex items-center gap-8">
-                        <Logo className="h-28 w-24 !p-3 shadow-inner border rounded-[2rem]" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                    <div className="flex items-center gap-6">
+                        <Logo className="h-20 w-16 !p-2 shadow-inner border rounded-2xl" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                         <div className="space-y-1 text-right">
-                            <h1 className="text-3xl font-black text-[#1e1b4b]">{branding?.company_name || 'Nova ERP'}</h1>
-                            <p className="text-sm text-muted-foreground font-bold">{branding?.address}</p>
-                            <p className="text-xs font-mono opacity-60">REF: {quotation.quotationNumber}</p>
+                            <h1 className="text-2xl font-black text-[#1e1b4b]">{branding?.company_name || 'Nova ERP'}</h1>
+                            <p className="text-[10px] text-muted-foreground font-bold">{branding?.address}</p>
+                            <p className="text-[9px] font-mono opacity-60">REF: {quotation.quotationNumber}</p>
                         </div>
                     </div>
-                    <div className="text-left space-y-2">
-                        <h2 className="text-4xl font-black text-primary tracking-tighter">عرض سعر رسمي</h2>
-                        <p className="text-xl font-bold text-gray-400 uppercase tracking-widest font-mono">QUOTATION PROPOSAL</p>
-                        <div className="pt-4">
-                            <Badge variant="outline" className={cn("px-8 py-2 border-4 font-black text-base rounded-full shadow-sm", statusColors[quotation.status])}>
+                    <div className="text-left space-y-1">
+                        <h2 className="text-3xl font-black text-primary tracking-tighter">عرض سعر رسمي</h2>
+                        <p className="text-lg font-bold text-gray-400 uppercase tracking-widest font-mono">QUOTATION PROPOSAL</p>
+                        <div className="pt-2">
+                            <Badge variant="outline" className={cn("px-6 py-1 border-2 font-black text-xs rounded-full shadow-sm", statusColors[quotation.status])}>
                                 {statusTranslations[quotation.status]}
                             </Badge>
                         </div>
                     </div>
                 </header>
 
-                <section className="grid grid-cols-2 gap-12 p-10 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 shadow-inner">
+                <section className="grid grid-cols-2 gap-8 p-8 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 shadow-inner">
                     <div className="text-right">
-                        <p className='text-[10px] uppercase font-black text-slate-400 mb-2 tracking-widest'>السيد المالك المحترم / Client Name:</p>
-                        <p className='text-3xl font-black text-slate-900'>{quotation.clientName}</p>
+                        <p className='text-[9px] uppercase font-black text-slate-400 mb-1 tracking-widest'>السيد المالك المحترم / Client Name:</p>
+                        <p className='text-2xl font-black text-slate-900'>{quotation.clientName}</p>
                     </div>
-                    <div className='text-left border-r-4 border-primary/20 pr-8'>
-                        <p className='text-[10px] uppercase font-black text-primary mb-2 tracking-widest'>موضوع العرض / Subject:</p>
-                        <p className='text-2xl font-black text-primary leading-tight'>{quotation.subject}</p>
-                        <p className="text-xs font-bold text-slate-500 mt-2">تاريخ الإصدار: {formatDate(quotation.date)}</p>
+                    <div className='text-left border-r-4 border-primary/20 pr-6'>
+                        <p className='text-[9px] uppercase font-black text-primary mb-1 tracking-widest'>موضوع العرض / Subject:</p>
+                        <p className='text-xl font-black text-primary leading-tight'>{quotation.subject}</p>
+                        <p className="text-[10px] font-bold text-slate-500 mt-1">تاريخ الإصدار: {formatDate(quotation.date)}</p>
                     </div>
                 </section>
 
-                <section className="space-y-6">
-                    <h3 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-4 border-r-8 border-indigo-600 pr-6">
-                        <Layers className="h-8 w-8 text-indigo-600" /> المواصفات الإنشائية للمشروع
+                <section className="space-y-4">
+                    <h3 className="text-xl font-black text-[#1e1b4b] flex items-center gap-3 border-r-8 border-indigo-600 pr-4">
+                        <Layers className="h-6 w-6 text-indigo-600" /> المواصفات الإنشائية للمشروع
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 p-10 border-4 border-slate-50 rounded-[3rem] bg-white shadow-xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-2 h-full bg-indigo-100" />
-                        <div className="space-y-2 text-right">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1 justify-end"><Ruler className="h-3 w-3" /> المساحة الإجمالية</Label>
-                            <p className="text-3xl font-black text-indigo-600 font-mono">{quotation.totalArea} <span className="text-sm">م²</span></p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-8 border-4 border-slate-50 rounded-[2.5rem] bg-white shadow-xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-1.5 h-full bg-indigo-100" />
+                        <div className="space-y-1 text-right">
+                            <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1 justify-end"><Ruler className="h-3 w-3" /> المساحة الإجمالية</Label>
+                            <p className="text-2xl font-black text-indigo-600 font-mono">{quotation.totalArea} <span className="text-xs">م²</span></p>
                         </div>
-                        <div className="space-y-2 text-right">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1 justify-end"><Building2 className="h-3 w-3" /> عدد الأدوار</Label>
-                            <p className="text-3xl font-black text-slate-800">{quotation.floorsCount}</p>
+                        <div className="space-y-1 text-right">
+                            <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1 justify-end"><Building2 className="h-3 w-3" /> عدد الأدوار</Label>
+                            <p className="text-2xl font-black text-slate-800">{quotation.floorsCount}</p>
                         </div>
-                        <div className="space-y-2 text-right">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">خيار السرداب</Label>
-                            <p className="text-xl font-bold">{basementLabels[quotation.basementType]}</p>
+                        <div className="space-y-1 text-right">
+                            <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">خيار السرداب</Label>
+                            <p className="text-base font-bold">{basementLabels[quotation.basementType]}</p>
                         </div>
-                        <div className="space-y-2 text-right">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">توسعة السطح</Label>
-                            <p className="text-xl font-bold">{roofExtensionLabels[quotation.roofExtension]}</p>
+                        <div className="space-y-1 text-right">
+                            <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">توسعة السطح</Label>
+                            <p className="text-base font-bold">{roofExtensionLabels[quotation.roofExtension]}</p>
                         </div>
                     </div>
                 </section>
 
-                <div className="space-y-12">
+                <div className="space-y-10">
                     {quotation.layoutBlocks?.map((block: any, bIdx: number) => (
                         <div key={block.id} className="animate-in fade-in duration-700">
                             {block.type === 'preamble' ? (
-                                <section className="space-y-4">
-                                    <h4 className="text-2xl font-black text-primary border-r-8 border-primary pr-6">{block.title}</h4>
-                                    <div className="p-10 bg-slate-50/50 rounded-[2rem] border-2 border-slate-100">
-                                        <p className="text-xl leading-[1.8] font-medium text-slate-700 whitespace-pre-wrap text-right">{block.content}</p>
+                                <section className="space-y-3">
+                                    <h4 className="text-xl font-black text-primary border-r-8 border-primary pr-4">{block.title}</h4>
+                                    <div className="p-8 bg-slate-50/50 rounded-[2rem] border-2 border-slate-100">
+                                        <p className="text-lg leading-[1.7] font-medium text-slate-700 whitespace-pre-wrap text-right">{block.content}</p>
                                     </div>
                                 </section>
                             ) : (
-                                <section className="space-y-8">
-                                    <h3 className="text-2xl font-black text-[#1e1b4b] flex items-center gap-4 border-r-8 border-primary pr-6">
-                                        <Calculator className="h-8 w-8 text-primary"/> الترتيبات المالية للدفعات
+                                <section className="space-y-6">
+                                    <h3 className="text-xl font-black text-[#1e1b4b] flex items-center gap-3 border-r-8 border-primary pr-4">
+                                        <Calculator className="h-6 w-6 text-primary"/> الترتيبات المالية للدفعات
                                     </h3>
-                                    <div className="border-4 border-slate-100 rounded-[3.5rem] overflow-hidden shadow-2xl">
+                                    <div className="border-4 border-slate-100 rounded-[3rem] overflow-hidden shadow-2xl">
                                         <Table>
-                                            <TableHeader className="bg-slate-900 h-16">
+                                            <TableHeader className="bg-slate-900 h-14">
                                                 <TableRow className="border-none">
-                                                    <TableHead className="w-20 text-center text-white border-l border-white/10 font-black">#</TableHead>
-                                                    <TableHead className="px-10 font-black text-xl text-white text-right">بيان الدفعة المستحقة</TableHead>
-                                                    <TableHead className="w-56 text-center font-black text-xl text-white">
+                                                    <TableHead className="w-16 text-center text-white border-l border-white/10 font-black">#</TableHead>
+                                                    <TableHead className="px-8 font-black text-lg text-white text-right">بيان الدفعة المستحقة</TableHead>
+                                                    <TableHead className="w-48 text-center font-black text-lg text-white">
                                                         {quotation.financialsType === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                                     </TableHead>
-                                                    <TableHead className="w-64 text-left px-12 font-black text-xl text-white">الإجمالي</TableHead>
+                                                    <TableHead className="w-56 text-left px-10 font-black text-lg text-white">الإجمالي</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -207,31 +207,31 @@ export default function ViewQuotationPage() {
                                                         : item.unitPrice; 
                                                     
                                                     return (
-                                                        <TableRow key={index} className="h-24 border-b last:border-0 hover:bg-transparent">
+                                                        <TableRow key={index} className="h-20 border-b last:border-0 hover:bg-transparent">
                                                             <TableCell className="text-center font-mono font-black text-slate-300 border-l">
                                                                 {index + 1}
                                                             </TableCell>
-                                                            <TableCell className="px-10 text-right">
-                                                                <p className="font-black text-2xl text-slate-800 leading-tight">الدفعة {arabicOrdinals[index] || (index + 1)}</p>
-                                                                <p className="text-sm font-bold text-primary mt-1">{item.triggerCondition}</p>
+                                                            <TableCell className="px-8 text-right">
+                                                                <p className="font-black text-xl text-slate-800 leading-tight">الدفعة {arabicOrdinals[index] || (index + 1)}</p>
+                                                                <p className="text-xs font-bold text-primary mt-1">{item.triggerCondition}</p>
                                                             </TableCell>
-                                                            <TableCell className="text-center font-mono font-black text-3xl opacity-40">
+                                                            <TableCell className="text-center font-mono font-black text-2xl opacity-40">
                                                                 {quotation.financialsType === 'percentage' ? `${item.percentage}%` : formatCurrency(item.unitPrice || 0)}
                                                             </TableCell>
-                                                            <TableCell className="text-left font-mono font-black text-3xl text-primary px-12 bg-primary/[0.02] border-r">
+                                                            <TableCell className="text-left font-mono font-black text-2xl text-primary px-10 bg-primary/[0.02] border-r">
                                                                 {formatCurrency(rowTotal || 0)}
                                                             </TableCell>
                                                         </TableRow>
                                                     );
                                                 })}
                                             </TableBody>
-                                            <TableFooter className="bg-primary text-white h-32">
+                                            <TableFooter className="bg-primary text-white h-24">
                                                 <TableRow className="border-none hover:bg-primary">
-                                                    <TableCell colSpan={3} className="text-right px-16">
-                                                        <p className="text-4xl font-black tracking-tighter">إجمالي قيمة التعاقد:</p>
-                                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mt-1 text-right">Total Fixed Contract Sum</p>
+                                                    <TableCell colSpan={3} className="text-right px-12">
+                                                        <p className="text-3xl font-black tracking-tighter">إجمالي قيمة التعاقد:</p>
+                                                        <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-60 mt-0.5 text-right">Total Fixed Contract Sum</p>
                                                     </TableCell>
-                                                    <TableCell className="text-left font-mono text-5xl font-black px-12 bg-white/10 border-r border-white/20">
+                                                    <TableCell className="text-left font-mono text-4xl font-black px-10 bg-white/10 border-r border-white/20">
                                                         {formatCurrency(quotation.totalAmount || 0)}
                                                     </TableCell>
                                                 </TableRow>
@@ -244,8 +244,8 @@ export default function ViewQuotationPage() {
                     ))}
                 </div>
 
-                <footer className="mt-32 pt-10 border-t-2 border-dashed text-center space-y-4">
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-[0.4em]">هذا العرض سارٍ لغاية {formatDate(quotation.validUntil)} ومعد آلياً عبر نظام Nova ERP.</p>
+                <footer className="mt-20 pt-8 border-t-2 border-dashed text-center space-y-3">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">هذا العرض سارٍ لغاية {formatDate(quotation.validUntil)} ومعد آلياً عبر نظام Nova ERP.</p>
                 </footer>
             </div>
         </div>

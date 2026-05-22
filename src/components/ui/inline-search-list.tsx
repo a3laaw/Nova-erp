@@ -61,7 +61,7 @@ export function InlineSearchList({
           aria-expanded={open}
           className={cn(
             "w-full justify-between h-9 rounded-xl border-2 transition-all px-3",
-            "bg-white/90 border-slate-200 hover:border-primary/40 text-xs font-bold",
+            "bg-white/90 border-slate-200 hover:border-primary/40 text-[11px] font-bold",
             !value && "text-muted-foreground font-medium",
             className
           )}
@@ -94,7 +94,7 @@ export function InlineSearchList({
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  // 🛡️ استخدام onPointerUp لضمان استجابة الماوس الفورية في بيئة الـ Popover
+                  // 🛡️ استخدام onSelect مع تفعيل النقر المباشر
                   onSelect={() => {
                     onSelect(option.value === value ? "" : option.value);
                     setOpen(false);

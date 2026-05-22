@@ -1,8 +1,7 @@
-
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useFirebase } from '@/firebase';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useFirebase, useSubscription } from '@/firebase';
 import { 
     collection, 
     query, 
@@ -58,10 +57,9 @@ import {
     GitBranch
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
+import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { defaultDepartments, defaultGovernorates, defaultJobs, defaultWorkStages, defaultAreas } from '@/lib/default-reference-data';
 import { useAuth } from '@/context/auth-context';
-import { useSubscription } from '@/hooks/use-subscription';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 
 import {
@@ -155,16 +153,16 @@ export function ReferenceDataManager() {
     const { toast } = useToast();
 
     const [view, setView] = useState<'main' | 'departments' | 'locations' | 'transactions'>('main');
-    const [activeSubTab, setActiveSubTab] = useState<'jobs' | 'stages' | 'areas' | 'subServices'>('jobs');
+    const activeSubTab = 'jobs'; // ✨ تم تثبيت هذا للـ Departments لعدم وجود مراحل عمل فيها بعد الآن
     
     const [selectedPrimaryId, setSelectedPrimaryId] = useState<string | null>(null);
-    const [selectedSecondaryId, setSelectedSecondaryId] = useState<string | null>(null); // ✨ معرف المستوى الثاني (للخدمات الفرعية)
+    const [selectedSecondaryId, setSelectedSecondaryId] = useState<string | null>(null); 
     const [isSaving, setIsSaving] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     
     const [isPrimaryDialogOpen, setIsPrimaryDialogOpen] = useState(false);
     const [isSecondaryDialogOpen, setIsSecondaryDialogOpen] = useState(false);
-    const [isTertiaryDialogOpen, setIsTertiaryDialogOpen] = useState(false); // ✨ نافذة المستوى الثالث (مراحل العمل)
+    const [isTertiaryDialogOpen, setIsTertiaryDialogOpen] = useState(false); 
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
     
@@ -197,18 +195,16 @@ export function ReferenceDataManager() {
     }, [view]);
 
     const secondaryCollectionName = useMemo(() => {
-        if (view === 'departments') return activeSubTab === 'jobs' ? 'jobs' : 'workStages';
+        if (view === 'departments') return 'jobs'; // ✨ مراحل العمل تم نقلها للمعاملات حصراً
         if (view === 'locations') return 'areas';
         if (view === 'transactions') return 'subServices';
         return '';
-    }, [view, activeSubTab]);
+    }, [view]);
 
-    const tertiaryCollectionName = 'workStages'; // ✨ حصراً للخدمات الفرعية
+    const tertiaryCollectionName = 'workStages';
 
-    // 1. جلب المستوى الأول
     const { data: rawPrimaryItems = [], loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null);
     
-    // 2. جلب المستوى الثاني
     const secondaryRelativePath = useMemo(() => {
         if (!selectedPrimaryId || !primaryCollectionName || !secondaryCollectionName) return null;
         return `${primaryCollectionName}/${selectedPrimaryId}/${secondaryCollectionName}`;
@@ -216,7 +212,6 @@ export function ReferenceDataManager() {
     
     const { data: rawSecondaryItems = [], loading: loadingSecondary } = useSubscription<any>(firestore, secondaryRelativePath);
 
-    // 3. ✨ جلب المستوى الثالث (مراحل العمل للخدمة الفرعية)
     const tertiaryRelativePath = useMemo(() => {
         if (view !== 'transactions' || !selectedPrimaryId || !selectedSecondaryId) return null;
         return `transactionTypes/${selectedPrimaryId}/subServices/${selectedSecondaryId}/workStages`;
@@ -239,7 +234,6 @@ export function ReferenceDataManager() {
     const selectedPrimary = useMemo(() => (primaryItems || []).find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
     const selectedSecondary = useMemo(() => (secondaryItems || []).find(i => i.id === selectedSecondaryId), [secondaryItems, selectedSecondaryId]);
 
-    // جلب الأقسام لربطها بالمعاملات
     const { data: allDepartments = [] } = useSubscription<Department>(firestore, 'departments');
     const departmentOptions = useMemo(() => allDepartments.map(d => ({ value: d.id!, label: d.name })), [allDepartments]);
 
@@ -335,13 +329,6 @@ export function ReferenceDataManager() {
                         const jobRef = doc(collection(firestore, jobsPath!));
                         batch.set(jobRef, { ...job, order: jIdx, companyId: tenantId, parentId: newDeptRef.id });
                     });
-
-                    const deptStages = defaultWorkStages[d.name] || [];
-                    const stagesPath = getTenantPath(`departments/${newDeptRef.id}/workStages`, tenantId);
-                    deptStages.forEach((stage, sIdx) => {
-                        const stageRef = doc(collection(firestore, stagesPath!));
-                        batch.set(stageRef, { ...stage, order: sIdx, companyId: tenantId, parentId: newDeptRef.id });
-                    });
                 }
             } else if (view === 'locations') {
                 for (const [idx, g] of defaultGovernorates.entries()) {
@@ -388,16 +375,16 @@ export function ReferenceDataManager() {
                         title="الأقسام والوظائف" 
                         count={primaryItems?.length || 0} 
                         icon={<Building2 className="h-10 w-10"/>} 
-                        onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} 
+                        onNavigate={() => { setView('departments'); setSelectedPrimaryId(null); }} 
                         colorClass="bg-blue-600/10 text-blue-600" 
                         loading={loadingPrimary} 
-                        description="إدارة الهيكل التنظيمي والوظائف ومراحل العمل المعتمدة." 
+                        description="إدارة الهيكل التنظيمي والوظائف المعتمدة لكل قسم." 
                     />
                     <SummaryCard 
                         title="المناطق والمواقع" 
                         count={primaryItems?.length || 0} 
                         icon={<MapPin className="h-10 w-10"/>} 
-                        onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} 
+                        onNavigate={() => { setView('locations'); setSelectedPrimaryId(null); }} 
                         colorClass="bg-emerald-600/10 text-emerald-600" 
                         loading={loadingPrimary} 
                         description="إدارة المحافظات والمناطق الجغرافية الرسمية." 
@@ -406,10 +393,10 @@ export function ReferenceDataManager() {
                         title="أنواع الخدمات" 
                         count={primaryItems?.length || 0} 
                         icon={<Workflow className="h-10 w-10"/>} 
-                        onNavigate={() => { setView('transactions'); setActiveSubTab('subServices'); setSelectedPrimaryId(null); setSelectedSecondaryId(null); }} 
+                        onNavigate={() => { setView('transactions'); setSelectedPrimaryId(null); setSelectedSecondaryId(null); }} 
                         colorClass="bg-orange-600/10 text-primary" 
                         loading={loadingPrimary} 
-                        description="قائمة المعاملات والخدمات المتاحة وربطها بالأقسام الإدارية." 
+                        description="قائمة المعاملات والخدمات المتاحة وربطها بالأقسام والمراحل الإجرائية." 
                     />
                 </div>
             </div>
@@ -435,7 +422,7 @@ export function ReferenceDataManager() {
                         <div className="flex items-center gap-6">
                             <div className="text-right">
                                 <CardTitle className="text-3xl font-black tracking-tighter text-white">
-                                    {view === 'departments' ? 'إدارة الأقسام والوظائف المعتمدة' : view === 'locations' ? 'إدارة المواقع الجغرافية المعتمدة' : 'إدارة أنواع الخدمات والربط'}
+                                    {view === 'departments' ? 'إدارة الأقسام والوظائف' : view === 'locations' ? 'إدارة المواقع الجغرافية' : 'إدارة أنواع الخدمات والربط'}
                                 </CardTitle>
                                 <div className="flex items-center gap-2 mt-2 justify-end">
                                     <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
@@ -453,9 +440,7 @@ export function ReferenceDataManager() {
             <div className="grid grid-cols-1 md:grid-cols-12 min-h-[650px] gap-6">
                 <Card className="md:col-span-4 border-none rounded-[2.5rem] shadow-xl bg-white/45 backdrop-blur-3xl overflow-hidden flex flex-col border-white/60">
                     <div className="p-10 border-b bg-primary/5 flex justify-between items-center">
-                        <div className="space-y-0.5">
-                            <Label className="font-black text-[#1e1b4b] text-xl tracking-tight">القائمة الموحدة</Label>
-                        </div>
+                        <Label className="font-black text-[#1e1b4b] text-xl tracking-tight">القائمة الموحدة</Label>
                         <Button onClick={() => { setEditingItem(null); setItemName(''); setSelectedDeptIds([]); setIsPrimaryDialogOpen(true); }} className="h-12 w-12 rounded-[1.5rem] shadow-xl shadow-primary/20"><Plus className="h-6 w-6" /></Button>
                     </div>
                     <ScrollArea className="flex-1 p-8">
@@ -490,7 +475,7 @@ export function ReferenceDataManager() {
                     {selectedPrimaryId ? (
                         <>
                             <div className="p-10 border-b bg-muted/5">
-                                <div className="flex justify-between items-center mb-8">
+                                <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-5">
                                         {selectedSecondaryId ? (
                                              <Button variant="ghost" size="icon" onClick={() => setSelectedSecondaryId(null)} className="h-10 w-10 rounded-full border bg-white shadow-sm"><ChevronLeft className="h-5 w-5"/></Button>
@@ -508,12 +493,6 @@ export function ReferenceDataManager() {
                                         <PlusCircle className="h-6 w-6" /> {selectedSecondaryId ? 'إضافة مرحلة عمل' : 'إضافة بند فرعي'}
                                     </Button>
                                 </div>
-                                {view === 'departments' && (
-                                    <div className="flex bg-white/60 p-1.5 rounded-[1.5rem] border border-primary/10 w-fit shadow-inner">
-                                        <Button variant={activeSubTab === 'jobs' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('jobs')} className="rounded-xl px-10 font-black text-xs h-11 transition-all">الوظائف والمهن</Button>
-                                        <Button variant={activeSubTab === 'stages' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('stages')} className="rounded-xl px-10 font-black text-xs h-11 transition-all">مراحل العمل</Button>
-                                    </div>
-                                )}
                             </div>
                             <ScrollArea className="flex-1 p-10">
                                 {(selectedSecondaryId ? loadingTertiary : loadingSecondary) ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-[1.8rem]"/><Skeleton className="h-16 w-full rounded-[1.8rem]"/></div> :
