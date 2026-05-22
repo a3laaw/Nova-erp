@@ -33,7 +33,7 @@ export interface WorkStage extends BaseEntity {
   name: string;
   order: number;
   parentId: string; // Linked to SubService ID
-  trackingType: 'duration' | 'occurrence' | 'hybrid' | 'none'; // Added Hybrid
+  trackingType: 'duration' | 'occurrence' | 'hybrid' | 'none';
   expectedDurationDays?: number;
   maxOccurrences?: number;
 }
@@ -96,6 +96,7 @@ export interface Appointment extends BaseEntity {
   engineerId: string;
   engineerName?: string;
   appointmentDate: Timestamp | any;
+  actualCompletionDate?: Timestamp | any;
   type: 'architectural' | 'room' | string;
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no-show';
   notes?: string;
