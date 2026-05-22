@@ -49,6 +49,7 @@ export interface TransactionStage {
   currentCount?: number;
   maxOccurrences?: number;
   order: number;
+  expectedDurationDays?: number;
 }
 
 export interface ClientTransaction extends BaseEntity {
@@ -454,107 +455,12 @@ export interface TechnicalSpecifications {
     ordinaryShowerCount?: number;
 }
 
-export interface Quotation extends BaseEntity {
-    quotationNumber: string;
-    clientId: string;
-    clientName: string;
-    subject: string;
-    date: Timestamp | any;
-    validUntil: Timestamp | any;
-    totalAmount: number;
-    status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
-    items: any[];
-    financialsType: 'fixed' | 'percentage';
-    totalArea?: number;
-    floorsCount?: number;
-    basementType: 'none' | 'full' | 'half' | 'vault';
-    roofExtension: 'none' | 'quarter' | 'half';
-    workNature: 'labor_only' | 'with_materials';
-    layoutBlocks?: any[];
-}
-
-export interface InventoryAdjustment extends BaseEntity {
-    adjustmentNumber: string;
-    date: Timestamp | any;
-    type: 'damage' | 'theft' | 'opening_balance' | 'material_issue' | 'purchase_return' | 'sales_return' | 'other' | 'transfer';
-    issueType?: 'project_site' | 'direct_sale';
+export interface AuditLog extends BaseEntity {
+    changeType: string;
+    field: string;
+    oldValue: any;
+    newValue: any;
+    effectiveDate: Timestamp | any;
+    changedBy: string;
     notes?: string;
-    items: any[];
-    warehouseId?: string;
-    fromWarehouseId?: string;
-    toWarehouseId?: string;
-    projectId?: string;
-    projectName?: string;
-    clientId?: string;
-    clientName?: string;
-    journalEntryId?: string;
-}
-
-export interface GoodsReceiptNote extends BaseEntity {
-    grnNumber: string;
-    date: Timestamp | any;
-    vendorId: string;
-    vendorName: string;
-    purchaseOrderId?: string;
-    warehouseId: string;
-    totalValue: number;
-    itemsReceived: any[];
-    status: 'received' | 'cancelled';
-    journalEntryId?: string;
-}
-
-export interface Subcontractor extends BaseEntity {
-    name: string;
-    type: string;
-    specialization?: string;
-    contactPerson?: string;
-    phone: string;
-    mobile?: string;
-    email?: string;
-    address?: string;
-    isActive: boolean;
-    blacklisted: boolean;
-    blacklistedReason?: string;
-    performanceRating?: number;
-    bankAccount?: {
-        bankName: string;
-        accountNumber: string;
-        iban: string;
-    };
-}
-
-export interface SubcontractorCertificate extends BaseEntity {
-    certificateNumber: string;
-    date: Timestamp | any;
-    subcontractorId: string;
-    subcontractorName: string;
-    projectId: string;
-    projectName: string;
-    amount: number;
-    description?: string;
-    status: 'draft' | 'approved' | 'cancelled';
-    journalEntryId?: string;
-}
-
-export interface SubcontractorType extends BaseEntity {
-    name: string;
-    order?: number;
-}
-
-export interface SubcontractorSpecialization extends BaseEntity {
-    name: string;
-    order?: number;
-    parentTypeId: string;
-}
-
-export interface MonthlyAttendance extends BaseEntity {
-    employeeId: string;
-    year: number;
-    month: number;
-    summary: {
-        presentDays: number;
-        absentDays: number;
-        lateDays: number;
-    };
-    records: any[];
 }

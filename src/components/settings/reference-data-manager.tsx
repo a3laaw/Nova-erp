@@ -60,10 +60,10 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
-import { defaultDepartments, defaultGovernorates, defaultTransactionTypes, defaultWorkStages, defaultItemCategories } from '@/lib/default-reference-data';
 import { useAuth } from '@/context/auth-context';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge'; // 🛡️ FIXED: Missing import
 
 import {
   DndContext,
@@ -322,21 +322,6 @@ export function ReferenceDataManager() {
             setIsDeleteDialogOpen(false); 
             setItemToDelete(null);
         } catch (e) { toast({ variant: 'destructive', title: 'فشل الحذف' }); } finally { setIsSaving(false); }
-    };
-
-    const handleImportDefaults = async () => {
-        if (!firestore || !tenantId) return;
-        setIsImporting(true);
-        try {
-            const batch = writeBatch(firestore);
-            
-            // This is a simplified bulk import for demo. Real implementation would handle hierarchies.
-            // For now, let's just toast and close to prevent data corruption.
-            toast({ title: 'نظام الاستيراد الموحد نشط' });
-        } finally {
-            setIsImporting(false);
-            setIsImportConfirmOpen(false);
-        }
     };
 
     if (view === 'main') {
