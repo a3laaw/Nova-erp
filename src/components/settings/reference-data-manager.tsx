@@ -13,7 +13,8 @@ import {
     writeBatch, 
     getDocs, 
     serverTimestamp,
-    collectionGroup
+    collectionGroup,
+    where
 } from 'firebase/firestore'; 
 import { 
     Card, 
@@ -737,3 +738,4 @@ export function ReferenceDataManager() {
         </div>
     );
 }
+

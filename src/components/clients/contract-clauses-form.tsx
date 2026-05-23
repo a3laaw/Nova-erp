@@ -21,20 +21,20 @@ import {
 } from '@/components/ui/table';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Loader2, Save, PlusCircle, Trash2, FileSignature, Calculator, LayoutGrid, CheckCircle2, Ruler, Building2, Layers } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, FileSignature, Calculator, Layers, CheckCircle2, Ruler, Building2, Target } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy } from 'firebase/firestore';
+import { doc, updateDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Client, ClientTransaction, Employee, Department, Account, ContractFinancialMilestone, TechnicalSpecifications, Quotation } from '@/lib/types';
+import type { Client, ClientTransaction, Employee, Department, Account, TechnicalSpecifications, Quotation } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/context/auth-context';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -65,16 +65,17 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       workNature: 'labor_only'
   });
   
-  const [referenceData, setReferenceData] = useState<{ stages: MultiSelectOption[] }>({ stages: [] });
+  const [referenceData, setReferenceData] = useState<{ stages: { value: string, label: string }[] }>({ stages: [] });
 
-  // ✨ محرك المزامنة والحقن (Data Injection Engine) ✨
   useEffect(() => {
-    if (!isOpen || !firestore) return;
+    if (!isOpen || !firestore || !currentUser?.currentCompanyId) return;
     
     const fetchDataAndSync = async () => {
       try {
+        const tenantId = currentUser.currentCompanyId;
+        
         // جلب مراحل العمل المعتمدة للربط
-        const stagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages')));
+        const stagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages'), where('companyId', '==', tenantId)));
         const stages = Array.from(new Map(stagesSnap.docs.map(doc => {
             const name = doc.data().name;
             return [name, { value: name, label: name }];
@@ -124,7 +125,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     };
     
     fetchDataAndSync();
-  }, [isOpen, firestore, transaction]);
+  }, [isOpen, firestore, transaction, currentUser]);
 
   const totalValue = useMemo(() => financials.milestones.reduce((sum: number, m: any) => sum + Number(m.value || 0), 0), [financials.milestones]);
 
@@ -136,9 +137,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         let newTxId = '';
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
-            const tenantId = currentUser.currentCompanyId;
+            const tenantId = currentUser.currentCompanyId!;
             
-            // جلب الحسابات المطلوبة
             const coaPath = getTenantPath('chartOfAccounts', tenantId);
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
             const clientAccSnap = await getDocs(query(collection(firestore, coaPath!), where('name', '==', clientName), limit(1)));
@@ -209,11 +209,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             }
         });
 
-        toast({ title: 'تم تفعيل العقد والمديونية', description: 'تم سحب البيانات من العرض بنجاح. سننتقل الآن لتأسيس هيكل المشروع.' });
+        toast({ title: 'نجاح تفعيل العقد', description: 'تم تحويل البيانات من العرض وتوليد المديونية بنجاح.' });
         onClose();
         router.push(`/dashboard/construction/projects/new?clientId=${clientId}&transactionId=${newTxId}`);
     } catch (e: any) {
-        console.error(e);
         toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: e.message });
     } finally { setIsSaving(false); }
   };
@@ -226,17 +225,16 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><FileSignature className="h-8 w-8"/></div>
                 <div className="text-right">
                     <DialogTitle className="text-2xl font-black text-[#1e1b4b]">توقيع العقد وتحويله لمشروع</DialogTitle>
-                    <DialogDescription className="font-bold text-slate-500">تم سحب تفاصيل عرض السعر آلياً. يرجى المراجعة والاعتماد النهائي.</DialogDescription>
+                    <DialogDescription className="font-bold text-slate-500">مراجعة وتأكيد بنود العرض المالي قبل بدء التنفيذ الميداني.</DialogDescription>
                 </div>
             </div>
         </DialogHeader>
 
         <ScrollArea className="flex-1 bg-muted/5">
             <div className="p-8 space-y-10">
-                {/* قسم المواصفات المسحوبة */}
                 <section className="space-y-6">
                     <h3 className="text-lg font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4">
-                        <Layers className="h-6 w-6 text-indigo-600" /> المواصفات المسحوبة من العرض
+                        <Layers className="h-6 w-6 text-indigo-600" /> المواصفات الفنية المسحوبة
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-8 border-2 border-dashed rounded-[2.5rem] bg-white shadow-inner">
                         <div className="space-y-1">
@@ -264,7 +262,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     </div>
                 </section>
 
-                {/* قسم الدفعات المسحوبة */}
                 <section className="space-y-6">
                     <div className="flex justify-between items-center pr-4 border-r-8 border-primary">
                         <h3 className="text-lg font-black flex items-center gap-3 text-[#1e1b4b]">
@@ -369,3 +366,4 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     </Dialog>
   );
 }
+
