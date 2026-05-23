@@ -88,15 +88,17 @@ async function reconcileClientAppointments(firestore: any, tenantId: string | un
     if (!identifier.clientId && !identifier.clientMobile) return;
     try {
         const apptsPath = getTenantPath('appointments', tenantId);
+        // 🛡️ التصفية داخل المتصفح (Client-side) لتجنب أخطاء الفهارس
         const apptsQueryConstraints = [where('type', '==', 'architectural')];
-        if (identifier.clientId) apptsQueryConstraints.push(where('clientId', '==', identifier.clientId));
-        else if (identifier.clientMobile) apptsQueryConstraints.push(where('clientMobile', '==', identifier.clientMobile));
-        else return;
-
         const clientApptsSnap = await getDocs(query(collection(firestore, apptsPath!), ...apptsQueryConstraints));
+        
         const appointments = clientApptsSnap.docs
             .map(d => ({ id: d.id, ...d.data() } as Appointment))
-            .filter(appt => appt.status !== 'cancelled')
+            .filter(appt => {
+                if (appt.status === 'cancelled') return false;
+                if (identifier.clientId) return appt.clientId === identifier.clientId;
+                return appt.clientMobile === identifier.clientMobile;
+            })
             .sort((a, b) => (a.appointmentDate?.toMillis() || 0) - (b.appointmentDate?.toMillis() || 0));
 
         let contractSigned = false;
@@ -276,7 +278,7 @@ export function ArchitecturalAppointmentsView() {
     useEffect(() => {
         if (!firestore || !tenantId) return;
         getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!), where('status', 'in', ['active', 'on-leave']))).then(snap => {
-            const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.nameAr));
+            const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
             setEngineers(arch);
         });
         getDocs(query(collection(firestore, getTenantPath('clients', tenantId)!), where('isActive', '==', true))).then(snap => {
@@ -576,7 +578,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
             return;
         }
 
-        // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
         if (isPast(apptDate) && !canBypassTime) {
             toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن حجز موعد في الماضي.' });
             return;
@@ -619,8 +620,14 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 const client = clients.find((c: any) => c.id === selectedClientId);
                 if (!client) throw new Error("لم يتم العثور على ملف العميل المختار.");
 
-                const snap = await getDocs(query(collection(firestore, apptsPath!), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'), where('status', '!=', 'cancelled')));
-                const visitCount = snap.size + 1;
+                // 🛡️ التصفية داخل المتصفح (Client-side) لتجنب أخطاء الفهارس
+                const apptsSnap = await getDocs(query(collection(firestore, apptsPath!), where('type', '==', 'architectural')));
+                const clientAppts = apptsSnap.docs.filter(d => {
+                    const data = d.data();
+                    return data.clientId === selectedClientId && data.status !== 'cancelled';
+                });
+                
+                const visitCount = clientAppts.length + 1;
                 dataToSave.clientId = selectedClientId;
                 dataToSave.visitCount = visitCount;
                 dataToSave.color = getVisitColor({ visitCount, contractSigned: client.status !== 'new' });
@@ -676,3 +683,4 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
+
