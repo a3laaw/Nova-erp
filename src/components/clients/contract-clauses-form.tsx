@@ -33,7 +33,10 @@ import {
   Target,
   ShieldCheck,
   AlertCircle,
-  X
+  X,
+  Ruler,
+  Building2,
+  Workflow
 } from 'lucide-react';
 import { 
     Select, 
@@ -101,64 +104,49 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
   const tenantId = currentUser?.currentCompanyId;
 
-  // 1. ✨ محرك المزامنة الفورية (Quotation-to-Contract Auto-Sync)
-  // يضمن تحويل الصورة الأولى (Quotation) إلى الصورة الثانية (Contract Form) آلياً
+  // 🛡️ محرك المزامنة الفورية الجذري (Zero-Latency Direct Mapping)
+  // يضمن نقل كافة الحقول من عرض السعر إلى العقد لحظة الفتح
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
-        // التحقق مما إذا كان المدخل هو عرض سعر (Quotation)
-        if (transaction.quotationNumber || transaction.subject) {
-            const q = transaction as Quotation;
-            
-            // مزامنة المواصفات الفنية
-            setSpecs({
-                totalArea: Number(q.totalArea) || 0,
-                floorsCount: Number(q.floorsCount) || 1,
-                basementType: q.basementType || 'none',
-                roofExtension: q.roofExtension || 'none',
-                workNature: q.workNature || 'labor_only'
-            });
+        // التحقق مما إذا كان المدخل هو عرض سعر (Quotation) أو معاملة بها عقد
+        const q = transaction as any;
+        
+        // 1. مزامنة المواصفات الفنية (Specifications Sync)
+        setSpecs({
+            totalArea: Number(q.totalArea || q.contract?.specs?.totalArea) || 0,
+            floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount) || 1,
+            basementType: q.basementType || q.contract?.specs?.basementType || 'none',
+            roofExtension: q.roofExtension || q.contract?.specs?.roofExtension || 'none',
+            workNature: q.workNature || q.contract?.specs?.workNature || 'labor_only'
+        });
 
-            const qType = q.financialsType || 'fixed';
-            
-            // مزامنة الدفعات والروابط الميدانية (WBS Sync)
-            setFinancials({
-                type: qType,
-                totalAmount: Number(q.totalAmount) || 0,
-                milestones: (q.items || []).map((item: any, idx: number) => ({
-                    id: generateId(),
-                    name: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                    // 🛡️ المزامنة الحرجة: نقل "شرط الاستحقاق" من عرض السعر ليكون هو الرابط في العقد
-                    condition: item.triggerCondition || '',
-                    value: qType === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice) || 0)
-                }))
-            });
-            
-            syncedRef.current = true;
-        } else if (transaction.contract) {
-            // مزامنة من عقد قائم (حالة التعديل)
-            const c = transaction.contract;
-            setSpecs(c.specs || {});
-            setFinancials({
-                type: c.financialsType || 'fixed',
-                totalAmount: Number(c.totalAmount) || 0,
-                milestones: (c.clauses || []).map((cl: any) => ({
-                    id: cl.id || generateId(),
-                    name: cl.name,
-                    condition: cl.condition || '',
-                    value: c.financialsType === 'percentage' ? (Number(cl.percentage) || 0) : (Number(cl.amount) || 0)
-                }))
-            });
-            syncedRef.current = true;
-        }
+        // 2. مزامنة البيانات المالية والتبعية (WBS & Financials Sync)
+        const type = q.financialsType || q.contract?.financialsType || 'fixed';
+        const rawItems = q.items || q.contract?.clauses || [];
+        
+        setFinancials({
+            type: type,
+            totalAmount: Number(q.totalAmount || q.contract?.totalAmount) || 0,
+            milestones: rawItems.map((item: any, idx: number) => ({
+                id: item.id || generateId(),
+                name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
+                // 🛡️ تصحيح الربط: ترجمة triggerCondition ليكون condition في العقد 🛡️
+                condition: item.triggerCondition || item.condition || '',
+                value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
+            }))
+        });
+        
+        syncedRef.current = true;
     }
     
-    if (!isOpen) syncedRef.current = false;
+    if (!isOpen) {
+        syncedRef.current = false;
+    }
   }, [isOpen, transaction]);
 
-  // 2. جلب مراحل العمل المعتمدة لتمكين الربط اليدوي عند الحاجة
+  // جلب مراحل العمل المعتمدة للبحث اليدوي
   useEffect(() => {
     if (!isOpen || !firestore || !tenantId) return;
-    
     const fetchRefData = async () => {
       setIsRefLoading(true);
       try {
@@ -168,10 +156,9 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             return [name, { value: name, label: name }];
         })).values());
         setReferenceData({ stages });
-      } catch (e) { console.error("Reference Data Fetch Failed:", e); }
+      } catch (e) { console.error(e); }
       finally { setIsRefLoading(false); }
     };
-    
     fetchRefData();
   }, [isOpen, firestore, tenantId]);
 
@@ -179,11 +166,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     (financials.milestones || []).reduce((sum: number, m: any) => sum + (Number(m.value) || 0), 0)
   , [financials.milestones]);
 
-  const handleSubmit = async () => {
+  const handleSaveContract = async () => {
     if (!firestore || !currentUser || !clientId || isSaving || !tenantId) return;
     
     if (financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01) {
-        toast({ variant: 'destructive', title: 'خلل في التوزيع', description: 'يجب أن يكون مجموع نسب الدفعات 100% بالضبط لضمان دقة القيد المالي.' });
+        toast({ variant: 'destructive', title: 'خلل مالي', description: 'يجب أن يكون مجموع نسب الدفعات 100% بالضبط.' });
         return;
     }
 
@@ -236,7 +223,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 const jePath = getTenantPath('journalEntries', tenantId);
                 const newJeRef = doc(collection(firestore, jePath!));
                 transaction_fs.set(newJeRef, cleanFirestoreData({
-                    entryNumber: `JV-DIRECT-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
+                    entryNumber: `JV-PR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
                     date: serverTimestamp(), 
                     narration: `إثبات مديونية عقد: ${transaction?.transactionType || transaction?.subject || ''} لـ ${clientName}`,
                     totalDebit: totalAmount, 
@@ -265,7 +252,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         onClose();
         router.push(`/dashboard/construction/projects/new?clientId=${clientId}&transactionId=${newTxId}`);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: e.message });
+        toast({ variant: 'destructive', title: 'خطأ', description: e.message });
     } finally { setIsSaving(false); }
   };
 
@@ -274,66 +261,66 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       <DialogContent 
         className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl bg-white" 
         dir="rtl"
+        // 🛡️ السر التقني: تحرير ملامس الماوس للقوائم المنسدلة 🛡️
         onInteractOutside={(e) => e.preventDefault()}
-        onPointerDownOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[data-radix-select-content]') || target.closest('[data-radix-popover-content]')) {
-                e.preventDefault();
-            }
-        }}
       >
         <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-4">
                 <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><FileSignature className="h-8 w-8"/></div>
                 <div className="text-right">
-                    <DialogTitle className="text-2xl font-black text-[#1e1b4b]">توقيع العقد وتحويله لمشروع</DialogTitle>
-                    <DialogDescription className="font-bold text-slate-500">مراجعة وتأكيد بنود العرض المالي المستوردة قبل بدء التنفيذ.</DialogDescription>
+                    <DialogTitle className="text-2xl font-black text-[#1e1b4b]">توقيع العقد المعتمد</DialogTitle>
+                    <DialogDescription className="font-bold text-slate-500">مراجعة وتأكيد بنود العرض الفني والمالي لبدء التنفيذ الميداني.</DialogDescription>
                 </div>
             </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1">
-            <div className="p-8 space-y-10">
+        <ScrollArea className="flex-1 bg-white">
+            <div className="p-8 space-y-12">
                 <section className="space-y-6">
-                    <h3 className="text-lg font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4">
-                        <Target className="h-6 w-6 text-indigo-600" /> المواصفات الفنية المزامنة
+                    <h3 className="text-xl font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4">
+                        <Target className="h-7 w-7 text-indigo-600" /> المواصفات الإنشائية (Synced)
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-8 border-2 border-dashed rounded-[2.5rem] bg-white shadow-inner">
-                        <div className="space-y-1">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1">المساحة (م²)</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-10 border-4 border-slate-50 rounded-[3rem] bg-white shadow-xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500/10" />
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1 flex items-center gap-1">
+                                <Ruler className="h-3 w-3" /> المساحة (م²)
+                            </Label>
                             <Input 
                                 type="number" 
                                 value={specs.totalArea} 
                                 onChange={e => setSpecs({...specs, totalArea: Number(e.target.value)})} 
-                                className="h-10 font-black text-indigo-600 rounded-xl bg-indigo-50/20 border-indigo-100" 
+                                className="h-12 font-black text-2xl text-indigo-600 rounded-xl bg-indigo-50/20 border-indigo-100 shadow-inner" 
                             />
                         </div>
-                        <div className="space-y-1">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1">عدد الأدوار</Label>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1 flex items-center gap-1">
+                                <Building2 className="h-3 w-3" /> عدد الأدوار
+                            </Label>
                             <Input 
                                 type="number" 
                                 value={specs.floorsCount} 
                                 onChange={e => setSpecs({...specs, floorsCount: Number(e.target.value)})} 
-                                className="h-10 font-black rounded-xl" 
+                                className="h-12 font-black text-2xl rounded-xl shadow-inner" 
                             />
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase text-slate-400 pr-1">خيار السرداب</Label>
                             <Select value={specs.basementType} onValueChange={v => setSpecs({...specs, basementType: v})}>
-                                <SelectTrigger className="h-10 rounded-xl font-bold bg-white border-2"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    <SelectItem value="none">بدون</SelectItem>
+                                <SelectTrigger className="h-12 rounded-xl font-black bg-white border-2"><SelectValue /></SelectTrigger>
+                                <SelectContent dir="rtl" className="rounded-xl">
+                                    <SelectItem value="none">بدون سرداب</SelectItem>
                                     <SelectItem value="full">كامل</SelectItem>
-                                    <SelectItem value="half">نص</SelectItem>
+                                    <SelectItem value="half">نصف دور</SelectItem>
                                     <SelectItem value="vault">قبو</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase text-slate-400 pr-1">توسعة السطح</Label>
                             <Select value={specs.roofExtension} onValueChange={v => setSpecs({...specs, roofExtension: v})}>
-                                <SelectTrigger className="h-10 rounded-xl font-bold bg-white border-2"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">
+                                <SelectTrigger className="h-12 rounded-xl font-black bg-white border-2"><SelectValue /></SelectTrigger>
+                                <SelectContent dir="rtl" className="rounded-xl">
                                     <SelectItem value="none">لا يوجد</SelectItem>
                                     <SelectItem value="quarter">ربع دور</SelectItem>
                                     <SelectItem value="half">نصف دور</SelectItem>
@@ -343,30 +330,42 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     </div>
                 </section>
 
-                <section className="space-y-6">
-                    <div className="flex justify-between items-center pr-4 border-r-8 border-primary">
-                        <h3 className="text-lg font-black flex items-center gap-3 text-[#1e1b4b]">
-                            <Calculator className="h-6 w-6 text-primary"/> الدفعات المالية المبرمجة
+                <section className="space-y-8">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-6 pr-4 border-r-8 border-primary">
+                        <h3 className="text-xl font-black flex items-center gap-3 text-[#1e1b4b]">
+                            <Calculator className="h-7 w-7 text-primary"/> الدفعات المالية المزامنة
                         </h3>
-                        <div className="flex items-center gap-4">
-                            <Label className="text-xs font-bold text-slate-500">نظام الدفع:</Label>
+                        <div className="flex items-center gap-4 bg-muted/20 p-3 rounded-2xl border no-print">
+                            <Label className="text-xs font-black text-slate-500">نظام الدفع المعتمد:</Label>
                             <Select value={financials.type} onValueChange={v => setFinancials({...financials, type: v, milestones: []})}>
-                                <SelectTrigger className="w-48 h-10 rounded-xl border-2 bg-white font-black text-primary shadow-sm"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    <SelectItem value="fixed">مبلغ ثابت (KD)</SelectItem>
+                                <SelectTrigger className="w-44 h-10 rounded-xl border-none bg-white font-black text-primary shadow-md"><SelectValue /></SelectTrigger>
+                                <SelectContent dir="rtl" className="rounded-xl">
+                                    <SelectItem value="fixed">مبالغ ثابتة (KD)</SelectItem>
                                     <SelectItem value="percentage">نسب مئوية (%)</SelectItem>
                                 </SelectContent>
                             </Select>
+                            
+                            {financials.type === 'percentage' && (
+                                <div className="flex items-center gap-2 border-r pr-4 mr-2 animate-in zoom-in-95">
+                                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">إجمالي العقد:</Label>
+                                    <Input 
+                                        type="number" 
+                                        value={financials.totalAmount} 
+                                        onChange={e => setFinancials({...financials, totalAmount: Number(e.target.value)})} 
+                                        className="w-32 h-10 border-none text-center font-black text-xl text-primary rounded-xl shadow-md bg-white"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-2xl bg-white">
+                    <div className="border-4 border-slate-50 rounded-[3rem] overflow-hidden shadow-2xl bg-white/95">
                         <Table>
-                            <TableHeader className="bg-muted/50 h-14">
+                            <TableHeader className="bg-slate-900 h-16">
                                 <TableRow className="border-none">
-                                    <TableHead className="w-24 text-center font-black text-slate-400 border-l border-white/20">#</TableHead>
-                                    <TableHead className="px-10 font-black text-slate-400 text-right">بيان شرط الاستحقاق (WBS LINK)</TableHead>
-                                    <TableHead className="text-center w-48 font-black">
+                                    <TableHead className="w-24 text-center font-black text-white/40 border-l border-white/10">#</TableHead>
+                                    <TableHead className="px-10 font-black text-white text-right text-lg">شرط الاستحقاق الميداني (WBS LINK)</TableHead>
+                                    <TableHead className="text-center w-64 font-black text-white text-lg">
                                         {financials.type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                     </TableHead>
                                     <TableHead className="w-16"></TableHead>
@@ -374,56 +373,63 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                             </TableHeader>
                             <TableBody>
                                 {(financials.milestones || []).map((m: any, i: number) => (
-                                    <TableRow key={m.id} className="h-20 border-b last:border-0 hover:bg-muted/5 transition-all group">
+                                    <TableRow key={m.id} className="h-24 border-b last:border-0 hover:bg-primary/[0.02] transition-all group">
                                         <TableCell className="text-center bg-slate-50/50 border-l">
-                                            <Badge variant="secondary" className="font-black text-xs px-3 h-7 rounded-full border bg-white text-slate-900">
+                                            <Badge variant="secondary" className="font-black text-sm px-4 h-8 rounded-full border bg-white text-slate-900 shadow-sm">
                                                 {i+1}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="px-10">
+                                            <Label className="text-[9px] font-black text-primary uppercase mb-1 block opacity-40">ارتباط سير العمل:</Label>
                                             <InlineSearchList 
                                                 value={m.condition} 
                                                 onSelect={v => { const newM = [...financials.milestones]; newM[i].condition = v; setFinancials({...financials, milestones: newM}); }} 
                                                 options={referenceData.stages} 
-                                                placeholder="اربط بمرحلة..." 
-                                                className="h-10 text-xs border-dashed border-primary/30 bg-primary/[0.02] font-bold" 
+                                                placeholder="اربط بمرحلة ميدانية..." 
+                                                className="h-12 text-sm border-dashed border-2 border-primary/20 bg-primary/[0.02] font-black text-primary rounded-xl" 
                                             />
                                         </TableCell>
-                                        <TableCell className="bg-primary/[0.01] border-r">
+                                        <TableCell className="bg-primary/[0.01] border-r border-slate-50">
                                             <Input 
                                                 type="number" step="any" 
                                                 value={m.value} 
                                                 onChange={e => { const newM = [...financials.milestones]; newM[i].value = parseFloat(e.target.value) || 0; setFinancials({...financials, milestones: newM}); }} 
-                                                className="text-center font-black text-2xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono" 
+                                                className="text-center font-black text-4xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono h-16" 
                                             />
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="text-center">
                                             <Button variant="ghost" size="icon" onClick={() => setFinancials({...financials, milestones: financials.milestones.filter((x: any) => x.id !== m.id)})} className="text-red-300 hover:text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-all">
-                                                <Trash2 className="h-4 w-4"/>
+                                                <Trash2 className="h-5 w-5"/>
                                             </Button>
                                         </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
-                            <TableFooter className="bg-primary/5 h-24">
-                                <TableRow className="border-t-4 border-primary/20">
+                            <TableFooter className="bg-primary h-28 text-white">
+                                <TableRow className="border-none hover:bg-transparent">
                                     <TableCell colSpan={2} className="text-right px-12">
-                                        <p className="text-2xl font-black tracking-tight text-slate-800">إجمالي قيمة التعاقد المبرم:</p>
+                                        <p className="text-3xl font-black tracking-tight">إجمالي قيمة التعاقد المبرم:</p>
+                                        <p className="text-[10px] uppercase font-black tracking-[0.3em] opacity-40 mt-1">Total Fixed Contract Sum</p>
                                     </TableCell>
-                                    <TableCell className="text-center border-r border-slate-200 bg-white">
+                                    <TableCell className="text-center border-r border-white/10 bg-white/10">
                                         <div className="flex flex-col items-center">
-                                            <div className={cn("text-4xl font-black font-mono tracking-tighter text-primary", financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01 ? 'text-red-600' : '')}>
+                                            <div className={cn("text-5xl font-black font-mono tracking-tighter", financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01 ? 'text-red-400' : 'text-white')}>
                                                 {financials.type === 'fixed' ? formatCurrency(currentTotalInput) : `${currentTotalInput}%`}
                                             </div>
+                                            {financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01 && (
+                                                <div className="flex items-center gap-1 text-[10px] font-black text-red-200 mt-2 uppercase animate-pulse">
+                                                    <AlertCircle className="h-3 w-3" /> يجب أن يكون المجموع 100%
+                                                </div>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell />
                                 </TableRow>
                             </TableFooter>
                         </Table>
-                        <div className="p-6 flex justify-center bg-muted/5 border-t">
-                            <Button variant="outline" onClick={() => setFinancials({...financials, milestones: [...financials.milestones, {id: generateId(), name: `الدفعة الجديدة`, value: 0, condition: ''}]})} className="h-14 px-16 rounded-2xl border-dashed border-2 font-black text-primary gap-3 hover:bg-white shadow-md">
-                                <PlusCircle className="h-6 w-6" /> إضافة دفعة استحقاق إضافية
+                        <div className="p-8 flex justify-center bg-muted/5 border-t border-dashed">
+                            <Button variant="outline" onClick={() => setFinancials({...financials, milestones: [...financials.milestones, {id: generateId(), name: `الدفعة الجديدة`, value: 0, condition: ''}]})} className="h-14 px-12 rounded-2xl border-dashed border-2 font-black text-primary gap-3 hover:bg-white shadow-xl hover:scale-105 transition-all active:scale-95">
+                                <PlusCircle className="h-6 w-6" /> إضافة دفعة استحقاق يدوية +
                             </Button>
                         </div>
                     </div>
@@ -431,18 +437,22 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             </div>
         </ScrollArea>
 
-        <DialogFooter className="p-10 border-t bg-slate-50 flex flex-col md:flex-row justify-between items-center gap-6 shrink-0">
+        <DialogFooter className="p-10 border-t bg-slate-50 flex flex-col md:flex-row justify-between items-center gap-8 shrink-0">
             <div className="text-right space-y-1">
-                <p className="text-sm font-black text-primary flex items-center gap-2">
-                    <ShieldCheck className="h-5 w-5"/> سيتم إنشاء قيد مديونية آلي بـ {financials.type === 'fixed' ? formatCurrency(currentTotalInput) : formatCurrency(financials.totalAmount)}
+                <p className="text-base font-black text-primary flex items-center gap-3">
+                    <ShieldCheck className="h-6 w-6 animate-pulse"/> سيتم إنشاء قيد مديونية آلي بـ {financials.type === 'fixed' ? formatCurrency(currentTotalInput) : formatCurrency(financials.totalAmount)}
                 </p>
-                <p className="text-[10px] text-muted-foreground font-bold pr-7">الاعتماد النهائي يغير حالة العميل آلياً ويبدأ دورة التنفيذ الميداني.</p>
+                <p className="text-[11px] text-muted-foreground font-bold pr-9">الاعتماد النهائي يغير حالة العميل آلياً ويبدأ دورة التنفيذ الميداني للمشاريع.</p>
             </div>
             <div className="flex gap-4">
-                <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                <Button onClick={handleSubmit} disabled={isSaving || financials.milestones.length === 0} className="h-16 px-16 rounded-[1.8rem] font-black text-2xl shadow-xl shadow-primary/30 gap-4 bg-[#7209B7] text-white border-none transition-all active:scale-95">
+                <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8 text-slate-400">إلغاء</Button>
+                <Button 
+                    onClick={handleSubmit} 
+                    disabled={isSaving || financials.milestones.length === 0 || (financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01)} 
+                    className="h-20 px-24 rounded-[2.2rem] font-black text-3xl shadow-2xl shadow-primary/40 gap-4 bg-[#7209B7] text-white border-none transition-all active:scale-95"
+                >
                     {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <CheckCircle2 className="h-8 w-8" />}
-                    اعتماد العقد والبدء بالتنفيذ
+                    توقيع واعتـماد العقـد
                 </Button>
             </div>
         </DialogFooter>
@@ -450,3 +460,4 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     </Dialog>
   );
 }
+
