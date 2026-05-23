@@ -90,7 +90,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
     try {
         const finalPath = getTenantPath(`quotations/${itemToDelete.id}`, tenantId);
         await deleteDoc(doc(firestore, finalPath!));
-        toast({ title: 'نجاح الحذف', description: 'تم مسح عرض السعر نهائياً من السجلات.' });
+        toast({ title: 'نجاح الحفظ', description: 'تم مسح عرض السعر نهائياً من السجلات.' });
     } catch (error) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف عرض السعر.' });
     } finally {

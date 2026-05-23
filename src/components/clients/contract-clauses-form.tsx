@@ -81,7 +81,7 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 /**
- * نموذج توقيع العقد السيادي (Sovereign Contract Signature V17.0):
+ * نموذج توقيع العقد السيادي (Sovereign Contract Signature V18.0):
  * - محرك مزامنة صفرية (Zero-Click Sync) لبيانات الـ WBS LINK والمواصفات.
  * - استجابة مطلقة للقوائم المنسدلة داخل النافذة المنبثقة.
  * - ربط مالي وقانوني آلي مع شجرة الحسابات.
@@ -107,16 +107,16 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync V16.0) ✨
-  // تم تحصينه لضمان استيراد (السطح، السرداب، WBS LINK) بكافة حالاتهم فوراً.
+  // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync V18.0) ✨
+  // تم تحصينه لضمان استيراد (السطح، السرداب، WBS LINK) بكافة حالاتهم فوراً وبشكل قسري.
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
         
-        // 1. مزامنة المواصفات الإنشائية
+        // 1. مزامنة المواصفات الإنشائية (قسرياً)
         setSpecs({
-            totalArea: Number(q.totalArea || q.contract?.specs?.totalArea) || 0,
-            floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount) || 1,
+            totalArea: Number(q.totalArea || q.contract?.specs?.totalArea || 0),
+            floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount || 1),
             basementType: q.basementType || q.contract?.specs?.basementType || 'none',
             roofExtension: q.roofExtension || q.contract?.specs?.roofExtension || 'none',
             workNature: q.workNature || q.contract?.specs?.workNature || 'labor_only'
@@ -128,7 +128,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         
         setFinancials({
             type: type,
-            totalAmount: Number(q.totalAmount || q.contract?.totalAmount) || 0,
+            totalAmount: Number(q.totalAmount || q.contract?.totalAmount || 0),
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,

@@ -110,7 +110,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
-  // ✨ محرك حقن البيانات التاريخية الصارم (Sovereign Data Injection V16.0) ✨
+  // ✨ محرك حقن البيانات السيادي الموحد (V18.0) ✨
+  // تم تحصينه بـ reset صريح لضمان استيراد (السطح، السرداب، WBS LINK) دون أدنى تأخير.
   useEffect(() => {
     if (initialData) {
         const formattedData: any = {
