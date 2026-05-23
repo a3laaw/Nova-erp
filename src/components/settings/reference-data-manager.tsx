@@ -64,6 +64,7 @@ import { useAuth } from '@/context/auth-context';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { 
     defaultDepartments, 
     defaultJobs, 
