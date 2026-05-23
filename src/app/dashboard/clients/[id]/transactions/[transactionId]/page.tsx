@@ -66,7 +66,6 @@ import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { SignaturePad } from '@/components/ui/signature-pad';
 import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
 import { Progress } from '@/components/ui/progress';
 import { useBranding } from '@/context/branding-context';
@@ -134,6 +133,7 @@ export default function TransactionDetailPage() {
 
   const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
+  const canEdit = useMemo(() => ['Admin', 'HR', 'Developer', 'Secretary', 'Engineer'].includes(currentUser?.role || ''), [currentUser]);
   const isAdmin = useMemo(() => ['Admin', 'HR', 'Developer'].includes(currentUser?.role || ''), [currentUser]);
 
   useEffect(() => {
@@ -159,7 +159,7 @@ export default function TransactionDetailPage() {
             const now = new Date();
             
             if (newStatus === 'in-progress' && !stage.startDate) {
-                stage.startDate = now;
+                stage.startDate = Timestamp.fromDate(now);
                 if (stage.expectedDurationDays) {
                     const expectedEnd = addWorkingDays(
                         now, 
@@ -167,34 +167,33 @@ export default function TransactionDetailPage() {
                         branding?.work_hours?.holidays || [], 
                         publicHolidays
                     );
-                    stage.expectedEndDate = expectedEnd;
+                    stage.expectedEndDate = Timestamp.fromDate(expectedEnd);
                 }
             }
             
             if (newStatus === 'completed') {
-                stage.endDate = now;
+                stage.endDate = Timestamp.fromDate(now);
                 
-                // ✨ ذكاء التبعية المتعددة: فتح كافة المسارات المتفرعة آلياً ✨
+                // ✨ محرك التبعية المتعددة: فتح كافة المسارات المتفرعة آلياً ✨
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
                         const target = currentStages.find(s => s.stageId === nid);
                         if (target && target.status === 'pending') {
                             target.status = 'in-progress';
-                            target.startDate = now;
+                            target.startDate = Timestamp.fromDate(now);
                             if (target.expectedDurationDays) {
-                                target.expectedEndDate = addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
+                                target.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
                             }
                         }
                     });
                 } else {
-                    // Fallback to order-based progression (only if no explicit branching is defined)
                     const nextStage = currentStages.find(s => s.order === stage.order + 1);
                     if (nextStage && nextStage.status === 'pending') {
                         nextStage.status = 'in-progress';
-                        nextStage.startDate = now;
+                        nextStage.startDate = Timestamp.fromDate(now);
                         if (nextStage.expectedDurationDays) {
-                            nextStage.expectedEndDate = addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
+                            nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
                         }
                     }
                 }
@@ -223,12 +222,14 @@ export default function TransactionDetailPage() {
   };
 
   if (transactionLoading || clientLoading) return <div className="p-8 max-w-5xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
-  if (!transaction || !client) return <div className="text-center py-20 text-destructive">فشل تحميل بيانات المعاملة.</div>;
+  if (!transaction || !client) return <div className="text-center py-20 text-destructive font-black opacity-30">المعاملة غير موجودة.</div>;
 
   return (
-    <div className='space-y-6 max-w-6xl mx-auto' dir='rtl'>
+    <div className='space-y-6 max-w-6xl mx-auto pb-20' dir='rtl'>
         <div className="flex items-center gap-4 no-print px-4">
-            <Button variant="ghost" onClick={() => router.back()} className="rounded-xl font-bold gap-2"><ArrowRight className="h-4 w-4"/> العودة لملف العميل</Button>
+            <Button variant="ghost" onClick={() => router.back()} className="rounded-xl font-bold gap-2 text-slate-500 hover:bg-white">
+                <ArrowRight className="h-4 w-4"/> العودة لملف العميل
+            </Button>
         </div>
 
         <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
@@ -254,37 +255,83 @@ export default function TransactionDetailPage() {
         <Tabs defaultValue="stages" dir="rtl" className="w-full">
             <div className="flex justify-center mb-8">
                 <TabsList className="bg-white/60 backdrop-blur-xl p-1.5 rounded-[2rem] border shadow-2xl h-16 w-full max-w-3xl">
-                    <TabsTrigger value="stages" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full">سير العمل (WBS)</TabsTrigger>
-                    <TabsTrigger value="boq" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full">المقايسة (BOQ)</TabsTrigger>
-                    <TabsTrigger value="history" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full">سجل الأحداث</TabsTrigger>
+                    <TabsTrigger value="stages" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">سير العمل (WBS)</TabsTrigger>
+                    <TabsTrigger value="boq" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">المقايسة (BOQ)</TabsTrigger>
+                    <TabsTrigger value="history" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">سجل الأحداث</TabsTrigger>
                 </TabsList>
             </div>
 
             <TabsContent value="stages" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
                     <CardHeader className="border-b bg-muted/5 p-8 px-10">
-                        <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'><Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الميداني</CardTitle>
+                        <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
+                            <Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الميداني (WBS)
+                        </CardTitle>
+                        <CardDescription className="text-xs font-bold">يمكن للمهندس أو السكرتارية تفعيل المراحل وتأكيد الإنجاز لتشغيل السلسلة آلياً.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
-                        {(transaction.stages || []).map((stage) => (
-                            <div key={stage.stageId} className="flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent bg-muted/20 rounded-[2rem] hover:bg-white hover:border-primary/20 transition-all">
-                                <div className="flex items-center gap-6">
-                                    <Badge variant="outline" className={cn("w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2", stageStatusColors[stage.status])}>{stageStatusTranslations[stage.status]}</Badge>
-                                    <div className="space-y-1">
-                                        <span className="font-black text-lg text-slate-800">{stage.name}</span>
-                                        {stage.status === 'in-progress' && stage.expectedEndDate && (
-                                            <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1"><Clock className="h-3 w-3" /> التسليم المتوقع: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}</p>
+                        {(transaction.stages || []).map((stage) => {
+                            const isDelayed = stage.status === 'in-progress' && stage.expectedEndDate && toFirestoreDate(stage.expectedEndDate)! < new Date();
+                            
+                            return (
+                                <div key={stage.stageId} className={cn(
+                                    "flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent rounded-[2rem] transition-all relative overflow-hidden group",
+                                    stage.status === 'in-progress' ? "bg-blue-50/40 border-blue-200" : "bg-muted/20 hover:bg-white hover:border-primary/20",
+                                    stage.status === 'completed' && "bg-green-50/20 opacity-80"
+                                )}>
+                                    <div className="flex items-center gap-6">
+                                        <Badge variant="outline" className={cn(
+                                            "w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2", 
+                                            stageStatusColors[stage.status]
+                                        )}>{stageStatusTranslations[stage.status]}</Badge>
+                                        
+                                        <div className="space-y-1">
+                                            <span className="font-black text-lg text-slate-800">{stage.name}</span>
+                                            <div className="flex gap-4">
+                                                {stage.startDate && (
+                                                    <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                                                        <Play className="h-2 w-2" /> البدء: {format(toFirestoreDate(stage.startDate)!, 'dd/MM/yyyy')}
+                                                    </p>
+                                                )}
+                                                {stage.status === 'in-progress' && stage.expectedEndDate && (
+                                                    <p className={cn(
+                                                        "text-[10px] font-black flex items-center gap-1",
+                                                        isDelayed ? "text-red-600 animate-pulse" : "text-blue-600"
+                                                    )}>
+                                                        {isDelayed ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                                                        التسليم المتوقع: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}
+                                                    </p>
+                                                )}
+                                                {stage.status === 'completed' && stage.endDate && (
+                                                    <p className="text-[10px] font-black text-green-600 flex items-center gap-1">
+                                                        <CheckCircle2 className="h-3 w-3" /> تم الإنجاز: {format(toFirestoreDate(stage.endDate)!, 'dd/MM/yyyy')}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-4 mt-4 sm:mt-0 no-print">
+                                        {canEdit && stage.status === 'pending' && (
+                                            <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 border-2 px-6 shadow-sm hover:bg-blue-600 hover:text-white transition-all">
+                                                <Play className="ml-2 h-4 w-4"/> بدء العمل
+                                            </Button>
                                         )}
+                                        {canEdit && stage.status === 'in-progress' && (
+                                            <Button size="sm" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 hover:bg-green-700 text-white gap-2 shadow-lg shadow-green-100 transition-all">
+                                                <Check className="ml-2 h-4 w-4"/> تأكيد الإنجاز
+                                            </Button>
+                                        )}
+                                        {stage.status === 'completed' && isAdmin && (
+                                            <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-9 w-9 rounded-xl text-orange-400 hover:text-orange-600 hover:bg-orange-50" title="تراجع عن الإكمال">
+                                                <Undo2 className="h-5 w-5" />
+                                            </Button>
+                                        )}
+                                        {stage.status === 'completed' && !isAdmin && <CheckCircle2 className="h-8 w-8 text-green-600" />}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4 mt-4 sm:mt-0">
-                                    {stage.status === 'pending' && <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 border-2 px-6"><Play className="ml-2 h-4 w-4"/> بدء العمل</Button>}
-                                    {stage.status === 'in-progress' && <Button size="sm" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 text-white gap-2"><Check className="ml-2 h-4 w-4"/> تأكيد الإنجاز</Button>}
-                                    {stage.status === 'completed' && isAdmin && <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-8 w-8 text-orange-400 hover:text-orange-600"><Undo2 className="h-4 w-4" /></Button>}
-                                    {stage.status === 'completed' && !isAdmin && <CheckCircle2 className="h-8 w-8 text-green-600" />}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </CardContent>
                 </Card>
             </TabsContent>

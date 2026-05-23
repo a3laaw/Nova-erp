@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import type { FieldVisit, ConstructionProject, TransactionStage, Holiday } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -154,12 +154,15 @@ export default function FieldVisitDetailPage() {
                 if (txSnap.exists()) {
                     const txData = txSnap.data();
                     const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(txData.stages || []));
+                    
+                    // البحث عن المرحلة المطابقة بالاسم أو المعرف
                     const stageIdx = currentStages.findIndex(s => s.name.includes(actualStage?.name || '') || s.stageId === selectedStageId);
                     
                     if (stageIdx > -1) {
                         const stage = currentStages[stageIdx];
                         const now = new Date();
 
+                        // معالجة التكرار (Occurrence)
                         if (stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') {
                             const newCount = (stage.currentCount || 0) + 1;
                             stage.currentCount = newCount;
@@ -175,7 +178,7 @@ export default function FieldVisitDetailPage() {
                             stage.endDate = Timestamp.fromDate(now);
                         }
 
-                        // ✨ تفعيل المسارات التالية آلياً (Multi-Branching Support)
+                        // ✨ تفعيل المسارات التالية آلياً (Multi-Branching Support) ✨
                         if (stage.status === 'completed') {
                             const nextIds = stage.nextStageIds || [];
                             if (nextIds.length > 0) {
@@ -185,17 +188,18 @@ export default function FieldVisitDetailPage() {
                                         target.status = 'in-progress';
                                         target.startDate = Timestamp.fromDate(now);
                                         if (target.expectedDurationDays) {
-                                            target.expectedEndDate = addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
+                                            target.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
                                         }
                                     }
                                 });
                             } else {
+                                // التتبع التسلسلي التلقائي في حال عدم وجود تشعب محدد
                                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                                 if (nextStage && nextStage.status === 'pending') {
                                     nextStage.status = 'in-progress';
                                     nextStage.startDate = Timestamp.fromDate(now);
                                     if (nextStage.expectedDurationDays) {
-                                        nextStage.expectedEndDate = addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
+                                        nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
                                     }
                                 }
                             }
@@ -229,7 +233,7 @@ export default function FieldVisitDetailPage() {
     };
 
     if (loading) return <div className="p-8 max-w-2xl mx-auto space-y-6"><Skeleton className="h-48 w-full rounded-3xl" /><Skeleton className="h-64 w-full rounded-3xl" /></div>;
-    if (!visit) return <div className="text-center p-20">الزيارة غير موجودة.</div>;
+    if (!visit) return <div className="text-center p-20 font-black opacity-30">الزيارة غير موجودة.</div>;
 
     const scheduledDate = toFirestoreDate(visit.scheduledDate);
     const isProcessed = visit.status !== 'planned';
@@ -281,7 +285,7 @@ export default function FieldVisitDetailPage() {
                     <div className="space-y-6 p-6 bg-primary/5 rounded-[2rem] border-2 border-primary/10 shadow-inner">
                         <div className="flex justify-between items-center">
                             <Label className="font-black text-lg text-primary flex items-center gap-2">
-                                <TrendingUp className="h-5 w-5" /> نسبة الإنجاز
+                                <TrendingUp className="h-5 w-5" /> نسبة الإنجاز الميداني
                             </Label>
                             <span className="text-2xl font-black text-primary font-mono">{progressAchieved[0]}%</span>
                         </div>
@@ -290,13 +294,13 @@ export default function FieldVisitDetailPage() {
 
                     <div className="space-y-4">
                         <Label className="font-black text-lg flex items-center gap-2">
-                            <MapPin className="h-5 w-5 text-primary" /> إثبات الحضور (GPS)
+                            <MapPin className="h-5 w-5 text-primary" /> إثبات الحضور الميداني (GPS)
                         </Label>
                         <div className={cn("p-6 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center gap-4", location ? "bg-green-50 border-green-200" : "bg-muted/10 border-muted-foreground/20")}>
                             {location ? (
                                 <div className="text-center">
                                     <ShieldCheck className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                                    <p className="font-black text-green-800">تم توثيق الموقع الجغرافي</p>
+                                    <p className="font-black text-green-800">تم توثيق الموقع الجغرافي بنجاح</p>
                                 </div>
                             ) : !isProcessed && (
                                 <Button onClick={handleGetLocation} disabled={isCapturingLocation} className="rounded-xl h-12 font-bold gap-2">
@@ -308,23 +312,23 @@ export default function FieldVisitDetailPage() {
 
                     <div className="space-y-4">
                         <Label className="font-black text-lg flex items-center gap-2">
-                            <ClipboardCheck className="h-5 w-5 text-primary" /> التقرير الفني للإنجاز
+                            <ClipboardCheck className="h-5 w-5 text-primary" /> التقرير الفني الميداني
                         </Label>
                         <Textarea 
                             value={notes} 
                             onChange={e => setNotes(e.target.value)} 
                             readOnly={isProcessed}
-                            placeholder="اشرح الأعمال التي تم تنفيذها اليوم..."
+                            placeholder="اشرح الأعمال التي تم تنفيذها اليوم ليراها العميل والمكتب..."
                             rows={4}
-                            className="rounded-3xl border-2"
+                            className="rounded-3xl border-2 p-6 shadow-inner"
                         />
                     </div>
                 </CardContent>
                 
                 {!isProcessed && (
                     <CardFooter className="p-8 bg-muted/10 border-t flex gap-4">
-                        <Button onClick={handleConfirmDone} disabled={isSaving || !notes.trim()} className="flex-1 h-14 rounded-2xl font-black text-xl shadow-lg gap-2">
-                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />} تم الإنجاز
+                        <Button onClick={handleConfirmDone} disabled={isSaving || !notes.trim()} className="flex-1 h-14 rounded-2xl font-black text-xl shadow-lg gap-3">
+                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />} تأكيد الإنجاز وإغلاق الزيارة
                         </Button>
                     </CardFooter>
                 )}
@@ -332,5 +336,3 @@ export default function FieldVisitDetailPage() {
         </div>
     );
 }
-
-import { useSubscription } from '@/hooks/use-subscription';
