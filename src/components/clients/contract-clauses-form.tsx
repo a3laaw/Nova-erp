@@ -31,8 +31,6 @@ import {
   Calculator, 
   Layers, 
   CheckCircle2, 
-  Ruler, 
-  Building2, 
   Target,
   ShieldCheck,
   AlertCircle,
@@ -102,17 +100,15 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // 🛡️ تحديد المنشأة (Tenant ID)
   const tenantId = currentUser?.currentCompanyId;
 
   // 1. ✨ محرك المزامنة الفورية الجبار (Quotation-to-Contract Power Sync)
+  // تم تحسينه لترجمة triggerCondition إلى condition بدقة
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
-        // حالة 1: سحب البيانات المباشرة من عرض السعر المفتوح
         if (transaction.quotationNumber || transaction.subject) {
             const q = transaction as Quotation;
             
-            // مزامنة المواصفات الفنية
             setSpecs({
                 totalArea: Number(q.totalArea) || 0,
                 floorsCount: Number(q.floorsCount) || 1,
@@ -121,22 +117,21 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 workNature: q.workNature || 'labor_only'
             });
 
-            // مزامنة البيانات المالية والنسب
+            const qType = q.financialsType || 'fixed';
             setFinancials({
-                type: q.financialsType || 'fixed',
+                type: qType,
                 totalAmount: Number(q.totalAmount) || 0,
                 milestones: (q.items || []).map((item: any, idx: number) => ({
                     id: generateId(),
                     name: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
+                    // 🛡️ تصحيح: مزامنة شرط الاستحقاق الميداني
                     condition: item.triggerCondition || '',
-                    value: q.financialsType === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice) || 0)
+                    value: qType === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice) || 0)
                 }))
             });
             
             syncedRef.current = true;
-        } 
-        // حالة 2: سحب البيانات من عقد سابق (حالة التعديل)
-        else if (transaction.contract) {
+        } else if (transaction.contract) {
             const c = transaction.contract;
             setSpecs(c.specs || {});
             setFinancials({
@@ -176,7 +171,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     fetchRefData();
   }, [isOpen, firestore, tenantId]);
 
-  // حساب المجموع اللحظي (للتأكد من توازن النسب أو المبالغ)
   const currentTotalInput = useMemo(() => 
     (financials.milestones || []).reduce((sum: number, m: any) => sum + (Number(m.value) || 0), 0)
   , [financials.milestones]);
@@ -184,7 +178,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const handleSubmit = async () => {
     if (!firestore || !currentUser || !clientId || isSaving || !tenantId) return;
     
-    // التحقق من توازن النسب المئوية
     if (financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01) {
         toast({ variant: 'destructive', title: 'خلل في التوزيع', description: 'يجب أن يكون مجموع نسب الدفعات 100% بالضبط لضمان دقة القيد المالي.' });
         return;
@@ -195,11 +188,9 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         let newTxId = '';
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
-            
             const coaPath = getTenantPath('chartOfAccounts', tenantId);
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
             const clientAccSnap = await getDocs(query(collection(firestore, coaPath!), where('name', '==', clientName), limit(1)));
-            
             const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
             const jeCounterRef = doc(firestore, jeCounterPath!);
             const jeCounterDoc = await transaction_fs.get(jeCounterRef);
@@ -270,19 +261,29 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         onClose();
         router.push(`/dashboard/construction/projects/new?clientId=${clientId}&transactionId=${newTxId}`);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ في المزامنة', description: e.message });
+        toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: e.message });
     } finally { setIsSaving(false); }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl" dir="rtl">
+      <DialogContent 
+        className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl" 
+        dir="rtl"
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-radix-select-content]') || target.closest('[data-radix-popover-content]')) {
+                e.preventDefault();
+            }
+        }}
+      >
         <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-4">
                 <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><FileSignature className="h-8 w-8"/></div>
                 <div className="text-right">
                     <DialogTitle className="text-2xl font-black text-[#1e1b4b]">توقيع العقد وتحويله لمشروع</DialogTitle>
-                    <DialogDescription className="font-bold text-slate-500">مراجعة وتأكيد بنود العرض المالي قبل بدء التنفيذ الميداني.</DialogDescription>
+                    <DialogDescription className="font-bold text-slate-500">مراجعة وتأكيد بنود العرض المالي المستوردة قبل بدء التنفيذ.</DialogDescription>
                 </div>
             </div>
         </DialogHeader>
@@ -291,7 +292,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             <div className="p-8 space-y-10">
                 <section className="space-y-6">
                     <h3 className="text-lg font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4">
-                        <Layers className="h-6 w-6 text-indigo-600" /> المواصفات الفنية المسحوبة
+                        <Target className="h-6 w-6 text-indigo-600" /> المواصفات الفنية المزامنة
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-8 border-2 border-dashed rounded-[2.5rem] bg-white shadow-inner">
                         <div className="space-y-1">
@@ -315,7 +316,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         <div className="space-y-1">
                             <Label className="text-[10px] font-black uppercase text-slate-400 pr-1">خيار السرداب</Label>
                             <Select value={specs.basementType} onValueChange={v => setSpecs({...specs, basementType: v})}>
-                                <SelectTrigger className="h-10 rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-10 rounded-xl font-bold bg-white border-2"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                     <SelectItem value="none">بدون</SelectItem>
                                     <SelectItem value="full">كامل</SelectItem>
@@ -327,7 +328,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         <div className="space-y-1">
                             <Label className="text-[10px] font-black uppercase text-slate-400 pr-1">توسعة السطح</Label>
                             <Select value={specs.roofExtension} onValueChange={v => setSpecs({...specs, roofExtension: v})}>
-                                <SelectTrigger className="h-10 rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-10 rounded-xl font-bold bg-white border-2"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                     <SelectItem value="none">لا يوجد</SelectItem>
                                     <SelectItem value="quarter">ربع دور</SelectItem>
@@ -341,12 +342,12 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 <section className="space-y-6">
                     <div className="flex justify-between items-center pr-4 border-r-8 border-primary">
                         <h3 className="text-lg font-black flex items-center gap-3 text-[#1e1b4b]">
-                            <Calculator className="h-6 w-6 text-primary"/> الترتيبات المالية المعتمدة
+                            <Calculator className="h-6 w-6 text-primary"/> الدفعات المالية المعتمدة
                         </h3>
                         <div className="flex items-center gap-4">
                             <Label className="text-xs font-bold text-slate-500">نظام الدفع:</Label>
                             <Select value={financials.type} onValueChange={v => setFinancials({...financials, type: v, milestones: []})}>
-                                <SelectTrigger className="w-48 h-9 rounded-xl border-none bg-white font-black text-primary shadow-md"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="w-48 h-10 rounded-xl border-2 bg-white font-black text-primary shadow-sm"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                     <SelectItem value="fixed">مبالغ ثابتة (KD)</SelectItem>
                                     <SelectItem value="percentage">نسب مئوية (%)</SelectItem>
@@ -407,10 +408,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                     </TableCell>
                                     <TableCell className="text-center border-r border-slate-200 bg-white">
                                         <div className="flex flex-col items-center">
-                                            <div className={cn("text-4xl font-black font-mono tracking-tighter text-primary", financials.type === 'percentage' && currentTotalInput !== 100 ? 'text-red-600' : '')}>
+                                            <div className={cn("text-4xl font-black font-mono tracking-tighter text-primary", financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01 ? 'text-red-600' : '')}>
                                                 {financials.type === 'fixed' ? formatCurrency(currentTotalInput) : `${currentTotalInput}%`}
                                             </div>
-                                            {financials.type === 'percentage' && currentTotalInput !== 100 && (
+                                            {financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01 && (
                                                 <span className="text-[10px] font-black text-red-600 mt-1 animate-pulse">يجب أن يكون المجموع 100%</span>
                                             )}
                                         </div>
