@@ -63,8 +63,17 @@ import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge'; // 🛡️ FIXED: Missing import
+import { Badge } from '@/components/ui/badge';
+import { 
+    defaultDepartments, 
+    defaultJobs, 
+    defaultGovernorates, 
+    defaultAreas, 
+    defaultTransactionTypes, 
+    defaultWorkStages 
+} from '@/lib/default-reference-data';
 
+// 🛡️ التطهير: استخدام المكتبة الصحيحة لضمان استقرار البناء
 import {
   DndContext,
   closestCenter,
@@ -173,7 +182,6 @@ export function ReferenceDataManager() {
     const [itemName, setItemName] = useState('');
     const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
     
-    // Stage-specific fields
     const [trackingType, setTrackingType] = useState<'duration' | 'occurrence' | 'hybrid' | 'none'>('duration');
     const [expectedDuration, setExpectedDuration] = useState('7');
     const [maxOccurrences, setMaxOccurrences] = useState('3');
@@ -184,18 +192,6 @@ export function ReferenceDataManager() {
       useSensor(PointerSensor),
       useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
-
-    const closeDialog = useCallback(() => {
-        setIsPrimaryDialogOpen(false);
-        setIsSecondaryDialogOpen(false);
-        setIsTertiaryDialogOpen(false);
-        setEditingItem(null);
-        setItemName('');
-        setSelectedDeptIds([]);
-        setTrackingType('duration');
-        setExpectedDuration('7');
-        setMaxOccurrences('3');
-    }, []);
 
     const primaryCollectionName = useMemo(() => {
         if (view === 'departments') return 'departments';
@@ -244,6 +240,18 @@ export function ReferenceDataManager() {
 
     const { data: allDepartments = [] } = useSubscription<Department>(firestore, 'departments');
     const departmentOptions = useMemo(() => allDepartments.map(d => ({ value: d.id!, label: d.name })), [allDepartments]);
+
+    const closeDialog = useCallback(() => {
+        setIsPrimaryDialogOpen(false);
+        setIsSecondaryDialogOpen(false);
+        setIsTertiaryDialogOpen(false);
+        setEditingItem(null);
+        setItemName('');
+        setSelectedDeptIds([]);
+        setTrackingType('duration');
+        setExpectedDuration('7');
+        setMaxOccurrences('3');
+    }, []);
 
     const handleDragEnd = async (event: DragEndEvent, type: 'primary' | 'secondary' | 'tertiary') => {
         const { active, over } = event;
@@ -324,10 +332,70 @@ export function ReferenceDataManager() {
         } catch (e) { toast({ variant: 'destructive', title: 'فشل الحذف' }); } finally { setIsSaving(false); }
     };
 
+    const handleImportDefaults = async () => {
+        if (!firestore || !tenantId) return;
+        setIsImporting(true);
+        try {
+            const batch = writeBatch(firestore);
+
+            // 1. استيراد الأقسام والوظائف
+            for (const dept of defaultDepartments) {
+                const deptRef = doc(collection(firestore, getTenantPath('departments', tenantId)!));
+                batch.set(deptRef, cleanFirestoreData({ ...dept, companyId: tenantId, createdAt: serverTimestamp() }));
+                
+                const deptJobs = defaultJobs[dept.name] || [];
+                deptJobs.forEach(job => {
+                    const jobRef = doc(collection(firestore, getTenantPath(`departments/${deptRef.id}/jobs`, tenantId)!));
+                    batch.set(jobRef, cleanFirestoreData({ ...job, parentId: deptRef.id, companyId: tenantId }));
+                });
+            }
+
+            // 2. استيراد المواقع الجغرافية
+            for (const gov of defaultGovernorates) {
+                const govRef = doc(collection(firestore, getTenantPath('governorates', tenantId)!));
+                batch.set(govRef, cleanFirestoreData({ ...gov, companyId: tenantId }));
+                
+                const govAreas = defaultAreas[gov.name] || [];
+                govAreas.forEach(area => {
+                    const areaRef = doc(collection(firestore, getTenantPath(`governorates/${govRef.id}/areas`, tenantId)!));
+                    batch.set(areaRef, cleanFirestoreData({ ...area, parentId: govRef.id, companyId: tenantId }));
+                });
+            }
+
+            // 3. استيراد أنواع الخدمات وهيكل الـ WBS الكامل
+            for (const type of defaultTransactionTypes) {
+                const typeRef = doc(collection(firestore, getTenantPath('transactionTypes', tenantId)!));
+                batch.set(typeRef, cleanFirestoreData({ 
+                    name: type.name, 
+                    order: type.order, 
+                    activityType: type.activityType, 
+                    companyId: tenantId 
+                }));
+
+                const subRef = doc(collection(firestore, getTenantPath(`transactionTypes/${typeRef.id}/subServices`, tenantId)!));
+                batch.set(subRef, cleanFirestoreData({ name: 'خدمة أساسية', order: 1, parentId: typeRef.id, companyId: tenantId }));
+
+                const stages = defaultWorkStages['القسم المعماري'] || [];
+                stages.forEach(stage => {
+                    const stageRef = doc(collection(firestore, getTenantPath(`transactionTypes/${typeRef.id}/subServices/${subRef.id}/workStages`, tenantId)!));
+                    batch.set(stageRef, cleanFirestoreData({ ...stage, parentId: subRef.id, companyId: tenantId }));
+                });
+            }
+
+            await batch.commit();
+            toast({ title: 'نجاح الاستيراد', description: 'تم تأسيس الهيكل المرجعي بنجاح.' });
+            setIsImportConfirmOpen(false);
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'فشل الاستيراد', description: e.message });
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     if (view === 'main') {
         return (
             <div className="space-y-12" dir="rtl">
-                <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
+                <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                     <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                     <CardHeader className="p-10 relative z-10 border-b border-white/10">
                         <div className="flex items-center gap-6">
@@ -373,6 +441,12 @@ export function ReferenceDataManager() {
                         loading={loadingPrimary} 
                         description="قائمة المعاملات المتاحة وربطها بمراحل الإنجاز (WBS)." 
                     />
+                </div>
+                
+                <div className="flex justify-center no-print">
+                    <Button onClick={() => setIsImportConfirmOpen(true)} variant="outline" className="h-14 px-12 rounded-[2.2rem] border-2 border-dashed font-black text-xl text-primary gap-3 hover:bg-primary/5">
+                        <DownloadCloud className="h-6 w-6" /> استيراد الهيكل المرجعي الموحد
+                    </Button>
                 </div>
             </div>
         );
@@ -611,7 +685,7 @@ export function ReferenceDataManager() {
                     <AlertDialogFooter className="mt-8 gap-3">
                         <AlertDialogCancel className="rounded-xl font-black h-12 px-8 border-2">تراجع</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
-                            {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، تأكيد الحذف النهائي'}
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin h-5 w-5"/> : 'نعم، تأكيد الحذف النهائي'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -627,7 +701,7 @@ export function ReferenceDataManager() {
                     <AlertDialogFooter className="mt-8 gap-3">
                         <AlertDialogCancel className="rounded-xl font-black h-12 px-8 border-2">تراجع</AlertDialogCancel>
                         <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-xl font-black h-12 px-12 shadow-xl shadow-primary/30">
-                            {isImporting ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، ابدأ الاستيراد الموحد'}
+                            {isImporting ? <Loader2 className="h-5 w-5 animate-spin h-5 w-5"/> : 'نعم، ابدأ الاستيراد الموحد'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -635,3 +709,4 @@ export function ReferenceDataManager() {
         </div>
     );
 }
+

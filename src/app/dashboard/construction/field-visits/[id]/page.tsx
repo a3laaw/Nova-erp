@@ -3,8 +3,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, orderBy, where } from 'firebase/firestore';
-import type { FieldVisit, ConstructionProject } from '@/lib/types';
+import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, orderBy, where, Timestamp } from 'firebase/firestore';
+import type { FieldVisit, ConstructionProject, TransactionStage } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -19,7 +19,9 @@ import {
     ShieldCheck, 
     ClipboardCheck, 
     Building2, 
-    TrendingUp
+    TrendingUp,
+    Clock,
+    Activity
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -27,7 +29,7 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
-import { cn, cleanFirestoreData } from '@/lib/utils';
+import { cn, cleanFirestoreData, getTenantPath, formatCurrency } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -39,6 +41,7 @@ export default function FieldVisitDetailPage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
+    const tenantId = currentUser?.currentCompanyId;
 
     const [isSaving, setIsSaving] = useState(false);
     const [isCapturingLocation, setIsCapturingLocation] = useState(false);
@@ -51,20 +54,21 @@ export default function FieldVisitDetailPage() {
     const [selectedStageId, setSelectedStageId] = useState('');
     const [isLoadingStages, setIsLoadingStages] = useState(false);
 
-    const visitRef = useMemo(() => (firestore && id ? doc(firestore, 'field_visits', id) : null), [firestore, id]);
-    const { data: visit, loading } = useDocument<FieldVisit>(firestore, visitRef?.path || null);
+    const visitPath = useMemo(() => getTenantPath(`field_visits/${id}`, tenantId), [id, tenantId]);
+    const { data: visit, loading } = useDocument<FieldVisit>(firestore, visitPath);
 
-    // ✨ محرك جلب بنود المقايسة (WBS logic المستقر)
     useEffect(() => {
         const fetchStages = async () => {
-            if (!visit || !firestore) return;
+            if (!visit || !firestore || !tenantId) return;
             setIsLoadingStages(true);
             try {
-                const projectSnap = await getDoc(doc(firestore, 'projects', visit.projectId));
+                const projectPath = getTenantPath(`projects/${visit.projectId}`, tenantId);
+                const projectSnap = await getDoc(doc(firestore, projectPath!));
                 if (projectSnap.exists()) {
                     const projectData = projectSnap.data() as ConstructionProject;
                     if (projectData.boqId) {
-                        const q = query(collection(firestore, `boqs/${projectData.boqId}/items`), orderBy('itemNumber'));
+                        const boqItemsPath = getTenantPath(`boqs/${projectData.boqId}/items`, tenantId);
+                        const q = query(collection(firestore, boqItemsPath!), orderBy('itemNumber'));
                         const snap = await getDocs(q);
                         const stages = snap.docs.map(d => {
                             const data = d.data();
@@ -91,7 +95,7 @@ export default function FieldVisitDetailPage() {
         };
 
         fetchStages();
-    }, [visit, firestore]);
+    }, [visit, firestore, tenantId]);
 
     useEffect(() => {
         if (visit?.confirmationData) {
@@ -115,14 +119,15 @@ export default function FieldVisitDetailPage() {
     };
 
     const handleConfirmDone = async () => {
-        if (!firestore || !visit || !currentUser || !notes.trim()) return;
+        if (!firestore || !visit || !currentUser || !tenantId || !notes.trim()) return;
 
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
             const actualStage = boqItems.find(s => s.id === selectedStageId);
             
-            batch.update(visitRef!, {
+            const visitDocPath = getTenantPath(`field_visits/${id}`, tenantId);
+            batch.update(doc(firestore, visitDocPath!), {
                 status: 'confirmed',
                 plannedStageId: selectedStageId,
                 plannedStageName: actualStage?.name || visit.plannedStageName || 'متابعة ميدانية',
@@ -135,11 +140,65 @@ export default function FieldVisitDetailPage() {
                 }
             });
 
+            // ✨ ذكاء التبعية: تحديث المعاملة المرتبطة (WBS Progression) ✨
+            if (visit.transactionId) {
+                const txPath = getTenantPath(`clients/${visit.clientId}/transactions/${visit.transactionId}`, tenantId);
+                const txRef = doc(firestore, txPath!);
+                const txSnap = await getDoc(txRef);
+                
+                if (txSnap.exists()) {
+                    const txData = txSnap.data();
+                    const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(txData.stages || []));
+                    const stageIdx = currentStages.findIndex(s => s.name.includes(actualStage?.name || '') || s.stageId === selectedStageId);
+                    
+                    if (stageIdx > -1) {
+                        const stage = currentStages[stageIdx];
+                        const now = new Date();
+
+                        if (stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') {
+                            stage.currentCount = (stage.currentCount || 0) + 1;
+                            if (stage.maxOccurrences && stage.currentCount >= stage.maxOccurrences) {
+                                stage.status = 'completed';
+                                stage.endDate = Timestamp.fromDate(now);
+                            } else {
+                                stage.status = 'in-progress';
+                            }
+                        } else {
+                            stage.status = 'completed';
+                            stage.endDate = Timestamp.fromDate(now);
+                        }
+
+                        // تفعيل المرحلة التالية آلياً
+                        if (stage.status === 'completed') {
+                            const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                            if (nextStage && nextStage.status === 'pending') {
+                                nextStage.status = 'in-progress';
+                                nextStage.startDate = Timestamp.fromDate(now);
+                            }
+                        }
+
+                        batch.update(txRef, { stages: currentStages, updatedAt: serverTimestamp() });
+                        
+                        // توثيق في التايم لاين
+                        const timelineRef = doc(collection(txRef, 'timelineEvents'));
+                        batch.set(timelineRef, {
+                            type: 'comment',
+                            content: `**[توثيق ميداني]**\nتم تسجيل إنجاز في المرحلة: ${stage.name}.\n\n**ملاحظات المهندس:**\n${notes}`,
+                            userId: currentUser.id,
+                            userName: currentUser.fullName,
+                            createdAt: serverTimestamp(),
+                            companyId: tenantId
+                        });
+                    }
+                }
+            }
+
             await batch.commit();
-            toast({ title: 'تم التوثيق', description: 'تم تحديث الإنجاز الميداني بنجاح.' });
+            toast({ title: 'تم التوثيق والمزامنة', description: 'تم تحديث الإنجاز الميداني وسير العمل آلياً.' });
             router.push('/dashboard/construction/field-visits');
         } catch (error) {
-            toast({ variant: 'destructive', title: 'خطأ' });
+            console.error(error);
+            toast({ variant: 'destructive', title: 'خطأ في التوثيق' });
         } finally {
             setIsSaving(false);
         }
@@ -154,7 +213,7 @@ export default function FieldVisitDetailPage() {
     return (
         <div className="max-w-2xl mx-auto space-y-6 pb-20" dir="rtl">
             <div className="flex items-center justify-between px-2">
-                <button onClick={() => router.back()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                <button onClick={() => router.back()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors font-bold">
                     <ArrowRight className="h-4 w-4" /> العودة للخطة
                 </button>
             </div>
@@ -228,8 +287,8 @@ export default function FieldVisitDetailPage() {
                             <ClipboardCheck className="h-5 w-5 text-primary" /> التقرير الفني للإنجاز
                         </Label>
                         <Textarea 
-                            value={notes}
-                            onChange={e => setNotes(e.target.value)}
+                            value={notes} 
+                            onChange={e => setNotes(e.target.value)} 
                             readOnly={isProcessed}
                             placeholder="اشرح الأعمال التي تم تنفيذها اليوم..."
                             rows={4}
@@ -241,7 +300,7 @@ export default function FieldVisitDetailPage() {
                 {!isProcessed && (
                     <CardFooter className="p-8 bg-muted/10 border-t flex gap-4">
                         <Button onClick={handleConfirmDone} disabled={isSaving || !notes.trim()} className="flex-1 h-14 rounded-2xl font-black text-xl shadow-lg gap-2">
-                            {isSaving ? <Loader2 className="animate-spin" /> : <CheckCircle2 className="h-6 w-6" />} تم الإنجاز
+                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />} تم الإنجاز
                         </Button>
                     </CardFooter>
                 )}
@@ -249,3 +308,5 @@ export default function FieldVisitDetailPage() {
         </div>
     );
 }
+
+import { Slider } from '@/components/ui/slider';

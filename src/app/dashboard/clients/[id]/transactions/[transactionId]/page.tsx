@@ -156,15 +156,16 @@ export default function TransactionDetailPage() {
             
             if (newStatus === 'in-progress' && !stage.startDate) {
                 stage.startDate = now;
-                if ((stage.trackingType === 'duration' || stage.trackingType === 'hybrid') && stage.expectedDurationDays) {
+                if (stage.expectedDurationDays) {
                     const expectedEnd = new Date(now.getTime() + stage.expectedDurationDays * 24 * 60 * 60 * 1000);
                     stage.expectedEndDate = expectedEnd;
                 }
             }
+            
             if (newStatus === 'completed') {
                 stage.endDate = now;
                 
-                // ✨ ذكاء التبعية: تشغيل المرحلة التالية آلياً إذا كانت تسلسلية ✨
+                // ✨ ذكاء التبعية: تشغيل المرحلة التالية آلياً ✨
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
@@ -177,7 +178,7 @@ export default function TransactionDetailPage() {
             }
 
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: 'نجاح التحديث', description: newStatus === 'completed' ? 'تم إنجاز المرحلة وتفعيل التالية.' : 'تم بدء العمل في المرحلة.' });
+            toast({ title: 'تم التحديث', description: newStatus === 'completed' ? 'تم إنجاز المرحلة وفتح التالية.' : 'بدأ العمل في المرحلة.' });
         } finally { setIsProcessing(false); }
   };
 
@@ -198,48 +199,6 @@ export default function TransactionDetailPage() {
         } finally { setIsProcessing(false); }
   };
 
-  const handleIncrementOccurrence = async (stageId: string) => {
-        if (!firestore || !currentUser || !transaction || !transactionPath) return;
-        setIsProcessing(true);
-        try {
-            const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
-            const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
-            if (stageIndex === -1) throw new Error("Stage not found");
-            
-            const stage = currentStages[stageIndex];
-            const newCount = (stage.currentCount || 0) + 1;
-            stage.currentCount = newCount;
-            
-            // في وضع التكرار فقط، نغلق المرحلة عند الوصول للحد
-            if (stage.trackingType === 'occurrence' && stage.maxOccurrences && newCount >= stage.maxOccurrences) {
-                stage.status = 'completed';
-                stage.endDate = new Date();
-            } else {
-                stage.status = 'in-progress';
-            }
-
-            await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: `تم تسجيل التكرار رقم ${newCount}` });
-        } finally { setIsProcessing(false); }
-  };
-
-  const handleSaveSignature = async (signatureDataUrl: string) => {
-    if (!firestore || !transactionPath || !transaction) return;
-    setIsProcessing(true);
-    try {
-        await updateDoc(doc(firestore, transactionPath), {
-            'contract.signatureInfo': {
-                clientSignature: signatureDataUrl,
-                signedAt: serverTimestamp(),
-            }
-        });
-        toast({ title: 'تم التوقيع', description: 'تم اعتماد توقيع المالك وحفظه في العقد بنجاح.' });
-        setIsSignDialogOpen(false);
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ' });
-    } finally { setIsProcessing(false); }
-  };
-
   if (transactionLoading || clientLoading) return <div className="p-8 max-w-5xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
   if (!transaction || !client) return <div className="text-center py-20 text-destructive">فشل تحميل بيانات المعاملة.</div>;
 
@@ -255,125 +214,54 @@ export default function TransactionDetailPage() {
                     <div className="text-right space-y-2">
                         <div className="flex items-center gap-3">
                             <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
-                            <UniversalActionTrigger 
-                                title={transaction.transactionType}
-                                sourceModule="المعاملات المعتمدة"
-                                sourceId={transaction.id!}
-                            />
+                            <UniversalActionTrigger title={transaction.transactionType} sourceModule="المعاملات" sourceId={transaction.id!} />
                         </div>
-                        {transaction.subServiceName && (
-                            <div className="flex items-center gap-2">
-                                <Layers className="h-4 w-4 text-primary opacity-60" />
-                                <Badge className="bg-primary text-white font-black px-4 h-7 rounded-full border-none shadow-md">{transaction.subServiceName}</Badge>
-                            </div>
-                        )}
-                        <CardDescription className="text-base font-bold">
-                            العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link>
-                        </CardDescription>
+                        {transaction.subServiceName && <Badge className="bg-primary text-white font-black px-4 h-7 rounded-full border-none shadow-md">{transaction.subServiceName}</Badge>}
+                        <CardDescription className="text-base font-bold">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link></CardDescription>
                     </div>
-                    <div className="flex flex-col items-end gap-3">
-                        <Badge variant="outline" className={cn("px-6 py-1.5 rounded-full font-black text-sm border-2 shadow-sm", transactionStatusColors[transaction.status])}>
-                            {statusTranslations[transaction.status]}
-                        </Badge>
-                        <span className="font-mono text-xs font-black opacity-30">REF: {transaction.transactionNumber}</span>
-                    </div>
+                    <Badge variant="outline" className={cn("px-6 py-1.5 rounded-full font-black text-sm border-2", transactionStatusColors[transaction.status])}>{statusTranslations[transaction.status]}</Badge>
                 </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10 bg-white">
-                <div className="space-y-4">
-                    <InfoRow icon={<User className="h-5 w-5 text-primary opacity-40"/>} label="المهندس المسؤول" value={transaction.assignedEngineerId ? <span className="font-black text-slate-800">{employeesMap.get(transaction.assignedEngineerId)}</span> : <span className="text-muted-foreground italic">لم يحدد بعد</span>} />
-                    <InfoRow icon={<Calendar className="h-5 w-5 text-primary opacity-40"/>} label="تاريخ الفتح الرسمي" value={<span className="font-bold">{toFirestoreDate(transaction.createdAt) ? format(toFirestoreDate(transaction.createdAt)!, 'eeee, dd MMMM yyyy', { locale: ar }) : '-'}</span>} />
-                </div>
-                {transaction.description && (
-                    <div className="bg-muted/10 p-6 rounded-3xl border-2 border-dashed border-primary/10">
-                        <Label className="text-[10px] font-black uppercase text-primary mb-2 block">ملاحظات التأسيس:</Label>
-                        <p className="text-sm font-medium leading-relaxed italic text-slate-600">{transaction.description}</p>
-                    </div>
-                )}
+                <InfoRow icon={<User className="h-5 w-5 text-primary opacity-40"/>} label="المهندس المسؤول" value={transaction.assignedEngineerId ? <span className="font-black text-slate-800">{employeesMap.get(transaction.assignedEngineerId)}</span> : 'غير مسند'} />
+                <InfoRow icon={<Calendar className="h-5 w-5 text-primary opacity-40"/>} label="تاريخ الفتح" value={<span className="font-bold">{toFirestoreDate(transaction.createdAt) ? format(toFirestoreDate(transaction.createdAt)!, 'dd MMMM yyyy', { locale: ar }) : '-'}</span>} />
             </CardContent>
         </Card>
         
         <Tabs defaultValue="stages" dir="rtl" className="w-full">
             <div className="flex justify-center mb-8">
-                <TabsList className="bg-white/60 backdrop-blur-xl p-1.5 rounded-[2rem] border border-white shadow-2xl h-16 w-full max-w-3xl">
-                    <TabsTrigger value="stages" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">سير العمل الفني</TabsTrigger>
-                    <TabsTrigger value="boq" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">المقايسة (BOQ)</TabsTrigger>
-                    <TabsTrigger value="comments" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">المتابعة والردود</TabsTrigger>
-                    <TabsTrigger value="history" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">سجل الأحداث</TabsTrigger>
+                <TabsList className="bg-white/60 backdrop-blur-xl p-1.5 rounded-[2rem] border shadow-2xl h-16 w-full max-w-3xl">
+                    <TabsTrigger value="stages" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full">سير العمل (WBS)</TabsTrigger>
+                    <TabsTrigger value="boq" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full">المقايسة (BOQ)</TabsTrigger>
+                    <TabsTrigger value="history" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full">سجل الأحداث</TabsTrigger>
                 </TabsList>
             </div>
 
             <TabsContent value="stages" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
                     <CardHeader className="border-b bg-muted/5 p-8 px-10">
-                        <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
-                            <Workflow className='text-primary h-6 w-6'/> حالة مراحل الإنجاز الميداني (WBS)
-                        </CardTitle>
+                        <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'><Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الميداني</CardTitle>
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
-                        {(transaction.stages || []).map((stage) => {
-                            const isOccurrence = stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid';
-                            const isDuration = stage.trackingType === 'duration' || stage.trackingType === 'hybrid';
-                            const currentCount = stage.currentCount || 0;
-                            const maxCount = stage.maxOccurrences || 0;
-                            const progress = isOccurrence && maxCount > 0 ? (currentCount / maxCount) * 100 : 0;
-
-                            return (
-                                <div key={stage.stageId} className="flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent bg-muted/20 rounded-[2rem] hover:bg-white hover:border-primary/20 hover:shadow-md transition-all">
-                                    <div className="flex items-center gap-6">
-                                        <Badge variant="outline" className={cn("w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2", stageStatusColors[stage.status])}>
-                                            {stageStatusTranslations[stage.status]}
-                                        </Badge>
-                                        <div className="space-y-1">
-                                            <span className="font-black text-lg text-slate-800">{stage.name}</span>
-                                            {isDuration && stage.status === 'in-progress' && stage.expectedEndDate && (
-                                                <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1">
-                                                    <Clock className="h-3 w-3" /> التسليم المتوقع: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}
-                                                </p>
-                                            )}
-                                            {isOccurrence && (
-                                                <div className="flex items-center gap-3 mt-1">
-                                                    <p className="text-[10px] font-black text-orange-600 uppercase tracking-tighter">سجل العداد: {currentCount} / {maxCount}</p>
-                                                    {maxCount > 0 && <Progress value={progress} className="h-1.5 w-24" />}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4 mt-4 sm:mt-0">
-                                        {stage.status === 'pending' && <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 border-2 px-6"><Play className="ml-2 h-4 w-4"/> بدء العمل</Button>}
-                                        
-                                        {isOccurrence && stage.status === 'in-progress' && (
-                                            <Button size="sm" variant="outline" onClick={() => handleIncrementOccurrence(stage.stageId)} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 border-orange-200 text-orange-600 bg-white gap-2 shadow-sm">
-                                                <Plus className="h-4 w-4"/> تسجيل {stage.trackingType === 'hybrid' ? 'تعديل' : 'مرة'}
-                                            </Button>
-                                        )}
-                                        
-                                        {stage.status === 'in-progress' && (stage.trackingType !== 'occurrence' || currentCount >= maxCount) && (
-                                            <Button size="sm" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 text-white gap-2">
-                                                <Check className="ml-2 h-4 w-4"/> تأكيد الإنجاز النهائي
-                                            </Button>
-                                        )}
-                                        
-                                        {stage.status === 'completed' && (
-                                            <div className="flex items-center gap-2">
-                                                <CheckCircle2 className="h-8 w-8 text-green-600" />
-                                                {isAdmin && (
-                                                    <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-8 w-8 text-orange-400 hover:text-orange-600" title="تراجع عن الإغلاق (صلاحية المدير)">
-                                                        <Undo2 className="h-4 w-4" />
-                                                    </Button>
-                                                )}
-                                            </div>
+                        {(transaction.stages || []).map((stage) => (
+                            <div key={stage.stageId} className="flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent bg-muted/20 rounded-[2rem] hover:bg-white hover:border-primary/20 transition-all">
+                                <div className="flex items-center gap-6">
+                                    <Badge variant="outline" className={cn("w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2", stageStatusColors[stage.status])}>{stageStatusTranslations[stage.status]}</Badge>
+                                    <div className="space-y-1">
+                                        <span className="font-black text-lg text-slate-800">{stage.name}</span>
+                                        {stage.status === 'in-progress' && stage.expectedEndDate && (
+                                            <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1"><Clock className="h-3 w-3" /> التسليم المتوقع: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}</p>
                                         )}
                                     </div>
                                 </div>
-                            )
-                        })}
-                        {(!transaction.stages || transaction.stages.length === 0) && (
-                            <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] opacity-30">
-                                <AlertCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                                <p className="text-xl font-black">بانتظار تحديد مراحل العمل لهذه الخدمة.</p>
+                                <div className="flex items-center gap-4 mt-4 sm:mt-0">
+                                    {stage.status === 'pending' && <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 border-2 px-6"><Play className="ml-2 h-4 w-4"/> بدء العمل</Button>}
+                                    {stage.status === 'in-progress' && <Button size="sm" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 text-white gap-2"><Check className="ml-2 h-4 w-4"/> تأكيد الإنجاز</Button>}
+                                    {stage.status === 'completed' && isAdmin && <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-8 w-8 text-orange-400 hover:text-orange-600"><Undo2 className="h-4 w-4" /></Button>}
+                                    {stage.status === 'completed' && !isAdmin && <CheckCircle2 className="h-8 w-8 text-green-600" />}
+                                </div>
                             </div>
-                        )}
+                        ))}
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -382,40 +270,18 @@ export default function TransactionDetailPage() {
                 <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white p-10">
                     {transaction.boqId ? <LinkedBoqView boqId={transaction.boqId} /> : (
                         <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] bg-muted/5 space-y-6">
-                            <Package className="h-16 w-16 mx-auto text-muted-foreground opacity-30" />
-                            <p className="text-xl font-black text-slate-400">لا يوجد جدول كميات مرتبط حالياً.</p>
-                            <Button asChild className="rounded-2xl font-black px-12 h-12 shadow-xl shadow-primary/20">
-                                <Link href={`/dashboard/construction/boq/new?projectId=${transaction.id}&clientId=${clientId}`}>إنشاء مقايسة جديدة +</Link>
-                            </Button>
+                            <Package className="h-16 w-16 mx-auto opacity-30" />
+                            <p className="text-xl font-black text-slate-400">لا يوجد جدول كميات مرتبط.</p>
+                            <Button asChild className="rounded-2xl font-black px-12 h-12 shadow-xl shadow-primary/20"><Link href={`/dashboard/construction/boq/new?projectId=${transaction.id}&clientId=${clientId}`}>إنشاء مقايسة جديدة +</Link></Button>
                         </div>
                     )}
                 </Card>
-            </TabsContent>
-
-            <TabsContent value="comments" className="animate-in fade-in duration-500">
-                <TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="comment" showInput={true} title="ساحة المتابعة والردود" icon={<MessageSquare className="text-primary h-6 w-6" />} client={client} transaction={transaction} />
             </TabsContent>
 
             <TabsContent value="history" className="animate-in fade-in duration-500">
                 <TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="log" showInput={false} title="السجل الإجرائي التاريخي" icon={<History className='text-primary h-6 w-6'/>} client={client} transaction={transaction} />
             </TabsContent>
         </Tabs>
-
-        <Dialog open={isSignDialogOpen} onOpenChange={setIsSignDialogOpen}>
-            <DialogContent className="max-w-lg rounded-[2.5rem] border-none shadow-2xl p-10 bg-white" dir="rtl">
-                <DialogHeader className="mb-6">
-                    <DialogTitle className="text-2xl font-black flex items-center gap-3">
-                        <FileSignature className="text-primary h-7 w-7" /> توقيع المالك المعتمد
-                    </DialogTitle>
-                    <DialogDescription className="font-bold text-slate-500">سيتم دمج هذا التوقيع في العقد الرسمي والأرشفة الفنية.</DialogDescription>
-                </DialogHeader>
-                <SignaturePad onSave={handleSaveSignature} />
-                <div className="mt-6 p-4 bg-muted/20 rounded-2xl border border-dashed text-xs text-muted-foreground flex gap-2">
-                    <Info className="h-4 w-4 shrink-0" />
-                    <p>هذا التوقيع يعتبر موافقة نهائية من المالك على بنود المعاملة والمواصفات الفنية المذكورة.</p>
-                </div>
-            </DialogContent>
-        </Dialog>
     </div>
   );
 }

@@ -36,6 +36,7 @@ export interface WorkStage extends BaseEntity {
   trackingType: 'duration' | 'occurrence' | 'hybrid' | 'none';
   expectedDurationDays?: number;
   maxOccurrences?: number;
+  allowedRoles?: string[];
 }
 
 export interface TransactionStage {
@@ -463,4 +464,26 @@ export interface AuditLog extends BaseEntity {
     effectiveDate: Timestamp | any;
     changedBy: string;
     notes?: string;
+}
+
+export interface CustodyReconciliation extends BaseEntity {
+    reconciliationNumber: string;
+    employeeId: string;
+    employeeName: string;
+    date: Timestamp | any;
+    totalAmount: number;
+    items: Array<{
+        description: string;
+        amount: number;
+        projectId?: string | null;
+        projectName?: string | null;
+        clientId?: string | null;
+        clientName?: string | null;
+        attachmentUrls: string[];
+        category?: string;
+        categoryName?: string;
+    }>;
+    status: 'pending' | 'approved' | 'rejected';
+    notes?: string;
+    journalEntryId?: string;
 }

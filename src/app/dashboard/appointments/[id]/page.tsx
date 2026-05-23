@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
 import type { Appointment, Client, WorkStage, ClientTransaction, AppointmentAuditLog, TransactionStage } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,20 +35,20 @@ export default function AppointmentDetailsPage() {
 
     const tenantId = currentUser?.currentCompanyId;
 
-    const apptPath = useMemo(() => id ? `appointments/${id}` : null, [id]);
+    const apptPath = useMemo(() => id && tenantId ? getTenantPath(`appointments/${id}`, tenantId) : null, [id, tenantId]);
     const { data: appointment, loading: apptLoading } = useDocument<Appointment>(firestore, apptPath);
     
-    const auditPath = useMemo(() => id ? `appointments/${id}/auditLogs` : null, [id]);
+    const auditPath = useMemo(() => id && tenantId ? getTenantPath(`appointments/${id}/auditLogs`, tenantId) : null, [id, tenantId]);
     const { data: auditLogs, loading: auditLoading } = useSubscription<AppointmentAuditLog>(
         firestore, 
         auditPath, 
         [orderBy('createdAt', 'desc')]
     );
 
-    const clientPath = useMemo(() => appointment?.clientId ? `clients/${appointment.clientId}` : null, [appointment?.clientId]);
+    const clientPath = useMemo(() => appointment?.clientId && tenantId ? getTenantPath(`clients/${appointment.clientId}`, tenantId) : null, [appointment?.clientId, tenantId]);
     const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
     
-    const transactionPath = useMemo(() => (appointment?.clientId && appointment?.transactionId) ? `clients/${appointment.clientId}/transactions/${appointment.transactionId}` : null, [appointment]);
+    const transactionPath = useMemo(() => (appointment?.clientId && appointment?.transactionId && tenantId) ? getTenantPath(`clients/${appointment.clientId}/transactions/${appointment.transactionId}`, tenantId) : null, [appointment, tenantId]);
     const { data: transaction } = useDocument<ClientTransaction>(firestore, transactionPath);
 
     const [selectedStageId, setSelectedStageId] = useState('');
@@ -78,33 +78,30 @@ export default function AppointmentDetailsPage() {
                 const stage = currentStages[stageIdx];
                 const now = new Date();
 
-                // ✨ منطق التحديث الهجين / المتعدد ✨
+                // ✨ محرك التحديث الهجين / المتعدد ✨
                 if (stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') {
                     const newCount = (stage.currentCount || 0) + 1;
                     stage.currentCount = newCount;
                     
-                    // إذا كان تتبع عددي بحت، نغلق عند الحد
                     if (stage.trackingType === 'occurrence' && stage.maxOccurrences && newCount >= stage.maxOccurrences) {
                         stage.status = 'completed';
                         stage.endDate = now;
                     } else {
-                        // في المسار الهجين أو إذا لم يصل للحد، يبقى قيد التنفيذ
                         stage.status = 'in-progress';
                     }
                 } else {
-                    // المسار الزمني أو العادي يغلق فوراً عند التوثيق من الزيارة
                     stage.status = 'completed';
                     stage.endDate = now;
                 }
                 
-                // ✨ ذكاء التبعية: تفعيل المرحلة التالية آلياً إذا أغلقت الحالية ✨
+                // ✨ ذكاء التبعية (WBS Chain Progression) ✨
                 if (stage.status === 'completed') {
                     const nextStage = currentStages.find(s => s.order === stage.order + 1);
                     if (nextStage && nextStage.status === 'pending') {
                         nextStage.status = 'in-progress';
                         nextStage.startDate = now;
-                        if ((nextStage.trackingType === 'duration' || nextStage.trackingType === 'hybrid') && (nextStage as any).expectedDurationDays) {
-                            const expEnd = new Date(now.getTime() + (nextStage as any).expectedDurationDays * 24 * 60 * 60 * 1000);
+                        if (nextStage.expectedDurationDays) {
+                            const expEnd = new Date(now.getTime() + nextStage.expectedDurationDays * 24 * 60 * 60 * 1000);
                             nextStage.expectedEndDate = expEnd;
                         }
                     }
@@ -122,12 +119,12 @@ export default function AppointmentDetailsPage() {
                     batch.update(txRef, { 'contract.clauses': updatedClauses });
                 }
 
-                batch.update(txRef, { stages: currentStages, status: 'in-progress', updatedAt: serverTimestamp() });
+                batch.update(txRef, { stages: currentStages, updatedAt: serverTimestamp() });
                 
                 const timelineRef = doc(collection(txRef, 'timelineEvents'));
                 batch.set(timelineRef, {
                     type: 'comment', 
-                    content: `**[محضر زيارة]**\nتم تسجيل إنجاز في مرحلة: ${stage.name}${isOccurrenceOrHybrid(stage.trackingType) ? ` (المرة رقم ${stage.currentCount})` : ''}\n\n**ملاحظات المهندس:**\n${notes}${financeComment}`, 
+                    content: `**[محضر زيارة]**\nتم تسجيل إنجاز في مرحلة: ${stage.name}${stage.trackingType === 'occurrence' ? ` (المرة رقم ${stage.currentCount})` : ''}\n\n**ملاحظات المهندس:**\n${notes}${financeComment}`, 
                     userId: currentUser.id, 
                     userName: currentUser.fullName, 
                     userAvatar: currentUser.avatarUrl,
@@ -162,8 +159,6 @@ export default function AppointmentDetailsPage() {
             toast({ variant: 'destructive', title: 'خطأ في التوثيق' }); 
         } finally { setIsSaving(false); }
     };
-
-    const isOccurrenceOrHybrid = (type: string) => type === 'occurrence' || type === 'hybrid';
 
     if (apptLoading || clientLoading) return <div className="p-8 max-w-2xl mx-auto"><Skeleton className="h-[500px] w-full rounded-[3.5rem]" /></div>;
     if (!appointment) return <div className="p-20 text-center font-black opacity-30">الزيارة غير موجودة.</div>;
@@ -244,7 +239,7 @@ export default function AppointmentDetailsPage() {
                                                 onSelect={setSelectedStageId} 
                                                 options={enrichedStages.map(s => ({ 
                                                     value: s.stageId, 
-                                                    label: `${s.name} ${isOccurrenceOrHybrid(s.trackingType) ? `(المرة ${ (s.currentCount || 0) + 1 })` : ''}` 
+                                                    label: `${s.name} ${s.trackingType === 'occurrence' ? `(المرة ${ (s.currentCount || 0) + 1 })` : ''}` 
                                                 }))} 
                                                 placeholder="ابحث عن مرحلة الإنجاز المخططة..." 
                                                 className="h-12 bg-white rounded-2xl border-2"
@@ -288,24 +283,6 @@ export default function AppointmentDetailsPage() {
                                                     : "يرجى ربط هذه الزيارة بإحدى المعاملات المفتوحة لهذا العميل لتتمكن من تحديث مراحل الإنجاز."}
                                             </AlertDescription>
                                         </Alert>
-                                        
-                                        <div className="flex flex-col gap-4">
-                                            {isProspective ? (
-                                                <Button asChild className="h-16 rounded-[2rem] font-black text-2xl gap-4 shadow-2xl bg-[#FF7A00] text-white">
-                                                    <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName || '')}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&fromAppointmentId=${appointment.id}&engineerId=${appointment.engineerId}`}>
-                                                        <UserPlus className="h-8 w-8" />
-                                                        تحويل لملف عميل رسمي الآن
-                                                    </Link>
-                                                </Button>
-                                            ) : (
-                                                <Button asChild variant="outline" className="h-16 rounded-[2rem] font-black text-2xl gap-4 border-4 border-primary text-primary hover:bg-primary/5 shadow-xl">
-                                                    <Link href={`/dashboard/clients/${appointment.clientId}`}>
-                                                        <Link2 className="h-8 w-8" />
-                                                        ربط الزيارة بمعاملة حالية
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                        </div>
                                     </div>
                                 )}
                             </TabsContent>
