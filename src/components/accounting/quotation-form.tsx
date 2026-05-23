@@ -11,9 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { 
     Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, 
     Calculator, Ruler, Building2, Layers,
-    GripVertical,
     Sparkles,
-    AlertTriangle
+    Target
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import type { Client, Quotation, ContractTemplate, SubService, TransactionType } from '@/lib/types';
@@ -22,21 +21,13 @@ import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/uti
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { collection, getDocs, query, orderBy, where, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where, limit, doc } from 'firebase/firestore';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
 import { Separator } from '../ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
-
-// --- dnd-kit Imports ---
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-} from '@radix-ui/react-context'; // Note: simplified placeholder, using standard dnd logic below
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -47,7 +38,6 @@ const itemSchema = z.object({
   quantity: z.preprocess((v) => parseFloat(String(v || '1')), z.number().min(0.01)),
   unitPrice: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)),
   percentage: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)).optional(),
-  total: z.number().optional(),
 });
 
 const layoutBlockSchema = z.object({
@@ -62,16 +52,13 @@ const quotationSchema = z.object({
   subject: z.string().min(1, 'الموضوع مطلوب.'),
   date: z.date({ required_error: "التاريخ مطلوب." }),
   validUntil: z.date({ required_error: "تاريخ الانتهاء مطلوب." }),
-  
   transactionTypeId: z.string().min(1, "الخدمة الرئيسية مطلوبة"),
   subServiceId: z.string().min(1, "الخدمة التفصيلية مطلوبة"),
-  
   totalArea: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
   basementType: z.enum(['none', 'full', 'half', 'vault']).default('none'),
   floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
   roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
   workNature: z.enum(['labor_only', 'with_materials']).default('labor_only'),
-  
   layoutBlocks: z.array(layoutBlockSchema).default([]),
   items: z.array(itemSchema).min(1, 'يجب إضافة بند مالي واحد على الأقل.'),
   financialsType: z.enum(['fixed', 'percentage']),
@@ -80,7 +67,7 @@ const quotationSchema = z.object({
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
 
-const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
+const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
 export function QuotationForm({ onSave, onClose, initialData = null, isSaving = false }: any) {
   const { firestore } = useFirebase();
@@ -110,25 +97,20 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         basementType: 'none',
         roofExtension: 'none',
         workNature: 'labor_only',
-        layoutBlocks: [
-            { id: 'initial-table', type: 'financial_table' }
-        ],
+        layoutBlocks: [{ id: 'initial-table', type: 'financial_table' }],
         items: [{ id: generateId(), description: 'الدفعة الأولى', triggerCondition: '', quantity: 1, unitPrice: 0 }]
     }
   });
 
-  const { fields: itemFields, append: appendItem, remove: removeItem, replace: replaceItems } = useFieldArray({ control, name: 'items' });
-  const { fields: blockFields, append: appendBlock, remove: removeBlock } = useFieldArray({ control, name: 'layoutBlocks' });
+  const { fields: itemFields, replace: replaceItems, append: appendItem, remove: removeItem } = useFieldArray({ control, name: 'items' });
+  const { fields: blockFields, replace: replaceBlocks, append: appendBlock, remove: removeBlock } = useFieldArray({ control, name: 'layoutBlocks' });
 
   const watchedItems = useWatch({ control, name: "items" });
   const financials_type = watch("financialsType");
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
-  /**
-   * ✨ محرك جلب البيانات القديمة (The Sovereign Edit Engine) ✨
-   * يضمن سحب كافة البيانات عند التعديل وتصفير الحالة (Reset)
-   */
+  // ✨ محرك حقن البيانات التاريخية الصارم (Sovereign Data Injection) ✨
   useEffect(() => {
     if (initialData) {
         const formattedData = {
@@ -145,6 +127,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                 quantity: Number(item.quantity) || 1,
                 unitPrice: Number(item.unitPrice) || 0,
                 percentage: Number(item.percentage) || 0,
+                triggerCondition: item.triggerCondition || '',
             })),
             layoutBlocks: initialData.layoutBlocks && initialData.layoutBlocks.length > 0 
                 ? initialData.layoutBlocks 
@@ -153,21 +136,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         reset(formattedData);
     }
   }, [initialData, reset]);
-
-  const totalCalculatedValue = useMemo(() => {
-    const items = watchedItems || [];
-    if (financials_type === 'fixed') {
-        return items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
-    } else {
-        return items.reduce((sum, item) => sum + (Number(item.percentage) || 0), 0);
-    }
-  }, [watchedItems, financials_type]);
-
-  useEffect(() => {
-    if (financials_type === 'fixed') {
-        setValue('totalAmount', totalCalculatedValue);
-    }
-  }, [totalCalculatedValue, financials_type, setValue]);
 
   useEffect(() => {
     if (!firestore || !tenantId) return;
@@ -222,6 +190,15 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       fetchStages();
   }, [selectedSubServiceId, selectedTransactionTypeId, firestore, tenantId]);
 
+  const totalCalculatedValue = useMemo(() => {
+    const items = watchedItems || [];
+    if (financials_type === 'fixed') {
+        return items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
+    } else {
+        return items.reduce((sum, item) => sum + (Number(item.percentage) || 0), 0);
+    }
+  }, [watchedItems, financials_type]);
+
   const handleTemplateSelect = (templateId: string) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
@@ -249,6 +226,14 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
   const templateOptions = useMemo(() => allTemplates.map(t => ({ value: t.id!, label: t.title })), [allTemplates]);
   const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.id!, label: t.name })), [transactionTypes]);
+
+  // 🛡️ محرك الخيارات الاحتياطية لضمان ظهور النص المسحوب فوراً 🛡️
+  const wbsOptionsForItems = useMemo(() => {
+      const currentValues = (watchedItems || []).map(i => i.triggerCondition).filter(Boolean);
+      const existingValues = new Set(specificWorkStages.map(s => s.value));
+      const fallbacks = currentValues.filter(v => !existingValues.has(v)).map(v => ({ value: v, label: v }));
+      return [...specificWorkStages, ...fallbacks];
+  }, [specificWorkStages, watchedItems]);
 
   return (
     <form onSubmit={handleSubmit(onSave)} className="space-y-6 pb-20">
@@ -281,11 +266,9 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       </div>
 
       <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-             <h3 className="text-sm font-black text-[#1e1b4b] flex items-center gap-2">
-                <Layers className="h-4 w-4 text-indigo-600" /> المواصفات والمسار الفني
-            </h3>
-          </div>
+          <h3 className="text-sm font-black text-[#1e1b4b] flex items-center gap-2 px-1">
+              <Layers className="h-4 w-4 text-indigo-600" /> المواصفات والمسار الفني
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-5 rounded-[2rem] border-2 border-slate-100 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 right-0 w-1 h-full bg-indigo-500/20" />
               <div className="grid gap-1">
@@ -310,8 +293,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
               <div className="grid grid-cols-4 gap-2 md:col-span-2 pt-2 border-t border-dashed">
                 <div className="grid gap-0.5"><Label className="text-[8px] font-black text-slate-400">المساحة</Label><Input type="number" {...register('totalArea')} className="h-8 font-black text-center text-indigo-600 text-xs" /></div>
                 <div className="grid gap-0.5"><Label className="text-[8px] font-black text-slate-400">الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-8 font-black text-center text-xs" /></div>
-                <div className="grid gap-0.5"><Label className="text-[8px] font-black text-slate-400">السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-8 font-bold text-xs"><SelectValue /></SelectTrigger><SelectContent dir="rtl" className="text-xs"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
-                <div className="grid gap-0.5"><Label className="text-[8px] font-black text-slate-400">السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-8 font-bold text-xs"><SelectValue /></SelectTrigger><SelectContent dir="rtl" className="text-xs"><SelectItem value="none">بدون</SelectItem><SelectItem value="full">كامل</SelectItem><SelectItem value="half">نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
+                <div className="grid gap-0.5"><Label className="text-[8px] font-black text-slate-400">السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-8 font-bold text-xs"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
+                <div className="grid gap-0.5"><Label className="text-[8px] font-black text-slate-400">السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-8 font-bold text-xs"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">بدون</SelectItem><SelectItem value="full">كامل</SelectItem><SelectItem value="half">نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
               </div>
           </div>
       </div>
@@ -360,7 +343,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                   <Table className="table-fixed">
                                       <TableHeader className="bg-slate-50 h-8">
                                         <TableRow className="border-none">
-                                            <TableHead className="w-20 text-center font-black text-[9px] text-slate-400 border-l border-white/20">رقم الدفعة</TableHead>
+                                            <TableHead className="w-20 text-center font-black text-[9px] text-slate-400 border-l border-white/20">#</TableHead>
                                             <TableHead className="px-4 font-black text-[9px] text-slate-400 text-right">شرط الاستحقاق (WBS)</TableHead>
                                             <TableHead className="text-center font-black text-[9px] text-slate-400 w-40">
                                                 {financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
@@ -374,7 +357,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                   <TableCell className="text-center bg-slate-50/30 border-l"><Badge variant="secondary" className="font-black text-[8px] px-2 h-5 rounded-full bg-white text-slate-400 border">{itemIdx + 1}</Badge></TableCell>
                                                   <TableCell className="px-4">
                                                       <Controller control={control} name={`items.${itemIdx}.triggerCondition`} render={({ field: condField }) => (
-                                                          <InlineSearchList value={condField.value} onSelect={condField.onChange} options={specificWorkStages} placeholder="اربط بمرحلة..." className="font-bold text-xs border-dashed border-primary/20 text-primary h-7" />
+                                                          <InlineSearchList value={condField.value} onSelect={condField.onChange} options={wbsOptionsForItems} placeholder="اربط بمرحلة..." className="font-bold text-xs border-dashed border-primary/20 text-primary h-7" />
                                                       )} />
                                                   </TableCell>
                                                   <TableCell className="bg-primary/[0.01] border-r border-slate-50">
@@ -417,7 +400,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
             className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl flex-1 gap-3 transition-all hover:scale-[1.01] bg-[#7209B7] text-white border-none"
           >
               {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-              اعتماد وإرسال العرض المالي
+              اعتماد وحفظ العرض المالي
           </Button>
       </DialogFooter>
     </form>

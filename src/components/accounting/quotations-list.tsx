@@ -61,14 +61,14 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   
   const [itemToDelete, setItemToDelete] = useState<Quotation | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const tenantId = currentUser?.currentCompanyId;
 
-  const quotationsQueryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
-  const { data: quotations, loading } = useSubscription<Quotation>(firestore, 'quotations', quotationsQueryConstraints);
+  const { data: quotations, loading } = useSubscription<Quotation>(firestore, 'quotations', [orderBy('date', 'desc')]);
 
   const filteredQuotations = useMemo(() => {
     let results = quotations.filter(quotation => {
@@ -213,3 +213,5 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
     </div>
   );
 }
+
+import { useRouter } from 'next/navigation';

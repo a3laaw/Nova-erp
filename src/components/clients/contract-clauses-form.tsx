@@ -89,12 +89,12 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const tenantId = currentUser?.currentCompanyId;
   const [isSaving, setIsSaving] = useState(false);
   
-  // 🛡️ المواصفات الفنية (Specs)
+  // 🛡️ المواصفات الفنية المزامنة (Specs)
   const [specs, setSpecs] = useState<any>({
       totalArea: 0, floorsCount: 1, basementType: 'none', roofExtension: 'none', workNature: 'labor_only'
   });
 
-  // 💰 البيانات المالية والدفعات
+  // 💰 البيانات المالية المزامنة
   const [financials, setFinancials] = useState<any>({ 
       type: 'fixed', totalAmount: 0, milestones: [] 
   });
@@ -103,12 +103,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // ✨ محرك المزامنة الصفرية المطلق (Zero-Click Hard-Wired Sync) ✨
+  // ✨ محرك المزامنة الصفرية المطلق (Hard-Wired Pre-emptive Sync) ✨
+  // يعمل فوراً عند توفر البيانات لضمان عدم ظهور حقول فارغة
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
         
-        // 1. مزامنة المواصفات
+        // 1. مزامنة المواصفات الإنشائية
         setSpecs({
             totalArea: Number(q.totalArea || q.contract?.specs?.totalArea) || 0,
             floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount) || 1,
@@ -117,7 +118,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             workNature: q.workNature || q.contract?.specs?.workNature || 'labor_only'
         });
 
-        // 2. مزامنة الدفعات والنسب والروابط الميدانية
+        // 2. مزامنة الدفعات والروابط الميدانية (ترجمة triggerCondition -> condition)
         const type = q.financialsType || q.contract?.financialsType || 'fixed';
         const rawItems = q.items || q.contract?.clauses || [];
         
@@ -127,7 +128,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                condition: item.triggerCondition || item.condition || '', 
+                condition: item.triggerCondition || item.condition || '', // ⚡ المفتاح السحري للمزامنة
                 value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
             }))
         });
@@ -154,7 +155,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     fetchRefData();
   }, [isOpen, firestore, tenantId]);
 
-  // محرك الخيارات الاحتياطية لضمان ظهور النص المسحوب
+  // محرك الخيارات الاحتياطية لضمان ظهور النص المسحوب (WBS Fallback)
   const wbsOptions = useMemo(() => {
       const currentValues = financials.milestones.map((m: any) => m.condition).filter(Boolean);
       const existingValues = new Set(fetchedStages.map(s => s.value));
