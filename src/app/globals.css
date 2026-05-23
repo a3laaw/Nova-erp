@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 @import "react-day-picker/dist/style.css";
 @tailwind base;
@@ -59,10 +58,43 @@
     border: 1px solid rgba(255, 122, 0, 0.1);
     box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
   }
+  
+  /* 🌟 محرك الأنيميشن الذهبي 🌟 */
+  .gold-glow-filter {
+    background: radial-gradient(circle, rgba(255,122,0,0.2) 0%, rgba(255,253,240,0) 70%);
+    filter: blur(20px);
+  }
+
+  .animate-spin-glow {
+    animation: spin-glow 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  .animate-gold-reverse {
+    animation: gold-pulse 4s ease-in-out infinite reverse;
+  }
+
+  .animate-float-slow {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes spin-glow {
+    0% { transform: rotate(0deg); border-top-color: #FF7A00; }
+    50% { border-top-color: #FFB000; }
+    100% { transform: rotate(360deg); border-top-color: #FF7A00; }
+  }
+
+  @keyframes gold-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.5); opacity: 0.6; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+  }
 }
 
-/* 🛡️ محرك فرض الاستجابة والجمالية للقوائم (Enhanced Selection UI) 🛡️ */
-
+/* 🛡️ محرك فرض الاستجابة والجمالية للقوائم 🛡️ */
 body[style*="pointer-events: none"] {
   pointer-events: auto !important;
 }

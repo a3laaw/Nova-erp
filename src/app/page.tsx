@@ -14,7 +14,9 @@ import {
     ArrowRight,
     User,
     Building2,
-    Sparkles
+    Sparkles,
+    RefreshCcw,
+    LogOut
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -26,10 +28,10 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * شعار نوفا المعتمد (NOVA Text Logo):
- * تمركز مطلق وتصميم خفيف.
+ * تمركز مطلق وتصميم خفيف مع نبض.
  */
 const NovaLogo = () => (
-  <svg width="100" height="40" viewBox="0 0 100 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="120" height="60" viewBox="0 0 100 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
     <text 
       x="50%" 
       y="55%" 
@@ -37,8 +39,9 @@ const NovaLogo = () => (
       textAnchor="middle" 
       fontFamily="inherit" 
       fontWeight="900" 
-      fontSize="32" 
+      fontSize="36" 
       fill="#FF7A00"
+      style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
     >
       NOVA
     </text>
@@ -46,7 +49,7 @@ const NovaLogo = () => (
 );
 
 export default function LoginPage() {
-  const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
+  const { login, resetPassword, user, logout, loading: globalLoading, error: authError } = useAuth();
   const { firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
@@ -103,17 +106,35 @@ export default function LoginPage() {
 
   if (globalLoading && !isSubmitting) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
-          <div className="relative flex items-center justify-center w-48 h-48">
-              {/* الدائرة المتوهجة الخفيفة */}
-              <div className="absolute inset-0 rounded-full border-2 border-slate-100 border-t-[#FF7A00] animate-spin-glow" />
-              
-              <div className="absolute h-24 w-24 gold-glow-filter animate-gold-reverse rounded-full" />
-              
-              <div className="relative z-10">
-                  <NovaLogo />
+      <div className="min-h-screen flex flex-col items-center justify-center gap-12 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
+          {/* هالات خلفية طافية */}
+          <div className="absolute top-20 right-20 w-64 h-64 bg-orange-100/30 rounded-full blur-[80px] animate-float-slow" />
+          <div className="absolute bottom-20 left-20 w-80 h-80 bg-orange-200/20 rounded-full blur-[100px] animate-float-slow" style={{ animationDelay: '2s' }} />
+
+          <div className="relative flex flex-col items-center justify-center">
+              {/* 🌟 محرك الحلقة الدوارة المطور 🌟 */}
+              <div className="relative flex items-center justify-center w-56 h-56">
+                  <div className="absolute inset-0 rounded-full border-[3px] border-slate-100 border-t-[#FF7A00] animate-spin-glow shadow-[0_0_15px_rgba(255,122,0,0.1)]" />
+                  
+                  {/* الهالة الذهبية الخفيفة */}
+                  <div className="absolute h-32 w-32 gold-glow-filter animate-gold-reverse rounded-full" />
+                  
+                  {/* الشعار المتمركز تماماً */}
+                  <div className="relative z-10 scale-110">
+                      <NovaLogo />
+                  </div>
               </div>
-              <p className="absolute -bottom-16 text-[#1e1b4b] font-black text-xl tracking-tighter">جاري التحميل...</p>
+              
+              <div className="mt-12 text-center space-y-4">
+                  <div className="flex items-center justify-center gap-2">
+                      <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري التحميل</p>
+                      <span className="flex gap-1 pt-2">
+                          <span className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                          <span className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                          <span className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                      </span>
+                  </div>
+              </div>
           </div>
       </div>
     );
