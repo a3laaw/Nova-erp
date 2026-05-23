@@ -88,8 +88,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const { toast } = useToast();
   const router = useRouter();
 
+  const tenantId = currentUser?.currentCompanyId;
   const [isSaving, setIsSaving] = useState(false);
-  const [financials, setFinancials] = useState<any>({ type: 'fixed', totalAmount: 0, milestones: [] });
+  
+  // 🛡️ المواصفات الفنية (Specs) 🛡️
   const [specs, setSpecs] = useState<any>({
       totalArea: 0,
       floorsCount: 1,
@@ -97,18 +99,22 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       roofExtension: 'none',
       workNature: 'labor_only'
   });
+
+  // 💰 البيانات المالية والدفعات (Financials) 💰
+  const [financials, setFinancials] = useState<any>({ 
+      type: 'fixed', 
+      totalAmount: 0, 
+      milestones: [] 
+  });
   
   const [referenceData, setReferenceData] = useState<{ stages: { value: string, label: string }[] }>({ stages: [] });
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  const tenantId = currentUser?.currentCompanyId;
-
-  // 🛡️ محرك المزامنة الفورية الجذري (Zero-Latency Direct Mapping)
-  // يضمن نقل كافة الحقول من عرض السعر إلى العقد لحظة الفتح
+  // 🛡️ محرك المزامنة الفورية الجذري (Zero-Latency Direct Mapping) 🛡️
+  // يضمن نقل كافة الحقول من عرض السعر إلى العقد لحظة الفتح بدقة ميكانيكية
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
-        // التحقق مما إذا كان المدخل هو عرض سعر (Quotation) أو معاملة بها عقد
         const q = transaction as any;
         
         // 1. مزامنة المواصفات الفنية (Specifications Sync)
@@ -166,7 +172,17 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     (financials.milestones || []).reduce((sum: number, m: any) => sum + (Number(m.value) || 0), 0)
   , [financials.milestones]);
 
-  const handleSaveContract = async () => {
+  useEffect(() => {
+    if (financials.type === 'fixed') {
+        setFinancials((prev: any) => ({ ...prev, totalAmount: currentTotalInput }));
+    }
+  }, [currentTotalInput, financials.type]);
+
+  /**
+   * دالة الاعتماد النهائي (handleSubmit):
+   * تقوم بتحويل البيانات إلى عقد رسمي وتوليد القيد المحاسبي.
+   */
+  const handleSubmit = async () => {
     if (!firestore || !currentUser || !clientId || isSaving || !tenantId) return;
     
     if (financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01) {
@@ -252,7 +268,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         onClose();
         router.push(`/dashboard/construction/projects/new?clientId=${clientId}&transactionId=${newTxId}`);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ', description: e.message });
+        toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: e.message });
     } finally { setIsSaving(false); }
   };
 
@@ -261,7 +277,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       <DialogContent 
         className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl bg-white" 
         dir="rtl"
-        // 🛡️ السر التقني: تحرير ملامس الماوس للقوائم المنسدلة 🛡️
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
@@ -340,7 +355,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                             <Select value={financials.type} onValueChange={v => setFinancials({...financials, type: v, milestones: []})}>
                                 <SelectTrigger className="w-44 h-10 rounded-xl border-none bg-white font-black text-primary shadow-md"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl" className="rounded-xl">
-                                    <SelectItem value="fixed">مبالغ ثابتة (KD)</SelectItem>
+                                    <SelectItem value="fixed">مبلغ ثابت (KD)</SelectItem>
                                     <SelectItem value="percentage">نسب مئوية (%)</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -351,8 +366,9 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                     <Input 
                                         type="number" 
                                         value={financials.totalAmount} 
+                                        readOnly={financials.type === 'fixed'}
                                         onChange={e => setFinancials({...financials, totalAmount: Number(e.target.value)})} 
-                                        className="w-32 h-10 border-none text-center font-black text-xl text-primary rounded-xl shadow-md bg-white"
+                                        className={cn("w-32 h-10 border-none text-center font-black text-xl text-primary rounded-xl shadow-md bg-white")} 
                                     />
                                 </div>
                             )}
@@ -439,8 +455,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
         <DialogFooter className="p-10 border-t bg-slate-50 flex flex-col md:flex-row justify-between items-center gap-8 shrink-0">
             <div className="text-right space-y-1">
-                <p className="text-base font-black text-primary flex items-center gap-3">
-                    <ShieldCheck className="h-6 w-6 animate-pulse"/> سيتم إنشاء قيد مديونية آلي بـ {financials.type === 'fixed' ? formatCurrency(currentTotalInput) : formatCurrency(financials.totalAmount)}
+                <p className="text-sm font-black text-primary flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 animate-pulse"/> سيتم إنشاء قيد مديونية آلي بـ {financials.type === 'fixed' ? formatCurrency(currentTotalInput) : formatCurrency(financials.totalAmount)}
                 </p>
                 <p className="text-[11px] text-muted-foreground font-bold pr-9">الاعتماد النهائي يغير حالة العميل آلياً ويبدأ دورة التنفيذ الميداني للمشاريع.</p>
             </div>
@@ -460,4 +476,3 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     </Dialog>
   );
 }
-
