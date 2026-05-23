@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -37,6 +38,14 @@ import {
   AlertCircle,
   X
 } from 'lucide-react';
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useFirebase } from '@/firebase';
 import { 
   doc, 
@@ -52,15 +61,13 @@ import {
   getDoc 
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/auth-context';
 import type { Client, ClientTransaction, Account, Quotation } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
 import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { InlineSearchList } from '../ui/inline-search-list';
-import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/context/auth-context';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -94,6 +101,9 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [referenceData, setReferenceData] = useState<{ stages: { value: string, label: string }[] }>({ stages: [] });
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
+
+  // 🛡️ تحديد المنشأة (Tenant ID)
+  const tenantId = currentUser?.currentCompanyId;
 
   // 1. ✨ محرك المزامنة الفورية الجبار (Quotation-to-Contract Power Sync)
   useEffect(() => {
@@ -148,12 +158,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
   // 2. ✨ جلب قائمة مراحل العمل لتمكين ربط الدفعات بالمسار الميداني (WBS Link)
   useEffect(() => {
-    if (!isOpen || !firestore || !currentUser?.currentCompanyId) return;
+    if (!isOpen || !firestore || !tenantId) return;
     
     const fetchRefData = async () => {
       setIsRefLoading(true);
       try {
-        const tenantId = currentUser.currentCompanyId;
         const stagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages'), where('companyId', '==', tenantId)));
         const stages = Array.from(new Map(stagesSnap.docs.map(doc => {
             const name = doc.data().name;
@@ -165,7 +174,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     };
     
     fetchRefData();
-  }, [isOpen, firestore, currentUser]);
+  }, [isOpen, firestore, tenantId]);
 
   // حساب المجموع اللحظي (للتأكد من توازن النسب أو المبالغ)
   const currentTotalInput = useMemo(() => 
@@ -173,11 +182,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   , [financials.milestones]);
 
   const handleSubmit = async () => {
-    if (!firestore || !currentUser || !clientId || isSaving) return;
+    if (!firestore || !currentUser || !clientId || isSaving || !tenantId) return;
     
     // التحقق من توازن النسب المئوية
     if (financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01) {
-        toast({ variant: 'destructive', title: 'خطأ في النسب', description: 'يجب أن يكون مجموع نسب الدفعات 100% بالضبط.' });
+        toast({ variant: 'destructive', title: 'خلل في التوزيع', description: 'يجب أن يكون مجموع نسب الدفعات 100% بالضبط لضمان دقة القيد المالي.' });
         return;
     }
 
@@ -186,7 +195,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         let newTxId = '';
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
-            const tenantId = currentUser.currentCompanyId!;
             
             const coaPath = getTenantPath('chartOfAccounts', tenantId);
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
@@ -337,9 +345,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         </h3>
                         <div className="flex items-center gap-4">
                             <Label className="text-xs font-bold text-slate-500">نظام الدفع:</Label>
-                            <Badge variant="outline" className="bg-white border-primary/20 text-primary font-black px-4 h-8 rounded-xl shadow-sm">
-                                {financials.type === 'percentage' ? 'نسب مئوية %' : 'مبالغ ثابتة KD'}
-                            </Badge>
+                            <Select value={financials.type} onValueChange={v => setFinancials({...financials, type: v, milestones: []})}>
+                                <SelectTrigger className="w-48 h-9 rounded-xl border-none bg-white font-black text-primary shadow-md"><SelectValue /></SelectTrigger>
+                                <SelectContent dir="rtl">
+                                    <SelectItem value="fixed">مبالغ ثابتة (KD)</SelectItem>
+                                    <SelectItem value="percentage">نسب مئوية (%)</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
 
@@ -377,7 +389,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                                 type="number" step="any" 
                                                 value={m.value} 
                                                 onChange={e => { const newM = [...financials.milestones]; newM[i].value = parseFloat(e.target.value) || 0; setFinancials({...financials, milestones: newM}); }} 
-                                                className="text-center font-black text-2xl text-primary border-none shadow-none focus-visible:ring-0 font-mono" 
+                                                className="text-center font-black text-2xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono" 
                                             />
                                         </TableCell>
                                         <TableCell>
