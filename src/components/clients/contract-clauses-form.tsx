@@ -60,6 +60,7 @@ import { Separator } from '../ui/separator';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -168,7 +169,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
   // حساب المجموع اللحظي (للتأكد من توازن النسب أو المبالغ)
   const currentTotalInput = useMemo(() => 
-    financials.milestones.reduce((sum: number, m: any) => sum + (Number(m.value) || 0), 0)
+    (financials.milestones || []).reduce((sum: number, m: any) => sum + (Number(m.value) || 0), 0)
   , [financials.milestones]);
 
   const handleSubmit = async () => {
@@ -187,18 +188,15 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const currentYear = new Date().getFullYear();
             const tenantId = currentUser.currentCompanyId!;
             
-            // 🛡️ جلب الحسابات المالية (إيرادات وعملاء)
             const coaPath = getTenantPath('chartOfAccounts', tenantId);
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
             const clientAccSnap = await getDocs(query(collection(firestore, coaPath!), where('name', '==', clientName), limit(1)));
             
-            // 🛡️ عداد القيود المحاسبية
             const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
             const jeCounterRef = doc(firestore, jeCounterPath!);
             const jeCounterDoc = await transaction_fs.get(jeCounterRef);
             const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
 
-            // تجهيز بنود العقد النهائية مع تحويل النسب لمبالغ ثابتة للحسابات
             const finalClauses = financials.milestones.map((m: any) => {
                 const amount = financials.type === 'percentage' ? (m.value / 100) * financials.totalAmount : m.value;
                 return { id: m.id, name: m.name, condition: m.condition, amount, status: 'غير مستحقة', percentage: m.value };
@@ -207,7 +205,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const totalAmount = financials.type === 'fixed' ? currentTotalInput : financials.totalAmount;
             const contractData = { clauses: finalClauses, totalAmount, financialsType: financials.type, specs };
 
-            // تحديث ملف العميل وفتح المعاملة
             const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
             const clientRef = doc(firestore, clientPath!);
             const clientSnap = await transaction_fs.get(clientRef);
@@ -232,7 +229,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             
             transaction_fs.update(clientRef, { transactionCounter: nextTxCount, status: 'contracted' });
 
-            // إنشاء قيد إثبات المديونية السيادي (IFRS)
             if (!revenueAccSnap.empty && !clientAccSnap.empty) {
                 const jePath = getTenantPath('journalEntries', tenantId);
                 const newJeRef = doc(collection(firestore, jePath!));
@@ -285,7 +281,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
         <ScrollArea className="flex-1 bg-muted/5">
             <div className="p-8 space-y-10">
-                {/* 📐 قسم المواصفات الفنية المسحوبة */}
                 <section className="space-y-6">
                     <h3 className="text-lg font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4">
                         <Layers className="h-6 w-6 text-indigo-600" /> المواصفات الفنية المسحوبة
@@ -335,7 +330,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     </div>
                 </section>
 
-                {/* 💰 قسم الترتيبات المالية المعتمدة */}
                 <section className="space-y-6">
                     <div className="flex justify-between items-center pr-4 border-r-8 border-primary">
                         <h3 className="text-lg font-black flex items-center gap-3 text-[#1e1b4b]">
@@ -344,7 +338,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         <div className="flex items-center gap-4">
                             <Label className="text-xs font-bold text-slate-500">نظام الدفع:</Label>
                             <Badge variant="outline" className="bg-white border-primary/20 text-primary font-black px-4 h-8 rounded-xl shadow-sm">
-                                {financials.type === 'percentage' ? '% نسب مئوية' : 'مبالغ ثابتة KD'}
+                                {financials.type === 'percentage' ? 'نسب مئوية %' : 'مبالغ ثابتة KD'}
                             </Badge>
                         </div>
                     </div>
@@ -362,7 +356,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {financials.milestones.map((m: any, i: number) => (
+                                {(financials.milestones || []).map((m: any, i: number) => (
                                     <TableRow key={m.id} className="h-20 border-b last:border-0 hover:bg-muted/5 transition-all group">
                                         <TableCell className="text-center bg-slate-50/50 border-l">
                                             <Badge variant="secondary" className="font-black text-xs px-3 h-7 rounded-full border bg-white text-slate-900">
@@ -371,7 +365,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                         </TableCell>
                                         <TableCell className="px-10">
                                             <InlineSearchList 
-                                                value={m.condition || ''} 
+                                                value={m.condition} 
                                                 onSelect={v => { const newM = [...financials.milestones]; newM[i].condition = v; setFinancials({...financials, milestones: newM}); }} 
                                                 options={referenceData.stages} 
                                                 placeholder="اربط بمرحلة..." 
