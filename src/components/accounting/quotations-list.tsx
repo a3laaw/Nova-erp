@@ -14,7 +14,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { doc, deleteDoc, orderBy } from 'firebase/firestore';
 import type { Quotation } from '@/lib/types';
 import { format } from 'date-fns';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
 import { FileText, Eye, Pencil, Trash2, User, MoreHorizontal, Loader2, Sparkles } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -40,6 +40,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { searchQuotations } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
+import { useAuth } from '@/context/auth-context';
 
 interface QuotationsListProps {
   searchQuery?: string;
@@ -51,17 +52,20 @@ interface QuotationsListProps {
 const statusMap: Record<string, { label: string, color: string }> = {
     draft: { label: 'مسودة', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
     sent: { label: 'مرسل', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-    accepted: { label: 'مقبول', color: 'bg-green-50 text-green-700 border-green-200' },
+    accepted: { label: 'مقبول / عقد مبرم', color: 'bg-green-50 text-green-700 border-green-200' },
     rejected: { label: 'مرفوض', color: 'bg-red-50 text-red-700 border-red-200' },
     expired: { label: 'منتهي', color: 'bg-gray-50 text-gray-700 border-gray-200' }
 };
 
 export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = 'all' }: QuotationsListProps) {
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
   
   const [itemToDelete, setItemToDelete] = useState<Quotation | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const tenantId = currentUser?.currentCompanyId;
 
   const quotationsQueryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
   const { data: quotations, loading } = useSubscription<Quotation>(firestore, 'quotations', quotationsQueryConstraints);
@@ -87,10 +91,11 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
   }, []);
   
   const handleDelete = async () => {
-    if (!itemToDelete || !firestore) return;
+    if (!itemToDelete || !firestore || !tenantId) return;
     setIsDeleting(true);
     try {
-        await deleteDoc(doc(firestore, 'quotations', itemToDelete.id!));
+        const finalPath = getTenantPath(`quotations/${itemToDelete.id}`, tenantId);
+        await deleteDoc(doc(firestore, finalPath!));
         toast({ title: 'نجاح التطهير', description: `تم حذف عرض السعر بنجاح.` });
     } catch (error) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف عرض السعر.' });
@@ -153,14 +158,14 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                                 <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
                                     <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase tracking-widest">خيارات العرض</DropdownMenuLabel>
                                     
-                                    <DropdownMenuItem className="rounded-lg py-3 font-bold gap-3 cursor-pointer" onSelect={() => Link}>
+                                    <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
                                         <Link href={`/dashboard/accounting/quotations/${quotation.id}`} className="flex items-center gap-3">
                                             <Eye className="h-4 w-4 text-primary"/> عرض وتصدير PDF
                                         </Link>
                                     </DropdownMenuItem>
 
                                     {quotation.status === 'draft' && (
-                                        <DropdownMenuItem className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                        <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
                                             <Link href={`/dashboard/accounting/quotations/${quotation.id}/edit`} className="flex items-center gap-3">
                                                 <Pencil className="h-4 w-4 text-primary"/> تعديل البيانات
                                             </Link>
