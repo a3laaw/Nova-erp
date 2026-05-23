@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -33,7 +33,8 @@ import {
   Ruler, 
   Building2, 
   Target,
-  ShieldCheck 
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { 
@@ -82,7 +83,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
   const [isSaving, setIsSaving] = useState(false);
   const [financials, setFinancials] = useState<any>({ type: 'fixed', totalAmount: 0, milestones: [] });
-  const [specs, setSpecs] = useState<TechnicalSpecifications | any>({
+  const [specs, setSpecs] = useState<any>({
       totalArea: 0,
       floorsCount: 1,
       basementType: 'none',
@@ -91,71 +92,78 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   });
   
   const [referenceData, setReferenceData] = useState<{ stages: { value: string, label: string }[] }>({ stages: [] });
+  const syncedRef = useRef(false);
 
+  // 1. ✨ محرك المزامنة الفورية (Immediate Data Injection)
+  useEffect(() => {
+    if (isOpen && transaction && !syncedRef.current) {
+        // حالة 1: سحب البيانات من عرض سعر (Quotation)
+        if (transaction.quotationNumber) {
+            const q = transaction as Quotation;
+            setFinancials({
+                type: q.financialsType || 'fixed',
+                totalAmount: q.totalAmount || 0,
+                milestones: (q.items || []).map((item: any, idx: number) => ({
+                    id: generateId(),
+                    name: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
+                    condition: item.triggerCondition || '',
+                    value: q.financialsType === 'percentage' ? (item.percentage || 0) : (item.unitPrice || 0)
+                }))
+            });
+            
+            setSpecs({
+                totalArea: q.totalArea || 0,
+                floorsCount: q.floorsCount || 1,
+                basementType: q.basementType || 'none',
+                roofExtension: q.roofExtension || 'none',
+                workNature: q.workNature || 'labor_only'
+            });
+            syncedRef.current = true;
+        } 
+        // حالة 2: سحب البيانات من عقد موجود (تعديل)
+        else if (transaction.contract) {
+            const c = transaction.contract;
+            setSpecs(c.specs || {});
+            setFinancials({
+                type: c.financialsType || 'fixed',
+                totalAmount: c.totalAmount || 0,
+                milestones: (c.clauses || []).map((cl: any) => ({
+                    id: cl.id || generateId(),
+                    name: cl.name,
+                    condition: cl.condition || '',
+                    value: c.financialsType === 'percentage' ? cl.percentage : cl.amount
+                }))
+            });
+            syncedRef.current = true;
+        }
+    }
+    
+    if (!isOpen) syncedRef.current = false;
+  }, [isOpen, transaction]);
+
+  // 2. ✨ محرك جلب القوائم المرجعية في الخلفية
   useEffect(() => {
     if (!isOpen || !firestore || !currentUser?.currentCompanyId) return;
     
-    const fetchDataAndSync = async () => {
+    const fetchRefData = async () => {
       try {
         const tenantId = currentUser.currentCompanyId;
-        
-        // جلب مراحل العمل المعتمدة للربط
         const stagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages'), where('companyId', '==', tenantId)));
         const stages = Array.from(new Map(stagesSnap.docs.map(doc => {
             const name = doc.data().name;
             return [name, { value: name, label: name }];
         })).values());
         setReferenceData({ stages });
-
-        if (transaction) {
-            // حالة 1: سحب البيانات من عرض سعر (Quotation)
-            if (transaction.quotationNumber) {
-                const q = transaction as Quotation;
-                setFinancials({
-                    type: q.financialsType || 'fixed',
-                    totalAmount: q.totalAmount || 0,
-                    milestones: (q.items || []).map((item: any, idx: number) => ({
-                        id: generateId(),
-                        name: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                        condition: item.triggerCondition || '',
-                        value: q.financialsType === 'percentage' ? (item.percentage || 0) : (item.unitPrice || 0)
-                    }))
-                });
-                
-                setSpecs({
-                    totalArea: q.totalArea || 0,
-                    floorsCount: q.floorsCount || 1,
-                    basementType: q.basementType || 'none',
-                    roofExtension: q.roofExtension || 'none',
-                    workNature: q.workNature || 'labor_only'
-                });
-            } 
-            // حالة 2: سحب البيانات من عقد موجود مسبقاً (تعديل)
-            else if (transaction.contract) {
-                const c = transaction.contract;
-                setSpecs(c.specs || {});
-                setFinancials({
-                    type: c.financialsType || 'fixed',
-                    totalAmount: c.totalAmount || 0,
-                    milestones: (c.clauses || []).map((cl: any) => ({
-                        id: cl.id || generateId(),
-                        name: cl.name,
-                        condition: cl.condition || '',
-                        value: c.financialsType === 'percentage' ? cl.percentage : cl.amount
-                    }))
-                });
-            }
-        }
-      } catch (e) { console.error("Sync Error:", e); }
+      } catch (e) { console.error("Ref Data Error:", e); }
     };
     
-    fetchDataAndSync();
-  }, [isOpen, firestore, transaction, currentUser]);
+    fetchRefData();
+  }, [isOpen, firestore, currentUser]);
 
   const totalValue = useMemo(() => financials.milestones.reduce((sum: number, m: any) => sum + Number(m.value || 0), 0), [financials.milestones]);
 
   const handleSubmit = async () => {
-    if (!firestore || !currentUser || !clientId) return;
+    if (!firestore || !currentUser || !clientId || isSaving) return;
     
     setIsSaving(true);
     try {
@@ -209,7 +217,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 const jePath = getTenantPath('journalEntries', tenantId);
                 const newJeRef = doc(collection(firestore, jePath!));
                 transaction_fs.set(newJeRef, cleanFirestoreData({
-                    entryNumber: `JV-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
+                    entryNumber: `JV-DIRECT-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
                     date: serverTimestamp(), 
                     narration: `إثبات مديونية عقد: ${transaction?.transactionType || ''} لـ ${clientName}`,
                     totalDebit: totalAmount, 
@@ -234,7 +242,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             }
         });
 
-        toast({ title: 'نجاح تفعيل العقد', description: 'تم تحويل البيانات من العرض وتوليد المديونية بنجاح.' });
+        toast({ title: 'نجاح تفعيل العقد', description: 'تم إنشاء العقد المباشر والترحيل المالي بنجاح.' });
         onClose();
         router.push(`/dashboard/construction/projects/new?clientId=${clientId}&transactionId=${newTxId}`);
     } catch (e: any) {
