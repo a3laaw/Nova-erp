@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -31,7 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, MousePointer2, MoreHorizontal } from 'lucide-react';
+import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, MousePointer2, MoreHorizontal, AlertCircle } from 'lucide-react';
 import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
@@ -92,7 +93,7 @@ async function reconcileClientAppointments(firestore: any, tenantId: string | un
         else if (identifier.clientMobile) apptsQueryConstraints.push(where('clientMobile', '==', identifier.clientMobile));
         else return;
 
-        const clientApptsSnap = await getDocs(query(collection(firestore, apptsPath), ...apptsQueryConstraints));
+        const clientApptsSnap = await getDocs(query(collection(firestore, apptsPath!), ...apptsQueryConstraints));
         const appointments = clientApptsSnap.docs
             .map(d => ({ id: d.id, ...d.data() } as Appointment))
             .filter(appt => appt.status !== 'cancelled')
@@ -101,7 +102,7 @@ async function reconcileClientAppointments(firestore: any, tenantId: string | un
         let contractSigned = false;
         if (identifier.clientId) {
             const clientPath = getTenantPath(`clients/${identifier.clientId}`, tenantId);
-            const clientSnap = await getDoc(doc(firestore, clientPath));
+            const clientSnap = await getDoc(doc(firestore, clientPath!));
             contractSigned = clientSnap.exists() && ['contracted', 'reContracted'].includes(clientSnap.data().status);
         }
         
@@ -111,7 +112,7 @@ async function reconcileClientAppointments(firestore: any, tenantId: string | un
             const visitCount = index + 1;
             const newColor = getVisitColor({ visitCount, contractSigned });
             if (appt.visitCount !== visitCount || appt.color !== newColor) {
-                batch.update(doc(firestore, apptsPath, appt.id!), { visitCount, color: newColor });
+                batch.update(doc(firestore, apptsPath!, appt.id!), { visitCount, color: newColor });
                 hasUpdates = true;
             }
         });
@@ -219,7 +220,6 @@ export function ArchitecturalAppointmentsView() {
 
     const tenantId = currentUser?.currentCompanyId;
     
-    // 🛡️ توحيد منطق التجاوز للمدير والمطور
     const canBypassTime = useMemo(() => 
         ['Admin', 'Developer'].includes(currentUser?.role || '')
     , [currentUser?.role]);
@@ -268,21 +268,21 @@ export function ArchitecturalAppointmentsView() {
         setLoading(true);
         try {
             const apptsPath = getTenantPath('appointments', tenantId);
-            const apptSnap = await getDocs(query(collection(firestore, apptsPath), where('appointmentDate', '>=', startOfDay(d)), where('appointmentDate', '<=', endOfDay(d))));
+            const apptSnap = await getDocs(query(collection(firestore, apptsPath!), where('appointmentDate', '>=', startOfDay(d)), where('appointmentDate', '<=', endOfDay(d))));
             setRawAppointments(apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment)).filter(appt => appt.type === 'architectural'));
         } finally { setLoading(false); }
     }, [firestore, tenantId]);
 
     useEffect(() => {
         if (!firestore || !tenantId) return;
-        getDocs(query(collection(firestore, getTenantPath('employees', tenantId)), where('status', 'in', ['active', 'on-leave']))).then(snap => {
+        getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!), where('status', 'in', ['active', 'on-leave']))).then(snap => {
             const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.nameAr));
             setEngineers(arch);
         });
-        getDocs(query(collection(firestore, getTenantPath('clients', tenantId)), where('isActive', '==', true))).then(snap => {
+        getDocs(query(collection(firestore, getTenantPath('clients', tenantId)!), where('isActive', '==', true))).then(snap => {
             setClients(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
         });
-        getDocs(query(collection(firestore, getTenantPath('leaveRequests', tenantId)), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
+        getDocs(query(collection(firestore, getTenantPath('leaveRequests', tenantId)!), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
             setLeaveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data()} as LeaveRequest)));
         });
     }, [firestore, tenantId]);
@@ -316,7 +316,7 @@ export function ArchitecturalAppointmentsView() {
             try {
                 const batch = writeBatch(firestore);
                 const apptPath = getTenantPath('appointments', tenantId);
-                const apptRef = doc(firestore, apptPath, apptId);
+                const apptRef = doc(firestore, apptPath!, apptId);
                 const apptToMove = rawAppointments.find(a => a.id === apptId);
 
                 const oldDate = toFirestoreDate(apptToMove?.appointmentDate);
@@ -388,7 +388,7 @@ export function ArchitecturalAppointmentsView() {
         try {
             const batch = writeBatch(firestore);
             const apptPath = getTenantPath('appointments', tenantId);
-            const apptRef = doc(firestore, apptPath, appointmentToDelete.id!);
+            const apptRef = doc(firestore, apptPath!, appointmentToDelete.id!);
 
             batch.update(apptRef, { 
                 status: 'cancelled',
@@ -446,9 +446,8 @@ export function ArchitecturalAppointmentsView() {
                                             if (isOnLeave || booking) return;
                                             const [h, m] = time.split(':').map(Number);
                                             const apptDate = setMinutes(setHours(date!, h), m);
-                                            // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
                                             if (isPast(apptDate) && !canBypassTime) {
-                                                return toast({ title: 'لا يمكن الحجز في الماضي' });
+                                                return toast({ title: 'عائق زمني', description: 'لا يمكن الحجز في الماضي.' });
                                             }
                                             setDialogData({ isEditing: false, engineerId: eng.id, engineerName: eng.fullName, appointmentDate: apptDate });
                                             setIsDialogOpen(true);
@@ -519,16 +518,18 @@ export function ArchitecturalAppointmentsView() {
                     )}
                 </div>
 
-                <BookingDialog 
-                    isOpen={isDialogOpen} 
-                    onClose={() => setIsDialogOpen(false)} 
-                    onSaveSuccess={() => date && fetchAppointments(date)} 
-                    dialogData={dialogData} 
-                    clients={clients} 
-                    firestore={firestore} 
-                    currentUser={currentUser} 
-                    canBypassTime={canBypassTime}
-                />
+                {isDialogOpen && (
+                    <BookingDialog 
+                        isOpen={isDialogOpen} 
+                        onClose={() => setIsDialogOpen(false)} 
+                        onSaveSuccess={() => date && fetchAppointments(date)} 
+                        dialogData={dialogData} 
+                        clients={clients} 
+                        firestore={firestore} 
+                        currentUser={currentUser} 
+                        canBypassTime={canBypassTime}
+                    />
+                )}
                 
                 <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
                     <AlertDialogContent dir="rtl" className="rounded-3xl">
@@ -566,24 +567,37 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     const [newClientMobile, setNewClientMobile] = useState('');
 
     const tenantId = currentUser?.currentCompanyId;
-    
     const apptDate = useMemo(() => toFirestoreDate(dialogData?.appointmentDate), [dialogData?.appointmentDate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!tenantId || !apptDate) return;
+        if (!firestore || !tenantId || !apptDate) {
+            toast({ variant: 'destructive', title: 'خطأ في الربط', description: 'تأكد من اختيار المنشأة وسلامة التاريخ.' });
+            return;
+        }
+
+        // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
+        if (isPast(apptDate) && !canBypassTime) {
+            toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن حجز موعد في الماضي.' });
+            return;
+        }
+
+        if (isNewClient && (!newClientName || !newClientMobile)) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى إدخال اسم وجوال العميل الجديد.' });
+            return;
+        }
+
+        if (!isNewClient && !selectedClientId) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار العميل المسجل.' });
+            return;
+        }
+
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
             const apptsPath = getTenantPath('appointments', tenantId);
 
-            // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
-            if (isPast(apptDate) && !canBypassTime) {
-                toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن حجز موعد في الماضي.'});
-                setIsSaving(false); return;
-            }
-
-            const newApptRef = doc(collection(firestore, apptsPath));
+            const newApptRef = doc(collection(firestore, apptsPath!));
             const dataToSave: any = { 
                 title: title || (isNewClient ? newClientName : clients.find((c: any) => c.id === selectedClientId)?.nameAr), 
                 engineerId: dialogData.engineerId, 
@@ -603,14 +617,16 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 dataToSave.color = '#facc15';
             } else {
                 const client = clients.find((c: any) => c.id === selectedClientId);
-                const snap = await getDocs(query(collection(firestore, apptsPath), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'), where('status', '!=', 'cancelled')));
+                if (!client) throw new Error("لم يتم العثور على ملف العميل المختار.");
+
+                const snap = await getDocs(query(collection(firestore, apptsPath!), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'), where('status', '!=', 'cancelled')));
                 const visitCount = snap.size + 1;
                 dataToSave.clientId = selectedClientId;
                 dataToSave.visitCount = visitCount;
                 dataToSave.color = getVisitColor({ visitCount, contractSigned: client.status !== 'new' });
             }
 
-            batch.set(newApptRef, dataToSave);
+            batch.set(newApptRef, cleanFirestoreData(dataToSave));
 
             const auditRef = doc(collection(newApptRef, 'auditLogs'));
             batch.set(auditRef, {
@@ -624,8 +640,12 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 
             await batch.commit();
             toast({ title: 'تم الحجز بنجاح' });
-            onSaveSuccess(); onClose();
-        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الحجز' }); } finally { setIsSaving(false); }
+            onSaveSuccess(); 
+            onClose();
+        } catch (e: any) { 
+            console.error("Booking Logic Failure:", e);
+            toast({ variant: 'destructive', title: 'خطأ في الحجز', description: e.message || 'حدث خلل في معالجة البيانات.' }); 
+        } finally { setIsSaving(false); }
     };
 
     return (
@@ -637,15 +657,20 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                         <DialogDescription className="font-bold">{dialogData?.engineerName} • {apptDate && format(apptDate, 'p', { locale: ar })}</DialogDescription>
                     </DialogHeader>
                     <div className="p-8 space-y-6">
-                        <div className="grid gap-2"><Label className="font-black text-gray-700 pr-1">الغرض من الزيارة</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: مناقشة المخططات..." className="h-12 rounded-xl border-2" /></div>
-                        <div className="flex items-center gap-2 pt-2"><Checkbox checked={isNewClient} onCheckedChange={(c) => setIsNewClient(!!c)} /><Label className="font-black cursor-pointer">إضافة عميل جديد (Lead)</Label></div>
+                        <div className="grid gap-2"><Label className="font-black text-gray-700 pr-1">الغرض من الزيارة</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: مناقشة المخططات..." className="h-12 rounded-xl border-2" disabled={isSaving} /></div>
+                        <div className="flex items-center gap-2 pt-2"><Checkbox checked={isNewClient} onCheckedChange={(c) => setIsNewClient(!!c)} disabled={isSaving} /><Label className="font-black cursor-pointer">إضافة عميل جديد (Lead)</Label></div>
                         {isNewClient ? (
-                            <div className="grid grid-cols-2 gap-4 animate-in fade-in"><div className="grid gap-2"><Label className="font-bold text-xs">الاسم</Label><Input value={newClientName} onChange={e => setNewClientName(e.target.value)} required className="h-10 rounded-xl" /></div><div className="grid gap-2"><Label className="font-bold text-xs">الجوال</Label><Input value={newClientMobile} onChange={e => setNewClientMobile(e.target.value)} required className="h-10 rounded-xl" /></div></div>
+                            <div className="grid grid-cols-2 gap-4 animate-in fade-in"><div className="grid gap-2"><Label className="font-bold text-xs">الاسم</Label><Input value={newClientName} onChange={e => setNewClientName(e.target.value)} required disabled={isSaving} className="h-10 rounded-xl" /></div><div className="grid gap-2"><Label className="font-bold text-xs">الجوال</Label><Input value={newClientMobile} onChange={e => setNewClientMobile(e.target.value)} required disabled={isSaving} className="h-10 rounded-xl" /></div></div>
                         ) : (
-                            <div className="grid gap-2 animate-in fade-in"><Label className="font-bold text-xs">العميل المسجل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clients.map((c: any) => ({ value: c.id, label: c.nameAr }))} placeholder="ابحث..." className="h-10" /></div>
+                            <div className="grid gap-2 animate-in fade-in"><Label className="font-bold text-xs">العميل المسجل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clients.map((c: any) => ({ value: c.id, label: c.nameAr }))} placeholder="ابحث..." disabled={isSaving} className="h-10" /></div>
                         )}
                     </div>
-                    <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3"><Button type="button" variant="outline" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30">{isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : 'تأكيد الحجز'}</Button></DialogFooter>
+                    <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
+                        <Button type="button" variant="outline" onClick={onClose} className="rounded-xl font-bold h-12 px-8" disabled={isSaving}>إلغاء</Button>
+                        <Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30">
+                            {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : 'تأكيد الحجز'}
+                        </Button>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
