@@ -15,7 +15,7 @@ import { doc, deleteDoc, orderBy } from 'firebase/firestore';
 import type { Quotation } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
-import { FileText, Eye, Pencil, Trash2, User, MoreHorizontal, Loader2, Sparkles } from 'lucide-react';
+import { FileText, Eye, Pencil, Trash2, User, MoreHorizontal, Loader2 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { 
@@ -38,16 +38,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { searchQuotations } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
-
-interface QuotationsListProps {
-  searchQuery?: string;
-  dateFrom?: Date;
-  dateTo?: Date;
-  statusFilter?: string;
-}
 
 const statusMap: Record<string, { label: string, color: string }> = {
     draft: { label: 'مسودة', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
@@ -57,7 +51,7 @@ const statusMap: Record<string, { label: string, color: string }> = {
     expired: { label: 'منتهي', color: 'bg-gray-50 text-gray-700 border-gray-200' }
 };
 
-export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = 'all' }: QuotationsListProps) {
+export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = 'all' }: any) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -96,7 +90,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
     try {
         const finalPath = getTenantPath(`quotations/${itemToDelete.id}`, tenantId);
         await deleteDoc(doc(firestore, finalPath!));
-        toast({ title: 'نجاح التطهير', description: `تم حذف عرض السعر بنجاح.` });
+        toast({ title: 'نجاح الحذف', description: 'تم مسح عرض السعر نهائياً من السجلات.' });
     } catch (error) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف عرض السعر.' });
     } finally {
@@ -151,24 +145,20 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                         <TableCell className="text-center rounded-l-2xl">
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border bg-slate-50 shadow-sm transition-all">
+                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border bg-slate-50 transition-all">
                                         <MoreHorizontal className="h-5 w-5"/>
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
+                                <DropdownMenuContent align="end" dir="rtl" className="rounded-xl p-2 shadow-2xl border-none bg-white">
                                     <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase tracking-widest">خيارات العرض</DropdownMenuLabel>
                                     
-                                    <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
-                                        <Link href={`/dashboard/accounting/quotations/${quotation.id}`} className="flex items-center gap-3">
-                                            <Eye className="h-4 w-4 text-primary"/> عرض وتصدير PDF
-                                        </Link>
+                                    <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                        <Eye className="h-4 w-4 text-primary"/> عرض وتصدير PDF
                                     </DropdownMenuItem>
 
-                                    {quotation.status === 'draft' && (
-                                        <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
-                                            <Link href={`/dashboard/accounting/quotations/${quotation.id}/edit`} className="flex items-center gap-3">
-                                                <Pencil className="h-4 w-4 text-primary"/> تعديل البيانات
-                                            </Link>
+                                    {quotation.status !== 'accepted' && (
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}/edit`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                            <Pencil className="h-4 w-4 text-primary"/> تعديل البيانات
                                         </DropdownMenuItem>
                                     )}
 
@@ -205,7 +195,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                         disabled={isDeleting} 
                         className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200 min-w-[180px]"
                     >
-                        {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
+                        {isDeleting ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، حذف نهائي'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -213,5 +203,3 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
     </div>
   );
 }
-
-import { useRouter } from 'next/navigation';

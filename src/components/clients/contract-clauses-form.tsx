@@ -89,12 +89,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const tenantId = currentUser?.currentCompanyId;
   const [isSaving, setIsSaving] = useState(false);
   
-  // 🛡️ المواصفات الفنية المزامنة (Specs)
   const [specs, setSpecs] = useState<any>({
       totalArea: 0, floorsCount: 1, basementType: 'none', roofExtension: 'none', workNature: 'labor_only'
   });
 
-  // 💰 البيانات المالية المزامنة
   const [financials, setFinancials] = useState<any>({ 
       type: 'fixed', totalAmount: 0, milestones: [] 
   });
@@ -103,13 +101,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // ✨ محرك المزامنة الصفرية المطلق (Hard-Wired Pre-emptive Sync) ✨
-  // يعمل فوراً عند توفر البيانات لضمان عدم ظهور حقول فارغة
+  // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync) ✨
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
         
-        // 1. مزامنة المواصفات الإنشائية
         setSpecs({
             totalArea: Number(q.totalArea || q.contract?.specs?.totalArea) || 0,
             floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount) || 1,
@@ -118,7 +114,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             workNature: q.workNature || q.contract?.specs?.workNature || 'labor_only'
         });
 
-        // 2. مزامنة الدفعات والروابط الميدانية (ترجمة triggerCondition -> condition)
         const type = q.financialsType || q.contract?.financialsType || 'fixed';
         const rawItems = q.items || q.contract?.clauses || [];
         
@@ -128,7 +123,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                condition: item.triggerCondition || item.condition || '', // ⚡ المفتاح السحري للمزامنة
+                condition: item.triggerCondition || item.condition || '', 
                 value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
             }))
         });
@@ -137,7 +132,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     }
   }, [isOpen, transaction]);
 
-  // جلب مراحل العمل المعتمدة
   useEffect(() => {
     if (!isOpen || !firestore || !tenantId) return;
     const fetchRefData = async () => {
@@ -155,14 +149,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     fetchRefData();
   }, [isOpen, firestore, tenantId]);
 
-  // محرك الخيارات الاحتياطية لضمان ظهور النص المسحوب (WBS Fallback)
   const wbsOptions = useMemo(() => {
       const currentValues = financials.milestones.map((m: any) => m.condition).filter(Boolean);
       const existingValues = new Set(fetchedStages.map(s => s.value));
-      const fallbacks = currentValues
-        .filter(v => !existingValues.has(v))
-        .map(v => ({ value: v, label: v }));
-      
+      const fallbacks = currentValues.filter(v => !existingValues.has(v)).map(v => ({ value: v, label: v }));
       return [...fetchedStages, ...fallbacks];
   }, [fetchedStages, financials.milestones]);
 
@@ -202,7 +192,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
             const clientRef = doc(firestore, clientPath!);
             const clientSnap = await transaction_fs.get(clientRef);
-            
             const nextTxCount = (clientSnap.data()?.transactionCounter || 0) + 1;
             const txNumber = `CL${clientSnap.data()?.fileNumber}-TX${String(nextTxCount).padStart(2, '0')}`;
             
@@ -210,14 +199,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const newTxRef = doc(collection(firestore, txsCollectionPath!));
             
             transaction_fs.set(newTxRef, cleanFirestoreData({
-                transactionNumber: txNumber, 
-                clientId, 
+                transactionNumber: txNumber, clientId, 
                 transactionType: transaction?.transactionType || transaction?.subject || 'عقد مبيعات',
-                status: 'in-progress', 
-                contract: contractData, 
-                createdAt: serverTimestamp(),
-                assignedEngineerId: transaction?.assignedEngineerId || null,
-                companyId: tenantId
+                status: 'in-progress', contract: contractData, createdAt: serverTimestamp(),
+                assignedEngineerId: transaction?.assignedEngineerId || null, companyId: tenantId
             }));
             
             transaction_fs.update(clientRef, { transactionCounter: nextTxCount, status: 'contracted' });

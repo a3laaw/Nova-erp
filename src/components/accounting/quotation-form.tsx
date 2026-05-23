@@ -113,7 +113,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   // ✨ محرك حقن البيانات التاريخية الصارم (Sovereign Data Injection) ✨
   useEffect(() => {
     if (initialData) {
-        const formattedData = {
+        const formattedData: any = {
             ...initialData,
             date: toFirestoreDate(initialData.date) || new Date(),
             validUntil: toFirestoreDate(initialData.validUntil) || new Date(),
