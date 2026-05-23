@@ -37,7 +37,7 @@ export interface WorkStage extends BaseEntity {
   expectedDurationDays?: number;
   maxOccurrences?: number;
   allowedRoles?: string[];
-  nextStageIds?: string[]; // قائمة المراحل التالية المتعددة
+  nextStageIds?: string[]; // قائمة المراحل التالية المتعددة (التبعية التشعبية)
 }
 
 export interface TransactionStage {
