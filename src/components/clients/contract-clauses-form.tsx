@@ -167,7 +167,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   }, [isOpen, firestore, tenantId]);
 
   // ✨ صمام أمان العرض (WBS LINK Safe Options) ✨
-  // هذا المحرك يضمن وجود القيم المسحوبة ضمن الخيارات لكي لا يظهر الحقل فارغاً
   const wbsOptions = useMemo(() => {
       const currentValues = financials.milestones.map((m: any) => m.condition).filter(Boolean);
       const existingValues = new Set(fetchedStages.map(s => s.value));
@@ -188,9 +187,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     }
   }, [currentTotalInput, financials.type]);
 
-  /**
-   * دالة الاعتماد النهائي (handleSubmit)
-   */
   const handleSubmit = async () => {
     if (!firestore || !currentUser || !clientId || isSaving || !tenantId) return;
     
@@ -287,7 +283,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl bg-white" 
         dir="rtl"
         onInteractOutside={(e) => e.preventDefault()}
-        onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-4">
@@ -358,11 +353,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 <section className="space-y-8">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6 pr-4 border-r-8 border-primary">
                         <h3 className="text-xl font-black flex items-center gap-3 text-[#1e1b4b]">
-                            <Calculator className="h-7 w-7 text-primary"/> الدفعات المالية المزامنة
+                            <Calculator className="h-7 w-7 text-primary"/> الدفعات المالية (حرّة التعديل)
                         </h3>
                         <div className="flex items-center gap-4 bg-muted/20 p-3 rounded-2xl border no-print">
-                            <Label className="text-xs font-black text-slate-500">نظام الدفع المعتمد:</Label>
-                            <Select value={financials.type} onValueChange={v => setFinancials({...financials, type: v, milestones: []})}>
+                            <Label className="text-xs font-black text-slate-500">نظام الدفع:</Label>
+                            <Select value={financials.type} onValueChange={v => setFinancials({...financials, type: v})}>
                                 <SelectTrigger className="w-44 h-10 rounded-xl border-none bg-white font-black text-primary shadow-md"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl" className="rounded-xl">
                                     <SelectItem value="fixed">مبلغ ثابت (KD)</SelectItem>
@@ -376,7 +371,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                     <Input 
                                         type="number" 
                                         value={financials.totalAmount} 
-                                        readOnly={financials.type === 'fixed'}
                                         onChange={e => setFinancials({...financials, totalAmount: Number(e.target.value)})} 
                                         className={cn("w-32 h-10 border-none text-center font-black text-xl text-primary rounded-xl shadow-md bg-white")} 
                                     />

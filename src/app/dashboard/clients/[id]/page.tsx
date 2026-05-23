@@ -129,7 +129,10 @@ export default function ClientProfilePage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
+  
+  // States for deletions
   const [transactionToDelete, setTransactionToDelete] = useState<ClientTransaction | null>(null);
+  const [quotationToDelete, setQuotationToDelete] = useState<Quotation | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const clientPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}`, tenantId) : null, [id, tenantId]);
@@ -167,7 +170,7 @@ export default function ClientProfilePage() {
     } finally { setIsProcessing(false); }
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDeleteTransaction = async () => {
     if (!firestore || !tenantId || !transactionToDelete?.id) return;
     setIsProcessing(true);
     try {
@@ -191,6 +194,33 @@ export default function ClientProfilePage() {
     } finally { 
         setIsProcessing(false); 
         setTransactionToDelete(null); 
+    }
+  };
+
+  const handleConfirmDeleteQuotation = async () => {
+    if (!firestore || !tenantId || !quotationToDelete?.id) return;
+    setIsProcessing(true);
+    try {
+        const qPath = getTenantPath(`quotations/${quotationToDelete.id}`, tenantId);
+        await deleteDoc(doc(firestore, qPath!));
+        
+        const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
+        await addDoc(collection(firestore, historyPath!), {
+            type: 'log',
+            content: `قام ${currentUser?.fullName} بحذف عرض السعر رقم "${quotationToDelete.quotationNumber}" نهائياً.`,
+            createdAt: serverTimestamp(),
+            userId: currentUser?.id,
+            userName: currentUser?.fullName,
+            userAvatar: currentUser?.avatarUrl,
+            companyId: tenantId
+        });
+
+        toast({ title: 'تم الحذف', description: 'تم مسح عرض السعر من سجلات العميل.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+    } finally { 
+        setIsProcessing(false); 
+        setQuotationToDelete(null); 
     }
   };
 
@@ -257,11 +287,36 @@ export default function ClientProfilePage() {
                                         <p className="text-[10px] font-bold text-muted-foreground mt-0.5">القيمة الإجمالية: {formatCurrency(q.totalAmount)}</p>
                                     </div>
                                 </div>
-                                <Badge className={cn("px-4 py-1 rounded-full font-black text-[9px] uppercase border-none", 
-                                    q.status === 'accepted' ? "bg-green-600 text-white" : "bg-blue-50 text-blue-700"
-                                )}>
-                                    {q.status === 'accepted' ? 'مقبول / عقد مبرم' : 'بانتظار القرار'}
-                                </Badge>
+                                <div className="flex items-center gap-4">
+                                    <Badge className={cn("px-4 py-1 rounded-full font-black text-[9px] uppercase border-none", 
+                                        q.status === 'accepted' ? "bg-green-600 text-white" : "bg-blue-50 text-blue-700"
+                                    )}>
+                                        {q.status === 'accepted' ? 'مقبول / عقد مبرم' : 'بانتظار القرار'}
+                                    </Badge>
+                                    
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border bg-slate-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <MoreHorizontal className="h-5 w-5"/>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
+                                            <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">إجراءات العرض</DropdownMenuLabel>
+                                            <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/${q.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                                <Eye className="h-4 w-4 text-primary"/> عرض التفاصيل
+                                            </DropdownMenuItem>
+                                            {q.status !== 'accepted' && (
+                                                <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/${q.id}/edit`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                                    <Pencil className="h-4 w-4 text-primary"/> تعديل البيانات
+                                                </DropdownMenuItem>
+                                            )}
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onSelect={() => setQuotationToDelete(q)} className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50">
+                                                <Trash2 className="h-4 w-4" /> حذف العرض
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
                             </div>
                         </Card>
                     ))}
@@ -365,6 +420,7 @@ export default function ClientProfilePage() {
 
         {isFormOpen && <ClientTransactionForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} clientId={id} clientName={client.nameAr} />}
         
+        {/* Transaction Delete Confirmation */}
         <AlertDialog open={!!transactionToDelete} onOpenChange={() => setTransactionToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
                 <AlertDialogHeader>
@@ -374,8 +430,28 @@ export default function ClientProfilePage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-10 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmDelete} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl">
+                    <AlertDialogAction onClick={handleConfirmDeleteTransaction} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl">
                         {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Quotation Delete Confirmation */}
+        <AlertDialog open={!!quotationToDelete} onOpenChange={() => setQuotationToDelete(null)}>
+            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
+                <AlertDialogHeader>
+                    <div className="p-4 bg-red-100 rounded-3xl w-fit mb-4"><Trash2 className="h-10 w-10 text-red-600"/></div>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tighter">تأكيد حذف عرض السعر؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">
+                        هل أنت متأكد من رغبتك في حذف عرض السعر رقم "{quotationToDelete?.quotationNumber}"؟ 
+                        سيتم مسح هذا السجل من تاريخ العميل نهائياً.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-10 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmDeleteQuotation} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl">
+                        {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف العرض'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
