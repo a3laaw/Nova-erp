@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
 import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, orderBy, where, Timestamp } from 'firebase/firestore';
-import type { FieldVisit, ConstructionProject, TransactionStage } from '@/lib/types';
+import type { FieldVisit, ConstructionProject, TransactionStage, Holiday } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -33,12 +33,15 @@ import { cn, cleanFirestoreData, getTenantPath, formatCurrency } from '@/lib/uti
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { addWorkingDays } from '@/services/leave-calculator';
+import { useBranding } from '@/context/branding-context';
 
 export default function FieldVisitDetailPage() {
     const params = useParams();
     const router = useRouter();
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
+    const { branding } = useBranding();
     const { toast } = useToast();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
     const tenantId = currentUser?.currentCompanyId;
@@ -54,7 +57,9 @@ export default function FieldVisitDetailPage() {
     const [selectedStageId, setSelectedStageId] = useState('');
     const [isLoadingStages, setIsLoadingStages] = useState(false);
 
-    const visitPath = useMemo(() => getTenantPath(`field_visits/${id}`, tenantId), [id, tenantId]);
+    const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
+
+    const visitPath = useMemo(() => id && tenantId ? getTenantPath(`field_visits/${id}`, tenantId) : null, [id, tenantId]);
     const { data: visit, loading } = useDocument<FieldVisit>(firestore, visitPath);
 
     useEffect(() => {
@@ -140,7 +145,7 @@ export default function FieldVisitDetailPage() {
                 }
             });
 
-            // ✨ ذكاء التبعية: تحديث المعاملة المرتبطة (WBS Progression) ✨
+            // ✨ ذكاء التبعية المتعددة: تحديث المعاملة المرتبطة (WBS Chain Progression) ✨
             if (visit.transactionId) {
                 const txPath = getTenantPath(`clients/${visit.clientId}/transactions/${visit.transactionId}`, tenantId);
                 const txRef = doc(firestore, txPath!);
@@ -156,8 +161,10 @@ export default function FieldVisitDetailPage() {
                         const now = new Date();
 
                         if (stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') {
-                            stage.currentCount = (stage.currentCount || 0) + 1;
-                            if (stage.maxOccurrences && stage.currentCount >= stage.maxOccurrences) {
+                            const newCount = (stage.currentCount || 0) + 1;
+                            stage.currentCount = newCount;
+                            
+                            if (stage.trackingType === 'occurrence' && stage.maxOccurrences && newCount >= stage.maxOccurrences) {
                                 stage.status = 'completed';
                                 stage.endDate = Timestamp.fromDate(now);
                             } else {
@@ -168,12 +175,29 @@ export default function FieldVisitDetailPage() {
                             stage.endDate = Timestamp.fromDate(now);
                         }
 
-                        // تفعيل المرحلة التالية آلياً
+                        // ✨ تفعيل المسارات التالية آلياً (Multi-Branching Support)
                         if (stage.status === 'completed') {
-                            const nextStage = currentStages.find(s => s.order === stage.order + 1);
-                            if (nextStage && nextStage.status === 'pending') {
-                                nextStage.status = 'in-progress';
-                                nextStage.startDate = Timestamp.fromDate(now);
+                            const nextIds = stage.nextStageIds || [];
+                            if (nextIds.length > 0) {
+                                nextIds.forEach(nid => {
+                                    const target = currentStages.find(s => s.stageId === nid);
+                                    if (target && target.status === 'pending') {
+                                        target.status = 'in-progress';
+                                        target.startDate = Timestamp.fromDate(now);
+                                        if (target.expectedDurationDays) {
+                                            target.expectedEndDate = addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
+                                        }
+                                    }
+                                });
+                            } else {
+                                const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                                if (nextStage && nextStage.status === 'pending') {
+                                    nextStage.status = 'in-progress';
+                                    nextStage.startDate = Timestamp.fromDate(now);
+                                    if (nextStage.expectedDurationDays) {
+                                        nextStage.expectedEndDate = addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
+                                    }
+                                }
                             }
                         }
 
@@ -309,4 +333,4 @@ export default function FieldVisitDetailPage() {
     );
 }
 
-import { Slider } from '@/components/ui/slider';
+import { useSubscription } from '@/hooks/use-subscription';

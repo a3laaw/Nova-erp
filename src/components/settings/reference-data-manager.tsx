@@ -239,8 +239,8 @@ export function ReferenceDataManager() {
     const selectedPrimary = useMemo(() => (primaryItems || []).find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
     const selectedSecondary = useMemo(() => (secondaryItems || []).find(i => i.id === selectedSecondaryId), [secondaryItems, selectedSecondaryId]);
 
-    const { data: allDepartments = [] } = useSubscription<Department>(firestore, 'departments');
-    const departmentOptions = useMemo(() => allDepartments.map(d => ({ value: d.id!, label: d.name })), [allDepartments]);
+    const { data: allDepartments = [] } = useSubscription<any>(firestore, 'departments');
+    const departmentOptions = useMemo(() => allDepartments.map((d: any) => ({ value: d.id!, label: d.name })), [allDepartments]);
 
     const closeDialog = useCallback(() => {
         setIsPrimaryDialogOpen(false);
@@ -466,7 +466,7 @@ export function ReferenceDataManager() {
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                 <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                 <CardHeader className="p-10 relative z-10 border-b border-white/10">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+                    <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="flex gap-4">
                             <Button onClick={() => setView('main')} variant="outline" className="bg-white/10 text-white border-white/40 hover:bg-white/20 rounded-2xl font-black h-12 px-8 gap-2 backdrop-blur-md shadow-xl">
                                 <X className="h-5 w-5" /> إغلاق
