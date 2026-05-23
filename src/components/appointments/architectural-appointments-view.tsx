@@ -218,6 +218,11 @@ export function ArchitecturalAppointmentsView() {
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
 
     const tenantId = currentUser?.currentCompanyId;
+    
+    // 🛡️ توحيد منطق التجاوز للمدير والمطور
+    const canBypassTime = useMemo(() => 
+        ['Admin', 'Developer'].includes(currentUser?.role || '')
+    , [currentUser?.role]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -297,7 +302,7 @@ export function ArchitecturalAppointmentsView() {
             const [hours, minutes] = targetTime.split(':').map(Number);
             const newDateTime = setMinutes(setHours(date, hours), minutes);
 
-            if (isPast(newDateTime) && currentUser?.role !== 'Admin') {
+            if (isPast(newDateTime) && !canBypassTime) {
                 toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكنك نقل موعد للماضي.' });
                 return;
             }
@@ -439,8 +444,12 @@ export function ArchitecturalAppointmentsView() {
                                         id={slotId}
                                         onClick={() => {
                                             if (isOnLeave || booking) return;
-                                            const apptDate = setMinutes(setHours(date!, Number(time.split(':')[0])), Number(time.split(':')[1]));
-                                            if (isPast(apptDate) && currentUser?.role !== 'Admin') return toast({ title: 'لا يمكن الحجز في الماضي' });
+                                            const [h, m] = time.split(':').map(Number);
+                                            const apptDate = setMinutes(setHours(date!, h), m);
+                                            // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
+                                            if (isPast(apptDate) && !canBypassTime) {
+                                                return toast({ title: 'لا يمكن الحجز في الماضي' });
+                                            }
                                             setDialogData({ isEditing: false, engineerId: eng.id, engineerName: eng.fullName, appointmentDate: apptDate });
                                             setIsDialogOpen(true);
                                         }}
@@ -510,7 +519,16 @@ export function ArchitecturalAppointmentsView() {
                     )}
                 </div>
 
-                <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} firestore={firestore} currentUser={currentUser} />
+                <BookingDialog 
+                    isOpen={isDialogOpen} 
+                    onClose={() => setIsDialogOpen(false)} 
+                    onSaveSuccess={() => date && fetchAppointments(date)} 
+                    dialogData={dialogData} 
+                    clients={clients} 
+                    firestore={firestore} 
+                    currentUser={currentUser} 
+                    canBypassTime={canBypassTime}
+                />
                 
                 <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
                     <AlertDialogContent dir="rtl" className="rounded-3xl">
@@ -538,7 +556,7 @@ export function ArchitecturalAppointmentsView() {
     );
 }
 
-function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, firestore, currentUser }: any) {
+function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, firestore, currentUser, canBypassTime }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const [selectedClientId, setSelectedClientId] = useState('');
@@ -559,7 +577,8 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
             const batch = writeBatch(firestore);
             const apptsPath = getTenantPath('appointments', tenantId);
 
-            if (isPast(apptDate) && currentUser?.role !== 'Admin') {
+            // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
+            if (isPast(apptDate) && !canBypassTime) {
                 toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن حجز موعد في الماضي.'});
                 setIsSaving(false); return;
             }

@@ -188,6 +188,11 @@ export default function RoomBookingCalendar() {
     const tenantId = currentUser?.currentCompanyId;
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
+    // 🛡️ توحيد منطق التجاوز للمدير والمطور
+    const canBypassTime = useMemo(() => 
+        ['Admin', 'Developer'].includes(currentUser?.role || '')
+    , [currentUser?.role]);
+
     useEffect(() => { if (!date) setDate(new Date()); }, [date]);
 
     const { morningSlots, eveningSlots, hasWorkHours, isRamadan } = useMemo(() => {
@@ -259,7 +264,8 @@ export default function RoomBookingCalendar() {
             const [hours, minutes] = targetTime.split(':').map(Number);
             const newDateTime = setMinutes(setHours(date, hours), minutes);
 
-            if (isPast(newDateTime) && currentUser?.role !== 'Admin') {
+            // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
+            if (isPast(newDateTime) && !canBypassTime) {
                 toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن نقل الحجز للماضي.' });
                 return;
             }
@@ -352,7 +358,10 @@ export default function RoomBookingCalendar() {
                                             if (booking) return;
                                             const [h, m] = time.split(':').map(Number);
                                             const startTime = setMinutes(setHours(date!, h), m);
-                                            if (isPast(startTime)) return toast({ title: 'لا يمكن الحجز في الماضي' });
+                                            // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
+                                            if (isPast(startTime) && !canBypassTime) {
+                                                return toast({ title: 'لا يمكن الحجز في الماضي' });
+                                            }
                                             setDialogData({ room, appointmentDate: startTime });
                                             setIsDialogOpen(true);
                                         }}
@@ -419,7 +428,7 @@ export default function RoomBookingCalendar() {
                     )}
                 </div>
 
-                {isDialogOpen && <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} engineers={engineers} firestore={firestore} currentUser={currentUser} leaveRequests={leaveRequests} />}
+                {isDialogOpen && <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} engineers={engineers} firestore={firestore} currentUser={currentUser} leaveRequests={leaveRequests} canBypassTime={canBypassTime} />}
                 
                 <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
                     <AlertDialogContent dir="rtl" className="rounded-3xl">
@@ -443,7 +452,7 @@ export default function RoomBookingCalendar() {
     );
 }
 
-function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, engineers, firestore, currentUser, leaveRequests }: any) {
+function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, engineers, firestore, currentUser, leaveRequests, canBypassTime }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const [selectedClientId, setSelectedClientId] = useState('');
@@ -485,6 +494,13 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
         try {
             const apptsPath = getTenantPath('appointments', tenantId);
             const client = clients.find((c: any) => c.id === selectedClientId);
+            
+            // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
+            if (isPast(dialogData.appointmentDate) && !canBypassTime) {
+                toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن حجز موعد في الماضي.' });
+                setIsSaving(false); return;
+            }
+
             const dataToSave = { clientId: selectedClientId, clientName: client?.nameAr || 'عميل محمول', engineerId: selectedEngineerId, title, department, notes, meetingRoom: dialogData.room || dialogData.meetingRoom, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'room' as const, companyId: tenantId };
             if (isEditing) await updateDoc(doc(firestore, apptsPath, dialogData.id), dataToSave);
             else await addDoc(collection(firestore, apptsPath), { ...dataToSave, createdAt: serverTimestamp() });
