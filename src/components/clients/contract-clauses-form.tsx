@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -107,17 +107,16 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       milestones: [] 
   });
   
-  const [referenceData, setReferenceData] = useState<{ stages: { value: string, label: string }[] }>({ stages: [] });
+  const [fetchedStages, setFetchedStages] = useState<{ value: string, label: string }[]>([]);
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // 🛡️ محرك المزامنة الفورية الجذري (Zero-Latency Direct Mapping) 🛡️
-  // يضمن نقل كافة الحقول من عرض السعر إلى العقد لحظة الفتح بدقة ميكانيكية
+  // 🛡️ محرك المزامنة الفورية الجذري (Zero-Latency Sync) 🛡️
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
         
-        // 1. مزامنة المواصفات الفنية (Specifications Sync)
+        // 1. مزامنة المواصفات
         setSpecs({
             totalArea: Number(q.totalArea || q.contract?.specs?.totalArea) || 0,
             floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount) || 1,
@@ -126,7 +125,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             workNature: q.workNature || q.contract?.specs?.workNature || 'labor_only'
         });
 
-        // 2. مزامنة البيانات المالية والتبعية (WBS & Financials Sync)
+        // 2. مزامنة الدفعات والنسب
         const type = q.financialsType || q.contract?.financialsType || 'fixed';
         const rawItems = q.items || q.contract?.clauses || [];
         
@@ -136,7 +135,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                // 🛡️ تصحيح الربط: ترجمة triggerCondition ليكون condition في العقد 🛡️
                 condition: item.triggerCondition || item.condition || '',
                 value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
             }))
@@ -150,7 +148,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     }
   }, [isOpen, transaction]);
 
-  // جلب مراحل العمل المعتمدة للبحث اليدوي
+  // جلب مراحل العمل المعتمدة
   useEffect(() => {
     if (!isOpen || !firestore || !tenantId) return;
     const fetchRefData = async () => {
@@ -161,12 +159,24 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const name = doc.data().name;
             return [name, { value: name, label: name }];
         })).values());
-        setReferenceData({ stages });
+        setFetchedStages(stages);
       } catch (e) { console.error(e); }
       finally { setIsRefLoading(false); }
     };
     fetchRefData();
   }, [isOpen, firestore, tenantId]);
+
+  // ✨ صمام أمان العرض (WBS LINK Safe Options) ✨
+  // هذا المحرك يضمن وجود القيم المسحوبة ضمن الخيارات لكي لا يظهر الحقل فارغاً
+  const wbsOptions = useMemo(() => {
+      const currentValues = financials.milestones.map((m: any) => m.condition).filter(Boolean);
+      const existingValues = new Set(fetchedStages.map(s => s.value));
+      const fallbacks = currentValues
+        .filter(v => !existingValues.has(v))
+        .map(v => ({ value: v, label: v }));
+      
+      return [...fetchedStages, ...fallbacks];
+  }, [fetchedStages, financials.milestones]);
 
   const currentTotalInput = useMemo(() => 
     (financials.milestones || []).reduce((sum: number, m: any) => sum + (Number(m.value) || 0), 0)
@@ -179,8 +189,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   }, [currentTotalInput, financials.type]);
 
   /**
-   * دالة الاعتماد النهائي (handleSubmit):
-   * تقوم بتحويل البيانات إلى عقد رسمي وتوليد القيد المحاسبي.
+   * دالة الاعتماد النهائي (handleSubmit)
    */
   const handleSubmit = async () => {
     if (!firestore || !currentUser || !clientId || isSaving || !tenantId) return;
@@ -278,6 +287,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl bg-white" 
         dir="rtl"
         onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-4">
@@ -396,11 +406,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="px-10">
-                                            <Label className="text-[9px] font-black text-primary uppercase mb-1 block opacity-40">ارتباط سير العمل:</Label>
+                                            <Label className="text-[9px] font-black text-primary uppercase mb-1 block opacity-40">ارتباط سير العمل الميداني:</Label>
                                             <InlineSearchList 
                                                 value={m.condition} 
                                                 onSelect={v => { const newM = [...financials.milestones]; newM[i].condition = v; setFinancials({...financials, milestones: newM}); }} 
-                                                options={referenceData.stages} 
+                                                options={wbsOptions} 
                                                 placeholder="اربط بمرحلة ميدانية..." 
                                                 className="h-12 text-sm border-dashed border-2 border-primary/20 bg-primary/[0.02] font-black text-primary rounded-xl" 
                                             />
