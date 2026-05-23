@@ -193,7 +193,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
                 <AlertDialogHeader>
                     <div className="p-4 bg-red-100 rounded-3xl w-fit mb-4 shadow-inner"><Trash2 className="h-10 w-10 text-red-600"/></div>
-                    <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tighter">تأكيد الحذف المعتمد؟</AlertDialogTitle>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tighter">تأكيد الحذف النهائي؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">
                         سيتم مسح عرض السعر رقم <strong className="text-foreground">"{itemToDelete?.quotationNumber}"</strong> نهائياً من السجلات. لا يمكن التراجع عن هذا الإجراء.
                     </AlertDialogDescription>

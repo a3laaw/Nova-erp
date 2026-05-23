@@ -16,9 +16,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import type { Quotation } from '@/lib/types';
 import { QuotationForm } from '@/components/accounting/quotation-form';
-import { cleanFirestoreData } from '@/lib/utils';
+import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 
+/**
+ * صفحة تعديل عرض السعر الموحدة:
+ * تسحب كافة البيانات القديمة وتحدثها في المسار السيادي المعتمد.
+ */
 export default function EditQuotationPage() {
     const router = useRouter();
     const params = useParams();
@@ -27,88 +31,92 @@ export default function EditQuotationPage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     
+    const tenantId = currentUser?.currentCompanyId;
     const [isSaving, setIsSaving] = useState(false);
 
-    const quotationRef = useMemo(() => {
-        if (!firestore || !id) return null;
-        return doc(firestore, 'quotations', id);
-    }, [firestore, id]);
+    const quotationPath = useMemo(() => 
+        id && tenantId ? getTenantPath(`quotations/${id}`, tenantId) : null
+    , [id, tenantId]);
 
-    const { data: quotation, loading, error } = useDocument<Quotation>(firestore, quotationRef ? quotationRef.path : null);
+    const { data: quotation, loading, error } = useDocument<Quotation>(firestore, quotationPath);
 
     const handleSave = useCallback(async (data: Omit<Quotation, 'id' | 'quotationNumber' | 'createdAt' | 'createdBy'>) => {
-        if (!firestore || !currentUser || !id || !quotation) return;
+        if (!firestore || !currentUser || !id || !quotation || !tenantId) return;
 
         setIsSaving(true);
         try {
-            const quotationRefDoc = doc(firestore, 'quotations', id);
+            const finalPath = getTenantPath(`quotations/${id}`, tenantId);
+            const quotationRefDoc = doc(firestore, finalPath!);
             
             const totalAmount = data.financialsType === 'fixed'
-                ? (data.items || []).reduce((sum, item) => sum + item.total, 0)
+                ? (data.items || []).reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0)
                 : data.totalAmount;
             
-            const finalData = { ...data, totalAmount };
+            const finalData = { 
+                ...data, 
+                totalAmount,
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser.id
+            };
             
             await updateDoc(quotationRefDoc, cleanFirestoreData(finalData));
 
-            toast({ title: 'نجاح', description: 'تم تحديث عرض السعر بنجاح.' });
+            toast({ title: 'نجاح التحديث', description: 'تم حفظ التعديلات على عرض السعر بنجاح.' });
             router.push(`/dashboard/accounting/quotations/${id}`);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error updating quotation:", error);
-            const errorMessage = error instanceof Error ? error.message : 'فشل تحديث عرض السعر.';
-            toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
+            toast({ title: "فشل الحفظ", description: error.message || 'حدث خطأ في الصلاحيات.', variant: "destructive" });
         } finally {
             setIsSaving(false);
         }
-    }, [firestore, currentUser, id, quotation, router, toast]);
+    }, [firestore, currentUser, id, quotation, router, toast, tenantId]);
 
     if (loading) {
         return (
-            <Card className="max-w-4xl mx-auto" dir="rtl">
-                <CardHeader><Skeleton className="h-8 w-48" /></CardHeader>
-                <CardContent><Skeleton className="h-96 w-full" /></CardContent>
-            </Card>
+            <div className="max-w-4xl mx-auto p-12" dir="rtl">
+                <Skeleton className="h-32 w-full rounded-[2.5rem] mb-6" />
+                <Skeleton className="h-[600px] w-full rounded-[3rem]" />
+            </div>
         );
     }
     
     if (error || !quotation) {
-        return <p className="text-center text-destructive">خطأ في تحميل عرض السعر.</p>;
+        return <p className="text-center py-20 font-black opacity-30">عذراً، لم يتم العثور على عرض السعر المطلوب.</p>;
     }
 
-    if (quotation.status !== 'draft') {
+    if (quotation.status === 'accepted') {
         return (
-             <Card className="max-w-2xl mx-auto" dir="rtl">
+             <Card className="max-w-2xl mx-auto rounded-[2.5rem] p-10 mt-20 text-center" dir="rtl">
                 <CardHeader>
-                     <CardTitle>عرض السعر غير قابل للتعديل</CardTitle>
-                    <CardDescription>لا يمكن تعديل عرض السعر إلا إذا كانت حالته "مسودة".</CardDescription>
+                    <div className="p-4 bg-orange-100 rounded-3xl w-fit mx-auto mb-4"><AlertTriangle className="h-10 w-10 text-orange-600"/></div>
+                    <CardTitle className="text-2xl font-black text-[#1e1b4b]">عرض سعر مغلق</CardTitle>
+                    <CardDescription className="text-lg font-bold">لا يمكن تعديل عرض السعر بعد تحويله لعقد رسمي. يرجى مراجعة العقد المرتبط.</CardDescription>
                 </CardHeader>
-                 <CardContent>
-                    <Button onClick={() => router.back()}>العودة</Button>
+                <CardContent>
+                    <Button onClick={() => router.back()} className="h-12 px-10 rounded-xl font-bold">العودة للخلف</Button>
                 </CardContent>
             </Card>
         );
     }
 
     return (
-        <Card className="max-w-4xl mx-auto" dir="rtl">
-            <CardHeader>
+        <Card className="max-w-4xl mx-auto rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect" dir="rtl">
+            <CardHeader className="bg-primary/5 pb-8 border-b">
                 <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle>تعديل عرض السعر</CardTitle>
-                        <CardDescription>
-                            تعديل تفاصيل عرض السعر قبل إرساله للعميل.
-                        </CardDescription>
+                        <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">تعديل عرض السعر</CardTitle>
+                        <CardDescription className="font-bold text-base mt-1">تعديل تفاصيل عرض السعر قبل إرساله للعميل.</CardDescription>
                     </div>
-                    <div className="text-right">
-                        <Label>رقم العرض</Label>
-                        <div className="font-mono text-lg font-semibold h-7">
+                    <div className="text-left bg-white p-4 rounded-2xl border shadow-inner min-w-[160px]">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground block mb-1 text-center">رقم العرض</Label>
+                        <div className="font-mono text-xl font-black text-center text-primary">
                             {quotation.quotationNumber}
                         </div>
                     </div>
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-8">
                 <QuotationForm
                     initialData={quotation}
                     onSave={handleSave}
@@ -119,3 +127,5 @@ export default function EditQuotationPage() {
         </Card>
     );
 }
+
+import { AlertTriangle } from 'lucide-react';
