@@ -33,7 +33,6 @@ import {
   Target,
   ShieldCheck,
   AlertCircle,
-  X,
   Ruler,
   Building2,
   Workflow
@@ -47,6 +46,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useFirebase } from '@/firebase';
+import { useAuth } from '@/context/auth-context';
 import { 
   doc, 
   collection, 
@@ -61,7 +61,6 @@ import {
   getDoc 
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/context/auth-context';
 import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
 import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
@@ -90,7 +89,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const tenantId = currentUser?.currentCompanyId;
   const [isSaving, setIsSaving] = useState(false);
   
-  // 🛡️ المواصفات الفنية (Specs) 🛡️
+  // 🛡️ المواصفات الفنية (Specs) - سحب البيانات فوراً
   const [specs, setSpecs] = useState<any>({
       totalArea: 0,
       floorsCount: 1,
@@ -99,7 +98,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       workNature: 'labor_only'
   });
 
-  // 💰 البيانات المالية والدفعات (Financials) 💰
+  // 💰 البيانات المالية والدفعات - سحب البيانات فوراً
   const [financials, setFinancials] = useState<any>({ 
       type: 'fixed', 
       totalAmount: 0, 
@@ -110,12 +109,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // 🛡️ محرك المزامنة الفورية المطلق (Zero-Click Hard-Wired Sync) 🛡️
+  // ✨ محرك المزامنة الصفرية (Zero-Click Hard-Wired Sync) ✨
+  // يقوم بحقن بيانات عرض السعر في العقد فور فتح النافذة
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
         
-        // 1. مزامنة المواصفات
+        // 1. مزامنة المواصفات الإنشائية
         setSpecs({
             totalArea: Number(q.totalArea || q.contract?.specs?.totalArea) || 0,
             floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount) || 1,
@@ -134,7 +134,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                condition: item.triggerCondition || item.condition || '', // ✨ المزامنة المطلقة للـ WBS LINK ✨
+                // ✨ السر البرمجي: ترجمة triggerCondition من عرض السعر إلى condition في العقد آلياً ✨
+                condition: item.triggerCondition || item.condition || '', 
                 value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
             }))
         });
@@ -147,7 +148,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     }
   }, [isOpen, transaction]);
 
-  // جلب مراحل العمل المعتمدة
+  // جلب مراحل العمل المعتمدة لخيارات الـ WBS
   useEffect(() => {
     if (!isOpen || !firestore || !tenantId) return;
     const fetchRefData = async () => {
@@ -165,7 +166,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     fetchRefData();
   }, [isOpen, firestore, tenantId]);
 
-  // ✨ صمام أمان العرض (WBS LINK Fallback Logic) ✨
+  // محرك الخيارات الاحتياطية لضمان ظهور النص المسحوب حتى لو لم يكتمل التحميل
   const wbsOptions = useMemo(() => {
       const currentValues = financials.milestones.map((m: any) => m.condition).filter(Boolean);
       const existingValues = new Set(fetchedStages.map(s => s.value));
@@ -196,7 +197,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
     setIsSaving(true);
     try {
-        let newTxId = '';
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const coaPath = getTenantPath('chartOfAccounts', tenantId);
@@ -224,7 +224,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             
             const txsCollectionPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
             const newTxRef = doc(collection(firestore, txsCollectionPath!));
-            newTxId = newTxRef.id;
             
             transaction_fs.set(newTxRef, cleanFirestoreData({
                 transactionNumber: txNumber, 
@@ -250,11 +249,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     totalCredit: totalAmount, 
                     status: 'posted',
                     lines: [
-                        { accountId: clientAccSnap.docs[0].id, accountName: clientName, debit: totalAmount, credit: 0, auto_profit_center: newTxId },
-                        { accountId: revenueAccSnap.docs[0].id, accountName: revenueAccSnap.docs[0].data().name, debit: 0, credit: totalAmount, auto_profit_center: newTxId }
+                        { accountId: clientAccSnap.docs[0].id, accountName: clientName, debit: totalAmount, credit: 0, auto_profit_center: newTxRef.id },
+                        { accountId: revenueAccSnap.docs[0].id, accountName: revenueAccSnap.docs[0].data().name, debit: 0, credit: totalAmount, auto_profit_center: newTxRef.id }
                     ],
                     clientId, 
-                    transactionId: newTxId, 
+                    transactionId: newTxRef.id, 
                     createdAt: serverTimestamp(), 
                     createdBy: currentUser.id,
                     companyId: tenantId
@@ -264,15 +263,15 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
             if (quotationIdToUpdate) {
                 const qPath = getTenantPath(`quotations/${quotationIdToUpdate}`, tenantId);
-                transaction_fs.update(doc(firestore, qPath!), { status: 'accepted', transactionId: newTxId });
+                transaction_fs.update(doc(firestore, qPath!), { status: 'accepted', transactionId: newTxRef.id });
             }
         });
 
-        toast({ title: 'نجاح تفعيل العقد', description: 'تم إنشاء العقد المباشر والترحيل المالي بنجاح.' });
+        toast({ title: 'تم توقيع العقد', description: 'تم إنشاء العقد المبرم والترحيل المالي آلياً.' });
         onClose();
-        router.push(`/dashboard/construction/projects/new?clientId=${clientId}&transactionId=${newTxId}`);
+        router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: e.message });
+        toast({ variant: 'destructive', title: 'خطأ', description: e.message });
     } finally { setIsSaving(false); }
   };
 
@@ -352,29 +351,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 <section className="space-y-8">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6 pr-4 border-r-8 border-primary">
                         <h3 className="text-xl font-black flex items-center gap-3 text-[#1e1b4b]">
-                            <Calculator className="h-7 w-7 text-primary"/> الدفعات المالية (حرّة التعديل)
+                            <Calculator className="h-7 w-7 text-primary"/> الدفعات المالية (قابل للتعديل)
                         </h3>
                         <div className="flex items-center gap-4 bg-muted/20 p-3 rounded-2xl border no-print">
-                            <Label className="text-xs font-black text-slate-500">نظام الدفع:</Label>
-                            <Select value={financials.type} onValueChange={(v: any) => setFinancials({...financials, type: v})}>
-                                <SelectTrigger className="w-44 h-10 rounded-xl border-none bg-white font-black text-primary shadow-md"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl" className="rounded-xl">
-                                    <SelectItem value="fixed">مبلغ ثابت (KD)</SelectItem>
-                                    <SelectItem value="percentage">نسبة مئوية (%)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            
-                            {financials.type === 'percentage' && (
-                                <div className="flex items-center gap-2 border-r pr-4 mr-2 animate-in zoom-in-95">
-                                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">إجمالي العقد:</Label>
-                                    <Input 
-                                        type="number" 
-                                        value={financials.totalAmount} 
-                                        onChange={e => setFinancials({...financials, totalAmount: Number(e.target.value)})} 
-                                        className={cn("w-32 h-10 border-none text-center font-black text-xl text-primary rounded-xl shadow-md bg-white")} 
-                                    />
-                                </div>
-                            )}
+                            <Label className="text-xs font-bold text-slate-500">نظام الدفع:</Label>
+                            <Badge variant="outline" className="bg-white border-primary/20 text-primary font-black px-4 h-8 rounded-xl shadow-sm">
+                                {financials.type === 'percentage' ? 'نسب مئوية %' : 'مبالغ ثابتة KD'}
+                            </Badge>
                         </div>
                     </div>
 
@@ -448,7 +431,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         </Table>
                         <div className="p-8 flex justify-center bg-muted/5 border-t border-dashed">
                             <Button variant="outline" onClick={() => setFinancials({...financials, milestones: [...financials.milestones, {id: generateId(), name: `الدفعة الجديدة`, value: 0, condition: ''}]})} className="h-14 px-12 rounded-2xl border-dashed border-2 font-black text-primary gap-3 hover:bg-white shadow-xl hover:scale-105 transition-all active:scale-95">
-                                <PlusCircle className="h-6 w-6" /> إضافة دفعة استحقاق يدوية +
+                                <PlusCircle className="h-6 w-6" /> إضافة دفعة استحقاق جديدة +
                             </Button>
                         </div>
                     </div>

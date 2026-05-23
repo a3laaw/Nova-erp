@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -15,7 +15,7 @@ import { doc, deleteDoc, orderBy } from 'firebase/firestore';
 import type { Quotation } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
-import { FileText, Eye, Pencil, Trash2, User, MoreHorizontal, Loader2, AlertTriangle } from 'lucide-react';
+import { FileText, Eye, Pencil, Trash2, User, MoreHorizontal, Loader2, Sparkles } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { 
@@ -81,24 +81,24 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
     return results;
   }, [quotations, searchQuery, dateFrom, dateTo, statusFilter]);
 
-  const formatDate = (dateValue: any) => {
+  const formatDate = useCallback((dateValue: any) => {
     const date = toFirestoreDate(dateValue);
     return date ? format(date, 'dd/MM/yyyy') : '-';
-  };
+  }, []);
   
   const handleDelete = async () => {
     if (!itemToDelete || !firestore) return;
     setIsDeleting(true);
     try {
         await deleteDoc(doc(firestore, 'quotations', itemToDelete.id!));
-        toast({ title: 'نجاح التطهير', description: `تم حذف عرض السعر رقم ${itemToDelete.quotationNumber} بنجاح.` });
+        toast({ title: 'نجاح التطهير', description: `تم حذف عرض السعر بنجاح.` });
     } catch (error) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف عرض السعر.' });
     } finally {
         setIsDeleting(false);
         setItemToDelete(null);
     }
-  }
+  };
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-16 w-full rounded-2xl" /><Skeleton className="h-16 w-full rounded-2xl" /></div>;
 
@@ -151,20 +151,28 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
-                                    <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">خيارات العرض</DropdownMenuLabel>
-                                    <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
-                                        <Link href={`/dashboard/accounting/quotations/${quotation.id}`}>
+                                    <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase tracking-widest">خيارات العرض</DropdownMenuLabel>
+                                    
+                                    <DropdownMenuItem className="rounded-lg py-3 font-bold gap-3 cursor-pointer" onSelect={() => Link}>
+                                        <Link href={`/dashboard/accounting/quotations/${quotation.id}`} className="flex items-center gap-3">
                                             <Eye className="h-4 w-4 text-primary"/> عرض وتصدير PDF
                                         </Link>
                                     </DropdownMenuItem>
+
                                     {quotation.status === 'draft' && (
-                                        <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
-                                            <Link href={`/dashboard/accounting/quotations/${quotation.id}/edit`}>
+                                        <DropdownMenuItem className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                            <Link href={`/dashboard/accounting/quotations/${quotation.id}/edit`} className="flex items-center gap-3">
                                                 <Pencil className="h-4 w-4 text-primary"/> تعديل البيانات
                                             </Link>
-                                        )}
+                                        </DropdownMenuItem>
+                                    )}
+
                                     <DropdownMenuSeparator className="bg-slate-100" />
-                                    <DropdownMenuItem onSelect={() => setItemToDelete(quotation)} className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50">
+                                    
+                                    <DropdownMenuItem 
+                                        onSelect={() => setItemToDelete(quotation)} 
+                                        className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50"
+                                    >
                                         <Trash2 className="h-4 w-4" /> حذف العرض نهائياً
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -187,7 +195,11 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-10 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200 min-w-[180px]">
+                    <AlertDialogAction 
+                        onClick={handleDelete} 
+                        disabled={isDeleting} 
+                        className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200 min-w-[180px]"
+                    >
                         {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
