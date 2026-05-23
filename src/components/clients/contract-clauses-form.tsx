@@ -101,7 +101,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync) ✨
+  // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync V15.0) ✨
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
@@ -234,7 +234,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ', description: e.message });
+        toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: e.message });
     } finally { setIsSaving(false); }
   };
 

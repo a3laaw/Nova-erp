@@ -110,7 +110,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
-  // ✨ محرك حقن البيانات التاريخية الصارم (Sovereign Data Injection) ✨
+  // ✨ محرك حقن البيانات التاريخية الصارم (Sovereign Data Injection V15.0) ✨
+  // تم تحصينه لضمان استيراد (السطح، السرداب) بكافة حالاتهم.
   useEffect(() => {
     if (initialData) {
         const formattedData: any = {
@@ -120,6 +121,9 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
             totalArea: Number(initialData.totalArea) || 0,
             floorsCount: Number(initialData.floorsCount) || 1,
             totalAmount: Number(initialData.totalAmount) || 0,
+            basementType: initialData.basementType || 'none',
+            roofExtension: initialData.roofExtension || 'none',
+            workNature: initialData.workNature || 'labor_only',
             items: (initialData.items || []).map((item: any, idx: number) => ({
                 ...item,
                 id: item.id || generateId(),
