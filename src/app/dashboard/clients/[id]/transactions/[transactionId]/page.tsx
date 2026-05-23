@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, increment } from 'firebase/firestore';
 import {
   Card,
@@ -56,7 +57,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import type { Client, ClientTransaction, WorkStage, TransactionStage } from '@/lib/types';
+import type { Client, ClientTransaction, WorkStage, TransactionStage, Holiday } from '@/lib/types';
 import { format, differenceInDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
@@ -69,6 +70,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { SignaturePad } from '@/components/ui/signature-pad';
 import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
 import { Progress } from '@/components/ui/progress';
+import { useBranding } from '@/context/branding-context';
+import { addWorkingDays } from '@/services/leave-calculator';
 
 const transactionStatusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -114,6 +117,7 @@ export default function TransactionDetailPage() {
   const router = useRouter();
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
+  const { branding } = useBranding();
   const { toast } = useToast();
   
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -122,13 +126,14 @@ export default function TransactionDetailPage() {
 
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSignDialogOpen, setIsSignDialogOpen] = useState(false);
 
   const transactionPath = useMemo(() => (firestore && clientId && transactionId && tenantId ? getTenantPath(`clients/${clientId}/transactions/${transactionId}`, tenantId) : null), [firestore, clientId, transactionId, tenantId]);
   const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(firestore, transactionPath);
   
   const clientPath = useMemo(() => (firestore && clientId && tenantId ? getTenantPath(`clients/${clientId}`, tenantId) : null), [firestore, clientId, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
+
+  const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
   const isAdmin = useMemo(() => ['Admin', 'HR', 'Developer'].includes(currentUser?.role || ''), [currentUser]);
 
@@ -157,7 +162,13 @@ export default function TransactionDetailPage() {
             if (newStatus === 'in-progress' && !stage.startDate) {
                 stage.startDate = now;
                 if (stage.expectedDurationDays) {
-                    const expectedEnd = new Date(now.getTime() + stage.expectedDurationDays * 24 * 60 * 60 * 1000);
+                    // ✨ استخدام محرك أيام العمل السيادي ✨
+                    const expectedEnd = addWorkingDays(
+                        now, 
+                        stage.expectedDurationDays, 
+                        branding?.work_hours?.holidays || [], 
+                        publicHolidays
+                    );
                     stage.expectedEndDate = expectedEnd;
                 }
             }
@@ -165,20 +176,25 @@ export default function TransactionDetailPage() {
             if (newStatus === 'completed') {
                 stage.endDate = now;
                 
-                // ✨ ذكاء التبعية: تشغيل المرحلة التالية آلياً ✨
+                // ✨ ذكاء التبعية الموحد: تشغيل المرحلة التالية آلياً ✨
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
                     nextStage.startDate = now;
                     if (nextStage.expectedDurationDays) {
-                        const nextExpEnd = new Date(now.getTime() + nextStage.expectedDurationDays * 24 * 60 * 60 * 1000);
+                        const nextExpEnd = addWorkingDays(
+                            now, 
+                            nextStage.expectedDurationDays, 
+                            branding?.work_hours?.holidays || [], 
+                            publicHolidays
+                        );
                         nextStage.expectedEndDate = nextExpEnd;
                     }
                 }
             }
 
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: 'تم التحديث', description: newStatus === 'completed' ? 'تم إنجاز المرحلة وفتح التالية.' : 'بدأ العمل في المرحلة.' });
+            toast({ title: 'تم التحديث', description: newStatus === 'completed' ? 'تم إنجاز المرحلة وفتح التالية آلياً بناءً على أيام العمل.' : 'بدأ العمل في المرحلة.' });
         } finally { setIsProcessing(false); }
   };
 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -5,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
-import type { Appointment, Client, WorkStage, ClientTransaction, AppointmentAuditLog, TransactionStage } from '@/lib/types';
+import type { Appointment, Client, WorkStage, ClientTransaction, AppointmentAuditLog, TransactionStage, Holiday } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,12 +25,15 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useBranding } from '@/context/branding-context';
+import { addWorkingDays } from '@/services/leave-calculator';
 
 export default function AppointmentDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
+    const { branding } = useBranding();
     const { toast } = useToast();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -50,6 +54,8 @@ export default function AppointmentDetailsPage() {
     
     const transactionPath = useMemo(() => (appointment?.clientId && appointment?.transactionId && tenantId) ? getTenantPath(`clients/${appointment.clientId}/transactions/${appointment.transactionId}`, tenantId) : null, [appointment, tenantId]);
     const { data: transaction } = useDocument<ClientTransaction>(firestore, transactionPath);
+
+    const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
     const [selectedStageId, setSelectedStageId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -94,14 +100,20 @@ export default function AppointmentDetailsPage() {
                     stage.endDate = now;
                 }
                 
-                // ✨ ذكاء التبعية (WBS Chain Progression) ✨
+                // ✨ ذكاء التبعية الموحد: تفعيل المرحلة التالية بناءً على أيام العمل ✨
                 if (stage.status === 'completed') {
                     const nextStage = currentStages.find(s => s.order === stage.order + 1);
                     if (nextStage && nextStage.status === 'pending') {
                         nextStage.status = 'in-progress';
                         nextStage.startDate = now;
                         if (nextStage.expectedDurationDays) {
-                            const expEnd = new Date(now.getTime() + nextStage.expectedDurationDays * 24 * 60 * 60 * 1000);
+                            // ✨ استخدام محرك أيام العمل السيادي ✨
+                            const expEnd = addWorkingDays(
+                                now, 
+                                nextStage.expectedDurationDays, 
+                                branding?.work_hours?.holidays || [], 
+                                publicHolidays
+                            );
                             nextStage.expectedEndDate = expEnd;
                         }
                     }
@@ -153,7 +165,7 @@ export default function AppointmentDetailsPage() {
             });
 
             await batch.commit();
-            toast({ title: 'تم توثيق الإنجاز', description: 'تم تحديث سير العمل والبيانات المالية بنجاح.' });
+            toast({ title: 'تم توثيق الإنجاز', description: 'تم تحديث سير العمل آلياً بناءً على أيام العمل المعتمدة.' });
             router.push('/dashboard/appointments');
         } catch (e) { 
             toast({ variant: 'destructive', title: 'خطأ في التوثيق' }); 
@@ -304,9 +316,7 @@ export default function AppointmentDetailsPage() {
                                         <div className="relative pr-6 border-r-2 border-slate-100 space-y-8">
                                             {auditLogs.map((log) => (
                                                 <div key={log.id} className="relative flex items-start gap-4">
-                                                    <div className="absolute -right-[1.85rem] top-1 p-1 bg-white rounded-full border-2 shadow-sm">
-                                                        <div className="h-3 w-3 rounded-full bg-primary" />
-                                                    </div>
+                                                    <div className="absolute -right-[1.85rem] top-1 p-1 bg-white rounded-full border-2 shadow-sm"><div className="h-3 w-3 rounded-full bg-primary" /></div>
                                                     <div className="flex-1 bg-slate-50 p-4 rounded-2xl border shadow-inner group">
                                                         <div className="flex justify-between items-start mb-2">
                                                             <div className="flex items-center gap-2">

@@ -1,11 +1,10 @@
 
 /**
- * @fileOverview محرك الحسابات القانونية (HR & Labor Law Engine).
- * يطبق قوانين العمل في دولة الكويت (القطاع الأهلي) بدقة رياضية.
+ * @fileOverview محرك الحسابات القانونية والزمنية المطور.
  */
 
-import { differenceInDays, eachDayOfInterval, format, differenceInYears, differenceInMonths, addMonths } from 'date-fns';
-import type { Employee, Holiday } from '@/lib/types';
+import { addDays, differenceInDays, eachDayOfInterval, format, differenceInYears, differenceInMonths, addMonths, isSameDay, startOfDay } from 'date-fns';
+import type { Employee, Holiday, BrandingSettings } from '@/lib/types';
 import { toFirestoreDate } from './date-converter';
 
 const dayNameToIndex: Record<string, number> = {
@@ -14,8 +13,7 @@ const dayNameToIndex: Record<string, number> = {
 };
 
 /**
- * حساب أيام العمل الفعلية:
- * يستثني العطل الأسبوعية المحددة في الإعدادات والعطل الرسمية المسجلة.
+ * حساب أيام العمل الفعلية بين تاريخين.
  */
 export function calculateWorkingDays(
   startDate: Date | undefined,
@@ -52,12 +50,40 @@ export function calculateWorkingDays(
 }
 
 /**
- * محرك تحليل شرائح الإجازة المرضية (Kuwaiti Labor Law Tiers)
- * - الأيام 1-15: 100% (أجر كامل) [e.gov.kw]
- * - الأيام 16-25: 75% [e.gov.kw]
- * - الأيام 26-35: 50% [e.gov.kw]
- * - الأيام 36-45: 25% [e.gov.kw]
- * - الأيام 46-75: 0% (بدون أجر) [e.gov.kw]
+ * ✨ المحرك الجديد: إضافة أيام عمل لتاريخ محدد ✨
+ * يقوم بحساب تاريخ الانتهاء عبر القفز فوق العطل الرسمية والأسبوعية.
+ */
+export function addWorkingDays(
+  startDate: Date,
+  daysToAdd: number,
+  weeklyHolidays: string[],
+  publicHolidays: Holiday[]
+): Date {
+  let result = new Date(startDate);
+  let addedDays = 0;
+
+  const weeklyHolidayIndexes = new Set(weeklyHolidays.map(day => dayNameToIndex[day]));
+  const publicHolidayDates = new Set(publicHolidays.map(h => {
+      const d = toFirestoreDate(h.date);
+      return d ? format(d, 'yyyy-MM-dd') : '';
+  }).filter(Boolean));
+
+  while (addedDays < daysToAdd) {
+    result = addDays(result, 1);
+    const dayIndex = result.getDay();
+    const dateString = format(result, 'yyyy-MM-dd');
+
+    // إذا لم يكن اليوم عطلة أسبوعية ولا عطلة رسمية، نعتبره يوم عمل
+    if (!weeklyHolidayIndexes.has(dayIndex) && !publicHolidayDates.has(dateString)) {
+      addedDays++;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * محرك تحليل شرائح الإجازة المرضية.
  */
 export const calculateSickLeaveTiers = (totalUsedBefore: number, requestedDays: number) => {
   const tiers = [
@@ -94,7 +120,7 @@ export const calculateSickLeaveTiers = (totalUsedBefore: number, requestedDays: 
 };
 
 /**
- * حساب رصيد الإجازات السنوية
+ * حساب رصيد الإجازات السنوية.
  */
 export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDate: Date): number => {
     const hireDate = toFirestoreDate(employee.hireDate);
@@ -111,7 +137,7 @@ export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDat
 };
 
 /**
- * محرك مكافأة نهاية الخدمة (مادة 51/53)
+ * محرك مكافأة نهاية الخدمة (مادة 51/53).
  */
 export const calculateGratuity = (
     employee: Employee, 
