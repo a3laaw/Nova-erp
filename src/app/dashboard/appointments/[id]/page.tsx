@@ -83,7 +83,6 @@ export default function AppointmentDetailsPage() {
                 const stage = currentStages[stageIdx];
                 const now = new Date();
 
-                // ✨ محرك التحديث الهجين / المتعدد ✨
                 if (stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') {
                     const newCount = (stage.currentCount || 0) + 1;
                     stage.currentCount = newCount;
@@ -99,26 +98,28 @@ export default function AppointmentDetailsPage() {
                     stage.endDate = now;
                 }
                 
-                // ✨ ذكاء التبعية الموحد: البحث عن المرحلة التالية المبرمجة يدوياً ✨
+                // ✨ ذكاء التبعية المتعددة: تفعيل كافة المسارات المبرمجة آلياً ✨
                 if (stage.status === 'completed') {
-                    let nextStage = null;
-                    if (stage.nextStageId) {
-                        nextStage = currentStages.find(s => s.stageId === stage.nextStageId);
+                    const nextIds = stage.nextStageIds || [];
+                    if (nextIds.length > 0) {
+                        nextIds.forEach(nid => {
+                            const target = currentStages.find(s => s.stageId === nid);
+                            if (target && target.status === 'pending') {
+                                target.status = 'in-progress';
+                                target.startDate = now;
+                                if (target.expectedDurationDays) {
+                                    target.expectedEndDate = addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
+                                }
+                            }
+                        });
                     } else {
-                        nextStage = currentStages.find(s => s.order === stage.order + 1);
-                    }
-
-                    if (nextStage && nextStage.status === 'pending') {
-                        nextStage.status = 'in-progress';
-                        nextStage.startDate = now;
-                        if (nextStage.expectedDurationDays) {
-                            const expEnd = addWorkingDays(
-                                now, 
-                                nextStage.expectedDurationDays, 
-                                branding?.work_hours?.holidays || [], 
-                                publicHolidays
-                            );
-                            nextStage.expectedEndDate = expEnd;
+                        const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                        if (nextStage && nextStage.status === 'pending') {
+                            nextStage.status = 'in-progress';
+                            nextStage.startDate = now;
+                            if (nextStage.expectedDurationDays) {
+                                nextStage.expectedEndDate = addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
+                            }
                         }
                     }
                 }
@@ -169,7 +170,7 @@ export default function AppointmentDetailsPage() {
             });
 
             await batch.commit();
-            toast({ title: 'تم توثيق الإنجاز', description: 'تم تحديث سير العمل آلياً بناءً على قواعد التبعية المعتمدة.' });
+            toast({ title: 'تم توثيق الإنجاز', description: 'تم تحديث كافة مسارات العمل التابعة آلياً.' });
             router.push('/dashboard/appointments');
         } catch (e) { 
             toast({ variant: 'destructive', title: 'خطأ في التوثيق' }); 

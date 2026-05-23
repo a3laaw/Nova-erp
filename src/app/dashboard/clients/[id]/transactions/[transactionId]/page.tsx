@@ -174,32 +174,34 @@ export default function TransactionDetailPage() {
             if (newStatus === 'completed') {
                 stage.endDate = now;
                 
-                // ✨ ذكاء التبعية الموحد: البحث عن المرحلة التالية المبرمجة يدوياً أولاً ✨
-                let nextStage = null;
-                if (stage.nextStageId) {
-                    nextStage = currentStages.find(s => s.stageId === stage.nextStageId);
+                // ✨ ذكاء التبعية المتعددة: فتح كافة المسارات المتفرعة آلياً ✨
+                const nextIds = stage.nextStageIds || [];
+                if (nextIds.length > 0) {
+                    nextIds.forEach(nid => {
+                        const target = currentStages.find(s => s.stageId === nid);
+                        if (target && target.status === 'pending') {
+                            target.status = 'in-progress';
+                            target.startDate = now;
+                            if (target.expectedDurationDays) {
+                                target.expectedEndDate = addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
+                            }
+                        }
+                    });
                 } else {
-                    // Fallback to order-based progression
-                    nextStage = currentStages.find(s => s.order === stage.order + 1);
-                }
-
-                if (nextStage && nextStage.status === 'pending') {
-                    nextStage.status = 'in-progress';
-                    nextStage.startDate = now;
-                    if (nextStage.expectedDurationDays) {
-                        const nextExpEnd = addWorkingDays(
-                            now, 
-                            nextStage.expectedDurationDays, 
-                            branding?.work_hours?.holidays || [], 
-                            publicHolidays
-                        );
-                        nextStage.expectedEndDate = nextExpEnd;
+                    // Fallback to order-based progression (only if no explicit branching is defined)
+                    const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                    if (nextStage && nextStage.status === 'pending') {
+                        nextStage.status = 'in-progress';
+                        nextStage.startDate = now;
+                        if (nextStage.expectedDurationDays) {
+                            nextStage.expectedEndDate = addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
+                        }
                     }
                 }
             }
 
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: 'تم التحديث', description: newStatus === 'completed' ? 'تم إنجاز المرحلة وفتح التالية آلياً.' : 'بدأ العمل في المرحلة.' });
+            toast({ title: 'تم التحديث', description: newStatus === 'completed' ? 'تم إنجاز المرحلة وتفعيل المسارات التالية آلياً.' : 'بدأ العمل في المرحلة.' });
         } finally { setIsProcessing(false); }
   };
 
@@ -238,7 +240,7 @@ export default function TransactionDetailPage() {
                             <UniversalActionTrigger title={transaction.transactionType} sourceModule="المعاملات" sourceId={transaction.id!} />
                         </div>
                         {transaction.subServiceName && <Badge className="bg-primary text-white font-black px-4 h-7 rounded-full border-none shadow-md">{transaction.subServiceName}</Badge>}
-                        <CardDescription className="text-base font-bold">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link></CardDescription>
+                        <CardDescription className="text-base font-bold">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline font-bold'>{client.nameAr}</Link></CardDescription>
                     </div>
                     <Badge variant="outline" className={cn("px-6 py-1.5 rounded-full font-black text-sm border-2", transactionStatusColors[transaction.status])}>{statusTranslations[transaction.status]}</Badge>
                 </div>

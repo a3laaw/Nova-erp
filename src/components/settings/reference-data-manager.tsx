@@ -185,7 +185,7 @@ export function ReferenceDataManager() {
     const [trackingType, setTrackingType] = useState<'duration' | 'occurrence' | 'hybrid' | 'none'>('duration');
     const [expectedDuration, setExpectedDuration] = useState('7');
     const [maxOccurrences, setMaxOccurrences] = useState('3');
-    const [nextStageId, setNextStageId] = useState<string | null>(null);
+    const [nextStageIds, setNextStageIds] = useState<string[]>([]);
 
     const tenantId = currentUser?.currentCompanyId;
 
@@ -252,7 +252,7 @@ export function ReferenceDataManager() {
         setTrackingType('duration');
         setExpectedDuration('7');
         setMaxOccurrences('3');
-        setNextStageId(null);
+        setNextStageIds([]);
     }, []);
 
     const handleDragEnd = async (event: DragEndEvent, type: 'primary' | 'secondary' | 'tertiary') => {
@@ -302,7 +302,7 @@ export function ReferenceDataManager() {
             if (type === 'tertiary') {
                 payload.parentId = selectedSecondaryId;
                 payload.trackingType = trackingType;
-                payload.nextStageId = nextStageId || null;
+                payload.nextStageIds = nextStageIds || [];
                 if (trackingType === 'duration' || trackingType === 'hybrid') payload.expectedDurationDays = parseInt(expectedDuration);
                 if (trackingType === 'occurrence' || trackingType === 'hybrid') payload.maxOccurrences = parseInt(maxOccurrences);
             }
@@ -395,7 +395,7 @@ export function ReferenceDataManager() {
         }
     };
 
-    const nextStageOptions = useMemo(() => 
+    const nextStageOptions: MultiSelectOption[] = useMemo(() => 
         tertiaryItems
             .filter(i => i.id !== editingItem?.id)
             .map(i => ({ value: i.id!, label: i.name }))
@@ -575,9 +575,9 @@ export function ReferenceDataManager() {
                                                                              item.trackingType === 'hybrid' ? `هجين: ${item.expectedDurationDays}ي / ${item.maxOccurrences}م` :
                                                                              'معيار نصوص'}
                                                                         </Badge>
-                                                                        {item.nextStageId && (
+                                                                        {item.nextStageIds && item.nextStageIds.length > 0 && (
                                                                             <Badge variant="outline" className="text-[8px] h-4 font-bold border-indigo-200 text-indigo-700 bg-indigo-50">
-                                                                                بعدها: {tertiaryItems.find(i => i.id === item.nextStageId)?.name || '---'}
+                                                                                بعدها: {item.nextStageIds.length} مراحل
                                                                             </Badge>
                                                                         )}
                                                                     </div>
@@ -597,7 +597,7 @@ export function ReferenceDataManager() {
                                                                     setTrackingType(item.trackingType || 'duration');
                                                                     setExpectedDuration(String(item.expectedDurationDays || '7'));
                                                                     setMaxOccurrences(String(item.maxOccurrences || '3'));
-                                                                    setNextStageId(item.nextStageId || null);
+                                                                    setNextStageIds(item.nextStageIds || []);
                                                                     setIsTertiaryDialogOpen(true);
                                                                 } else {
                                                                     setIsSecondaryDialogOpen(true); 
@@ -665,21 +665,21 @@ export function ReferenceDataManager() {
                                     
                                     <div className="grid gap-2 p-5 bg-indigo-50/50 rounded-2xl border-2 border-dashed border-indigo-200">
                                         <Label className="font-black text-indigo-700 pr-2 text-xs uppercase flex items-center gap-2">
-                                            <Workflow className="h-4 w-4" /> المرحلة التالية التلقائية
+                                            <Workflow className="h-4 w-4" /> مراحل الاستكمال التلقائية (تفتح معاً)
                                         </Label>
-                                        <InlineSearchList 
-                                            value={nextStageId || ''} 
-                                            onSelect={setNextStageId} 
-                                            options={nextStageOptions} 
-                                            placeholder="اختر المرحلة التي ستفتح بعدها..." 
-                                            className="h-10 bg-white"
+                                        <MultiSelect 
+                                            options={nextStageOptions}
+                                            selected={nextStageIds}
+                                            onChange={setNextStageIds}
+                                            placeholder="اختر المرحلة أو المراحل التي ستفتح بعدها..."
+                                            className="bg-white"
                                         />
-                                        <p className="text-[9px] text-indigo-500 font-bold pr-1">سيقوم النظام بتفعيل هذه المرحلة آلياً فور إنجاز المرحلة الحالية.</p>
+                                        <p className="text-[9px] text-indigo-500 font-bold pr-1">سيقوم النظام بتفعيل كافة المراحل المختارة آلياً فور إنجاز المرحلة الحالية.</p>
                                     </div>
 
                                     {(trackingType === 'duration' || trackingType === 'hybrid') && (
                                         <div className="grid gap-2 animate-in zoom-in-95">
-                                            <Label className="font-black text-blue-700 pr-2 text-xs">المدة المتوقعة للإنجاز (يوم) *</Label>
+                                            <Label className="font-black text-blue-700 pr-2 text-xs">المدة المتوقعة للإنجاز (يوم عمل) *</Label>
                                             <Input type="number" value={expectedDuration} onChange={e => setExpectedDuration(e.target.value)} className="h-11 rounded-xl border-2 font-mono font-black text-xl text-center text-blue-600 bg-blue-50/30" />
                                         </div>
                                     )}
@@ -738,3 +738,4 @@ export function ReferenceDataManager() {
         </div>
     );
 }
+
