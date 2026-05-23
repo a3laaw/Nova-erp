@@ -37,6 +37,7 @@ interface InlineSearchListProps {
  * مكون البحث والاختيار المطور (Refined Edition):
  * - أبعاد رشيقة وخطوط صغيرة ومهنية.
  * - استجابة فورية للنقر بالماوس عبر Pointer Events.
+ * - حماية البيانات: يظهر القيمة حتى لو لم تكن في الخيارات (Fallback).
  */
 export function InlineSearchList({
   value,
@@ -67,7 +68,8 @@ export function InlineSearchList({
           )}
           disabled={disabled}
         >
-          <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+          {/* ✨ التعديل الجوهري: إظهار القيمة المسحوبة حتى لو لم تكتمل قائمة الإعدادات ✨ */}
+          <span className="truncate">{selectedOption ? selectedOption.label : (value || placeholder)}</span>
           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40 text-primary" />
         </Button>
       </PopoverTrigger>
@@ -76,6 +78,7 @@ export function InlineSearchList({
         align="start"
         dir="rtl"
         style={{ pointerEvents: 'auto' }}
+        onInteractOutside={(e) => e.preventDefault()}
       >
         <Command className="bg-white">
           <div className="flex items-center border-b px-2 bg-slate-50/50">
@@ -94,7 +97,6 @@ export function InlineSearchList({
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  // 🛡️ استخدام onSelect مع تفعيل النقر المباشر
                   onSelect={() => {
                     onSelect(option.value === value ? "" : option.value);
                     setOpen(false);

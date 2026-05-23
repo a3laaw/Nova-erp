@@ -15,10 +15,27 @@ import { doc, deleteDoc, orderBy } from 'firebase/firestore';
 import type { Quotation } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
-import { FileText, Eye, Pencil, Trash2, User } from 'lucide-react';
+import { FileText, Eye, Pencil, Trash2, User, MoreHorizontal } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { 
+    DropdownMenu, 
+    DropdownMenuContent, 
+    DropdownMenuItem, 
+    DropdownMenuLabel, 
+    DropdownMenuSeparator, 
+    DropdownMenuTrigger 
+} from '../ui/dropdown-menu';
+import { 
+    AlertDialog, 
+    AlertDialogAction, 
+    AlertDialogCancel, 
+    AlertDialogContent, 
+    AlertDialogDescription, 
+    AlertDialogFooter, 
+    AlertDialogHeader, 
+    AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { searchQuotations } from '@/lib/cache/fuse-search';
@@ -74,7 +91,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
     setIsDeleting(true);
     try {
         await deleteDoc(doc(firestore, 'quotations', itemToDelete.id!));
-        toast({ title: 'نجاح', description: 'تم حذف عرض السعر بنجاح.' });
+        toast({ title: 'نجاح التطهير', description: `تم حذف عرض السعر رقم ${itemToDelete.quotationNumber} بنجاح.` });
     } catch (error) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف عرض السعر.' });
     } finally {
@@ -90,7 +107,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
       <Table className="border-separate border-spacing-y-2 px-2">
         <TableHeader className="bg-[#F8F9FE]">
           <TableRow className="hover:bg-transparent border-none">
-            <TableHead className="px-6 py-5 font-black text-[#7209B7] text-right rounded-r-2xl">رقم العرض</TableHead>
+            <TableHead className="px-8 py-5 font-black text-[#7209B7] text-right rounded-r-2xl">رقم العرض</TableHead>
             <TableHead className="font-black text-[#7209B7] text-right">المالك / العميل</TableHead>
             <TableHead className="font-black text-[#7209B7] text-right">الموضوع</TableHead>
             <TableHead className="font-black text-[#7209B7] text-center">التاريخ</TableHead>
@@ -102,12 +119,12 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
         <TableBody className="before:block before:h-2">
             {filteredQuotations.length === 0 ? (
                 <TableRow>
-                    <TableCell colSpan={7} className="h-48 text-center text-muted-foreground opacity-40 font-bold">لا توجد عروض أسعار مسجلة.</TableCell>
+                    <TableCell colSpan={7} className="h-48 text-center text-muted-foreground opacity-40 font-bold italic">لا توجد عروض أسعار مسجلة.</TableCell>
                 </TableRow>
             ) : (
                 filteredQuotations.map((quotation) => (
-                    <TableRow key={quotation.id} className="group border-none shadow-sm transition-all duration-300 hover:bg-[#F3E8FF]/20 [&:nth-child(even)]:bg-[#F3E8FF]/10">
-                        <TableCell className="px-6 py-5 font-mono font-black text-[#7209B7] text-sm rounded-r-2xl">
+                    <TableRow key={quotation.id} className="group border-none shadow-sm transition-all duration-300 hover:bg-[#F3E8FF]/20">
+                        <TableCell className="px-8 py-5 font-mono font-black text-[#7209B7] text-sm rounded-r-2xl">
                             <Link href={`/dashboard/accounting/quotations/${quotation.id}`} className='hover:underline'>{quotation.quotationNumber}</Link>
                         </TableCell>
                         <TableCell>
@@ -115,13 +132,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                                 <div className="p-2 bg-[#F8F9FE] rounded-full group-hover:bg-white transition-colors">
                                     <User className="h-4 w-4 text-[#7209B7]" />
                                 </div>
-                                {quotation.clientId ? (
-                                    <Link href={`/dashboard/clients/${quotation.clientId}`} className='font-black text-gray-800 hover:underline hover:text-primary transition-colors'>
-                                        {quotation.clientName}
-                                    </Link>
-                                ) : (
-                                    <span className="font-black text-gray-800">{quotation.clientName}</span>
-                                )}
+                                <span className="font-black text-gray-800">{quotation.clientName}</span>
                             </div>
                         </TableCell>
                         <TableCell className="font-bold text-gray-600">{quotation.subject}</TableCell>
@@ -133,16 +144,32 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                             </Badge>
                         </TableCell>
                         <TableCell className="text-center rounded-l-2xl">
-                            <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border border-primary/20 text-primary hover:bg-primary hover:text-white" asChild>
-                                    <Link href={`/dashboard/accounting/quotations/${quotation.id}`}><Eye className="h-4 w-4" /></Link>
-                                </Button>
-                                {quotation.status === 'draft' && (
-                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border border-primary/20 text-primary hover:bg-primary hover:text-white" asChild>
-                                        <Link href={`/dashboard/accounting/quotations/${quotation.id}/edit`}><Pencil className="h-4 w-4" /></Link>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border bg-slate-50 shadow-sm transition-all">
+                                        <MoreHorizontal className="h-5 w-5"/>
                                     </Button>
-                                )}
-                            </div>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
+                                    <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">خيارات العرض</DropdownMenuLabel>
+                                    <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                        <Link href={`/dashboard/accounting/quotations/${quotation.id}`}>
+                                            <Eye className="h-4 w-4 text-primary"/> عرض وتصدير PDF
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    {quotation.status === 'draft' && (
+                                        <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                            <Link href={`/dashboard/accounting/quotations/${quotation.id}/edit`}>
+                                                <Pencil className="h-4 w-4 text-primary"/> تعديل البيانات
+                                            </Link>
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator className="bg-slate-100" />
+                                    <DropdownMenuItem onSelect={() => setItemToDelete(quotation)} className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50">
+                                        <Trash2 className="h-4 w-4" /> حذف العرض نهائياً
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </TableCell>
                     </TableRow>
                 ))
@@ -151,12 +178,18 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
       </Table>
 
       <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
-            <AlertDialogContent dir="rtl" className="rounded-3xl">
-                <AlertDialogHeader><AlertDialogTitle>تأكيد الحذف؟</AlertDialogTitle><AlertDialogDescription>سيتم حذف عرض السعر رقم "{itemToDelete?.quotationNumber}" بشكل دائم.</AlertDialogDescription></AlertDialogHeader>
-                <AlertDialogFooter className="gap-2">
-                    <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold">
-                        {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، حذف'}
+            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
+                <AlertDialogHeader>
+                    <div className="p-4 bg-red-100 rounded-3xl w-fit mb-4 shadow-inner"><Trash2 className="h-10 w-10 text-red-600"/></div>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tighter">تأكيد الحذف المعتمد؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">
+                        سيتم مسح عرض السعر رقم <strong className="text-foreground">"{itemToDelete?.quotationNumber}"</strong> نهائياً من السجلات. لا يمكن التراجع عن هذا الإجراء.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-10 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200 min-w-[180px]">
+                        {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
