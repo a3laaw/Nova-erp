@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, increment, Timestamp, addDoc, updateDoc } from 'firebase/firestore';
 import type { Appointment, Client, ClientTransaction, AppointmentAuditLog, TransactionStage, Holiday } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,12 +28,6 @@ import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 
-/**
- * صفحة تفاصيل الزيارة المحدثة (V300.0):
- * - تدعم الربط المباشر بالمعاملات من داخل الصفحة.
- * - تدعم تحويل العملاء المحتملين (Leads) لملفات رسمية.
- * - إدارة كاملة لمراحل الـ WBS ومحضر الاجتماع.
- */
 export default function AppointmentDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -45,11 +39,9 @@ export default function AppointmentDetailsPage() {
 
     const tenantId = currentUser?.currentCompanyId;
 
-    // 1. جلب بيانات الموعد
     const apptPath = useMemo(() => id && tenantId ? getTenantPath(`appointments/${id}`, tenantId) : null, [id, tenantId]);
     const { data: appointment, loading: apptLoading } = useDocument<Appointment>(firestore, apptPath);
     
-    // 2. جلب سجل التدقيق
     const auditPath = useMemo(() => id && tenantId ? getTenantPath(`appointments/${id}/auditLogs`, tenantId) : null, [id, tenantId]);
     const { data: auditLogs, loading: auditLoading } = useSubscription<AppointmentAuditLog>(
         firestore, 
@@ -57,15 +49,12 @@ export default function AppointmentDetailsPage() {
         [orderBy('createdAt', 'desc')]
     );
 
-    // 3. جلب ملف العميل (إن وجد)
     const clientPath = useMemo(() => appointment?.clientId && tenantId ? getTenantPath(`clients/${appointment.clientId}`, tenantId) : null, [appointment?.clientId, tenantId]);
     const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
     
-    // 4. جلب المعاملات المفتوحة للعميل للربط
     const clientTxsPath = useMemo(() => appointment?.clientId && tenantId ? getTenantPath(`clients/${appointment.clientId}/transactions`, tenantId) : null, [appointment?.clientId, tenantId]);
-    const { data: clientTransactions } = useSubscription<ClientTransaction>(firestore, clientTxsPath, [where('status', 'in', ['new', 'in-progress'])]);
+    const { data: clientTransactions = [] } = useSubscription<ClientTransaction>(firestore, clientTxsPath, [where('status', 'in', ['new', 'in-progress'])]);
 
-    // 5. جلب المعاملة المربوطة حالياً
     const transactionPath = useMemo(() => (appointment?.clientId && appointment?.transactionId && tenantId) ? getTenantPath(`clients/${appointment.clientId}/transactions/${appointment.transactionId}`, tenantId) : null, [appointment, tenantId]);
     const { data: transaction } = useDocument<ClientTransaction>(firestore, transactionPath);
 
@@ -83,20 +72,25 @@ export default function AppointmentDetailsPage() {
         return transaction.stages.filter(s => s.status !== 'completed');
     }, [transaction?.stages]);
 
-    // 🛡️ إجراء ربط الزيارة بمعاملة قائمة
+    // 🛡️ إجراء ربط الزيارة بمعاملة قائمة (تم الإصلاح لضمان سلامة الـ Audit Log)
     const handleLinkTransaction = async () => {
         if (!firestore || !tenantId || !appointment || !selectedTxToLink) return;
         setIsLinking(true);
         try {
+            const batch = writeBatch(firestore);
             const apptRef = doc(firestore, apptPath!);
-            await updateDoc(apptRef, { 
+            
+            batch.update(apptRef, { 
                 transactionId: selectedTxToLink,
                 updatedAt: serverTimestamp(),
                 updatedBy: currentUser?.id
             });
 
-            const auditRef = doc(collection(apptRef, 'auditLogs'));
-            await addDoc(auditRef, {
+            // 🛡️ تصحيح: استخدام مسار المجلد لإضافة السجل الجديد
+            const auditCollectionRef = collection(apptRef, 'auditLogs');
+            const newAuditRef = doc(auditCollectionRef);
+            
+            batch.set(newAuditRef, {
                 action: 'linked',
                 details: `تم ربط الزيارة يدوياً بالمعاملة: ${clientTransactions.find(t => t.id === selectedTxToLink)?.transactionType}.`,
                 userName: currentUser?.fullName,
@@ -105,13 +99,14 @@ export default function AppointmentDetailsPage() {
                 companyId: tenantId
             });
 
+            await batch.commit();
             toast({ title: 'تم الربط بنجاح', description: 'يمكنك الآن توثيق إنجاز المراحل لهذه المعاملة.' });
         } catch (e) {
+            console.error("Link Transaction Error:", e);
             toast({ variant: 'destructive', title: 'خطأ في الربط' });
         } finally { setIsLinking(false); }
     };
 
-    // 🛡️ إجراء توثيق الإنجاز وإغلاق الزيارة
     const handleUpdateVisitStatus = async () => {
         if (!firestore || !currentUser || !tenantId || !appointment || !selectedStageId || !transaction) return;
         setIsSaving(true);
@@ -133,7 +128,6 @@ export default function AppointmentDetailsPage() {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 
-                // ✨ تفعيل التبعية المتعددة آلياً ✨
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
@@ -344,7 +338,7 @@ export default function AppointmentDetailsPage() {
                                                     <InlineSearchList 
                                                         value={selectedTxToLink}
                                                         onSelect={setSelectedTxToLink}
-                                                        options={(clientTransactions || []).map(tx => ({ value: tx.id!, label: `${tx.transactionType} (${tx.transactionNumber})` }))}
+                                                        options={clientTransactions.map(tx => ({ value: tx.id!, label: `${tx.transactionType} (${tx.transactionNumber})` }))}
                                                         placeholder="ابحث عن معاملة مفتوحة..."
                                                         className="h-12 border-2"
                                                     />
@@ -436,4 +430,3 @@ export default function AppointmentDetailsPage() {
         </div>
     );
 }
-

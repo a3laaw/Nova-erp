@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -738,4 +737,3 @@ export function ReferenceDataManager() {
         </div>
     );
 }
-
