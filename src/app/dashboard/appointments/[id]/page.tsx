@@ -5,12 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
-import type { Appointment, Client, WorkStage, ClientTransaction, AppointmentAuditLog, TransactionStage, Holiday } from '@/lib/types';
+import type { Appointment, Client, ClientTransaction, AppointmentAuditLog, TransactionStage, Holiday } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Link2, Plus, ShieldCheck, UserPlus, FileText, Target, History, RotateCcw } from 'lucide-react';
+import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Link2, Plus, ShieldCheck, UserPlus, FileText, Target, History, RotateCcw, Link as LinkIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -26,7 +26,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
+import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 
+/**
+ * صفحة تفاصيل الزيارة المحدثة (V300.0):
+ * - تدعم الربط المباشر بالمعاملات من داخل الصفحة.
+ * - تدعم تحويل العملاء المحتملين (Leads) لملفات رسمية.
+ * - إدارة كاملة لمراحل الـ WBS ومحضر الاجتماع.
+ */
 export default function AppointmentDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -38,9 +45,11 @@ export default function AppointmentDetailsPage() {
 
     const tenantId = currentUser?.currentCompanyId;
 
+    // 1. جلب بيانات الموعد
     const apptPath = useMemo(() => id && tenantId ? getTenantPath(`appointments/${id}`, tenantId) : null, [id, tenantId]);
     const { data: appointment, loading: apptLoading } = useDocument<Appointment>(firestore, apptPath);
     
+    // 2. جلب سجل التدقيق
     const auditPath = useMemo(() => id && tenantId ? getTenantPath(`appointments/${id}/auditLogs`, tenantId) : null, [id, tenantId]);
     const { data: auditLogs, loading: auditLoading } = useSubscription<AppointmentAuditLog>(
         firestore, 
@@ -48,16 +57,25 @@ export default function AppointmentDetailsPage() {
         [orderBy('createdAt', 'desc')]
     );
 
+    // 3. جلب ملف العميل (إن وجد)
     const clientPath = useMemo(() => appointment?.clientId && tenantId ? getTenantPath(`clients/${appointment.clientId}`, tenantId) : null, [appointment?.clientId, tenantId]);
     const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
     
+    // 4. جلب المعاملات المفتوحة للعميل للربط
+    const clientTxsPath = useMemo(() => appointment?.clientId && tenantId ? getTenantPath(`clients/${appointment.clientId}/transactions`, tenantId) : null, [appointment?.clientId, tenantId]);
+    const { data: clientTransactions } = useSubscription<ClientTransaction>(firestore, clientTxsPath, [where('status', 'in', ['new', 'in-progress'])]);
+
+    // 5. جلب المعاملة المربوطة حالياً
     const transactionPath = useMemo(() => (appointment?.clientId && appointment?.transactionId && tenantId) ? getTenantPath(`clients/${appointment.clientId}/transactions/${appointment.transactionId}`, tenantId) : null, [appointment, tenantId]);
     const { data: transaction } = useDocument<ClientTransaction>(firestore, transactionPath);
 
     const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
     const [selectedStageId, setSelectedStageId] = useState('');
+    const [selectedTxToLink, setSelectedTxToLink] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [isLinking, setIsLinking] = useState(false);
+    const [isTxFormOpen, setIsTxFormOpen] = useState(false);
     const [notes, setNotes] = useState('');
 
     const enrichedStages = useMemo(() => {
@@ -65,6 +83,35 @@ export default function AppointmentDetailsPage() {
         return transaction.stages.filter(s => s.status !== 'completed');
     }, [transaction?.stages]);
 
+    // 🛡️ إجراء ربط الزيارة بمعاملة قائمة
+    const handleLinkTransaction = async () => {
+        if (!firestore || !tenantId || !appointment || !selectedTxToLink) return;
+        setIsLinking(true);
+        try {
+            const apptRef = doc(firestore, apptPath!);
+            await updateDoc(apptRef, { 
+                transactionId: selectedTxToLink,
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser?.id
+            });
+
+            const auditRef = doc(collection(apptRef, 'auditLogs'));
+            await addDoc(auditRef, {
+                action: 'linked',
+                details: `تم ربط الزيارة يدوياً بالمعاملة: ${clientTransactions.find(t => t.id === selectedTxToLink)?.transactionType}.`,
+                userName: currentUser?.fullName,
+                userAvatar: currentUser?.avatarUrl,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
+
+            toast({ title: 'تم الربط بنجاح', description: 'يمكنك الآن توثيق إنجاز المراحل لهذه المعاملة.' });
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ في الربط' });
+        } finally { setIsLinking(false); }
+    };
+
+    // 🛡️ إجراء توثيق الإنجاز وإغلاق الزيارة
     const handleUpdateVisitStatus = async () => {
         if (!firestore || !currentUser || !tenantId || !appointment || !selectedStageId || !transaction) return;
         setIsSaving(true);
@@ -83,43 +130,29 @@ export default function AppointmentDetailsPage() {
                 const stage = currentStages[stageIdx];
                 const now = new Date();
 
-                if (stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') {
-                    const newCount = (stage.currentCount || 0) + 1;
-                    stage.currentCount = newCount;
-                    
-                    if (stage.trackingType === 'occurrence' && stage.maxOccurrences && newCount >= stage.maxOccurrences) {
-                        stage.status = 'completed';
-                        stage.endDate = now;
-                    } else {
-                        stage.status = 'in-progress';
-                    }
-                } else {
-                    stage.status = 'completed';
-                    stage.endDate = now;
-                }
+                stage.status = 'completed';
+                stage.endDate = Timestamp.fromDate(now);
                 
-                // ✨ ذكاء التبعية المتعددة: تفعيل كافة المسارات المبرمجة آلياً ✨
-                if (stage.status === 'completed') {
-                    const nextIds = stage.nextStageIds || [];
-                    if (nextIds.length > 0) {
-                        nextIds.forEach(nid => {
-                            const target = currentStages.find(s => s.stageId === nid);
-                            if (target && target.status === 'pending') {
-                                target.status = 'in-progress';
-                                target.startDate = now;
-                                if (target.expectedDurationDays) {
-                                    target.expectedEndDate = addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
-                                }
+                // ✨ تفعيل التبعية المتعددة آلياً ✨
+                const nextIds = stage.nextStageIds || [];
+                if (nextIds.length > 0) {
+                    nextIds.forEach(nid => {
+                        const target = currentStages.find(s => s.stageId === nid);
+                        if (target && target.status === 'pending') {
+                            target.status = 'in-progress';
+                            target.startDate = Timestamp.fromDate(now);
+                            if (target.expectedDurationDays) {
+                                target.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
                             }
-                        });
-                    } else {
-                        const nextStage = currentStages.find(s => s.order === stage.order + 1);
-                        if (nextStage && nextStage.status === 'pending') {
-                            nextStage.status = 'in-progress';
-                            nextStage.startDate = now;
-                            if (nextStage.expectedDurationDays) {
-                                nextStage.expectedEndDate = addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
-                            }
+                        }
+                    });
+                } else {
+                    const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                    if (nextStage && nextStage.status === 'pending') {
+                        nextStage.status = 'in-progress';
+                        nextStage.startDate = Timestamp.fromDate(now);
+                        if (nextStage.expectedDurationDays) {
+                            nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
                         }
                     }
                 }
@@ -141,7 +174,7 @@ export default function AppointmentDetailsPage() {
                 const timelineRef = doc(collection(txRef, 'timelineEvents'));
                 batch.set(timelineRef, {
                     type: 'comment', 
-                    content: `**[محضر زيارة]**\nتم تسجيل إنجاز في مرحلة: ${stage.name}${stage.trackingType === 'occurrence' ? ` (المرة رقم ${stage.currentCount})` : ''}\n\n**ملاحظات المهندس:**\n${notes}${financeComment}`, 
+                    content: `**[محضر زيارة]**\nتم تسجيل إنجاز في مرحلة: ${stage.name}\n\n**ملاحظات المهندس:**\n${notes}${financeComment}`, 
                     userId: currentUser.id, 
                     userName: currentUser.fullName, 
                     userAvatar: currentUser.avatarUrl,
@@ -254,10 +287,7 @@ export default function AppointmentDetailsPage() {
                                             <InlineSearchList 
                                                 value={selectedStageId} 
                                                 onSelect={setSelectedStageId} 
-                                                options={enrichedStages.map(s => ({ 
-                                                    value: s.stageId, 
-                                                    label: `${s.name} ${s.trackingType === 'occurrence' ? `(المرة ${ (s.currentCount || 0) + 1 })` : ''}` 
-                                                }))} 
+                                                options={enrichedStages.map(s => ({ value: s.stageId, label: s.name }))} 
                                                 placeholder="ابحث عن مرحلة الإنجاز المخططة..." 
                                                 className="h-12 bg-white rounded-2xl border-2"
                                             />
@@ -290,7 +320,7 @@ export default function AppointmentDetailsPage() {
                                         </AlertDescription>
                                     </Alert>
                                 ) : (
-                                    <div className="space-y-6">
+                                    <div className="space-y-6 animate-in slide-in-from-top-4 duration-700">
                                         <Alert variant="destructive" className="rounded-[2rem] border-4 border-dashed border-red-200 py-8 bg-red-50/50">
                                             <AlertCircle className="h-8 w-8 text-red-600"/>
                                             <AlertTitle className="text-red-900 font-black text-2xl mb-2">إجراء مطلوب لربط البيانات</AlertTitle>
@@ -300,6 +330,44 @@ export default function AppointmentDetailsPage() {
                                                     : "يرجى ربط هذه الزيارة بإحدى المعاملات المفتوحة لهذا العميل لتتمكن من تحديث مراحل الإنجاز."}
                                             </AlertDescription>
                                         </Alert>
+
+                                        {isProspective ? (
+                                            <Button asChild className="w-full h-16 rounded-[1.8rem] font-black text-xl gap-4 shadow-xl bg-orange-600 hover:bg-orange-700">
+                                                <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName)}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&engineerId=${encodeURIComponent(appointment.engineerId)}&fromAppointmentId=${appointment.id}`}>
+                                                    <UserPlus className="h-6 w-6" /> تأسيس ملف عميل رسمي الآن
+                                                </Link>
+                                            </Button>
+                                        ) : (
+                                            <div className="p-8 bg-white rounded-[2.5rem] border-2 border-slate-100 shadow-xl space-y-6">
+                                                <div className="grid gap-3">
+                                                    <Label className="font-black text-[#1e1b4b] pr-2">اختر المعاملة لربط الزيارة بها:</Label>
+                                                    <InlineSearchList 
+                                                        value={selectedTxToLink}
+                                                        onSelect={setSelectedTxToLink}
+                                                        options={(clientTransactions || []).map(tx => ({ value: tx.id!, label: `${tx.transactionType} (${tx.transactionNumber})` }))}
+                                                        placeholder="ابحث عن معاملة مفتوحة..."
+                                                        className="h-12 border-2"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col sm:flex-row gap-3">
+                                                    <Button 
+                                                        onClick={handleLinkTransaction} 
+                                                        disabled={isLinking || !selectedTxToLink} 
+                                                        className="flex-1 h-12 rounded-xl font-black gap-2"
+                                                    >
+                                                        {isLinking ? <Loader2 className="animate-spin h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
+                                                        حفظ وتأكيد الربط
+                                                    </Button>
+                                                    <Button 
+                                                        variant="outline" 
+                                                        onClick={() => setIsTxFormOpen(true)}
+                                                        className="flex-1 h-12 rounded-xl font-bold border-primary/20 text-primary hover:bg-primary/5 gap-2"
+                                                    >
+                                                        <Plus className="h-4 w-4" /> فتح معاملة جديدة +
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </TabsContent>
@@ -355,6 +423,17 @@ export default function AppointmentDetailsPage() {
                     </Button>
                 </CardFooter>
             </Card>
+
+            {isTxFormOpen && appointment?.clientId && (
+                <ClientTransactionForm 
+                    isOpen={isTxFormOpen} 
+                    onClose={() => setIsTxFormOpen(false)} 
+                    clientId={appointment.clientId} 
+                    clientName={client?.nameAr || ''}
+                    fromAppointmentId={appointment.id}
+                />
+            )}
         </div>
     );
 }
+
