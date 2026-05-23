@@ -34,10 +34,10 @@ interface InlineSearchListProps {
 }
 
 /**
- * مكون البحث والاختيار المطور (Refined Edition):
- * - أبعاد رشيقة وخطوط صغيرة ومهنية.
- * - استجابة فورية للنقر بالماوس عبر Pointer Events.
- * - حماية البيانات: يظهر القيمة حتى لو لم تكن في الخيارات (Fallback).
+ * مكون البحث والاختيار المطور (V14.0):
+ * - تم حل مشكلة ظهور المربع فارغاً عند سحب بيانات خارجية (Fallback Display).
+ * - استجابة فورية للنقر بالماوس داخل النوافذ المنبثقة.
+ * - دعم كامل لعرض النص حتى لو لم تنتهِ قائمة الإعدادات من التحميل.
  */
 export function InlineSearchList({
   value,
@@ -49,6 +49,7 @@ export function InlineSearchList({
 }: InlineSearchListProps) {
   const [open, setOpen] = React.useState(false);
   
+  // البحث عن النص الظاهر المقابل للقيمة
   const selectedOption = React.useMemo(() => 
     options.find((option) => option.value === value)
   , [options, value]);
@@ -68,7 +69,7 @@ export function InlineSearchList({
           )}
           disabled={disabled}
         >
-          {/* ✨ التعديل الجوهري: إظهار القيمة المسحوبة حتى لو لم تكتمل قائمة الإعدادات ✨ */}
+          {/* ✨ التعديل الجوهري: إظهار القيمة المسحوبة (مثل: تصميم الدور الأرضي) حتى لو لم تكتمل قائمة الإعدادات ✨ */}
           <span className="truncate">{selectedOption ? selectedOption.label : (value || placeholder)}</span>
           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40 text-primary" />
         </Button>

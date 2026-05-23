@@ -15,7 +15,7 @@ import { doc, deleteDoc, orderBy } from 'firebase/firestore';
 import type { Quotation } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
-import { FileText, Eye, Pencil, Trash2, User, MoreHorizontal } from 'lucide-react';
+import { FileText, Eye, Pencil, Trash2, User, MoreHorizontal, Loader2, AlertTriangle } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { 
@@ -150,7 +150,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                                         <MoreHorizontal className="h-5 w-5"/>
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
+                                <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
                                     <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">خيارات العرض</DropdownMenuLabel>
                                     <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
                                         <Link href={`/dashboard/accounting/quotations/${quotation.id}`}>
@@ -162,8 +162,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                                             <Link href={`/dashboard/accounting/quotations/${quotation.id}/edit`}>
                                                 <Pencil className="h-4 w-4 text-primary"/> تعديل البيانات
                                             </Link>
-                                        </DropdownMenuItem>
-                                    )}
+                                        )}
                                     <DropdownMenuSeparator className="bg-slate-100" />
                                     <DropdownMenuItem onSelect={() => setItemToDelete(quotation)} className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50">
                                         <Trash2 className="h-4 w-4" /> حذف العرض نهائياً

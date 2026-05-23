@@ -110,7 +110,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // 🛡️ محرك المزامنة الفورية الجذري (Zero-Latency Sync) 🛡️
+  // 🛡️ محرك المزامنة الفورية المطلق (Zero-Click Hard-Wired Sync) 🛡️
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
@@ -124,7 +124,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             workNature: q.workNature || q.contract?.specs?.workNature || 'labor_only'
         });
 
-        // 2. مزامنة الدفعات والنسب
+        // 2. مزامنة الدفعات والنسب والروابط الميدانية WBS
         const type = q.financialsType || q.contract?.financialsType || 'fixed';
         const rawItems = q.items || q.contract?.clauses || [];
         
@@ -134,7 +134,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                condition: item.triggerCondition || item.condition || '', // ترجمة WBS LINK
+                condition: item.triggerCondition || item.condition || '', // ✨ المزامنة المطلقة للـ WBS LINK ✨
                 value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
             }))
         });
@@ -165,7 +165,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     fetchRefData();
   }, [isOpen, firestore, tenantId]);
 
-  // ✨ صمام أمان العرض (WBS LINK Safe Options) ✨
+  // ✨ صمام أمان العرض (WBS LINK Fallback Logic) ✨
   const wbsOptions = useMemo(() => {
       const currentValues = financials.milestones.map((m: any) => m.condition).filter(Boolean);
       const existingValues = new Set(fetchedStages.map(s => s.value));
@@ -356,11 +356,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         </h3>
                         <div className="flex items-center gap-4 bg-muted/20 p-3 rounded-2xl border no-print">
                             <Label className="text-xs font-black text-slate-500">نظام الدفع:</Label>
-                            <Select value={financials.type} onValueChange={v => setFinancials({...financials, type: v})}>
+                            <Select value={financials.type} onValueChange={(v: any) => setFinancials({...financials, type: v})}>
                                 <SelectTrigger className="w-44 h-10 rounded-xl border-none bg-white font-black text-primary shadow-md"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl" className="rounded-xl">
                                     <SelectItem value="fixed">مبلغ ثابت (KD)</SelectItem>
-                                    <SelectItem value="percentage">نسب مئوية (%)</SelectItem>
+                                    <SelectItem value="percentage">نسبة مئوية (%)</SelectItem>
                                 </SelectContent>
                             </Select>
                             
@@ -470,7 +470,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     disabled={isSaving || financials.milestones.length === 0 || (financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01)} 
                     className="h-20 px-24 rounded-[2.2rem] font-black text-3xl shadow-2xl shadow-primary/40 gap-4 bg-[#7209B7] text-white border-none transition-all active:scale-95"
                 >
-                    {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <CheckCircle2 className="h-8 w-8" />}
+                    {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
                     توقيع واعتـماد العقـد
                 </Button>
             </div>
