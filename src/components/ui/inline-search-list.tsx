@@ -34,7 +34,7 @@ interface InlineSearchListProps {
 }
 
 /**
- * مكون البحث والاختيار المطور (V15.0):
+ * مكون البحث والاختيار المطور (V16.0):
  * - تم حل مشكلة ظهور المربع فارغاً عند سحب بيانات خارجية (Fallback Display).
  * - استجابة فورية للنقر بالماوس داخل النوافذ المنبثقة.
  * - دعم كامل لعرض النص حتى لو لم تنتهِ قائمة الإعدادات من التحميل.
@@ -79,7 +79,12 @@ export function InlineSearchList({
         align="start"
         dir="rtl"
         style={{ pointerEvents: 'auto' }}
-        onInteractOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[role="listbox"]') || target.closest('[data-radix-select-content]')) {
+                e.preventDefault();
+            }
+        }}
       >
         <Command className="bg-white">
           <div className="flex items-center border-b px-2 bg-slate-50/50">

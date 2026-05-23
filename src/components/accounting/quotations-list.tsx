@@ -152,12 +152,12 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                                 <DropdownMenuContent align="end" dir="rtl" className="rounded-xl p-2 shadow-2xl border-none bg-white">
                                     <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase tracking-widest">خيارات العرض</DropdownMenuLabel>
                                     
-                                    <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                    <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/${quotation.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
                                         <Eye className="h-4 w-4 text-primary"/> عرض وتصدير PDF
                                     </DropdownMenuItem>
 
                                     {quotation.status !== 'accepted' && (
-                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}/edit`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                        <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/${quotation.id}/edit`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
                                             <Pencil className="h-4 w-4 text-primary"/> تعديل البيانات
                                         </DropdownMenuItem>
                                     )}

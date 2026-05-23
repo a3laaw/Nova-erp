@@ -80,6 +80,12 @@ interface ContractClausesFormProps {
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
+/**
+ * نموذج توقيع العقد السيادي (Sovereign Contract Signature V17.0):
+ * - محرك مزامنة صفرية (Zero-Click Sync) لبيانات الـ WBS LINK والمواصفات.
+ * - استجابة مطلقة للقوائم المنسدلة داخل النافذة المنبثقة.
+ * - ربط مالي وقانوني آلي مع شجرة الحسابات.
+ */
 export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transaction, clientId, clientName, quotationIdToUpdate }: ContractClausesFormProps) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -101,11 +107,13 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync V15.0) ✨
+  // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync V16.0) ✨
+  // تم تحصينه لضمان استيراد (السطح، السرداب، WBS LINK) بكافة حالاتهم فوراً.
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
         
+        // 1. مزامنة المواصفات الإنشائية
         setSpecs({
             totalArea: Number(q.totalArea || q.contract?.specs?.totalArea) || 0,
             floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount) || 1,
@@ -114,6 +122,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             workNature: q.workNature || q.contract?.specs?.workNature || 'labor_only'
         });
 
+        // 2. مزامنة الترتيبات المالية والربط الميداني (WBS LINK)
         const type = q.financialsType || q.contract?.financialsType || 'fixed';
         const rawItems = q.items || q.contract?.clauses || [];
         
@@ -123,7 +132,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                condition: item.triggerCondition || item.condition || '', 
+                condition: item.triggerCondition || item.condition || '', // 🛡️ ترجمة حقل الاستحقاق الميداني
                 value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
             }))
         });
@@ -149,6 +158,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     fetchRefData();
   }, [isOpen, firestore, tenantId]);
 
+  // 🛡️ محرك الخيارات الاحتياطية لضمان ظهور النص المسحوب فوراً 🛡️
   const wbsOptions = useMemo(() => {
       const currentValues = financials.milestones.map((m: any) => m.condition).filter(Boolean);
       const existingValues = new Set(fetchedStages.map(s => s.value));
@@ -243,7 +253,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       <DialogContent 
         className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl bg-white" 
         dir="rtl"
-        onPointerDownOutside={(e) => {
+        onInteractOutside={(e) => {
             const target = e.target as HTMLElement;
             if (target.closest('[role="listbox"]') || target.closest('[data-radix-select-content]') || target.closest('[data-inline-search-list-options]')) {
                 e.preventDefault();
