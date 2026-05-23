@@ -21,11 +21,36 @@ import {
 } from '@/components/ui/table';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Loader2, Save, PlusCircle, Trash2, FileSignature, Calculator, Layers, CheckCircle2, Ruler, Building2, Target } from 'lucide-react';
+import { 
+  Loader2, 
+  Save, 
+  PlusCircle, 
+  Trash2, 
+  FileSignature, 
+  Calculator, 
+  Layers, 
+  CheckCircle2, 
+  Ruler, 
+  Building2, 
+  Target,
+  ShieldCheck 
+} from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy, getDoc } from 'firebase/firestore';
+import { 
+  doc, 
+  collection, 
+  serverTimestamp, 
+  getDocs, 
+  query, 
+  runTransaction, 
+  limit, 
+  where, 
+  collectionGroup, 
+  orderBy, 
+  getDoc 
+} from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Client, ClientTransaction, Employee, Department, Account, TechnicalSpecifications, Quotation } from '@/lib/types';
+import type { Client, ClientTransaction, Account, TechnicalSpecifications, Quotation } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
@@ -279,8 +304,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         <Table>
                             <TableHeader className="bg-muted/50 h-14">
                                 <TableRow className="border-none">
-                                    <TableHead className="px-10 font-black">بيان الدفعة</TableHead>
-                                    <TableHead className="font-black">شرط الاستحقاق الميداني (WBS Link)</TableHead>
+                                    <TableHead className="w-32 text-center font-black text-slate-400 border-l border-white/20">رقم الدفعة</TableHead>
+                                    <TableHead className="px-10 font-black text-slate-400 text-right">بيان شرط الاستحقاق (WBS Link)</TableHead>
                                     <TableHead className="text-center w-48 font-black">
                                         {financials.type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                     </TableHead>
@@ -290,13 +315,12 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                             <TableBody>
                                 {financials.milestones.map((m: any, i: number) => (
                                     <TableRow key={m.id} className="h-20 border-b last:border-0 hover:bg-muted/5 transition-all">
-                                        <TableCell className="px-10">
-                                            <div className="flex items-center gap-3">
-                                                <Badge variant="secondary" className="bg-primary/5 text-primary font-black text-[10px] w-8 h-8 rounded-full flex items-center justify-center p-0">{i+1}</Badge>
-                                                <Input value={m.name} onChange={e => { const newM = [...financials.milestones]; newM[i].name = e.target.value; setFinancials({...financials, milestones: newM}); }} className="font-bold border-none shadow-none text-lg bg-transparent" />
-                                            </div>
+                                        <TableCell className="text-center bg-slate-50/50 border-l">
+                                            <Badge variant="secondary" className="font-black text-xs px-4 h-8 rounded-full border-none shadow-sm bg-white text-slate-900">
+                                                {i+1}
+                                            </Badge>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="px-10">
                                             <InlineSearchList 
                                                 value={m.condition || ''} 
                                                 onSelect={v => { const newM = [...financials.milestones]; newM[i].condition = v; setFinancials({...financials, milestones: newM}); }} 
@@ -366,4 +390,3 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     </Dialog>
   );
 }
-
