@@ -26,8 +26,7 @@ import { useFirebase } from '@/firebase';
 import { doc, updateDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Client, ClientTransaction, Employee, Department, Account, ContractFinancialMilestone, TechnicalSpecifications, Quotation } from '@/lib/types';
-import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
-import { useAuth } from '@/context/auth-context';
+import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -35,6 +34,7 @@ import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { InlineSearchList } from '../ui/inline-search-list';
+import { Badge } from '@/components/ui/badge';
 
 interface ContractClausesFormProps {
   isOpen: boolean;
@@ -47,7 +47,7 @@ interface ContractClausesFormProps {
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
-const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
+const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transaction, clientId, clientName, quotationIdToUpdate }: ContractClausesFormProps) {
   const { firestore } = useFirebase();
@@ -214,11 +214,9 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         router.push(`/dashboard/construction/projects/new?clientId=${clientId}&transactionId=${newTxId}`);
     } catch (e: any) {
         console.error(e);
-        toast({ variant: 'destructive', title: 'خطأ في الربط', description: e.message });
+        toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: e.message });
     } finally { setIsSaving(false); }
   };
-
-  const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
