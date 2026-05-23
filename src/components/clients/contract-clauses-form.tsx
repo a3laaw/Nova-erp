@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -102,13 +101,15 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
   const tenantId = currentUser?.currentCompanyId;
 
-  // 1. ✨ محرك المزامنة الفورية الجبار (Quotation-to-Contract Power Sync)
-  // تم تحسينه لترجمة triggerCondition إلى condition بدقة
+  // 1. ✨ محرك المزامنة الفورية (Quotation-to-Contract Auto-Sync)
+  // يضمن تحويل الصورة الأولى (Quotation) إلى الصورة الثانية (Contract Form) آلياً
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
+        // التحقق مما إذا كان المدخل هو عرض سعر (Quotation)
         if (transaction.quotationNumber || transaction.subject) {
             const q = transaction as Quotation;
             
+            // مزامنة المواصفات الفنية
             setSpecs({
                 totalArea: Number(q.totalArea) || 0,
                 floorsCount: Number(q.floorsCount) || 1,
@@ -118,13 +119,15 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             });
 
             const qType = q.financialsType || 'fixed';
+            
+            // مزامنة الدفعات والروابط الميدانية (WBS Sync)
             setFinancials({
                 type: qType,
                 totalAmount: Number(q.totalAmount) || 0,
                 milestones: (q.items || []).map((item: any, idx: number) => ({
                     id: generateId(),
                     name: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                    // 🛡️ تصحيح: مزامنة شرط الاستحقاق الميداني
+                    // 🛡️ المزامنة الحرجة: نقل "شرط الاستحقاق" من عرض السعر ليكون هو الرابط في العقد
                     condition: item.triggerCondition || '',
                     value: qType === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice) || 0)
                 }))
@@ -132,6 +135,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             
             syncedRef.current = true;
         } else if (transaction.contract) {
+            // مزامنة من عقد قائم (حالة التعديل)
             const c = transaction.contract;
             setSpecs(c.specs || {});
             setFinancials({
@@ -151,7 +155,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     if (!isOpen) syncedRef.current = false;
   }, [isOpen, transaction]);
 
-  // 2. ✨ جلب قائمة مراحل العمل لتمكين ربط الدفعات بالمسار الميداني (WBS Link)
+  // 2. جلب مراحل العمل المعتمدة لتمكين الربط اليدوي عند الحاجة
   useEffect(() => {
     if (!isOpen || !firestore || !tenantId) return;
     
@@ -218,7 +222,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             transaction_fs.set(newTxRef, cleanFirestoreData({
                 transactionNumber: txNumber, 
                 clientId, 
-                transactionType: transaction?.transactionType || 'عقد مبيعات',
+                transactionType: transaction?.transactionType || transaction?.subject || 'عقد مبيعات',
                 status: 'in-progress', 
                 contract: contractData, 
                 createdAt: serverTimestamp(),
@@ -234,7 +238,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 transaction_fs.set(newJeRef, cleanFirestoreData({
                     entryNumber: `JV-DIRECT-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
                     date: serverTimestamp(), 
-                    narration: `إثبات مديونية عقد: ${transaction?.transactionType || ''} لـ ${clientName}`,
+                    narration: `إثبات مديونية عقد: ${transaction?.transactionType || transaction?.subject || ''} لـ ${clientName}`,
                     totalDebit: totalAmount, 
                     totalCredit: totalAmount, 
                     status: 'posted',
@@ -257,7 +261,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             }
         });
 
-        toast({ title: 'تم تفعيل العقد', description: 'تم تأسيس المشروع والترحيل المالي بنجاح.' });
+        toast({ title: 'نجاح تفعيل العقد', description: 'تم إنشاء العقد المباشر والترحيل المالي بنجاح.' });
         onClose();
         router.push(`/dashboard/construction/projects/new?clientId=${clientId}&transactionId=${newTxId}`);
     } catch (e: any) {
@@ -268,7 +272,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl" 
+        className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl bg-white" 
         dir="rtl"
         onInteractOutside={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => {
@@ -288,7 +292,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 bg-muted/5">
+        <ScrollArea className="flex-1">
             <div className="p-8 space-y-10">
                 <section className="space-y-6">
                     <h3 className="text-lg font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4">
@@ -342,14 +346,14 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 <section className="space-y-6">
                     <div className="flex justify-between items-center pr-4 border-r-8 border-primary">
                         <h3 className="text-lg font-black flex items-center gap-3 text-[#1e1b4b]">
-                            <Calculator className="h-6 w-6 text-primary"/> الدفعات المالية المعتمدة
+                            <Calculator className="h-6 w-6 text-primary"/> الدفعات المالية المبرمجة
                         </h3>
                         <div className="flex items-center gap-4">
                             <Label className="text-xs font-bold text-slate-500">نظام الدفع:</Label>
                             <Select value={financials.type} onValueChange={v => setFinancials({...financials, type: v, milestones: []})}>
                                 <SelectTrigger className="w-48 h-10 rounded-xl border-2 bg-white font-black text-primary shadow-sm"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
-                                    <SelectItem value="fixed">مبالغ ثابتة (KD)</SelectItem>
+                                    <SelectItem value="fixed">مبلغ ثابت (KD)</SelectItem>
                                     <SelectItem value="percentage">نسب مئوية (%)</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -360,7 +364,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         <Table>
                             <TableHeader className="bg-muted/50 h-14">
                                 <TableRow className="border-none">
-                                    <TableHead className="w-24 text-center font-black text-slate-400 border-l border-white/20">رقم الدفعة</TableHead>
+                                    <TableHead className="w-24 text-center font-black text-slate-400 border-l border-white/20">#</TableHead>
                                     <TableHead className="px-10 font-black text-slate-400 text-right">بيان شرط الاستحقاق (WBS LINK)</TableHead>
                                     <TableHead className="text-center w-48 font-black">
                                         {financials.type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
@@ -411,9 +415,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                             <div className={cn("text-4xl font-black font-mono tracking-tighter text-primary", financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01 ? 'text-red-600' : '')}>
                                                 {financials.type === 'fixed' ? formatCurrency(currentTotalInput) : `${currentTotalInput}%`}
                                             </div>
-                                            {financials.type === 'percentage' && Math.abs(currentTotalInput - 100) > 0.01 && (
-                                                <span className="text-[10px] font-black text-red-600 mt-1 animate-pulse">يجب أن يكون المجموع 100%</span>
-                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell />
