@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -100,14 +99,19 @@ export default function AppointmentDetailsPage() {
                     stage.endDate = now;
                 }
                 
-                // ✨ ذكاء التبعية الموحد: تفعيل المرحلة التالية بناءً على أيام العمل ✨
+                // ✨ ذكاء التبعية الموحد: البحث عن المرحلة التالية المبرمجة يدوياً ✨
                 if (stage.status === 'completed') {
-                    const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                    let nextStage = null;
+                    if (stage.nextStageId) {
+                        nextStage = currentStages.find(s => s.stageId === stage.nextStageId);
+                    } else {
+                        nextStage = currentStages.find(s => s.order === stage.order + 1);
+                    }
+
                     if (nextStage && nextStage.status === 'pending') {
                         nextStage.status = 'in-progress';
                         nextStage.startDate = now;
                         if (nextStage.expectedDurationDays) {
-                            // ✨ استخدام محرك أيام العمل السيادي ✨
                             const expEnd = addWorkingDays(
                                 now, 
                                 nextStage.expectedDurationDays, 
@@ -165,7 +169,7 @@ export default function AppointmentDetailsPage() {
             });
 
             await batch.commit();
-            toast({ title: 'تم توثيق الإنجاز', description: 'تم تحديث سير العمل آلياً بناءً على أيام العمل المعتمدة.' });
+            toast({ title: 'تم توثيق الإنجاز', description: 'تم تحديث سير العمل آلياً بناءً على قواعد التبعية المعتمدة.' });
             router.push('/dashboard/appointments');
         } catch (e) { 
             toast({ variant: 'destructive', title: 'خطأ في التوثيق' }); 

@@ -37,6 +37,7 @@ export interface WorkStage extends BaseEntity {
   expectedDurationDays?: number;
   maxOccurrences?: number;
   allowedRoles?: string[];
+  nextStageId?: string | null; // المرحلة التالية المبرمجة
 }
 
 export interface TransactionStage {
@@ -51,6 +52,7 @@ export interface TransactionStage {
   maxOccurrences?: number;
   order: number;
   expectedDurationDays?: number;
+  nextStageId?: string | null; // تتبع التبعية في المعاملة الحالية
 }
 
 export interface ClientTransaction extends BaseEntity {

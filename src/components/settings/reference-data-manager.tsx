@@ -73,7 +73,6 @@ import {
     defaultWorkStages 
 } from '@/lib/default-reference-data';
 
-// 🛡️ التطهير: استخدام المكتبة الصحيحة لضمان استقرار البناء
 import {
   DndContext,
   closestCenter,
@@ -185,6 +184,7 @@ export function ReferenceDataManager() {
     const [trackingType, setTrackingType] = useState<'duration' | 'occurrence' | 'hybrid' | 'none'>('duration');
     const [expectedDuration, setExpectedDuration] = useState('7');
     const [maxOccurrences, setMaxOccurrences] = useState('3');
+    const [nextStageId, setNextStageId] = useState<string | null>(null);
 
     const tenantId = currentUser?.currentCompanyId;
 
@@ -251,6 +251,7 @@ export function ReferenceDataManager() {
         setTrackingType('duration');
         setExpectedDuration('7');
         setMaxOccurrences('3');
+        setNextStageId(null);
     }, []);
 
     const handleDragEnd = async (event: DragEndEvent, type: 'primary' | 'secondary' | 'tertiary') => {
@@ -300,6 +301,7 @@ export function ReferenceDataManager() {
             if (type === 'tertiary') {
                 payload.parentId = selectedSecondaryId;
                 payload.trackingType = trackingType;
+                payload.nextStageId = nextStageId || null;
                 if (trackingType === 'duration' || trackingType === 'hybrid') payload.expectedDurationDays = parseInt(expectedDuration);
                 if (trackingType === 'occurrence' || trackingType === 'hybrid') payload.maxOccurrences = parseInt(maxOccurrences);
             }
@@ -391,6 +393,12 @@ export function ReferenceDataManager() {
             setIsImporting(false);
         }
     };
+
+    const nextStageOptions = useMemo(() => 
+        tertiaryItems
+            .filter(i => i.id !== editingItem?.id)
+            .map(i => ({ value: i.id!, label: i.name }))
+    , [tertiaryItems, editingItem]);
 
     if (view === 'main') {
         return (
@@ -566,6 +574,11 @@ export function ReferenceDataManager() {
                                                                              item.trackingType === 'hybrid' ? `هجين: ${item.expectedDurationDays}ي / ${item.maxOccurrences}م` :
                                                                              'معيار نصوص'}
                                                                         </Badge>
+                                                                        {item.nextStageId && (
+                                                                            <Badge variant="outline" className="text-[8px] h-4 font-bold border-indigo-200 text-indigo-700 bg-indigo-50">
+                                                                                بعدها: {tertiaryItems.find(i => i.id === item.nextStageId)?.name || '---'}
+                                                                            </Badge>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -583,6 +596,7 @@ export function ReferenceDataManager() {
                                                                     setTrackingType(item.trackingType || 'duration');
                                                                     setExpectedDuration(String(item.expectedDurationDays || '7'));
                                                                     setMaxOccurrences(String(item.maxOccurrences || '3'));
+                                                                    setNextStageId(item.nextStageId || null);
                                                                     setIsTertiaryDialogOpen(true);
                                                                 } else {
                                                                     setIsSecondaryDialogOpen(true); 
@@ -648,6 +662,20 @@ export function ReferenceDataManager() {
                                         </Select>
                                     </div>
                                     
+                                    <div className="grid gap-2 p-5 bg-indigo-50/50 rounded-2xl border-2 border-dashed border-indigo-200">
+                                        <Label className="font-black text-indigo-700 pr-2 text-xs uppercase flex items-center gap-2">
+                                            <Workflow className="h-4 w-4" /> المرحلة التالية التلقائية
+                                        </Label>
+                                        <InlineSearchList 
+                                            value={nextStageId || ''} 
+                                            onSelect={setNextStageId} 
+                                            options={nextStageOptions} 
+                                            placeholder="اختر المرحلة التي ستفتح بعدها..." 
+                                            className="h-10 bg-white"
+                                        />
+                                        <p className="text-[9px] text-indigo-500 font-bold pr-1">سيقوم النظام بتفعيل هذه المرحلة آلياً فور إنجاز المرحلة الحالية.</p>
+                                    </div>
+
                                     {(trackingType === 'duration' || trackingType === 'hybrid') && (
                                         <div className="grid gap-2 animate-in zoom-in-95">
                                             <Label className="font-black text-blue-700 pr-2 text-xs">المدة المتوقعة للإنجاز (يوم) *</Label>
@@ -709,4 +737,3 @@ export function ReferenceDataManager() {
         </div>
     );
 }
-

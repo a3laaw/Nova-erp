@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -162,7 +161,6 @@ export default function TransactionDetailPage() {
             if (newStatus === 'in-progress' && !stage.startDate) {
                 stage.startDate = now;
                 if (stage.expectedDurationDays) {
-                    // ✨ استخدام محرك أيام العمل السيادي ✨
                     const expectedEnd = addWorkingDays(
                         now, 
                         stage.expectedDurationDays, 
@@ -176,8 +174,15 @@ export default function TransactionDetailPage() {
             if (newStatus === 'completed') {
                 stage.endDate = now;
                 
-                // ✨ ذكاء التبعية الموحد: تشغيل المرحلة التالية آلياً ✨
-                const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                // ✨ ذكاء التبعية الموحد: البحث عن المرحلة التالية المبرمجة يدوياً أولاً ✨
+                let nextStage = null;
+                if (stage.nextStageId) {
+                    nextStage = currentStages.find(s => s.stageId === stage.nextStageId);
+                } else {
+                    // Fallback to order-based progression
+                    nextStage = currentStages.find(s => s.order === stage.order + 1);
+                }
+
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
                     nextStage.startDate = now;
@@ -194,7 +199,7 @@ export default function TransactionDetailPage() {
             }
 
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: 'تم التحديث', description: newStatus === 'completed' ? 'تم إنجاز المرحلة وفتح التالية آلياً بناءً على أيام العمل.' : 'بدأ العمل في المرحلة.' });
+            toast({ title: 'تم التحديث', description: newStatus === 'completed' ? 'تم إنجاز المرحلة وفتح التالية آلياً.' : 'بدأ العمل في المرحلة.' });
         } finally { setIsProcessing(false); }
   };
 
