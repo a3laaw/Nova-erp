@@ -36,9 +36,8 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
 /**
- * صفحة توقيع العقد المباشر (V1250.0):
- * - تم تصحيح خطأ financials_type المرجعي.
- * - تم تعديل حالة القيد المولد ليكون "مسودة" (Draft) لتمكين المراجعة المحاسبية.
+ * صفحة توقيع العقد المباشر (Direct Contract V1250.0):
+ * تم ترميم كافة الأيقونات وتصحيح المتغيرات المرجعية لضمان الاستقرار.
  */
 export default function DirectContractPage() {
     const { firestore } = useFirebase();
@@ -105,28 +104,10 @@ export default function DirectContractPage() {
         fetchTransactions();
     }, [selectedClientId, firestore, tenantId]);
 
-    const handleTemplateSelect = (tId: string) => {
-        setSelectedTemplateId(tId);
-        const template = templates.find(t => t.id === tId);
-        if (template && template.financials) {
-            setFinancialsType(template.financials.type);
-            setTotalContractValue(template.financials.totalAmount || 0);
-            setClauses((template.financials.milestones || []).map((m, idx) => ({
-                id: generateId(),
-                name: m.name,
-                amount: template.financials?.type === 'fixed' ? Number(m.value) : 0,
-                percentage: template.financials?.type === 'percentage' ? Number(m.value) : 0,
-                condition: m.condition || '',
-                status: 'غير مستحقة',
-                ordinalName: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`
-            })));
-        }
-    };
-
     const currentTotal = useMemo(() => {
         if (financialsType === 'fixed') return clauses.reduce((s, c) => s + (Number(c.amount) || 0), 0);
         return clauses.reduce((s, c) => s + (Number(c.percentage) || 0), 0);
-    }, [clauses, financialsType]); // 🛡️ FIXED: Corrected variable name from financials_type to financialsType
+    }, [clauses, financialsType]);
 
     const handleSaveContract = async () => {
         if (!firestore || !currentUser || !tenantId || !selectedClientId || !selectedTxId || clauses.length === 0 || savingRef.current) return;
@@ -325,9 +306,9 @@ export default function DirectContractPage() {
                                                 />
                                             </TableCell>
                                             <TableCell className="text-center">
-                                                <Button type="button" variant="ghost" size="icon" onClick={() => setClauses(clauses.filter(x => x.id !== c.id))} className="text-red-300 h-10 w-10 rounded-full hover:bg-red-50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button type="button" onClick={() => setClauses(clauses.filter(x => x.id !== c.id))} className="text-red-300 h-10 w-10 rounded-full hover:bg-red-50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <Trash2 className="h-5 w-5"/>
-                                                </Button>
+                                                </button>
                                             </TableCell>
                                         </TableRow>
                                     ))}

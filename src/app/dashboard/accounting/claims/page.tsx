@@ -168,7 +168,7 @@ export default function FinancialClaimsPage() {
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader className="bg-[#F8F9FE]">
-                            <TableRow className="h-14">
+                            <TableRow className="h-14 border-none">
                                 <TableHead className="px-10 font-black text-[#7209B7]">رقم المطالبة</TableHead>
                                 <TableHead className="font-black text-[#7209B7]">العميل والمشروع</TableHead>
                                 <TableHead className="text-left font-black text-[#7209B7]">قيمة المطالبة</TableHead>
@@ -179,7 +179,7 @@ export default function FinancialClaimsPage() {
                         </TableHeader>
                         <TableBody>
                             {filteredClaims.length === 0 ? (
-                                <TableRow><TableCell colSpan={6} className="h-48 text-center opacity-30 italic font-black text-xl">لا توجد مطالبات نشطة.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-bold italic text-xl">لا توجد مطالبات نشطة.</TableCell></TableRow>
                             ) : (
                                 filteredClaims.map(claim => (
                                     <TableRow key={claim.id} className={cn("h-20 hover:bg-[#F3E8FF]/20 group transition-colors", claim.isCritical && "bg-red-50/30")}>

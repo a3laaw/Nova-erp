@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, ChevronsUpDown, Search, PlusCircle, Fingerprint } from 'lucide-react';
+import { Check, ChevronsUpDown, Search, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,9 +36,9 @@ interface InlineSearchListProps {
 }
 
 /**
- * مكون البحث والاختيار السيادي المطور (V26.0):
+ * مكون البحث والاختيار السيادي المطور (Sovereign Clarity Engine V26.0):
  * - تم حل مشكلة تشابه الأسماء عبر إظهار الـ searchKey (الكود/القسم) في كبسولة جانبية.
- * - تحسين التباين اللوني (Text Contrast) لضمان سهولة القراءة.
+ * - تحسين التباين اللوني (Text Contrast) لضمان سهولة القراءة القصوى (Black Text).
  */
 export function InlineSearchList({
   value,

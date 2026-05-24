@@ -62,14 +62,16 @@
   /* 🌟 محرك أنيميشن "انفجار النوفا" (Nova Motion Engine V3.5) 🌟 */
   
   .nova-glow-nebula {
-    background: radial-gradient(circle, rgba(255,122,0,0.15) 0%, rgba(255,253,240,0) 70%);
+    background: radial-gradient(circle, rgba(255,122,0,0.2) 0%, rgba(255,253,240,0) 70%);
     filter: blur(60px);
-    animation: nebula-pulse 5s ease-in-out infinite;
+    animation: nebula-pulse 4s ease-in-out infinite;
+    position: absolute;
+    z-index: 0;
   }
 
   @keyframes nebula-pulse {
     0%, 100% { transform: scale(1); opacity: 0.3; }
-    50% { transform: scale(1.4); opacity: 0.5; }
+    50% { transform: scale(1.3); opacity: 0.5; }
   }
 
   .nova-plasma-ring {
@@ -77,10 +79,10 @@
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    border: 3px solid transparent;
-    border-top: 3px solid #FF7A00;
-    filter: drop-shadow(0 0 15px rgba(255, 122, 0, 0.4));
-    animation: plasma-spin 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    border: 2px solid rgba(255, 122, 0, 0.1);
+    border-top: 3.5px solid #FF7A00;
+    filter: drop-shadow(0 0 10px rgba(255, 122, 0, 0.4));
+    animation: plasma-spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 
   @keyframes plasma-spin {
@@ -92,38 +94,39 @@
   /* جزيئات الانفجار المتطايرة */
   .stardust-particle {
     position: absolute;
-    width: 3px;
-    height: 3px;
+    width: 2px;
+    height: 2px;
     background: #FF7A00;
     border-radius: 100%;
-    filter: blur(0.5px);
-    animation: particle-blast 2.5s ease-out infinite;
+    filter: blur(0.3px);
+    animation: particle-blast 3s ease-out infinite;
     opacity: 0;
   }
 
   @keyframes particle-blast {
-    0% { transform: translate(0, 0) scale(1); opacity: 1; }
-    80% { opacity: 0.6; }
+    0% { transform: translate(0, 0) scale(1); opacity: 0; }
+    10% { opacity: 1; }
+    80% { opacity: 0.4; }
     100% { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) scale(0); opacity: 0; }
   }
 
   .nova-text-glow {
-    text-shadow: 0 0 20px rgba(255, 122, 0, 0.3), 0 0 40px rgba(255, 122, 0, 0.1);
-    animation: text-pulse 2s ease-in-out infinite;
+    text-shadow: 0 0 25px rgba(255, 122, 0, 0.4), 0 0 45px rgba(255, 122, 0, 0.1);
+    animation: text-breathing 2.5s ease-in-out infinite;
   }
 
-  @keyframes text-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.8; transform: scale(0.98); }
+  @keyframes text-breathing {
+    0%, 100% { opacity: 1; transform: scale(1); filter: blur(0px); }
+    50% { opacity: 0.85; transform: scale(0.97); filter: blur(0.5px); }
   }
 
   .animate-bounce-dots {
-    animation: bounce-dots 0.8s infinite alternate;
+    animation: bounce-dots 0.6s infinite alternate;
   }
 
   @keyframes bounce-dots {
     from { transform: translateY(0); opacity: 0.4; }
-    to { transform: translateY(-6px); opacity: 1; }
+    to { transform: translateY(-5px); opacity: 1; }
   }
 }
 
