@@ -36,21 +36,11 @@ const kuwaitGovernorates: Option[] = [
 export function GovernorateCombobox() {
   const [open, setOpen] = React.useState(false)
   const [value, setValue] = React.useState("")
-  const isSelectingRef = React.useRef(false)
 
   const selectedOption = kuwaitGovernorates.find((o) => o.value === value)
 
   return (
-    <Popover 
-      open={open} 
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen && isSelectingRef.current) {
-          isSelectingRef.current = false;
-          return;
-        }
-        setOpen(nextOpen);
-      }}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -66,12 +56,7 @@ export function GovernorateCombobox() {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent 
-        className="w-[--radix-popover-trigger-width] p-0 z-[999999]"
-        onInteractOutside={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-        data-governorate-combobox-options
-      >
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[999999]">
         <Command>
           <CommandInput placeholder="ابحث عن محافظة..." />
           <CommandList>
@@ -81,16 +66,13 @@ export function GovernorateCombobox() {
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  onPointerDown={() => {
-                    isSelectingRef.current = true;
-                  }}
-                  onPointerUp={() => {
-                    isSelectingRef.current = false;
-                    setValue(option.value === value ? "" : option.value);
-                    setOpen(false);
-                  }}
-                  onSelect={() => {
-                    setValue(option.value === value ? "" : option.value);
+                  onSelect={(currentLabel) => {
+                    const selected = kuwaitGovernorates.find(
+                      (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
+                    );
+                    if (selected) {
+                      setValue(selected.value);
+                    }
                     setOpen(false);
                   }}
                 >

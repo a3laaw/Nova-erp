@@ -46,21 +46,11 @@ export function Combobox({
     className,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
-  const isSelectingRef = React.useRef(false)
 
   const selectedLabel = options.find((option) => option.value === value)?.label
 
   return (
-    <Popover 
-      open={open} 
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen && isSelectingRef.current) {
-          isSelectingRef.current = false;
-          return;
-        }
-        setOpen(nextOpen);
-      }}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -74,11 +64,7 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent 
-        className="w-[--radix-popover-trigger-width] p-0 z-[999999]"
-        onInteractOutside={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-      >
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[999999]">
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -88,16 +74,6 @@ export function Combobox({
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  onPointerDown={() => {
-                    isSelectingRef.current = true;
-                  }}
-                  onPointerUp={() => {
-                    isSelectingRef.current = false;
-                    if (onValueChange) {
-                      onValueChange(option.value === value ? "" : option.value);
-                    }
-                    setOpen(false);
-                  }}
                   onSelect={() => {
                     if (onValueChange) {
                        onValueChange(option.value === value ? "" : option.value);
