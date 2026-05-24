@@ -22,7 +22,8 @@ import {
     Sparkles,
     Target,
     AlertCircle,
-    ShieldCheck
+    ShieldCheck,
+    PlusCircle // 🛡️ تم إضافة الاستيراد المفقود هنا
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
@@ -124,7 +125,7 @@ export default function DirectContractPage() {
     const currentTotal = useMemo(() => {
         if (financialsType === 'fixed') return clauses.reduce((s, c) => s + (Number(c.amount) || 0), 0);
         return clauses.reduce((s, c) => s + (Number(c.percentage) || 0), 0);
-    }, [clauses, financialsType]);
+    }, [clauses, financials_type]);
 
     const handleSaveContract = async () => {
         if (!firestore || !currentUser || !tenantId || !selectedClientId || !selectedTxId || clauses.length === 0 || savingRef.current) return;
@@ -197,7 +198,7 @@ export default function DirectContractPage() {
                     date: serverTimestamp(), 
                     narration: `[قيد مديونية مباشر] عقد: ${selectedTx.transactionType} لـ ${selectedClient.nameAr} - بانتظار المراجعة`,
                     totalDebit: finalTotal, totalCredit: finalTotal, 
-                    status: 'draft', // 🛡️ تم التغيير لمسودة
+                    status: 'draft', 
                     lines: [
                         { accountId: clientAccountId, accountName: selectedClient.nameAr, debit: finalTotal, credit: 0, auto_profit_center: selectedTxId },
                         { accountId: revenueAccSnap.docs[0]?.id || '4101', accountName: revenueAccSnap.docs[0]?.data()?.name || 'إيرادات عقود', debit: 0, credit: finalTotal, auto_profit_center: selectedTxId }
