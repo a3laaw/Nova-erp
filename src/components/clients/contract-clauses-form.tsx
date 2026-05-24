@@ -40,7 +40,6 @@ import {
   CheckCircle2, 
   Target,
   ShieldCheck,
-  AlertCircle,
   Ruler,
   Building2,
   Workflow
@@ -70,9 +69,9 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 /**
- * نموذج توقيع العقد السيادي (Sovereign Contract Engine V1100.0):
- * - تم إحكام المزامنة الصفرية لضمان انتقال "شرط الاستحقاق" من العرض للعقد بدقة 100%.
- * - دعم الحقول الهجينة للكتابة اليدوية والآلية.
+ * نموذج توقيع العقد السيادي (Sovereign Contract Engine V1200.0):
+ * - تم حل خطأ "القراءة بعد الكتابة" في Firestore Transactions.
+ * - إحكام المزامنة الصفرية لضمان انتقال "شرط الاستحقاق" من العرض للعقد بدقة 100%.
  */
 export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName, quotationIdToUpdate }: any) {
   const { firestore } = useFirebase();
@@ -95,7 +94,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   const [fetchedStages, setFetchedStages] = useState<{ value: string, label: string }[]>([]);
   const syncedRef = useRef(false);
 
-  // ✨ محرك المزامنة الصفرية: حقن البيانات من عرض السعر قسرياً ✨
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
@@ -117,7 +115,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                // 🛡️ المزامنة المطلقة: مسح كافة احتمالات تسمية حقل الربط الميداني 🛡️
                 condition: item.triggerCondition || item.condition || (idx === 0 ? 'عند توقيع العقد' : ''), 
                 value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
             }))
@@ -168,32 +165,44 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
     savingRef.current = true;
     setIsSaving(true);
-    try {
-        await runTransaction(firestore, async (transaction_fs) => {
-            const currentYear = new Date().getFullYear();
-            const coaPath = getTenantPath('chartOfAccounts', tenantId);
-            
-            // 🛡️ التأسيس المالي التلقائي (Auto-COA)
-            const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
-            const clientAccQuery = query(collection(firestore, coaPath!), where('name', '==', clientName), where('parentCode', '==', '1102'), limit(1));
-            const clientAccSnap = await getDocs(clientAccQuery);
 
+    try {
+        const coaPath = getTenantPath('chartOfAccounts', tenantId);
+        
+        // 🛡️ Pre-Transaction Reads (Regular Reads)
+        const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
+        const clientAccSnap = await getDocs(query(collection(firestore, coaPath!), where('name', '==', clientName), where('parentCode', '==', '1102'), limit(1)));
+        
+        await runTransaction(firestore, async (transaction_fs) => {
+            // 🛡️ Step 1: All internal transaction reads MUST happen at the start
+            const currentYear = new Date().getFullYear();
+            const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
+            const coaSubCounterPath = getTenantPath('counters/coa_clients', tenantId);
+            
+            const jeCounterRef = doc(firestore, jeCounterPath!);
+            const coaSubCounterRef = doc(firestore, coaSubCounterPath!);
+            
+            // EXECUTE ALL READS FIRST
+            const [jeCounterDoc, coaSubCounterDoc] = await Promise.all([
+                transaction_fs.get(jeCounterRef),
+                transaction_fs.get(coaSubCounterRef)
+            ]);
+
+            // 🛡️ Step 2: Logic and Calculations based on reads
             let clientAccountId = '';
             if (clientAccSnap.empty) {
-                const counterPath = getTenantPath('counters/coa_clients', tenantId);
-                const counterRef = doc(firestore, counterPath!);
-                const counterDoc = await transaction_fs.get(counterRef);
-                const nextClientNum = (counterDoc.data()?.lastNumber || 0) + 1;
+                const nextClientNum = (coaSubCounterDoc.data()?.lastNumber || 0) + 1;
                 const clientCode = `1102C${String(nextClientNum).padStart(4, '0')}`;
                 
                 const newAccRef = doc(collection(firestore, coaPath!));
                 clientAccountId = newAccRef.id;
+                
                 transaction_fs.set(newAccRef, {
                     code: clientCode, name: clientName, type: 'asset', level: 3,
                     parentCode: '1102', isPayable: true, statement: 'Balance Sheet', balanceType: 'Debit',
                     companyId: tenantId, createdAt: serverTimestamp()
                 });
-                transaction_fs.set(counterRef, { lastNumber: nextClientNum }, { merge: true });
+                transaction_fs.set(coaSubCounterRef, { lastNumber: nextClientNum }, { merge: true });
             } else {
                 clientAccountId = clientAccSnap.docs[0].id;
             }
@@ -208,17 +217,14 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const totalAmount = financials.type === 'fixed' ? currentTotalInput : financials.totalAmount;
             
+            // 🛡️ Step 3: Execute all writes
             transaction_fs.update(txRef, {
                 status: 'in-progress',
                 contract: cleanFirestoreData({ clauses: finalClauses, totalAmount, financialsType: financials.type, specs }),
                 updatedAt: serverTimestamp()
             });
 
-            const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
-            const jeCounterRef = doc(firestore, jeCounterPath!);
-            const jeCounterDoc = await transaction_fs.get(jeCounterRef);
             const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-
             const jePath = getTenantPath('journalEntries', tenantId);
             const newJeRef = doc(collection(firestore, jePath!));
 
@@ -234,12 +240,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 clientId, transactionId: targetTxId, createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
             }));
 
-            transaction_fs.set(jeCounterRef, { counts: { [currentYear]: nextJeNum } }, { merge: true });
-
-            if (quotationIdToUpdate) {
-                const qPath = getTenantPath(`quotations/${quotationIdToUpdate}`, tenantId);
-                transaction_fs.update(doc(firestore, qPath!), { status: 'accepted' });
-            }
+            transaction_fs.set(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum }, { merge: true });
             
             const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
             transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
@@ -249,7 +250,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ في المسار', description: e.message });
+        console.error("Critical Transaction Failure:", e);
+        toast({ variant: 'destructive', title: 'خطأ تقني في المعالجة', description: e.message });
     } finally { setIsSaving(false); savingRef.current = false; }
   };
 
