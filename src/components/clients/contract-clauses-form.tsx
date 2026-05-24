@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -80,12 +81,6 @@ interface ContractClausesFormProps {
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
-/**
- * نموذج توقيع العقد السيادي (Sovereign Contract Signature V18.0):
- * - محرك مزامنة صفرية (Zero-Click Sync) لبيانات الـ WBS LINK والمواصفات.
- * - استجابة مطلقة للقوائم المنسدلة داخل النافذة المنبثقة.
- * - ربط مالي وقانوني آلي مع شجرة الحسابات.
- */
 export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transaction, clientId, clientName, quotationIdToUpdate }: ContractClausesFormProps) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -108,12 +103,11 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const syncedRef = useRef(false);
 
   // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync V18.0) ✨
-  // تم تحصينه لضمان استيراد (السطح، السرداب، WBS LINK) بكافة حالاتهم فوراً وبشكل قسري.
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
         
-        // 1. مزامنة المواصفات الإنشائية (قسرياً)
+        // 1. مزامنة المواصفات الإنشائية
         setSpecs({
             totalArea: Number(q.totalArea || q.contract?.specs?.totalArea || 0),
             floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount || 1),
@@ -132,7 +126,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                condition: item.triggerCondition || item.condition || '', // 🛡️ ترجمة حقل الاستحقاق الميداني
+                condition: item.triggerCondition || item.condition || '', 
                 value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
             }))
         });
@@ -158,7 +152,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     fetchRefData();
   }, [isOpen, firestore, tenantId]);
 
-  // 🛡️ محرك الخيارات الاحتياطية لضمان ظهور النص المسحوب فوراً 🛡️
   const wbsOptions = useMemo(() => {
       const currentValues = financials.milestones.map((m: any) => m.condition).filter(Boolean);
       const existingValues = new Set(fetchedStages.map(s => s.value));
@@ -199,23 +192,51 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const totalAmount = financials.type === 'fixed' ? currentTotalInput : financials.totalAmount;
             const contractData = { clauses: finalClauses, totalAmount, financialsType: financials.type, specs };
 
+            // 🛡️ ذكاء التعرف على المعاملة المرتبطة (Fixed Path Logic) 🛡️
+            const existingTxId = (transaction as any).transactionId;
+            let txRef;
+            
+            if (existingTxId) {
+                // تحديث المعاملة القائمة (مثل TX01) لمنع ظهور TX03 مكرر
+                const txPath = getTenantPath(`clients/${clientId}/transactions/${existingTxId}`, tenantId);
+                txRef = doc(firestore, txPath!);
+                
+                transaction_fs.update(txRef, {
+                    status: 'in-progress',
+                    contract: cleanFirestoreData(contractData),
+                    updatedAt: serverTimestamp()
+                });
+            } else {
+                // إنشاء معاملة جديدة فقط إذا لم يكن عرض السعر مربوطاً مسبقاً
+                const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
+                const clientRef = doc(firestore, clientPath!);
+                const clientSnap = await transaction_fs.get(clientRef);
+                const nextTxCount = (clientSnap.data()?.transactionCounter || 0) + 1;
+                const txNumber = `CL${clientSnap.data()?.fileNumber}-TX${String(nextTxCount).padStart(2, '0')}`;
+                
+                const txsCollectionPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
+                txRef = doc(collection(firestore, txsCollectionPath!));
+                
+                transaction_fs.set(txRef, cleanFirestoreData({
+                    transactionNumber: txNumber, 
+                    clientId, 
+                    transactionType: transaction?.transactionType || transaction?.subject || 'عقد مبيعات',
+                    transactionTypeId: transaction?.transactionTypeId || null,
+                    subServiceId: transaction?.subServiceId || null,
+                    subServiceName: transaction?.subServiceName || null,
+                    assignedEngineerId: transaction?.assignedEngineerId || null,
+                    status: 'in-progress', 
+                    contract: contractData, 
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
+                }));
+                
+                transaction_fs.update(clientRef, { transactionCounter: nextTxCount, status: 'contracted' });
+            }
+
+            // تحديث حالة العميل للمنظمة بالكامل
             const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
-            const clientRef = doc(firestore, clientPath!);
-            const clientSnap = await transaction_fs.get(clientRef);
-            const nextTxCount = (clientSnap.data()?.transactionCounter || 0) + 1;
-            const txNumber = `CL${clientSnap.data()?.fileNumber}-TX${String(nextTxCount).padStart(2, '0')}`;
-            
-            const txsCollectionPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
-            const newTxRef = doc(collection(firestore, txsCollectionPath!));
-            
-            transaction_fs.set(newTxRef, cleanFirestoreData({
-                transactionNumber: txNumber, clientId, 
-                transactionType: transaction?.transactionType || transaction?.subject || 'عقد مبيعات',
-                status: 'in-progress', contract: contractData, createdAt: serverTimestamp(),
-                assignedEngineerId: transaction?.assignedEngineerId || null, companyId: tenantId
-            }));
-            
-            transaction_fs.update(clientRef, { transactionCounter: nextTxCount, status: 'contracted' });
+            transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
 
             if (!revenueAccSnap.empty && !clientAccSnap.empty) {
                 const jePath = getTenantPath('journalEntries', tenantId);
@@ -226,21 +247,21 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                     narration: `إثبات مديونية عقد: ${transaction?.transactionType || transaction?.subject || ''} لـ ${clientName}`,
                     totalDebit: totalAmount, totalCredit: totalAmount, status: 'posted',
                     lines: [
-                        { accountId: clientAccSnap.docs[0].id, accountName: clientName, debit: totalAmount, credit: 0, auto_profit_center: newTxRef.id },
-                        { accountId: revenueAccSnap.docs[0].id, accountName: revenueAccSnap.docs[0].data().name, debit: 0, credit: totalAmount, auto_profit_center: newTxRef.id }
+                        { accountId: clientAccSnap.docs[0].id, accountName: clientName, debit: totalAmount, credit: 0, auto_profit_center: txRef.id },
+                        { accountId: revenueAccSnap.docs[0].id, accountName: revenueAccSnap.docs[0].data().name, debit: 0, credit: totalAmount, auto_profit_center: txRef.id }
                     ],
-                    clientId, transactionId: newTxRef.id, createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
+                    clientId, transactionId: txRef.id, createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
                 }));
                 transaction_fs.set(jeCounterRef, { counts: { [currentYear]: nextJeNum } }, { merge: true });
             }
 
             if (quotationIdToUpdate) {
                 const qPath = getTenantPath(`quotations/${quotationIdToUpdate}`, tenantId);
-                transaction_fs.update(doc(firestore, qPath!), { status: 'accepted', transactionId: newTxRef.id });
+                transaction_fs.update(doc(firestore, qPath!), { status: 'accepted', transactionId: txRef.id });
             }
         });
 
-        toast({ title: 'تم توقيع العقد', description: 'تم إنشاء العقد المبرم والترحيل المالي آلياً.' });
+        toast({ title: 'تم توقيع العقد', description: 'تم تحديث المعاملة الأصلية والترحيل المالي آلياً.' });
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
@@ -392,7 +413,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         </Table>
                         <div className="p-8 flex justify-center bg-muted/5 border-t border-dashed no-print">
                             <Button variant="outline" onClick={() => setFinancials({...financials, milestones: [...financials.milestones, {id: generateId(), name: `الدفعة الجديدة`, value: 0, condition: ''}]})} className="h-14 px-12 rounded-2xl border-dashed border-2 font-black text-primary gap-3 hover:bg-white shadow-xl hover:scale-105 transition-all active:scale-95">
-                                <PlusCircle className="h-6 w-6" /> إضافة دفعة استحقاق جديدة +
+                                <PlusCircle className="h-6 w-6 text-primary" /> إضافة دفعة استحقاق جديدة +
                             </Button>
                         </div>
                     </div>
@@ -412,7 +433,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 <Button 
                     onClick={handleSubmit} 
                     disabled={isSaving || financials.milestones.length === 0} 
-                    className="h-20 px-24 rounded-[2.2rem] font-black text-3xl shadow-2xl shadow-primary/40 gap-4 bg-[#7209B7] text-white border-none transition-all active:scale-95"
+                    className="h-20 px-24 rounded-[2.2rem] font-black text-3xl shadow-2xl shadow-primary/40 gap-4 bg-[#7209B7] text-white border-none transition-all active:scale-[1.02]"
                 >
                     {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
                     توقيع واعتـماد العقـد
