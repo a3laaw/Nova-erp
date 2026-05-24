@@ -9,12 +9,12 @@ import { AlertCircle, RefreshCcw, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
-import { OfflineIndicator } from '@/components/ui/offline-indicator';
+import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 /**
  * جزيئات غبار النجوم الصامتة (Silent Stardust Engine):
- * محاكاة للجسيمات المتطايرة بحركة هادئة جداً.
+ * محاكاة للجسيمات المتطايرة بحركة هادئة جداً لضمان فخامة تجربة "النوفا".
  */
 const Stardust = () => {
     return (
@@ -52,6 +52,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setMounted(true);
+    // 🛡️ صمام أمان: إذا استمر التحميل أكثر من 10 ثوانٍ، نظهر خيار الخروج الطارئ والإصلاح
     const timer = setTimeout(() => {
       setShowEmergencyExit(true);
     }, 10000); 
@@ -63,7 +64,7 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 🛡️ شاشة التحميل المطابقة للصورة المرجعية (Silent Nova V4.0) 🛡️
+  // 🛡️ شاشة التحميل "النوفا الصامتة V4.0" 🛡️
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
@@ -95,14 +96,14 @@ export default function DashboardLayout({
                         <div className="h-1.5 w-1.5 bg-[#FFB000] rounded-full animate-bounce-dots" style={{ animationDelay: '0.2s' }} />
                         <div className="h-1.5 w-1.5 bg-[#E66D00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.4s' }} />
                     </div>
-                    <p className="text-[#1e1b4b] font-black text-lg tracking-tight opacity-70 order-1">جاري التحميل</p>
+                    <p className="text-[#1e1b4b] font-black text-lg tracking-tight opacity-70 order-1">جاري استعادة الجلسة السيادية</p>
                 </div>
                 
                 {showEmergencyExit && (
                     <div className="mt-8 animate-in zoom-in-95 duration-500 glass-effect p-6 rounded-[2.5rem] border-2 border-white shadow-2xl max-w-xs mx-auto">
                         <div className="flex gap-3">
-                            <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] border-slate-200">تحديث</Button>
-                            <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] text-red-600">خروج</Button>
+                            <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] border-slate-200">تحديث الصفحة</Button>
+                            <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] text-red-600">خروج وإصلاح</Button>
                         </div>
                     </div>
                 )}
@@ -112,12 +113,16 @@ export default function DashboardLayout({
     );
   }
 
+  // 🛡️ حماية المسار السيادي
   if (!user || !user.currentCompanyId) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]" dir="rtl">
-        <AlertCircle className="h-12 w-12 text-red-600 animate-bounce" />
+        <div className="p-6 bg-red-500/10 rounded-full border-2 border-red-500/20 mb-4">
+            <AlertCircle className="h-12 w-12 text-red-400 animate-bounce" />
+        </div>
         <h2 className="text-3xl font-black text-[#1e1b4b]">انتهت جلسة العمل</h2>
-        <Button onClick={handleSafeExit} className="bg-primary text-white font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl">بوابة الدخول</Button>
+        <p className="text-slate-500 font-bold max-w-xs mx-auto">يرجى تسجيل الدخول مرة أخرى للوصول إلى بياناتك المعزولة.</p>
+        <Button onClick={handleSafeExit} className="bg-[#FF7A00] text-white font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:bg-[#E66D00] active:scale-95 transition-all">بوابة الدخول</Button>
       </div>
     );
   }
