@@ -148,8 +148,8 @@ export default function TransactionDetailPage() {
   }, [firestore, tenantId]);
 
   /**
-   * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V1800.0) ✨
-   * تنفيذ منطق الأزرار الثلاثة مع التشغيل التلقائي للمرحلة التالية.
+   * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V1900.0) ✨
+   * تنفيذ منطق الأزرار الثلاثة مع التشغيل التلقائي المتشعب للمراحل التالية.
    */
   const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
         if (!firestore || !currentUser || !transaction || !transactionPath) return;
@@ -175,14 +175,14 @@ export default function TransactionDetailPage() {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 
-                // ✨ تفعيل المرحلة التالية تلقائياً (Auto-Start Following Stage) ✨
-                // يتم البحث حسب التبعية الصريحة أو الترتيب الرقمي
+                // ✨ تفعيل المسارات التالية آلياً بدعم التشعب (Successor Activation) ✨
+                // 1. البحث في القائمة الصريحة للمراحل التالية المعرفة في القالب
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
                         const target = currentStages.find(s => s.stageId === nid);
                         if (target && target.status === 'pending') {
-                            target.status = 'in-progress'; // يبدأ العمل آلياً
+                            target.status = 'in-progress'; 
                             target.startDate = Timestamp.fromDate(now);
                             if (target.expectedDurationDays) {
                                 target.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
@@ -190,14 +190,26 @@ export default function TransactionDetailPage() {
                         }
                     });
                 } else {
+                    // 2. إذا لم يوجد ربط صريح، نفترض التسلسل التقليدي حسب الترتيب (Order)
                     const nextStage = currentStages.find(s => s.order === stage.order + 1);
                     if (nextStage && nextStage.status === 'pending') {
-                        nextStage.status = 'in-progress'; // يبدأ العمل آلياً
+                        nextStage.status = 'in-progress';
                         nextStage.startDate = Timestamp.fromDate(now);
                         if (nextStage.expectedDurationDays) {
                             nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
                         }
                     }
+                }
+
+                // تحديث الأثر المالي في العقد
+                if (transaction.contract?.clauses) {
+                    const updatedClauses = transaction.contract.clauses.map((clause: any) => {
+                        if (clause.condition === stage.name && clause.status === 'غير مستحقة') {
+                            return { ...clause, status: 'مستحقة' };
+                        }
+                        return clause;
+                    });
+                    await updateDoc(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
                 }
             }
 
@@ -205,7 +217,7 @@ export default function TransactionDetailPage() {
             
             toast({ 
                 title: 'تم تحديث المسار', 
-                description: action === 'complete' ? 'تم إنهاء المرحلة وبدء المرحلة التالية آلياً.' : 
+                description: action === 'complete' ? 'تم إنهاء المرحلة وبدء التبعات التالية آلياً.' : 
                              action === 'modify' ? 'تم تسجيل جولة تعديل بنجاح.' : 'تم تسجيل بدء العمل الفعلي.' 
             });
         } catch (e: any) {
@@ -222,11 +234,12 @@ export default function TransactionDetailPage() {
             if (stageIndex === -1) throw new Error("Stage not found");
             
             const stage = currentStages[stageIndex];
+            // العودة لحالة "قيد التنفيذ" وإلغاء تاريخ الانتهاء
             stage.status = 'in-progress';
             stage.endDate = null;
             
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: 'تم التراجع', description: 'تمت إعادة المرحلة لوضع التنفيذ.' });
+            toast({ title: 'تم التراجع عن الإنجاز', description: 'عادت المرحلة لوضع التنفيذ النشط.' });
         } finally { setIsProcessing(false); }
   };
 
@@ -276,14 +289,15 @@ export default function TransactionDetailPage() {
                         <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
                             <Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الميداني (WBS)
                         </CardTitle>
-                        <CardDescription className="text-xs font-bold">إدارة ذكية للمراحل؛ الانتهاء من مرحلة يُفعل التبعات التالية آلياً ويغلق المسار السابق.</CardDescription>
+                        <CardDescription className="text-xs font-bold">إدارة ذكية للمراحل؛ الانتهاء من مرحلة يُفعل كافة التبعات المتشعبة آلياً.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
                         {(transaction.stages || []).map((stage, idx) => {
                             const isDelayed = stage.status === 'in-progress' && stage.expectedEndDate && toFirestoreDate(stage.expectedEndDate)! < new Date();
                             
-                            // 🛡️ المبدأ الرقابي: فحص هل المرحلة السابقة منجزة؟ 🛡️
-                            const isPredecessorCompleted = idx === 0 || transaction.stages![idx - 1].status === 'completed';
+                            // 🛡️ القاعدة الرقابية: فحص هل أي من المراحل السابقة (Predecessors) قد انتهى؟
+                            // في النسخة البسيطة نفحص الترتيب الرقمي أو التبعية الصريحة
+                            const isPredecessorCompleted = idx === 0 || transaction.stages?.some(s => s.status === 'completed' && s.nextStageIds?.includes(stage.stageId)) || transaction.stages![idx-1].status === 'completed';
                             const isBlocked = !isPredecessorCompleted && stage.status === 'pending';
 
                             return (
@@ -328,7 +342,6 @@ export default function TransactionDetailPage() {
                                     </div>
                                     
                                     <div className="flex items-center gap-3 mt-4 sm:mt-0 no-print">
-                                        {/* زر البدء يظهر فقط إذا كانت المرحلة جاهزة (السابقة منجزة) وهي معلقة */}
                                         {canEdit && stage.status === 'pending' && isPredecessorCompleted && (
                                             <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-orange-600 hover:bg-orange-700 text-white shadow-md hover:scale-105 transition-all">
                                                 <Play className="ml-2 h-4 w-4"/> بدء العمل

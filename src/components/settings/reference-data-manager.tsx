@@ -738,4 +738,3 @@ export function ReferenceDataManager() {
         </div>
     );
 }
-
