@@ -112,7 +112,14 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
         try {
             const stagesPath = getTenantPath(`transactionTypes/${selectedTransactionTypeId}/subServices/${selectedSubServiceId}/workStages`, tenantId);
             const snap = await getDocs(query(collection(firestore, stagesPath!), orderBy('order')));
-            setSpecificWorkStages(snap.docs.map(d => ({ value: d.data().name, label: d.data().name })));
+            
+            const stages = snap.docs.map(d => ({ value: d.data().name, label: d.data().name }));
+            
+            // 🛡️ إضافة الخيار الافتراضي "عند توقيع العقد" لسهولة الوصول 🛡️
+            setSpecificWorkStages([
+                { value: 'عند توقيع العقد', label: 'عند توقيع العقد' },
+                ...stages
+            ]);
         } catch (e) { console.error(e); }
     };
     fetchStages();
@@ -170,7 +177,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent dir="rtl" className="max-w-5xl h-[90vh] flex flex-col p-0 rounded-2xl border-none shadow-2xl overflow-hidden bg-white">
+        <DialogContent dir="rtl" className="max-w-5xl h-[90vh] flex flex-col p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-white">
             <DialogHeader className={cn("p-8 border-b text-white shrink-0 no-print", templateType === 'Consulting' ? "bg-primary" : "bg-amber-600")}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 text-right">
@@ -274,12 +281,13 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                                 </Badge>
                                             </div>
                                             <div className="md:col-span-8">
-                                                <Label className="text-[9px] font-black text-primary uppercase mb-1 block no-print">مرحلة الإنجاز الميداني</Label>
+                                                <Label className="text-[9px] font-black text-primary uppercase mb-1 block no-print">مرحلة الإنجاز الميداني (اختر أو اكتب مسمى مخصص)</Label>
                                                 <InlineSearchList 
                                                     value={m.condition} 
                                                     onSelect={v => setFinancials({...financials, milestones: financials.milestones.map((x: any) => x.id === m.id ? {...x, condition: v} : x)})} 
                                                     options={specificWorkStages} 
-                                                    placeholder="اختر مرحلة..." 
+                                                    placeholder="اختر أو اكتب شرط الاستحقاق..." 
+                                                    allowCustomValue={true}
                                                     className="h-10 border-dashed bg-primary/[0.02] border-primary/20 text-primary" 
                                                 />
                                             </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, Search, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,13 +31,14 @@ interface InlineSearchListProps {
   placeholder: string;
   disabled?: boolean;
   className?: string;
+  allowCustomValue?: boolean;
 }
 
 /**
- * مكون البحث والاختيار المطور (V18.0):
- * - تم حل مشكلة ظهور المربع فارغاً عند سحب بيانات خارجية عبر محرك "الخيارات الاحتياطية" (Fallback Display).
- * - استجابة فورية للنقر بالماوس داخل النوافذ المنبثقة عبر تعطيل الـ Portal.
- * - دعم كامل لعرض النص حتى لو لم تكتمل قائمة الإعدادات.
+ * مكون البحث والاختيار المطور (V19.0):
+ * - تم إضافة خاصية allowCustomValue للسماح بكتابة قيم غير موجودة في القائمة.
+ * - يظهر خيار "إضافة كقيمة مخصصة" عند عدم وجود نتائج بحث.
+ * - استجابة فورية للنقر بالماوس وتحصين ضد اختفاء القيم.
  */
 export function InlineSearchList({
   value,
@@ -46,13 +47,25 @@ export function InlineSearchList({
   placeholder,
   disabled,
   className,
+  allowCustomValue = false,
 }: InlineSearchListProps) {
   const [open, setOpen] = React.useState(false);
+  const [searchValue, setSearchValue] = React.useState('');
   
+  // تصفير نص البحث عند إغلاق القائمة
+  React.useEffect(() => {
+    if (!open) setSearchValue('');
+  }, [open]);
+
   // البحث عن النص الظاهر المقابل للقيمة
   const selectedOption = React.useMemo(() => 
     options.find((option) => option.value === value)
   , [options, value]);
+
+  const showCustomAdd = React.useMemo(() => {
+    if (!allowCustomValue || !searchValue.trim()) return false;
+    return !options.some(opt => opt.label.toLowerCase() === searchValue.toLowerCase().trim());
+  }, [allowCustomValue, searchValue, options]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -62,14 +75,13 @@ export function InlineSearchList({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "w-full justify-between h-9 rounded-xl border-2 transition-all px-3",
+            "w-full justify-between h-9 rounded-xl border-2 transition-all px-3 text-right",
             "bg-white/90 border-slate-200 hover:border-primary/40 text-[11px] font-bold",
             !value && "text-muted-foreground font-medium",
             className
           )}
           disabled={disabled}
         >
-          {/* ✨ التعديل الجوهري: إظهار القيمة المسحوبة (مثل: تصميم الدور الأرضي) قسرياً حتى لو لم تكتمل قائمة الإعدادات ✨ */}
           <span className="truncate">{selectedOption ? selectedOption.label : (value || placeholder)}</span>
           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40 text-primary" />
         </Button>
@@ -90,14 +102,32 @@ export function InlineSearchList({
           <div className="flex items-center border-b px-2 bg-slate-50/50">
             <Search className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40 text-primary" />
             <CommandInput 
-                placeholder="ابحث هنا..." 
+                placeholder="ابحث أو اكتب هنا..." 
+                value={searchValue}
+                onValueChange={setSearchValue}
                 className="h-9 text-[11px] font-bold border-none bg-transparent" 
             />
           </div>
           <CommandList className="max-h-[220px] p-1 scrollbar-none">
-            <CommandEmpty className="py-4 text-center text-[10px] font-bold text-muted-foreground italic">
-                لا توجد نتائج..
+            {showCustomAdd && (
+                <CommandItem
+                  value={searchValue}
+                  onSelect={() => {
+                    onSelect(searchValue.trim());
+                    setOpen(false);
+                    setSearchValue('');
+                  }}
+                  className="cursor-pointer font-black text-primary py-2.5 px-3 rounded-lg mb-1 bg-primary/5 border border-dashed border-primary/30 flex items-center gap-2 text-[10px] animate-in slide-in-from-top-1"
+                >
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  <span>استخدام القيمة: "{searchValue}"</span>
+                </CommandItem>
+            )}
+
+            <CommandEmpty className={cn("py-4 text-center text-[10px] font-bold text-muted-foreground italic", showCustomAdd && "hidden")}>
+                لا توجد نتائج مطابقة..
             </CommandEmpty>
+            
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
@@ -106,6 +136,7 @@ export function InlineSearchList({
                   onSelect={() => {
                     onSelect(option.value === value ? "" : option.value);
                     setOpen(false);
+                    setSearchValue('');
                   }}
                   className="cursor-pointer font-bold text-[#1e1b4b] py-2 px-3 rounded-lg mb-0.5 aria-selected:bg-primary/10 aria-selected:text-primary transition-colors flex items-center justify-between text-[11px]"
                 >
