@@ -13,16 +13,40 @@ import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 /**
- * شعار نوفا المعتمد (NOVA Text Logo):
- * تصميم عريض وبوليد يحاكي لقطة الشاشة تماماً.
+ * شعار نوفا السيادي (The Sovereign NOVA Logo):
+ * تصميم عريض وبوليد يحاكي لقطة الشاشة تماماً مع نبض داخلي.
  */
 const NovaLogo = () => (
-  <div className="relative flex items-center justify-center">
-    <span className="text-5xl font-black tracking-tighter text-[#FF7A00] drop-shadow-sm select-none">
+  <div className="relative flex items-center justify-center animate-in zoom-in-50 duration-1000">
+    <span className="text-6xl font-black tracking-tighter text-[#FF7A00] drop-shadow-[0_0_15px_rgba(255,122,0,0.3)] select-none z-10">
       NOVA
     </span>
   </div>
 );
+
+/**
+ * جزيئات غبار النجوم (Stardust Particles):
+ * جزيئات تنطلق من المركز لمحاكاة الانفجار الكوني.
+ */
+const Stardust = () => {
+    return (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            {Array.from({ length: 12 }).map((_, i) => (
+                <div 
+                    key={i} 
+                    className="stardust-particle"
+                    style={{
+                        top: '50%',
+                        left: '50%',
+                        '--tw-translate-x': `${(Math.random() - 0.5) * 400}px`,
+                        '--tw-translate-y': `${(Math.random() - 0.5) * 400}px`,
+                        animationDelay: `${Math.random() * 2}s`,
+                    } as any}
+                />
+            ))}
+        </div>
+    );
+};
 
 export default function DashboardLayout({
   children,
@@ -49,35 +73,34 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 🛡️ شاشة الموشن جرافيك السيادية المحدثة (Motion Engine V3.0)
+  // 🛡️ شاشة التحميل "انفجار النوفا" (Nova Explosion Engine V3.0) 🛡️
   if (loading || !mounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-16 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* هالات خلفية ناعمة */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-100/20 rounded-full blur-[120px] animate-float-slow" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-200/10 rounded-full blur-[100px] animate-float-slow" style={{ animationDelay: '3s' }} />
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
+        {/* خلفية سديمية نابضة */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] nova-glow-nebula rounded-full" />
+        
+        {/* جزيئات الانفجار */}
+        <Stardust />
 
-        <div className="relative flex flex-col items-center justify-center">
-            {/* 🌟 محرك الحلقة الدوارة الخاطفة 🌟 */}
+        <div className="relative flex flex-col items-center justify-center scale-110 sm:scale-125">
+            {/* 🌟 محرك النوفا الدوار 🌟 */}
             <div className="relative flex items-center justify-center w-64 h-64">
-                {/* الحلقة الرمادية الخلفية */}
-                <div className="absolute inset-0 rounded-full border-[1.5px] border-slate-200/40" />
+                {/* الحلقة الخلفية */}
+                <div className="absolute inset-0 rounded-full border-[1.5px] border-slate-200/30" />
                 
-                {/* الحلقة البرتقالية الدوارة (سريعة + تدرج لوني) */}
-                <div className="absolute inset-0 rounded-full border-[3.5px] border-transparent border-t-[#FF7A00] animate-spin-sovereign shadow-[0_0_20px_rgba(255,122,0,0.05)]" />
+                {/* الحلقة المدارية السريعة */}
+                <div className="absolute inset-0 rounded-full border-[4px] border-transparent border-t-[#FF7A00] animate-nova-spin shadow-[0_0_30px_rgba(255,122,0,0.1)]" />
                 
-                {/* الهالة النبضية */}
-                <div className="absolute h-40 w-40 gold-glow-filter animate-gold-pulse rounded-full" />
-                
-                {/* الشعار المتمركز */}
-                <div className="relative z-10">
+                {/* الشعار المضيء */}
+                <div className="relative z-20">
                     <NovaLogo />
                 </div>
             </div>
             
-            <div className="mt-12 text-center space-y-4">
+            <div className="mt-16 text-center space-y-4">
                 <div className="flex items-center justify-center gap-3">
-                    <p className="text-[#1e1b4b] font-black text-xl tracking-tight">جاري التحميل</p>
+                    <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-80">جاري الاستعادة</p>
                     <div className="flex gap-1.5 pt-2">
                         <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0s' }} />
                         <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.2s' }} />
@@ -86,13 +109,13 @@ export default function DashboardLayout({
                 </div>
                 
                 {showEmergencyExit && (
-                    <div className="mt-4 animate-in zoom-in-95 duration-500 bg-white/40 backdrop-blur-sm p-4 rounded-3xl border-2 border-white shadow-xl max-w-xs mx-auto">
-                        <p className="text-[10px] font-bold text-slate-400 mb-2">استغرق التحميل وقتاً طويلاً</p>
+                    <div className="mt-6 animate-in zoom-in-95 duration-500 glass-effect p-5 rounded-[2rem] border-2 border-white shadow-2xl max-w-xs mx-auto">
+                        <p className="text-[10px] font-bold text-slate-400 mb-3">تأخر في الاستجابة السحابية</p>
                         <div className="flex gap-2">
-                            <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-9 rounded-xl font-black text-[10px] gap-1.5 text-[#1e1b4b]">
+                            <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] gap-1.5 border-slate-200">
                                 <RefreshCcw className="h-3 w-3" /> تحديث
                             </Button>
-                            <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-9 rounded-xl font-black text-[10px] gap-1.5 text-red-600">
+                            <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] gap-1.5 text-red-600">
                                 <LogOut className="h-3 w-3" /> خروج
                             </Button>
                         </div>

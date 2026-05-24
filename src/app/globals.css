@@ -40,7 +40,6 @@
     min-height: 100vh;
   }
 
-  /* 🛡️ محرك الحماية ضد تغيير المبالغ ببكرة الماوس والأسهم 🛡️ */
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -60,41 +59,42 @@
     box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
   }
   
-  /* 🌟 محرك الأنيميشن الذهبي والسرعة السيادية 🌟 */
-  .gold-glow-filter {
-    background: radial-gradient(circle, rgba(255,122,0,0.15) 0%, rgba(255,253,240,0) 70%);
-    filter: blur(25px);
+  /* 🌟 محرك أنيميشن "انفجار النوفا" (Nova Motion Engine) 🌟 */
+  
+  .nova-glow-nebula {
+    background: radial-gradient(circle, rgba(255,122,0,0.2) 0%, rgba(255,253,240,0) 70%);
+    filter: blur(40px);
+    animation: nebula-pulse 4s ease-in-out infinite;
   }
 
-  /* دوران سريع مع تدرج لوني (يغمق ويبهت) */
-  .animate-spin-sovereign {
-    animation: spin-sovereign 0.8s linear infinite;
+  @keyframes nebula-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.5); opacity: 0.6; }
   }
 
-  @keyframes spin-sovereign {
-    0% { 
-      transform: rotate(0deg); 
-      border-top-color: #E66D00; /* غامق */
-      opacity: 1;
-    }
-    50% { 
-      border-top-color: #FFB000; /* باهت/فاتح */
-      opacity: 0.5;
-    }
-    100% { 
-      transform: rotate(360deg); 
-      border-top-color: #E66D00; /* غامق */
-      opacity: 1;
-    }
+  .animate-nova-spin {
+    animation: nova-spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 
-  .animate-gold-pulse {
-    animation: gold-pulse 3s ease-in-out infinite;
+  @keyframes nova-spin {
+    0% { transform: rotate(0deg); border-top-color: #FF7A00; }
+    50% { border-top-color: #FFB000; opacity: 0.6; }
+    100% { transform: rotate(360deg); border-top-color: #FF7A00; }
   }
 
-  @keyframes gold-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.2; }
-    50% { transform: scale(1.3); opacity: 0.4; }
+  .stardust-particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #FF7A00;
+    border-radius: 100%;
+    filter: blur(1px);
+    animation: particle-blast 2s ease-out infinite;
+  }
+
+  @keyframes particle-blast {
+    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) scale(0); opacity: 0; }
   }
 
   .animate-float-slow {
@@ -116,7 +116,6 @@
   }
 }
 
-/* 🛡️ محرك فرض الاستجابة والجمالية للقوائم 🛡️ */
 body[style*="pointer-events: none"] {
   pointer-events: auto !important;
 }
