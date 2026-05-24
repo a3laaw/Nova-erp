@@ -35,8 +35,8 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
 /**
- * صفحة توقيع العقد المباشر (V1200.0):
- * - تم حل خطأ "القراءة بعد الكتابة" في Firestore Transactions.
+ * صفحة توقيع العقد المباشر (V1250.0):
+ * - تم تعديل حالة القيد المولد ليكون "مسودة" (Draft) لتمكين المراجعة المحاسبية.
  */
 export default function DirectContractPage() {
     const { firestore } = useFirebase();
@@ -138,14 +138,13 @@ export default function DirectContractPage() {
         setIsSaving(true);
 
         try {
-            // 🛡️ PRE-FETCH REGULAR READS OUTSIDE TRANSACTION
+            // 🛡️ PRE-FETCH REGULAR READS
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
             const clientAccSnap = await getDocs(query(collection(firestore, coaPath!), where('name', '==', selectedClient.nameAr), where('parentCode', '==', '1102'), limit(1)));
 
             await runTransaction(firestore, async (transaction_fs) => {
                 const currentYear = new Date().getFullYear();
                 
-                // 🛡️ EXECUTE TRANSACTION OBJECT READS FIRST
                 const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
                 const coaSubCounterPath = getTenantPath('counters/coa_clients', tenantId);
                 const jeCounterRef = doc(firestore, jeCounterPath!);
@@ -156,7 +155,6 @@ export default function DirectContractPage() {
                     transaction_fs.get(coaSubCounterRef)
                 ]);
 
-                // 🛡️ Logic based on reads
                 let clientAccountId = '';
                 if (clientAccSnap.empty) {
                     const nextClientNum = (coaSubCounterDoc.data()?.lastNumber || 0) + 1;
@@ -177,7 +175,6 @@ export default function DirectContractPage() {
                 const txPath = getTenantPath(`clients/${selectedClientId}/transactions/${selectedTxId}`, tenantId);
                 const txRef = doc(firestore, txPath!);
                 
-                // EXECUTE WRITES
                 transaction_fs.update(txRef, {
                     status: 'in-progress',
                     contract: cleanFirestoreData({
@@ -194,11 +191,13 @@ export default function DirectContractPage() {
                 const jePath = getTenantPath('journalEntries', tenantId);
                 const newJeRef = doc(collection(firestore, jePath!));
 
+                // 🛡️ التعديل الرقابي: القيد يولد كـ مسودة (draft) بانتظار مراجعة المحاسب
                 transaction_fs.set(newJeRef, cleanFirestoreData({
                     entryNumber: `JV-DR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
                     date: serverTimestamp(), 
-                    narration: `إثبات مديونية عقد مباشر: ${selectedTx.transactionType} لـ ${selectedClient.nameAr}`,
-                    totalDebit: finalTotal, totalCredit: finalTotal, status: 'posted',
+                    narration: `[قيد مديونية مباشر] عقد: ${selectedTx.transactionType} لـ ${selectedClient.nameAr} - بانتظار المراجعة`,
+                    totalDebit: finalTotal, totalCredit: finalTotal, 
+                    status: 'draft', // 🛡️ تم التغيير لمسودة
                     lines: [
                         { accountId: clientAccountId, accountName: selectedClient.nameAr, debit: finalTotal, credit: 0, auto_profit_center: selectedTxId },
                         { accountId: revenueAccSnap.docs[0]?.id || '4101', accountName: revenueAccSnap.docs[0]?.data()?.name || 'إيرادات عقود', debit: 0, credit: finalTotal, auto_profit_center: selectedTxId }
@@ -212,7 +211,7 @@ export default function DirectContractPage() {
                 transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
             });
 
-            toast({ title: 'تم توقيع العقد المباشر', description: 'تم تحديث المعاملة وتوليد القيد المالي بنجاح.' });
+            toast({ title: '✅ تم توقيع العقد بنجاح', description: 'تم إنشاء قيد المديونية كمسودة للمراجعة المحاسبية.' });
             router.push(`/dashboard/construction/projects/new?clientId=${selectedClientId}&transactionId=${selectedTxId}`);
 
         } catch (e: any) {
@@ -363,9 +362,9 @@ export default function DirectContractPage() {
                 <CardFooter className="p-10 border-t bg-muted/10 flex flex-col md:flex-row justify-between items-center gap-8">
                     <div className="space-y-1 text-right">
                         <p className="text-sm font-black text-primary flex items-center gap-2">
-                            <ShieldCheck className="h-5 w-5 animate-pulse"/> سيتم تحديث المعاملة المختارة وتوليد قيد مديونية آلي.
+                            <ShieldCheck className="h-5 w-5 animate-pulse"/> سيتم تحديث المعاملة المختارة وتوليد قيد مديونية آلي
                         </p>
-                        <p className="text-[10px] text-muted-foreground font-bold pr-7">الاعتماد النهائي يثبت مديونية العميل في شجرة الحسابات فوراً.</p>
+                        <p className="text-[10px] text-muted-foreground font-bold pr-7">الاعتماد النهائي يثبت مديونية العميل في شجرة الحسابات (كقيد مسودة للمراجعة).</p>
                     </div>
                     <Button 
                         onClick={handleSaveContract} 

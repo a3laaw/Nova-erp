@@ -56,7 +56,8 @@ import {
   limit, 
   where, 
   orderBy, 
-  getDoc 
+  getDoc,
+  Timestamp 
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
@@ -69,8 +70,8 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 /**
- * نموذج توقيع العقد السيادي (Sovereign Contract Engine V1200.0):
- * - تم حل خطأ "القراءة بعد الكتابة" في Firestore Transactions.
+ * نموذج توقيع العقد السيادي (Sovereign Contract Engine V1250.0):
+ * - تم تعديل حالة القيد المولد ليكون "مسودة" (Draft) لتمكين المراجعة المحاسبية.
  * - إحكام المزامنة الصفرية لضمان انتقال "شرط الاستحقاق" من العرض للعقد بدقة 100%.
  */
 export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName, quotationIdToUpdate }: any) {
@@ -169,12 +170,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     try {
         const coaPath = getTenantPath('chartOfAccounts', tenantId);
         
-        // 🛡️ Pre-Transaction Reads (Regular Reads)
+        // 🛡️ Pre-Transaction Reads
         const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
         const clientAccSnap = await getDocs(query(collection(firestore, coaPath!), where('name', '==', clientName), where('parentCode', '==', '1102'), limit(1)));
         
         await runTransaction(firestore, async (transaction_fs) => {
-            // 🛡️ Step 1: All internal transaction reads MUST happen at the start
             const currentYear = new Date().getFullYear();
             const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
             const coaSubCounterPath = getTenantPath('counters/coa_clients', tenantId);
@@ -182,13 +182,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const jeCounterRef = doc(firestore, jeCounterPath!);
             const coaSubCounterRef = doc(firestore, coaSubCounterPath!);
             
-            // EXECUTE ALL READS FIRST
             const [jeCounterDoc, coaSubCounterDoc] = await Promise.all([
                 transaction_fs.get(jeCounterRef),
                 transaction_fs.get(coaSubCounterRef)
             ]);
 
-            // 🛡️ Step 2: Logic and Calculations based on reads
             let clientAccountId = '';
             if (clientAccSnap.empty) {
                 const nextClientNum = (coaSubCounterDoc.data()?.lastNumber || 0) + 1;
@@ -217,7 +215,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const totalAmount = financials.type === 'fixed' ? currentTotalInput : financials.totalAmount;
             
-            // 🛡️ Step 3: Execute all writes
             transaction_fs.update(txRef, {
                 status: 'in-progress',
                 contract: cleanFirestoreData({ clauses: finalClauses, totalAmount, financialsType: financials.type, specs }),
@@ -228,11 +225,13 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const jePath = getTenantPath('journalEntries', tenantId);
             const newJeRef = doc(collection(firestore, jePath!));
 
+            // 🛡️ التعديل الرقابي: القيد يولد كـ مسودة (draft) بانتظار مراجعة المحاسب
             transaction_fs.set(newJeRef, cleanFirestoreData({
                 entryNumber: `JV-PR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
                 date: serverTimestamp(), 
-                narration: `إثبات مديونية عقد: ${transaction.transactionType || transaction.subject} لـ ${clientName}`,
-                totalDebit: totalAmount, totalCredit: totalAmount, status: 'posted',
+                narration: `[قيد إثبات مديونية] عقد: ${transaction.transactionType || transaction.subject} لـ ${clientName} - بانتظار المراجعة`,
+                totalDebit: totalAmount, totalCredit: totalAmount, 
+                status: 'draft', // 🛡️ تم التغيير لمسودة
                 lines: [
                     { accountId: clientAccountId, accountName: clientName, debit: totalAmount, credit: 0, auto_profit_center: targetTxId },
                     { accountId: revenueAccSnap.docs[0]?.id || '4101', accountName: revenueAccSnap.docs[0]?.data()?.name || 'إيرادات عقود', debit: 0, credit: totalAmount, auto_profit_center: targetTxId }
@@ -246,7 +245,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
         });
 
-        toast({ title: '✅ تم توقيع العقد بنجاح' });
+        toast({ title: '✅ تم توقيع العقد بنجاح', description: 'تم إنشاء قيد المديونية كمسودة للمراجعة المحاسبية.' });
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
@@ -403,9 +402,9 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         <DialogFooter className="p-10 border-t bg-slate-50 flex flex-col md:flex-row justify-between items-center gap-8 shrink-0 no-print">
             <div className="text-right space-y-1">
                 <p className="text-base font-black text-primary flex items-center gap-2">
-                    <ShieldCheck className="h-6 w-6 animate-pulse"/> سيتم تحديث مسار المعاملة وتوليد قيد مديونية آلي
+                    <ShieldCheck className="h-6 w-6 animate-pulse"/> سيتم تحديث مسار المعاملة وتوليد قيد مديونية مسودة
                 </p>
-                <p className="text-[11px] text-muted-foreground font-bold pr-9">الاعتماد النهائي يثبت مديونية العميل في شجرة الحسابات فوراً.</p>
+                <p className="text-[11px] text-muted-foreground font-bold pr-9">الاعتماد النهائي يثبت مديونية العميل في شجرة الحسابات (كقيد غير مرحل).</p>
             </div>
             <div className="flex gap-4">
                 <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-2xl font-bold h-14 px-10 text-slate-400">إلغاء</Button>
