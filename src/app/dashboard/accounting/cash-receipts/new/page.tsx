@@ -31,6 +31,7 @@ import { numberToArabicWords, formatCurrency, cleanFirestoreData, cn, getTenantP
 import { useAuth } from '@/context/auth-context';
 import { useBranding } from '@/context/branding-context';
 import { DateInput } from '@/components/ui/date-input';
+import { Skeleton } from '@/components/ui/skeleton'; // FIXED: Added missing import
 
 const getTotalPaidForProject = async (projectId: string, db: any, tenantId: string) => {
     let total = 0;
@@ -260,7 +261,7 @@ export default function NewCashReceiptPage() {
             const jePath = getTenantPath('journalEntries', tenantId);
             const newJournalEntryRef = doc(collection(firestore, jePath!));
 
-            const selectedMethodData = branding?.payment_methods?.find(m => m.name === paymentMethod);
+            const selectedMethodData = branding?.payment_methods?.find((m: any) => m.name === paymentMethod);
             let commissionAmount = 0;
             if (selectedMethodData) {
                 commissionAmount = (parseFloat(amount) * ((selectedMethodData.percentageFee || 0) / 100)) + (selectedMethodData.fixedFee || 0);
