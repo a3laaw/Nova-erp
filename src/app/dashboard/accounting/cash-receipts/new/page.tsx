@@ -22,8 +22,8 @@ import {
 } from '@/components/ui/select';
 import { Save, Loader2, Target, Banknote, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, orderBy } from 'firebase/firestore';
+import { useFirebase, useSubscription } from '@/firebase';
+import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, getDoc, orderBy } from 'firebase/firestore';
 import type { Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -42,7 +42,9 @@ const getTotalPaidForProject = async (projectId: string, db: any, tenantId: stri
     let total = 0;
     if (!projectId || !db || !tenantId) return total;
     const receiptsPath = getTenantPath('cashReceipts', tenantId);
-    const receiptsQuery = query(collection(db, receiptsPath!), where('projectId', '==', projectId));
+    if (!receiptsPath) return total;
+    
+    const receiptsQuery = query(collection(db, receiptsPath), where('projectId', '==', projectId));
     const receiptsSnap = await getDocs(receiptsQuery);
     receiptsSnap.forEach(doc => {
         total += doc.data().amount || 0;
@@ -58,16 +60,6 @@ export default function NewCashReceiptPage() {
   const { toast } = useToast();
 
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [clients, setClients] = useState<Client[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [refDataLoading, setRefDataLoading] = useState(true);
-  
-  const [clientProjects, setClientProjects] = useState<ClientTransaction[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(false);
-
-  // Form state
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
 
@@ -85,6 +77,15 @@ export default function NewCashReceiptPage() {
   const [isGeneratingVoucher, setIsGeneratingVoucher] = useState(true);
 
   const tenantId = currentUser?.currentCompanyId;
+
+  // 🛡️ استخدام الاشتراكات اللحظية بدلاً من getDocs لضمان استقرار المزامنة 🛡️
+  const { data: clients = [], loading: clientsLoading } = useSubscription<Client>(firestore, tenantId ? 'clients' : null, [where('isActive', '==', true)]);
+  const { data: accounts = [], loading: accountsLoading } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null, [orderBy('code')]);
+  const { data: employees = [] } = useSubscription<Employee>(firestore, tenantId ? 'employees' : null);
+  const { data: departments = [] } = useSubscription<Department>(firestore, tenantId ? 'departments' : null);
+
+  const [clientProjects, setClientProjects] = useState<ClientTransaction[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
 
   // 🛡️ محرك توليد رقم السند السيادي
   useEffect(() => {
@@ -106,7 +107,7 @@ export default function NewCashReceiptPage() {
             setVoucherNumber(`CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
         } catch (error) {
             console.error("Error generating voucher number:", error);
-            setVoucherNumber('خطأ: العداد غير متاح');
+            setVoucherNumber('خطأ في العداد');
         } finally {
             setIsGeneratingVoucher(false);
         }
@@ -143,7 +144,6 @@ export default function NewCashReceiptPage() {
         if (remainingAmountFromCurrentPayment <= 0) break;
         
         const clauseAmount = clause.amount;
-        // حساب ما تم دفعه على هذا البند تحديداً من السندات السابقة
         const paidOnThisClausePreviously = Math.max(0, Math.min(clauseAmount, totalPaidPreviously - allocatedPaid));
         const remainingOnClause = clauseAmount - paidOnThisClausePreviously;
 
@@ -172,69 +172,7 @@ export default function NewCashReceiptPage() {
     generateDescription();
   }, [amount, selectedProjectId, clientProjects, firestore, tenantId]);
 
-  // 🛡️ محرك جلب البيانات المرجعية من مسار المنشأة
-  useEffect(() => {
-    if (!firestore || !tenantId) return;
-
-    const fetchInitialData = async () => {
-        setRefDataLoading(true);
-        try {
-            const clientsPath = getTenantPath('clients', tenantId);
-            const coaPath = getTenantPath('chartOfAccounts', tenantId);
-            const empPath = getTenantPath('employees', tenantId);
-            const deptPath = getTenantPath('departments', tenantId);
-
-            const [clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
-                getDocs(query(collection(firestore, clientsPath!), where('isActive', '==', true), limit(200))),
-                getDocs(query(collection(firestore, coaPath!), orderBy('code'))),
-                getDocs(query(collection(firestore, empPath!))),
-                getDocs(query(collection(firestore, deptPath!)))
-            ]);
-
-            setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
-            setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
-            setEmployees(empSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
-            setDepartments(deptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
-
-        } catch (error) {
-            console.error("Error fetching initial data:", error);
-        } finally {
-            setRefDataLoading(false);
-        }
-    };
-    fetchInitialData();
-  }, [firestore, tenantId]);
-  
-  useEffect(() => {
-    if (accounts.length > 0 && paymentMethod) {
-      const isCash = paymentMethod === 'Cash';
-      const searchKey = isCash ? 'صندوق' : 'بنك';
-      const defaultAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes(searchKey));
-      setDebitAccountId(defaultAccount?.id || '');
-    } else if (!paymentMethod) {
-        setDebitAccountId('');
-    }
-  }, [accounts, paymentMethod]);
-
-  const handleAccountChange = (accountId: string) => {
-    setSelectedAccountId(accountId);
-    setSelectedProjectId('');
-    setClientProjects([]);
-    setDescription('');
-
-    const account = accounts.find(a => a.id === accountId);
-    if (account) {
-        const client = clients.find(c => c.nameAr === account.name);
-        if (client) {
-            setSelectedClientId(client.id!);
-        } else {
-            setSelectedClientId('');
-        }
-    } else {
-        setSelectedClientId('');
-    }
-  };
-
+  // تحديث قائمة المشاريع عند تغيير العميل
   useEffect(() => {
     if (!firestore || !selectedClientId || !tenantId) {
         setClientProjects([]);
@@ -245,15 +183,14 @@ export default function NewCashReceiptPage() {
         setProjectsLoading(true);
         try {
             const projectsPath = getTenantPath(`clients/${selectedClientId}/transactions`, tenantId);
-            const projectsQuery = query(collection(firestore, projectsPath!));
-            const snapshot = await getDocs(projectsQuery);
+            const snapshot = await getDocs(query(collection(firestore, projectsPath!)));
             const fetchedProjects = snapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction))
                 .filter(tx => !!tx.contract);
 
             setClientProjects(fetchedProjects);
         } catch (error) {
-            console.error("Error fetching client projects:", error);
+            console.error("Error fetching projects:", error);
         } finally {
             setProjectsLoading(false);
         }
@@ -262,12 +199,25 @@ export default function NewCashReceiptPage() {
     fetchClientProjects();
   }, [firestore, selectedClientId, tenantId]);
   
+  const handleAccountChange = (accountId: string) => {
+    setSelectedAccountId(accountId);
+    setSelectedProjectId('');
+    setClientProjects([]);
+    setDescription('');
+
+    const account = accounts.find(a => a.id === accountId);
+    if (account) {
+        const client = clients.find(c => c.nameAr === account.name);
+        if (client) setSelectedClientId(client.id!);
+        else setSelectedClientId('');
+    } else setSelectedClientId('');
+  };
+
   const handleSave = async () => {
-    if (!firestore || !currentUser || !tenantId) return;
-    if (savingRef.current) return;
+    if (!firestore || !currentUser || !tenantId || savingRef.current) return;
     
     if (!selectedAccountId || !amount || !date || !paymentMethod || !debitAccountId) {
-        toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).'});
+        toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).'});
         return;
     }
 
@@ -283,18 +233,13 @@ export default function NewCashReceiptPage() {
             const counterDoc = await transaction_fs.get(counterRef);
             
             const clientAccount = accounts.find(acc => acc.id === selectedAccountId);
-            if (!clientAccount) throw new Error("لم يتم العثور على حساب العميل في الشجرة.");
-            
             const debitAccount = accounts.find(acc => acc.id === debitAccountId);
-            if (!debitAccount) throw new Error('حساب الاستلام غير صالح.');
             
-            let nextNumber = 1;
-            if (counterDoc.exists()) {
-                const counts = counterDoc.data()?.counts || {};
-                nextNumber = (counts[currentYear] || 0) + 1;
-            }
+            if (!clientAccount || !debitAccount) throw new Error("الحسابات المطلوبة غير متوفرة حالياً.");
             
+            let nextNumber = (counterDoc.data()?.counts?.[currentYear] || 0) + 1;
             const newVoucherNumber = `CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+            
             const receiptsPath = getTenantPath('cashReceipts', tenantId);
             const newReceiptRef = doc(collection(firestore, receiptsPath!));
             newReceiptId = newReceiptRef.id;
@@ -304,13 +249,13 @@ export default function NewCashReceiptPage() {
             let autoTags = {};
             if (selectedProjectId && selectedProject && selectedProject.assignedEngineerId) {
                 const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
-                const department = departments.find(d => d.name === engineer?.department);
+                const dept = departments.find(d => d.name === engineer?.department);
                 autoTags = {
                     clientId: selectedClientId,
                     transactionId: selectedProjectId,
                     auto_profit_center: selectedProjectId,
                     auto_resource_id: selectedProject.assignedEngineerId,
-                    ...(department && { auto_dept_id: department.id }),
+                    ...(dept && { auto_dept_id: dept.id }),
                 };
             }
 
@@ -320,26 +265,18 @@ export default function NewCashReceiptPage() {
             const selectedMethodData = branding?.payment_methods?.find(m => m.name === paymentMethod);
             let commissionAmount = 0;
             if (selectedMethodData) {
-                const percFee = parseFloat(amount) * ((selectedMethodData.percentageFee || 0) / 100);
-                const fixedFee = selectedMethodData.fixedFee || 0;
-                commissionAmount = percFee + fixedFee;
+                commissionAmount = (parseFloat(amount) * ((selectedMethodData.percentageFee || 0) / 100)) + (selectedMethodData.fixedFee || 0);
             }
             const netBankDeposit = parseFloat(amount) - commissionAmount;
 
-            const newReceiptData: any = { 
+            transaction_fs.set(newReceiptRef, cleanFirestoreData({ 
                 voucherNumber: newVoucherNumber, voucherSequence: nextNumber, voucherYear: currentYear,
                 clientId: selectedClientId || null, clientNameAr: clientAccount.name, 
-                amount: parseFloat(amount), amountInWords: amountInWords, receiptDate: date,
-                paymentMethod: paymentMethod, description: description, reference: reference, journalEntryId: newJournalEntryRef.id,
-                commissionAmount,
-                createdAt: serverTimestamp(),
-                companyId: tenantId
-            };
-            
-            if (selectedProjectId && selectedProject) {
-                newReceiptData.projectId = selectedProjectId;
-                newReceiptData.projectNameAr = selectedProject.transactionType;
-            }
+                amount: parseFloat(amount), amountInWords, receiptDate: date,
+                paymentMethod, description, reference, journalEntryId: newJournalEntryRef.id,
+                commissionAmount, createdAt: serverTimestamp(), companyId: tenantId,
+                ...(selectedProjectId && { projectId: selectedProjectId, projectNameAr: selectedProject?.transactionType })
+            }));
 
             const jeLines = [
                 { accountId: debitAccount.id!, accountName: debitAccount.name, debit: netBankDeposit, credit: 0 },
@@ -347,34 +284,23 @@ export default function NewCashReceiptPage() {
             ];
 
             if (commissionAmount > 0 && selectedMethodData?.expenseAccountId) {
-                jeLines.push({
-                    accountId: selectedMethodData.expenseAccountId,
-                    accountName: selectedMethodData.expenseAccountName || 'مصروف عمولات بنكية',
-                    debit: commissionAmount,
-                    credit: 0
-                });
+                jeLines.push({ accountId: selectedMethodData.expenseAccountId, accountName: selectedMethodData.expenseAccountName || 'مصروف عمولات بنكية', debit: commissionAmount, credit: 0 });
             }
 
-            const journalEntryData = {
-                entryNumber: `JE-${newVoucherNumber}`, date: newReceiptData.receiptDate,
-                narration: `[تحصيل مالي] ${description} ${commissionAmount > 0 ? `(صافي المودع: ${formatCurrency(netBankDeposit)})` : ''}`,
-                totalDebit: parseFloat(amount), totalCredit: parseFloat(amount), status: 'posted' as const,
-                lines: jeLines,
-                clientId: selectedClientId || null, transactionId: selectedProjectId || null,
-                createdAt: serverTimestamp(), createdBy: currentUser.id,
-                companyId: tenantId
-            };
+            transaction_fs.set(newJournalEntryRef, cleanFirestoreData({
+                entryNumber: `JE-${newVoucherNumber}`, date, narration: `[تحصيل مالي] ${description}`,
+                totalDebit: parseFloat(amount), totalCredit: parseFloat(amount), status: 'posted',
+                lines: jeLines, clientId: selectedClientId || null, transactionId: selectedProjectId || null,
+                createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
+            }));
 
             transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
-            transaction_fs.set(newReceiptRef, cleanFirestoreData(newReceiptData));
-            transaction_fs.set(newJournalEntryRef, journalEntryData);
         });
         
-        toast({ title: 'نجاح', description: 'تم حفظ سند القبض ومعالجة العمولات البنكية آلياً.' });
+        toast({ title: 'نجاح الحفظ', description: 'تم إصدار السند والترحيل المالي بنجاح.' });
         router.push(`/dashboard/accounting/cash-receipts/${newReceiptId}`);
-
     } catch (error: any) {
-        toast({ variant: 'destructive', title: 'خطأ', description: error.message || 'فشل حفظ السند.' });
+        toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message });
         setIsSaving(false);
         savingRef.current = false;
     }
@@ -388,21 +314,6 @@ export default function NewCashReceiptPage() {
     }))
   , [accounts]);
 
-  const projectOptions = useMemo(() => clientProjects.map(p => {
-    const date = toFirestoreDate(p.createdAt);
-    const dateString = date ? format(date, 'dd/MM/yyyy') : '';
-    return {
-        value: p.id!,
-        label: dateString ? `${p.transactionType} (${dateString})` : p.transactionType,
-    }
-  }), [clientProjects]);
-  
-  const paymentMethodOptions = useMemo(() => {
-      const base = [{ value: 'Cash', label: 'نقداً' }, { value: 'Cheque', label: 'شيك' }, { value: 'Bank Transfer', label: 'تحويل بنكي' }];
-      const dynamic = (branding?.payment_methods || []).map(m => ({ value: m.name, label: m.name }));
-      return [...base, ...dynamic];
-  }, [branding]);
-
   const debitAccountOptions = useMemo(() => {
     if (!paymentMethod) return [];
     const isCash = paymentMethod === 'Cash';
@@ -412,19 +323,17 @@ export default function NewCashReceiptPage() {
   }, [accounts, paymentMethod]);
 
   return (
-    <Card className={cn("max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden glass-effect")} dir="rtl">
-        <CardHeader className={cn("pb-8 rounded-t-[2.5rem] border-b bg-white/10")}>
-            <div className="flex justify-between items-start">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-[#FF7A00]/10 rounded-2xl text-[#FF7A00] shadow-inner">
-                        <Banknote className="h-8 w-8" />
-                    </div>
-                    <div>
-                        <CardTitle className="text-3xl font-black text-[#1e1b4b]">سـنـد قـبـض / Cash Receipt</CardTitle>
-                        <CardDescription className="font-black text-[#1e1b4b]/60">
-                            {isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند المعتمد
-                        </CardDescription>
-                    </div>
+    <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden glass-effect" dir="rtl">
+        <CardHeader className="pb-8 rounded-t-[2.5rem] border-b bg-white/10">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-[#FF7A00]/10 rounded-2xl text-[#FF7A00] shadow-inner">
+                    <Banknote className="h-8 w-8" />
+                </div>
+                <div>
+                    <CardTitle className="text-3xl font-black text-[#1e1b4b]">سـنـد قـبـض / Cash Receipt</CardTitle>
+                    <CardDescription className="font-black text-[#1e1b4b]/60">
+                        {isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند المعتمد
+                    </CardDescription>
                 </div>
             </div>
         </CardHeader>
@@ -436,14 +345,14 @@ export default function NewCashReceiptPage() {
                     value={selectedAccountId}
                     onSelect={handleAccountChange}
                     options={clientAccountOptions}
-                    placeholder={refDataLoading ? 'جاري التحميل...' : 'اختر الحساب المالي للعميل...'}
-                    disabled={refDataLoading || isSaving}
-                    className="h-12 rounded-2xl border-2 soft-shadow-input"
+                    placeholder={accountsLoading ? 'جاري جلب الحسابات...' : 'اختر الحساب المالي للعميل...'}
+                    disabled={accountsLoading || isSaving}
+                    className="h-12 rounded-2xl border-2"
                 />
                 </div>
                 <div className="grid gap-2">
                     <Label className="font-black text-[#1e1b4b] pr-1">التاريخ *</Label>
-                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-12 rounded-2xl border-2 soft-shadow-input" />
+                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-12 rounded-2xl" />
                 </div>
             </div>
             
@@ -454,17 +363,17 @@ export default function NewCashReceiptPage() {
                 <InlineSearchList 
                     value={selectedProjectId}
                     onSelect={setSelectedProjectId}
-                    options={projectOptions}
-                    placeholder={!selectedClientId ? 'اختر حساب العميل المربوط بملف أولاً' : projectsLoading ? 'جاري جلب المشاريع...' : 'اختر المشروع (اختياري)...'}
+                    options={clientProjects.map(p => ({ value: p.id!, label: p.transactionType }))}
+                    placeholder={!selectedClientId ? 'اختر حساب العميل أولاً' : projectsLoading ? 'جاري التحميل...' : 'اختر المشروع (اختياري)...'}
                     disabled={!selectedClientId || projectsLoading || isSaving}
-                    className="h-12 bg-white border-primary/20 rounded-2xl soft-shadow-input"
+                    className="h-12 bg-white rounded-2xl"
                 />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="grid gap-2">
                     <Label className="font-black text-[#1e1b4b] pr-1">المبلغ المحصل *</Label>
-                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr h-14 text-3xl font-black text-[#1e1b4b] rounded-2xl shadow-inner border-2 soft-shadow-input' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
+                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr h-14 text-3xl font-black text-[#1e1b4b] rounded-2xl' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
                 </div>
                 <div className="md:col-span-2 grid gap-2">
                 <Label className="text-xs font-black text-muted-foreground uppercase pr-1">مبلغ وقدره (كتابة)</Label>
@@ -475,31 +384,35 @@ export default function NewCashReceiptPage() {
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="description" className="font-black text-[#1e1b4b] pr-1">البيان / وذلك عن</Label>
-                <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving} rows={3} className="rounded-3xl border-2 p-4 text-base font-medium soft-shadow-input" />
+                <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving} rows={3} className="rounded-3xl border-2" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t">
                 <div className="grid gap-2">
                     <Label className="font-black text-[#1e1b4b] pr-1">طريقة الدفع *</Label>
                     <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
-                        <SelectTrigger className="h-12 rounded-2xl border-2 soft-shadow-input text-[#1e1b4b]"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
-                        <SelectContent dir="rtl">{paymentMethodOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+                        <SelectTrigger className="h-12 rounded-2xl border-2 text-[#1e1b4b]"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
+                        <SelectContent dir="rtl">
+                            <SelectItem value="Cash">نقداً</SelectItem>
+                            <SelectItem value="Cheque">شيك</SelectItem>
+                            <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
+                            {(branding?.payment_methods || []).map((m: any) => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
+                        </SelectContent>
                     </Select>
                 </div>
                  <div className="grid gap-2">
                     <Label className="font-black text-[#1e1b4b] pr-1">حساب الإيداع *</Label>
-                    <InlineSearchList value={debitAccountId} onSelect={setDebitAccountId} options={debitAccountOptions} placeholder={!paymentMethod ? 'اختر الطريقة أولاً' : 'اختر الحساب...'} disabled={isSaving || !paymentMethod} className="h-12 rounded-2xl border-2 soft-shadow-input" />
+                    <InlineSearchList value={debitAccountId} onSelect={setDebitAccountId} options={debitAccountOptions} placeholder={!paymentMethod ? 'اختر الطريقة أولاً' : 'اختر الحساب...'} disabled={isSaving || !paymentMethod} className="h-12 rounded-2xl" />
                 </div>
                 <div className="grid gap-2">
                 <Label className="font-black text-[#1e1b4b] pr-1">رقم الشيك / المرجع</Label>
-                <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-12 rounded-2xl border-2 font-mono shadow-inner soft-shadow-input text-[#1e1b4b]" />
+                <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-12 rounded-2xl border-2 font-mono text-[#1e1b4b]" />
                 </div>
             </div>
         </CardContent>
       <CardFooter className="flex justify-end gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
-        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black h-12 text-[#1e1b4b]/60">إلغاء</Button>
-        <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 gap-3 min-w-[350px] bg-[#7209B7] text-white">
-            {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-            اعتماد وإصدار السند
+        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-14 px-10 rounded-2xl font-bold">إلغاء</Button>
+        <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-xl shadow-primary/30 bg-[#7209B7] text-white">
+            {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />} الاعتماد والحفظ
         </Button>
       </CardFooter>
     </Card>
