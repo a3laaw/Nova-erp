@@ -14,24 +14,14 @@ import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 /**
  * شعار نوفا المعتمد (NOVA Text Logo):
- * تم تحسينه لضمان التمركز المطلق مع أنيميشن النبض.
+ * تصميم عريض وبوليد يحاكي لقطة الشاشة تماماً.
  */
 const NovaLogo = () => (
-  <svg width="120" height="60" viewBox="0 0 100 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
-    <text 
-      x="50%" 
-      y="55%" 
-      dominantBaseline="middle" 
-      textAnchor="middle" 
-      fontFamily="inherit" 
-      fontWeight="900" 
-      fontSize="36" 
-      fill="#FF7A00"
-      style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
-    >
+  <div className="relative flex items-center justify-center">
+    <span className="text-5xl font-black tracking-tighter text-[#FF7A00] drop-shadow-sm select-none">
       NOVA
-    </text>
-  </svg>
+    </span>
+  </div>
 );
 
 export default function DashboardLayout({
@@ -59,47 +49,51 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 🛡️ شاشة الموشن جرافيك المعتمدة والمحدثة (Motion Engine V2.0)
+  // 🛡️ شاشة الموشن جرافيك السيادية المحدثة (Motion Engine V3.0)
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-16 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* هالات خلفية طافية */}
-        <div className="absolute top-20 right-20 w-64 h-64 bg-orange-100/30 rounded-full blur-[80px] animate-float-slow" />
-        <div className="absolute bottom-20 left-20 w-80 h-80 bg-orange-200/20 rounded-full blur-[100px] animate-float-slow" style={{ animationDelay: '2s' }} />
+        {/* هالات خلفية ناعمة */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-100/20 rounded-full blur-[120px] animate-float-slow" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-200/10 rounded-full blur-[100px] animate-float-slow" style={{ animationDelay: '3s' }} />
 
         <div className="relative flex flex-col items-center justify-center">
-            {/* 🌟 محرك الحلقة الدوارة المحصن 🌟 */}
-            <div className="relative flex items-center justify-center w-56 h-56">
-                <div className="absolute inset-0 rounded-full border-[3px] border-slate-100 border-t-[#FF7A00] animate-spin-glow shadow-[0_0_15px_rgba(255,122,0,0.1)]" />
+            {/* 🌟 محرك الحلقة الدوارة الخاطفة 🌟 */}
+            <div className="relative flex items-center justify-center w-64 h-64">
+                {/* الحلقة الرمادية الخلفية */}
+                <div className="absolute inset-0 rounded-full border-[1.5px] border-slate-200/40" />
                 
-                {/* الهالة الذهبية الخفيفة المتغيرة */}
-                <div className="absolute h-32 w-32 gold-glow-filter animate-gold-reverse rounded-full" />
+                {/* الحلقة البرتقالية الدوارة (سريعة + تدرج لوني) */}
+                <div className="absolute inset-0 rounded-full border-[3.5px] border-transparent border-t-[#FF7A00] animate-spin-sovereign shadow-[0_0_20px_rgba(255,122,0,0.05)]" />
                 
-                {/* الشعار المتمركز تماماً مع نبض هادئ */}
-                <div className="relative z-10 scale-110">
+                {/* الهالة النبضية */}
+                <div className="absolute h-40 w-40 gold-glow-filter animate-gold-pulse rounded-full" />
+                
+                {/* الشعار المتمركز */}
+                <div className="relative z-10">
                     <NovaLogo />
                 </div>
             </div>
             
             <div className="mt-12 text-center space-y-4">
-                <div className="flex items-center justify-center gap-2">
-                    <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري التحميل</p>
-                    <span className="flex gap-1 pt-2">
-                        <span className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                        <span className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                        <span className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-                    </span>
+                <div className="flex items-center justify-center gap-3">
+                    <p className="text-[#1e1b4b] font-black text-xl tracking-tight">جاري التحميل</p>
+                    <div className="flex gap-1.5 pt-2">
+                        <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0s' }} />
+                        <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.2s' }} />
+                        <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.4s' }} />
+                    </div>
                 </div>
                 
                 {showEmergencyExit && (
-                    <div className="mt-4 flex flex-col gap-2 animate-in zoom-in-95 duration-500 bg-white/60 backdrop-blur-sm p-4 rounded-3xl border-2 border-white shadow-xl">
-                        <p className="text-[10px] font-bold text-slate-400 mb-1">استغرق التحميل وقتاً أطول من المعتاد</p>
+                    <div className="mt-4 animate-in zoom-in-95 duration-500 bg-white/40 backdrop-blur-sm p-4 rounded-3xl border-2 border-white shadow-xl max-w-xs mx-auto">
+                        <p className="text-[10px] font-bold text-slate-400 mb-2">استغرق التحميل وقتاً طويلاً</p>
                         <div className="flex gap-2">
-                            <Button onClick={() => window.location.reload()} variant="outline" className="h-9 rounded-xl font-black gap-2 text-[#1e1b4b] border-orange-200 text-xs px-4">
-                                <RefreshCcw className="h-3 w-3" /> تحديث الصفحة
+                            <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-9 rounded-xl font-black text-[10px] gap-1.5 text-[#1e1b4b]">
+                                <RefreshCcw className="h-3 w-3" /> تحديث
                             </Button>
-                            <Button onClick={handleSafeExit} variant="ghost" className="h-9 rounded-xl font-black gap-2 text-red-600 hover:bg-red-50 text-xs px-4">
-                                <LogOut className="h-3 w-3" /> خروج آمن
+                            <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-9 rounded-xl font-black text-[10px] gap-1.5 text-red-600">
+                                <LogOut className="h-3 w-3" /> خروج
                             </Button>
                         </div>
                     </div>

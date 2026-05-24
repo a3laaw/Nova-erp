@@ -28,24 +28,14 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * شعار نوفا المعتمد (NOVA Text Logo):
- * تمركز مطلق وتصميم خفيف مع نبض.
+ * تصميم عريض وبوليد يحاكي لقطة الشاشة تماماً.
  */
 const NovaLogo = () => (
-  <svg width="120" height="60" viewBox="0 0 100 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
-    <text 
-      x="50%" 
-      y="55%" 
-      dominantBaseline="middle" 
-      textAnchor="middle" 
-      fontFamily="inherit" 
-      fontWeight="900" 
-      fontSize="36" 
-      fill="#FF7A00"
-      style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
-    >
+  <div className="relative flex items-center justify-center">
+    <span className="text-5xl font-black tracking-tighter text-[#FF7A00] drop-shadow-sm select-none">
       NOVA
-    </text>
-  </svg>
+    </span>
+  </div>
 );
 
 export default function LoginPage() {
@@ -107,32 +97,36 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-12 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-          {/* هالات خلفية طافية */}
-          <div className="absolute top-20 right-20 w-64 h-64 bg-orange-100/30 rounded-full blur-[80px] animate-float-slow" />
-          <div className="absolute bottom-20 left-20 w-80 h-80 bg-orange-200/20 rounded-full blur-[100px] animate-float-slow" style={{ animationDelay: '2s' }} />
+          {/* هالات خلفية ناعمة */}
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-100/20 rounded-full blur-[120px] animate-float-slow" />
+          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-200/10 rounded-full blur-[100px] animate-float-slow" style={{ animationDelay: '3s' }} />
 
           <div className="relative flex flex-col items-center justify-center">
-              {/* 🌟 محرك الحلقة الدوارة المطور 🌟 */}
-              <div className="relative flex items-center justify-center w-56 h-56">
-                  <div className="absolute inset-0 rounded-full border-[3px] border-slate-100 border-t-[#FF7A00] animate-spin-glow shadow-[0_0_15px_rgba(255,122,0,0.1)]" />
+              {/* 🌟 محرك الحلقة الدوارة الخاطفة 🌟 */}
+              <div className="relative flex items-center justify-center w-64 h-64">
+                  {/* الحلقة الرمادية الخلفية */}
+                  <div className="absolute inset-0 rounded-full border-[1.5px] border-slate-200/40" />
                   
-                  {/* الهالة الذهبية الخفيفة */}
-                  <div className="absolute h-32 w-32 gold-glow-filter animate-gold-reverse rounded-full" />
+                  {/* الحلقة البرتقالية الدوارة (سريعة + تدرج لوني) */}
+                  <div className="absolute inset-0 rounded-full border-[3.5px] border-transparent border-t-[#FF7A00] animate-spin-sovereign shadow-[0_0_20px_rgba(255,122,0,0.05)]" />
                   
-                  {/* الشعار المتمركز تماماً */}
-                  <div className="relative z-10 scale-110">
+                  {/* الهالة النبضية */}
+                  <div className="absolute h-40 w-40 gold-glow-filter animate-gold-pulse rounded-full" />
+                  
+                  {/* الشعار المتمركز */}
+                  <div className="relative z-10">
                       <NovaLogo />
                   </div>
               </div>
               
               <div className="mt-12 text-center space-y-4">
-                  <div className="flex items-center justify-center gap-2">
-                      <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري التحميل</p>
-                      <span className="flex gap-1 pt-2">
-                          <span className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                          <span className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                          <span className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-                      </span>
+                  <div className="flex items-center justify-center gap-3">
+                      <p className="text-[#1e1b4b] font-black text-xl tracking-tight">جاري التحميل</p>
+                      <div className="flex gap-1.5 pt-2">
+                          <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0s' }} />
+                          <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.2s' }} />
+                          <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.4s' }} />
+                      </div>
                   </div>
               </div>
           </div>
@@ -146,7 +140,7 @@ export default function LoginPage() {
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/5 rounded-full blur-[80px] pointer-events-none" />
 
       <div className="p-1 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#FF7A00] shadow-2xl animate-in zoom-in-95 duration-1000 relative z-10">
-        <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
+        <Card className="w-full max-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
             <CardHeader className="py-10 px-8 text-center">
                 <div className="bg-gradient-to-br from-[#FF7A00] to-[#E66D00] p-6 rounded-[2.2rem] w-fit mx-auto mb-6 shadow-xl border-4 border-white/30 transition-transform hover:scale-105 duration-500">
                     <LogIn className="h-10 w-10 text-white" />

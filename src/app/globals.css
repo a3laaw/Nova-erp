@@ -59,38 +59,59 @@
     box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
   }
   
-  /* 🌟 محرك الأنيميشن الذهبي 🌟 */
+  /* 🌟 محرك الأنيميشن الذهبي والسرعة السيادية 🌟 */
   .gold-glow-filter {
-    background: radial-gradient(circle, rgba(255,122,0,0.2) 0%, rgba(255,253,240,0) 70%);
-    filter: blur(20px);
+    background: radial-gradient(circle, rgba(255,122,0,0.15) 0%, rgba(255,253,240,0) 70%);
+    filter: blur(25px);
   }
 
-  .animate-spin-glow {
-    animation: spin-glow 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  /* دوران سريع مع تدرج لوني (يغمق ويبهت) */
+  .animate-spin-sovereign {
+    animation: spin-sovereign 0.8s linear infinite;
   }
 
-  .animate-gold-reverse {
-    animation: gold-pulse 4s ease-in-out infinite reverse;
+  @keyframes spin-sovereign {
+    0% { 
+      transform: rotate(0deg); 
+      border-top-color: #E66D00; /* غامق */
+      opacity: 1;
+    }
+    50% { 
+      border-top-color: #FFB000; /* باهت/فاتح */
+      opacity: 0.5;
+    }
+    100% { 
+      transform: rotate(360deg); 
+      border-top-color: #E66D00; /* غامق */
+      opacity: 1;
+    }
+  }
+
+  .animate-gold-pulse {
+    animation: gold-pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes gold-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.2; }
+    50% { transform: scale(1.3); opacity: 0.4; }
   }
 
   .animate-float-slow {
     animation: float 6s ease-in-out infinite;
   }
 
-  @keyframes spin-glow {
-    0% { transform: rotate(0deg); border-top-color: #FF7A00; }
-    50% { border-top-color: #FFB000; }
-    100% { transform: rotate(360deg); border-top-color: #FF7A00; }
-  }
-
-  @keyframes gold-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.3; }
-    50% { transform: scale(1.5); opacity: 0.6; }
-  }
-
   @keyframes float {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-20px); }
+  }
+
+  .animate-bounce-dots {
+    animation: bounce-dots 0.6s infinite alternate;
+  }
+
+  @keyframes bounce-dots {
+    from { transform: translateY(0); opacity: 0.5; }
+    to { transform: translateY(-4px); opacity: 1; }
   }
 }
 
