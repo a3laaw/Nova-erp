@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -36,29 +36,24 @@ import {
     Workflow, 
     Play, 
     Check, 
-    MessageSquare, 
     History, 
     ClipboardList, 
-    Sparkles, 
     CheckCircle2,
     ArrowRight,
-    Info,
     AlertCircle,
     Package,
     Layers,
     FileSignature,
     Loader2,
     Target,
-    RotateCcw,
     Clock,
-    Plus,
-    Undo2,
-    IterationCcw
+    IterationCcw,
+    Undo2
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import type { Client, ClientTransaction, WorkStage, TransactionStage, Holiday } from '@/lib/types';
-import { format, differenceInDays } from 'date-fns';
+import type { Client, ClientTransaction, TransactionStage, Holiday } from '@/lib/types';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 import { useAuth } from '@/context/auth-context';
@@ -66,7 +61,6 @@ import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
 import { Progress } from '@/components/ui/progress';
 import { useBranding } from '@/context/branding-context';
@@ -99,17 +93,6 @@ const stageStatusTranslations: Record<string, string> = {
   'in-progress': 'قيد التنفيذ',
   completed: 'مكتملة',
 };
-
-function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: any }) {
-    if (!value) return null;
-    return (
-        <div className="flex items-center gap-4 text-sm">
-            <div className="flex-shrink-0 text-muted-foreground pt-1">{icon}</div>
-            <div className="font-semibold w-32">{label}</div>
-            <div className="text-muted-foreground break-words">{value}</div>
-        </div>
-    );
-}
 
 export default function TransactionDetailPage() {
   const params = useParams();
@@ -148,8 +131,8 @@ export default function TransactionDetailPage() {
   }, [firestore, tenantId]);
 
   /**
-   * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V2000.0) ✨
-   * تنفيذ منطق الأزرار بناءً على النوع المختار في القوائم المرجعية.
+   * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V2100.0) ✨
+   * تنفيذ منطق الأزرار بناءً على النوع المختار في القوائم المرجعية (للبيانات القديمة والجديدة).
    */
   const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
         if (!firestore || !currentUser || !transaction || !transactionPath) return;
@@ -165,19 +148,19 @@ export default function TransactionDetailPage() {
             if (action === 'start') {
                 stage.status = 'in-progress';
                 stage.startDate = Timestamp.fromDate(now);
-                // 🛡️ الالتزام بـ (المدة المتوقعة للإنجاز) المبرمجة 🛡️
-                if (stage.expectedDurationDays) {
-                    const expectedEnd = addWorkingDays(now, stage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
-                    stage.expectedEndDate = Timestamp.fromDate(expectedEnd);
-                }
+                
+                // 🛡️ التزام بـ (المدة المتوقعة) المبرمجة مع دعم البيانات القديمة
+                const days = stage.expectedDurationDays || 7; 
+                const expectedEnd = addWorkingDays(now, days, branding?.work_hours?.holidays || [], publicHolidays);
+                stage.expectedEndDate = Timestamp.fromDate(expectedEnd);
+                
             } else if (action === 'modify') {
-                // 🛡️ الالتزام بـ (نوع التتبع الرقابي: Occurrence) 🛡️
                 stage.currentCount = (stage.currentCount || 0) + 1;
             } else if (action === 'complete') {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 
-                // 🛡️ الالتزام بـ (مراحل الاستكمال التلقائية) المتشعبة 🛡️
+                // 🛡️ التشعب التلقائي (الالتزام بما في القوائم المرجعية)
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
@@ -185,19 +168,18 @@ export default function TransactionDetailPage() {
                         if (target && target.status === 'pending') {
                             target.status = 'in-progress'; 
                             target.startDate = Timestamp.fromDate(now);
-                            if (target.expectedDurationDays) {
-                                target.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
-                            }
+                            const tDays = target.expectedDurationDays || 7;
+                            target.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, tDays, branding?.work_hours?.holidays || [], publicHolidays));
                         }
                     });
                 } else {
+                    // Fallback للتسلسل العادي إذا لم يوجد تشعب مبرمج
                     const nextStage = currentStages.find(s => s.order === stage.order + 1);
                     if (nextStage && nextStage.status === 'pending') {
                         nextStage.status = 'in-progress';
                         nextStage.startDate = Timestamp.fromDate(now);
-                        if (nextStage.expectedDurationDays) {
-                            nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
-                        }
+                        const nDays = nextStage.expectedDurationDays || 7;
+                        nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nDays, branding?.work_hours?.holidays || [], publicHolidays));
                     }
                 }
 
@@ -216,9 +198,8 @@ export default function TransactionDetailPage() {
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
             
             toast({ 
-                title: 'تم التحديث', 
-                description: action === 'complete' ? 'تم إنهاء المرحلة وبدء التبعات التالية آلياً.' : 
-                             action === 'modify' ? 'تم تسجيل جولة تعديل بنجاح.' : 'تم تسجيل بدء العمل الفعلي.' 
+                title: 'نجاح التحديث', 
+                description: action === 'complete' ? 'تم إغلاق المرحلة وفتح التبعات آلياً.' : 'تم تسجيل الإجراء الميداني.' 
             });
         } catch (e: any) {
             toast({ variant: 'destructive', title: 'خطأ', description: e.message });
@@ -234,12 +215,11 @@ export default function TransactionDetailPage() {
             if (stageIndex === -1) throw new Error("Stage not found");
             
             const stage = currentStages[stageIndex];
-            // العودة لحالة "قيد التنفيذ" وإلغاء تاريخ الانتهاء
             stage.status = 'in-progress';
             stage.endDate = null;
             
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: 'تم التراجع عن الإنجاز', description: 'عادت المرحلة لوضع التنفيذ النشط.' });
+            toast({ title: 'تم التراجع', description: 'عادت المرحلة لوضع التنفيذ لضمان سلامة السجل.' });
         } finally { setIsProcessing(false); }
   };
 
@@ -269,8 +249,14 @@ export default function TransactionDetailPage() {
                 </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10 bg-white">
-                <InfoRow icon={<User className="h-5 w-5 text-primary opacity-40"/>} label="المهندس المسؤول" value={transaction.assignedEngineerId ? <span className="font-black text-slate-800">{employeesMap.get(transaction.assignedEngineerId)}</span> : 'غير مسند'} />
-                <InfoRow icon={<Calendar className="h-5 w-5 text-primary opacity-40"/>} label="تاريخ الفتح" value={<span className="font-bold">{toFirestoreDate(transaction.createdAt) ? format(toFirestoreDate(transaction.createdAt)!, 'dd MMMM yyyy', { locale: ar }) : '-'}</span>} />
+                <div className="flex items-center gap-4 text-sm">
+                    <div className="p-2.5 bg-slate-50 rounded-xl text-primary"><User className="h-5 w-5 opacity-40"/></div>
+                    <div><p className="text-[10px] font-black text-slate-400 uppercase">المهندس المسؤول</p><p className="font-black text-slate-800">{transaction.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) : 'غير مسند'}</p></div>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                    <div className="p-2.5 bg-slate-50 rounded-xl text-primary"><Calendar className="h-5 w-5 opacity-40"/></div>
+                    <div><p className="text-[10px] font-black text-slate-400 uppercase">تاريخ فتح المسار</p><p className="font-bold">{toFirestoreDate(transaction.createdAt) ? format(toFirestoreDate(transaction.createdAt)!, 'dd MMMM yyyy', { locale: ar }) : '-'}</p></div>
+                </div>
             </CardContent>
         </Card>
         
@@ -289,13 +275,14 @@ export default function TransactionDetailPage() {
                         <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
                             <Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الميداني (WBS)
                         </CardTitle>
-                        <CardDescription className="text-xs font-bold">إدارة ذكية للمراحل؛ الانتهاء من مرحلة يُفعل كافة التبعات المتشعبة آلياً.</CardDescription>
+                        <CardDescription className="text-xs font-bold italic">ملاحظة: البيانات القديمة يتم مواءمتها آلياً لتعمل بذكاء التشعب والتبعية.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
                         {(transaction.stages || []).map((stage, idx) => {
-                            const isDelayed = stage.status === 'in-progress' && stage.expectedEndDate && toFirestoreDate(stage.expectedEndDate)! < new Date();
+                            const expectedDate = toFirestoreDate(stage.expectedEndDate);
+                            const isDelayed = stage.status === 'in-progress' && expectedDate && expectedDate < new Date();
                             
-                            // 🛡️ الحماية الرقابية الصارمة 🛡️
+                            // 🛡️ الحماية الرقابية: فحص اكتمال الشروط المسبقة 🛡️
                             const isPredecessorCompleted = idx === 0 || 
                                 transaction.stages?.some(s => s.status === 'completed' && s.nextStageIds?.includes(stage.stageId)) || 
                                 transaction.stages![idx-1].status === 'completed';
@@ -325,13 +312,13 @@ export default function TransactionDetailPage() {
                                                         <Play className="h-2 w-2" /> البدء: {format(toFirestoreDate(stage.startDate)!, 'dd/MM/yyyy')}
                                                     </p>
                                                 )}
-                                                {stage.status === 'in-progress' && stage.expectedEndDate && (
+                                                {stage.status === 'in-progress' && expectedDate && (
                                                     <p className={cn(
                                                         "text-[10px] font-black flex items-center gap-1",
                                                         isDelayed ? "text-red-600 animate-pulse" : "text-blue-600"
                                                     )}>
                                                         {isDelayed ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                                                        التسليم المتوقع: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}
+                                                        التسليم المخطط: {format(expectedDate, 'dd/MM/yyyy')}
                                                     </p>
                                                 )}
                                                 {stage.status === 'completed' && stage.endDate && (
@@ -345,7 +332,7 @@ export default function TransactionDetailPage() {
                                     
                                     <div className="flex items-center gap-3 mt-4 sm:mt-0 no-print">
                                         {canEdit && stage.status === 'pending' && isPredecessorCompleted && (
-                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-orange-600 hover:bg-orange-700 text-white shadow-md hover:scale-105 transition-all">
+                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-orange-600 hover:bg-orange-700 text-white shadow-md">
                                                 <Play className="ml-2 h-4 w-4"/> بدء العمل
                                             </Button>
                                         )}
@@ -353,21 +340,20 @@ export default function TransactionDetailPage() {
                                         {canEdit && stage.status === 'in-progress' && (
                                             <>
                                                 {(stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') && (
-                                                    <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-6 border-orange-200 text-orange-700 hover:bg-orange-50 gap-2 shadow-sm">
+                                                    <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-6 border-orange-200 text-orange-700 hover:bg-orange-50 gap-2">
                                                         <IterationCcw className="h-4 w-4" /> سجل تعديل ({stage.currentCount || 0})
                                                     </Button>
                                                 )}
-                                                <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 hover:bg-green-700 text-white gap-2 shadow-lg shadow-green-100 transition-all">
-                                                    <Check className="ml-2 h-4 w-4"/> إنهاء وإنجاز
+                                                <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 hover:bg-green-700 text-white gap-2 shadow-lg shadow-green-100">
+                                                    <Check className="ml-2 h-4 w-4"/> إنجاز وإغلاق
                                                 </Button>
                                             </>
                                         )}
                                         {stage.status === 'completed' && isAdmin && (
-                                            <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-9 w-9 rounded-xl text-orange-400 hover:text-orange-600 hover:bg-orange-50" title="تراجع عن الإكمال">
+                                            <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-9 w-9 rounded-xl text-orange-400 hover:text-orange-600" title="تراجع">
                                                 <Undo2 className="h-5 w-5" />
                                             </Button>
                                         )}
-                                        {stage.status === 'completed' && !isAdmin && <CheckCircle2 className="h-8 w-8 text-green-600" />}
                                     </div>
                                 </div>
                             );

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -18,7 +17,7 @@ import { Loader2, Save, X, Workflow, UserCheck, Layers } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, Department, SubService } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, Department, SubService, TransactionStage } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
@@ -69,12 +68,10 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 const empPath = getTenantPath('employees', tenantId);
                 const typesPath = getTenantPath('transactionTypes', tenantId);
 
-                if (!clientRefPath || !empPath || !typesPath) return;
-
                 const [clientSnap, engSnap, typesSnap] = await Promise.all([
-                    getDoc(doc(firestore, clientRefPath)),
-                    getDocs(query(collection(firestore, empPath), where('status', '==', 'active'))),
-                    getDocs(query(collection(firestore, typesPath), orderBy('order')))
+                    getDoc(doc(firestore, clientRefPath!)),
+                    getDocs(query(collection(firestore, empPath!), where('status', '==', 'active'))),
+                    getDocs(query(collection(firestore, typesPath!), orderBy('order')))
                 ]);
 
                 if (clientSnap.exists()) setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
@@ -92,7 +89,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         fetchAllData();
     }, [firestore, isOpen, tenantId, clientId]);
 
-    // ✨ محرك جلب الخدمات الفرعية (Sub-Services Logic)
     useEffect(() => {
         if (!transactionTypeName || !firestore || !tenantId) {
             setSubServices([]);
@@ -107,9 +103,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 if (!selectedType?.id) return;
 
                 const subsPath = getTenantPath(`transactionTypes/${selectedType.id}/subServices`, tenantId);
-                if (!subsPath) return;
-
-                const snap = await getDocs(query(collection(firestore, subsPath), orderBy('order')));
+                const snap = await getDocs(query(collection(firestore, subsPath!), orderBy('order')));
                 setSubServices(snap.docs.map(d => ({ id: d.id, ...d.data() } as SubService)));
             } finally {
                 setSubServicesLoading(false);
@@ -118,15 +112,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
         fetchSubServices();
     }, [transactionTypeName, transactionTypes, firestore, tenantId]);
-
-    // ✨ محرك الإسناد التلقائي الذكي
-    useEffect(() => {
-        if (transactionTypeName && client && engineers.length > 0) {
-            if (client.assignedEngineer) {
-                setAssignedEngineerId(client.assignedEngineer);
-            }
-        }
-    }, [transactionTypeName, client, transactionTypes, engineers]);
 
     const transactionTypeOptions = useMemo(() => 
         transactionTypes.map(t => ({ value: t.name, label: t.name })), 
@@ -157,18 +142,25 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const selectedSub = subServices.find(s => s.id === selectedSubServiceId);
 
-            // ✨ جلب مراحل العمل المعتمدة من مستوى الخدمة الفرعية (Level 3) ✨
+            // ✨ جلب مراحل العمل المعتمدة وحقن ذكاء القوالب (WBS V2000.0) ✨
             let initialStages: any[] = [];
             const stagesPath = getTenantPath(`transactionTypes/${selectedType?.id}/subServices/${selectedSubServiceId}/workStages`, tenantId);
             
             if (stagesPath) {
                 const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
-                initialStages = stagesSnap.docs.map(d => ({ 
-                    stageId: d.id, 
-                    name: d.data().name, 
-                    status: 'pending',
-                    order: d.data().order || 0
-                }));
+                initialStages = stagesSnap.docs.map(d => {
+                    const data = d.data() as WorkStage;
+                    return { 
+                        stageId: d.id, 
+                        name: data.name, 
+                        status: 'pending' as const,
+                        order: data.order || 0,
+                        trackingType: data.trackingType || 'duration',
+                        expectedDurationDays: data.expectedDurationDays || null,
+                        maxOccurrences: data.maxOccurrences || null,
+                        nextStageIds: data.nextStageIds || []
+                    } satisfies TransactionStage;
+                });
             }
 
             const batch = writeBatch(firestore);
@@ -194,22 +186,17 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(), 
                 stages: initialStages,
-                assignedEngineerId: assignedEngineerId || null,
+                assignedEngineerId: assignedEngineerId || client?.assignedEngineer || null,
                 transactionTypeId: selectedType?.id || null,
                 companyId: tenantId
             };
             
             batch.set(newTransactionRef, cleanFirestoreData(newTransactionData));
 
-            if (fromAppointmentId) {
-                const apptPath = getTenantPath(`appointments/${fromAppointmentId}`, tenantId);
-                if (apptPath) batch.update(doc(firestore, apptPath), { transactionId: newTransactionRef.id });
-            }
-
             const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
                 type: 'log', 
-                content: `تم فتح معاملة معتمدة: "${transactionTypeName}${selectedSub ? ` - ${selectedSub.name}` : ''}" برقم مرجعي ${transactionNumber}.`,
+                content: `تم فتح مسار معاملة: "${transactionTypeName}${selectedSub ? ` - ${selectedSub.name}` : ''}". تم حقن ${initialStages.length} مرحلة إنجاز مبرمجة آلياً.`,
                 userId: currentUser.id, 
                 userName: currentUser.fullName, 
                 createdAt: serverTimestamp(),
@@ -218,13 +205,12 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
             await batch.commit();
             
-            toast({ title: 'تم الحفظ بنجاح', description: `المعاملة جاهزة للمتابعة برقم ${transactionNumber}` });
+            toast({ title: 'نجاح التأسيس الفني', description: `تم إعداد هيكل المعاملة بنجاح.` });
             onClose();
             router.refresh();
 
         } catch (error: any) {
-            console.error("Save transaction error:", error);
-            toast({ variant: 'destructive', title: 'فشل الحفظ', description: error.message });
+            toast({ variant: 'destructive', title: 'فشل التأسيس', description: error.message });
             setIsSaving(false);
             savingRef.current = false;
         }
@@ -235,31 +221,29 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             <DialogContent dir="rtl" className="max-w-lg rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0 bg-white">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader className="p-8 bg-primary/5 border-b">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
-                                <Workflow className="h-6 w-6" />
-                            </div>
-                            <div className="text-right">
-                                <DialogTitle className="text-xl font-black text-[#1e1b4b]">إضافة معاملة جديدة معتمدة</DialogTitle>
-                                <DialogDescription className="font-bold text-slate-500">تحديد الخدمة الرئيسية والفرعية لضمان دقة سير العمل الموحد.</DialogDescription>
+                        <div className="flex items-center gap-4 text-right">
+                            <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Workflow className="h-6 w-6" /></div>
+                            <div>
+                                <DialogTitle className="text-xl font-black text-[#1e1b4b]">تأسيس معاملة تقنية</DialogTitle>
+                                <DialogDescription className="font-bold text-slate-500">سيتم حقن مراحل العمل (WBS) آلياً بناءً على نوع الخدمة.</DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
                     
                     <div className="p-8 space-y-6">
                         <div className="grid gap-2">
-                            <Label className="font-black text-gray-700 pr-1">نوع المعاملة الرئيسية *</Label>
+                            <Label className="font-black text-gray-700 pr-1">الخدمة الرئيسية *</Label>
                             <InlineSearchList 
                                 value={transactionTypeName} 
                                 onSelect={setTransactionTypeName} 
                                 options={transactionTypeOptions} 
-                                placeholder={typesLoading ? 'جاري جلب القوائم المعتمدة...' : 'اختر الخدمة الرئيسية...'} 
+                                placeholder={typesLoading ? 'جاري التحميل...' : 'اختر الخدمة الرئيسية...'} 
                                 disabled={typesLoading || isSaving} 
                             />
                         </div>
 
                         {subServices.length > 0 && (
-                            <div className="grid gap-2 animate-in slide-in-from-top-2 duration-300">
+                            <div className="grid gap-2 animate-in slide-in-from-top-2">
                                 <Label className="font-black text-primary pr-1 flex items-center gap-2">
                                     <Layers className="h-4 w-4" /> نوع الخدمة التفصيلي *
                                 </Label>
@@ -267,19 +251,11 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                                     value={selectedSubServiceId} 
                                     onSelect={setSelectedSubServiceId} 
                                     options={subServiceOptions} 
-                                    placeholder={subServicesLoading ? 'جاري جلب الخيارات...' : 'اختر التصنيف الميداني (Layer 2)...'} 
+                                    placeholder={subServicesLoading ? 'جاري جلب الخيارات...' : 'اختر التصنيف الميداني المعتمد...'} 
                                     disabled={subServicesLoading || isSaving} 
                                     className="border-primary/20 bg-primary/[0.02]"
                                 />
                             </div>
-                        )}
-
-                        {assignedEngineerId && (
-                            <Alert className="bg-green-50 border-green-200 rounded-2xl animate-in slide-in-from-top-2 border-2 border-dashed">
-                                <UserCheck className="h-4 w-4 text-green-600" />
-                                <AlertTitle className="text-xs font-black text-green-800 uppercase tracking-tighter">إسناد تلقائي ذكي</AlertTitle>
-                                <AlertDescription className="text-[10px] font-bold text-green-700 leading-tight">تم التعرف على المهندس المتابع لهذا العميل وإسناده آلياً لتوافقه مع هذه الخدمة المعتمدة.</AlertDescription>
-                            </Alert>
                         )}
 
                         <div className="grid gap-2">
@@ -293,11 +269,11 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label className="font-black text-gray-700 pr-1">ملاحظات العقد أو التنفيذ</Label>
+                            <Label className="font-black text-gray-700 pr-1">ملاحظات إضافية</Label>
                             <Textarea 
                                 value={description} 
                                 onChange={e => setDescription(e.target.value)} 
-                                placeholder="أي تفاصيل فنية خاصة بهذه المعاملة..." 
+                                placeholder="أي تفاصيل فنية خاصة..." 
                                 disabled={isSaving}
                                 className="rounded-2xl border-2 p-4 min-h-[100px] shadow-inner"
                             />
@@ -306,7 +282,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
                     <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || !transactionTypeName} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2 bg-[#7209B7] text-white border-none">
+                        <Button type="submit" disabled={isSaving || !transactionTypeName} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2 bg-[#7209B7] text-white">
                             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
                             بدء مسار المعاملة
                         </Button>
