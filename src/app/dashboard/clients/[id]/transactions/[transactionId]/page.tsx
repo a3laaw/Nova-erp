@@ -148,8 +148,8 @@ export default function TransactionDetailPage() {
   }, [firestore, tenantId]);
 
   /**
-   * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V1700.0) ✨
-   * يدعم الأزرار الثلاثة: بدء، تعديل تكراري، إنهاء مع تشعب تلقائي.
+   * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V1800.0) ✨
+   * تنفيذ منطق الأزرار الثلاثة مع التشغيل التلقائي للمرحلة التالية.
    */
   const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
         if (!firestore || !currentUser || !transaction || !transactionPath) return;
@@ -175,13 +175,14 @@ export default function TransactionDetailPage() {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 
-                // ✨ تفعيل المسارات المتفرعة آلياً (Automatic Chain Reaction) ✨
+                // ✨ تفعيل المرحلة التالية تلقائياً (Auto-Start Following Stage) ✨
+                // يتم البحث حسب التبعية الصريحة أو الترتيب الرقمي
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
                         const target = currentStages.find(s => s.stageId === nid);
                         if (target && target.status === 'pending') {
-                            target.status = 'in-progress';
+                            target.status = 'in-progress'; // يبدأ العمل آلياً
                             target.startDate = Timestamp.fromDate(now);
                             if (target.expectedDurationDays) {
                                 target.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
@@ -191,7 +192,7 @@ export default function TransactionDetailPage() {
                 } else {
                     const nextStage = currentStages.find(s => s.order === stage.order + 1);
                     if (nextStage && nextStage.status === 'pending') {
-                        nextStage.status = 'in-progress';
+                        nextStage.status = 'in-progress'; // يبدأ العمل آلياً
                         nextStage.startDate = Timestamp.fromDate(now);
                         if (nextStage.expectedDurationDays) {
                             nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
@@ -203,10 +204,12 @@ export default function TransactionDetailPage() {
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
             
             toast({ 
-                title: 'تحديث المسار', 
-                description: action === 'complete' ? 'تم إنجاز المرحلة وتفعيل المسارات التالية آلياً.' : 
-                             action === 'modify' ? 'تم تسجيل جولة تعديل جديدة.' : 'بدأ العمل في المرحلة.' 
+                title: 'تم تحديث المسار', 
+                description: action === 'complete' ? 'تم إنهاء المرحلة وبدء المرحلة التالية آلياً.' : 
+                             action === 'modify' ? 'تم تسجيل جولة تعديل بنجاح.' : 'تم تسجيل بدء العمل الفعلي.' 
             });
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'خطأ', description: e.message });
         } finally { setIsProcessing(false); }
   };
 
@@ -247,7 +250,7 @@ export default function TransactionDetailPage() {
                             <UniversalActionTrigger title={transaction.transactionType} sourceModule="المعاملات" sourceId={transaction.id!} />
                         </div>
                         {transaction.subServiceName && <Badge className="bg-primary text-white font-black px-4 h-7 rounded-full border-none shadow-md">{transaction.subServiceName}</Badge>}
-                        <CardDescription className="text-base font-bold">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline font-bold'>{client.nameAr}</Link></CardDescription>
+                        <CardDescription className="text-base font-medium">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline font-bold'>{client.nameAr}</Link></CardDescription>
                     </div>
                     <Badge variant="outline" className={cn("px-6 py-1.5 rounded-full font-black text-sm border-2", transactionStatusColors[transaction.status])}>{statusTranslations[transaction.status]}</Badge>
                 </div>
@@ -273,23 +276,30 @@ export default function TransactionDetailPage() {
                         <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
                             <Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الميداني (WBS)
                         </CardTitle>
-                        <CardDescription className="text-xs font-bold">إدارة ذكية للمراحل؛ الانتهاء من مرحلة يُفعل التبعات التالية آلياً.</CardDescription>
+                        <CardDescription className="text-xs font-bold">إدارة ذكية للمراحل؛ الانتهاء من مرحلة يُفعل التبعات التالية آلياً ويغلق المسار السابق.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
-                        {(transaction.stages || []).map((stage) => {
+                        {(transaction.stages || []).map((stage, idx) => {
                             const isDelayed = stage.status === 'in-progress' && stage.expectedEndDate && toFirestoreDate(stage.expectedEndDate)! < new Date();
                             
+                            // 🛡️ المبدأ الرقابي: فحص هل المرحلة السابقة منجزة؟ 🛡️
+                            const isPredecessorCompleted = idx === 0 || transaction.stages![idx - 1].status === 'completed';
+                            const isBlocked = !isPredecessorCompleted && stage.status === 'pending';
+
                             return (
                                 <div key={stage.stageId} className={cn(
                                     "flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent rounded-[2rem] transition-all relative overflow-hidden group",
                                     stage.status === 'in-progress' ? "bg-blue-50/40 border-blue-200 ring-2 ring-primary/5 shadow-lg" : "bg-muted/20 hover:bg-white hover:border-primary/20",
-                                    stage.status === 'completed' && "bg-green-50/20 opacity-80"
+                                    stage.status === 'completed' && "bg-green-50/20 opacity-80",
+                                    isBlocked && "opacity-40 grayscale pointer-events-none"
                                 )}>
                                     <div className="flex items-center gap-6">
                                         <Badge variant="outline" className={cn(
                                             "w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2", 
                                             stageStatusColors[stage.status]
-                                        )}>{stageStatusTranslations[stage.status]}</Badge>
+                                        )}>
+                                            {isBlocked ? 'بانتظار سابقتها' : stageStatusTranslations[stage.status]}
+                                        </Badge>
                                         
                                         <div className="space-y-1">
                                             <span className="font-black text-lg text-slate-800">{stage.name}</span>
@@ -318,15 +328,17 @@ export default function TransactionDetailPage() {
                                     </div>
                                     
                                     <div className="flex items-center gap-3 mt-4 sm:mt-0 no-print">
-                                        {canEdit && stage.status === 'pending' && (
-                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 shadow-md hover:scale-105 transition-all">
+                                        {/* زر البدء يظهر فقط إذا كانت المرحلة جاهزة (السابقة منجزة) وهي معلقة */}
+                                        {canEdit && stage.status === 'pending' && isPredecessorCompleted && (
+                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-orange-600 hover:bg-orange-700 text-white shadow-md hover:scale-105 transition-all">
                                                 <Play className="ml-2 h-4 w-4"/> بدء العمل
                                             </Button>
                                         )}
+                                        
                                         {canEdit && stage.status === 'in-progress' && (
                                             <>
-                                                <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-6 border-orange-200 text-orange-700 hover:bg-orange-50 gap-2">
-                                                    <IterationCcw className="h-4 w-4" /> تعديل ({stage.currentCount || 0})
+                                                <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-6 border-orange-200 text-orange-700 hover:bg-orange-50 gap-2 shadow-sm">
+                                                    <IterationCcw className="h-4 w-4" /> سجل تعديل ({stage.currentCount || 0})
                                                 </Button>
                                                 <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 hover:bg-green-700 text-white gap-2 shadow-lg shadow-green-100 transition-all">
                                                     <Check className="ml-2 h-4 w-4"/> إنهاء وإنجاز
@@ -366,4 +378,3 @@ export default function TransactionDetailPage() {
     </div>
   );
 }
-
