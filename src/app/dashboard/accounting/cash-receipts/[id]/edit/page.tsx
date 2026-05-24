@@ -92,7 +92,7 @@ export default function EditCashReceiptPage() {
       setSelectedProjectId(receipt.projectId || '');
       setSelectedClientId(receipt.clientId || '');
 
-      const acc = accounts.find(a => (a.parentCode === '1102' || a.code.startsWith('1102')) && a.name === receipt.clientNameAr);
+      const acc = accounts.find(a => a.code.startsWith('1102') && a.name === receipt.clientNameAr);
       if (acc) setSelectedAccountId(acc.id!);
       
       const drAccLine = accounts.find(a => a.name.includes(receipt.paymentMethod === 'Cash' ? 'صندوق' : 'بنك') && a.isPayable);
@@ -120,7 +120,7 @@ export default function EditCashReceiptPage() {
     }
   };
 
-  // ✨ محرك تحليل الدفعات المطور (Precise Narrative Engine V1500.0) ✨
+  // ✨ محرك توصيف الدفعات المطور (Precise Narrative Engine V1600.0) ✨
   useEffect(() => {
     const generateDescription = async () => {
       if (!selectedProjectId || !amount || parseFloat(amount) <= 0 || !firestore || !tenantId) {
@@ -146,14 +146,18 @@ export default function EditCashReceiptPage() {
         if (remainingOnClause > 0) {
           const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
           
-          if (paymentForThisClause >= remainingOnClause) {
-            const prefix = paidOnThisClausePreviously > 0 ? "استكمال سداد" : "سداد كامل";
-            descriptionParts.push(`${prefix} للدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
+          if (paymentForThisClause >= remainingOnClause && paidOnThisClausePreviously > 0) {
+            // حالة الاستكمال مع ذكر القيمة الإجمالية
+            descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} استكمالاً للدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
+          } else if (paymentForThisClause >= remainingOnClause) {
+            // سداد كامل (لأول مرة)
+            descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
           } else {
+            // سداد جزئي
             const partText = paidOnThisClausePreviously > 0 ? "جزء إضافي" : "جزء أول";
-            descriptionParts.push(`${partText} من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
+            descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} كـ ${partText} من الدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
             const newRemaining = remainingOnClause - paymentForThisClause;
-            descriptionParts.push(`(المتبقي من الدفعة: ${formatCurrency(newRemaining)})`);
+            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
           }
           remainingAmountFromCurrentPayment -= paymentForThisClause;
         }
@@ -218,12 +222,20 @@ export default function EditCashReceiptPage() {
   };
 
   const clientAccountOptions = useMemo(() => 
-    accounts.filter(a => a.parentCode === '1102' || a.code.startsWith('1102')).map(a => ({
+    accounts.filter(a => a.code.startsWith('1102')).map(a => ({
       value: a.id!,
       label: `${a.name} (${a.code})`,
       searchKey: a.code
     }))
   , [accounts]);
+
+  const debitAccountOptions = useMemo(() => {
+    if (!paymentMethod) return [];
+    const isCash = paymentMethod === 'Cash';
+    return accounts
+        .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes(isCash ? 'صندوق' : 'بنك'))
+        .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+  }, [accounts, paymentMethod]);
 
   if (receiptLoading || accountsLoading) return <div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-96 w-full rounded-2xl" /></div>;
 
@@ -307,21 +319,3 @@ export default function EditCashReceiptPage() {
     </Card>
   );
 }
-
-function useDebitAccountOptions(accounts: Account[], paymentMethod: string) {
-    return useMemo(() => {
-        if (!paymentMethod) return [];
-        const isCash = paymentMethod === 'Cash';
-        return accounts
-            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes(isCash ? 'صندوق' : 'بنك'))
-            .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
-      }, [accounts, paymentMethod]);
-}
-
-const debitAccountOptions = (accounts: Account[], paymentMethod: string) => {
-    if (!paymentMethod) return [];
-    const isCash = paymentMethod === 'Cash';
-    return accounts
-        .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes(isCash ? 'صندوق' : 'بنك'))
-        .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
-};
