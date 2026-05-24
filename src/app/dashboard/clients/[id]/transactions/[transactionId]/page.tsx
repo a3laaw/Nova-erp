@@ -131,8 +131,8 @@ export default function TransactionDetailPage() {
   }, [firestore, tenantId]);
 
   /**
-   * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V2100.0) ✨
-   * تنفيذ منطق الأزرار بناءً على النوع المختار في القوائم المرجعية (للبيانات القديمة والجديدة).
+   * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V2200.0) ✨
+   * تنفيذ منطق الأزرار الثلاثة والالتزام الصارم بقواعد القوائم المرجعية.
    */
   const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
         if (!firestore || !currentUser || !transaction || !transactionPath) return;
@@ -149,7 +149,7 @@ export default function TransactionDetailPage() {
                 stage.status = 'in-progress';
                 stage.startDate = Timestamp.fromDate(now);
                 
-                // 🛡️ التزام بـ (المدة المتوقعة) المبرمجة مع دعم البيانات القديمة
+                // 🛡️ التزام بـ (المدة المتوقعة) المبرمجة في القوائم المرجعية
                 const days = stage.expectedDurationDays || 7; 
                 const expectedEnd = addWorkingDays(now, days, branding?.work_hours?.holidays || [], publicHolidays);
                 stage.expectedEndDate = Timestamp.fromDate(expectedEnd);
@@ -160,7 +160,7 @@ export default function TransactionDetailPage() {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 
-                // 🛡️ التشعب التلقائي (الالتزام بما في القوائم المرجعية)
+                // 🛡️ التشعب التلقائي (الالتزام بما في القوائم المرجعية - مراحل الاستكمال التلقائية)
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
@@ -173,7 +173,7 @@ export default function TransactionDetailPage() {
                         }
                     });
                 } else {
-                    // Fallback للتسلسل العادي إذا لم يوجد تشعب مبرمج
+                    // Fallback للتسلسل العادي إذا لم يوجد تشعب مبرمج في القوائم المرجعية
                     const nextStage = currentStages.find(s => s.order === stage.order + 1);
                     if (nextStage && nextStage.status === 'pending') {
                         nextStage.status = 'in-progress';
@@ -183,7 +183,7 @@ export default function TransactionDetailPage() {
                     }
                 }
 
-                // تحديث الأثر المالي في العقد
+                // تحديث الأثر المالي في العقد إذا كان مرتبطاً بهذه المرحلة
                 if (transaction.contract?.clauses) {
                     const updatedClauses = transaction.contract.clauses.map((clause: any) => {
                         if (clause.condition === stage.name && clause.status === 'غير مستحقة') {
@@ -199,7 +199,7 @@ export default function TransactionDetailPage() {
             
             toast({ 
                 title: 'نجاح التحديث', 
-                description: action === 'complete' ? 'تم إغلاق المرحلة وفتح التبعات آلياً.' : 'تم تسجيل الإجراء الميداني.' 
+                description: action === 'complete' ? 'تم إغلاق المرحلة وفتح التبعات آلياً حسب القوائم المرجعية.' : 'تم تسجيل الإجراء الميداني.' 
             });
         } catch (e: any) {
             toast({ variant: 'destructive', title: 'خطأ', description: e.message });
@@ -275,7 +275,7 @@ export default function TransactionDetailPage() {
                         <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
                             <Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الميداني (WBS)
                         </CardTitle>
-                        <CardDescription className="text-xs font-bold italic">ملاحظة: البيانات القديمة يتم مواءمتها آلياً لتعمل بذكاء التشعب والتبعية.</CardDescription>
+                        <CardDescription className="text-xs font-bold italic">ملاحظة: النظام يلتزم حرفياً بقواعد (النوع الرقابي والتبعيات) المحددة في القوائم المرجعية.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
                         {(transaction.stages || []).map((stage, idx) => {
@@ -283,6 +283,7 @@ export default function TransactionDetailPage() {
                             const isDelayed = stage.status === 'in-progress' && expectedDate && expectedDate < new Date();
                             
                             // 🛡️ الحماية الرقابية: فحص اكتمال الشروط المسبقة 🛡️
+                            // تفتح المرحلة للبدء إذا اكتملت كافة المراحل التي تشير إليها في nextStageIds، أو السابقة بالترتيب
                             const isPredecessorCompleted = idx === 0 || 
                                 transaction.stages?.some(s => s.status === 'completed' && s.nextStageIds?.includes(stage.stageId)) || 
                                 transaction.stages![idx-1].status === 'completed';
@@ -381,3 +382,4 @@ export default function TransactionDetailPage() {
     </div>
   );
 }
+
