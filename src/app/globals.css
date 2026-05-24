@@ -59,60 +59,71 @@
     box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
   }
   
-  /* 🌟 محرك أنيميشن "انفجار النوفا" (Nova Motion Engine) 🌟 */
+  /* 🌟 محرك أنيميشن "انفجار النوفا" (Nova Motion Engine V3.5) 🌟 */
   
   .nova-glow-nebula {
-    background: radial-gradient(circle, rgba(255,122,0,0.2) 0%, rgba(255,253,240,0) 70%);
-    filter: blur(40px);
-    animation: nebula-pulse 4s ease-in-out infinite;
+    background: radial-gradient(circle, rgba(255,122,0,0.15) 0%, rgba(255,253,240,0) 70%);
+    filter: blur(60px);
+    animation: nebula-pulse 5s ease-in-out infinite;
   }
 
   @keyframes nebula-pulse {
     0%, 100% { transform: scale(1); opacity: 0.3; }
-    50% { transform: scale(1.5); opacity: 0.6; }
+    50% { transform: scale(1.4); opacity: 0.5; }
   }
 
-  .animate-nova-spin {
-    animation: nova-spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  .nova-plasma-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    border-top: 3px solid #FF7A00;
+    filter: drop-shadow(0 0 15px rgba(255, 122, 0, 0.4));
+    animation: plasma-spin 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 
-  @keyframes nova-spin {
+  @keyframes plasma-spin {
     0% { transform: rotate(0deg); border-top-color: #FF7A00; }
-    50% { border-top-color: #FFB000; opacity: 0.6; }
+    50% { border-top-color: #FFB000; opacity: 0.8; }
     100% { transform: rotate(360deg); border-top-color: #FF7A00; }
   }
 
+  /* جزيئات الانفجار المتطايرة */
   .stardust-particle {
     position: absolute;
-    width: 4px;
-    height: 4px;
+    width: 3px;
+    height: 3px;
     background: #FF7A00;
     border-radius: 100%;
-    filter: blur(1px);
-    animation: particle-blast 2s ease-out infinite;
+    filter: blur(0.5px);
+    animation: particle-blast 2.5s ease-out infinite;
+    opacity: 0;
   }
 
   @keyframes particle-blast {
     0% { transform: translate(0, 0) scale(1); opacity: 1; }
+    80% { opacity: 0.6; }
     100% { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) scale(0); opacity: 0; }
   }
 
-  .animate-float-slow {
-    animation: float 6s ease-in-out infinite;
+  .nova-text-glow {
+    text-shadow: 0 0 20px rgba(255, 122, 0, 0.3), 0 0 40px rgba(255, 122, 0, 0.1);
+    animation: text-pulse 2s ease-in-out infinite;
   }
 
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-20px); }
+  @keyframes text-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(0.98); }
   }
 
   .animate-bounce-dots {
-    animation: bounce-dots 0.6s infinite alternate;
+    animation: bounce-dots 0.8s infinite alternate;
   }
 
   @keyframes bounce-dots {
-    from { transform: translateY(0); opacity: 0.5; }
-    to { transform: translateY(-4px); opacity: 1; }
+    from { transform: translateY(0); opacity: 0.4; }
+    to { transform: translateY(-6px); opacity: 1; }
   }
 }
 

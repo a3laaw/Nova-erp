@@ -13,34 +13,24 @@ import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 /**
- * شعار نوفا السيادي (The Sovereign NOVA Logo):
- * تصميم عريض وبوليد يحاكي لقطة الشاشة تماماً مع نبض داخلي.
- */
-const NovaLogo = () => (
-  <div className="relative flex items-center justify-center animate-in zoom-in-50 duration-1000">
-    <span className="text-6xl font-black tracking-tighter text-[#FF7A00] drop-shadow-[0_0_15px_rgba(255,122,0,0.3)] select-none z-10">
-      NOVA
-    </span>
-  </div>
-);
-
-/**
- * جزيئات غبار النجوم (Stardust Particles):
- * جزيئات تنطلق من المركز لمحاكاة الانفجار الكوني.
+ * جزيئات غبار النجوم (Stardust Blast Engine):
+ * توليد جسيمات تنطلق من المركز بمحاكاة عشوائية.
  */
 const Stardust = () => {
     return (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            {Array.from({ length: 12 }).map((_, i) => (
+            {Array.from({ length: 24 }).map((_, i) => (
                 <div 
                     key={i} 
                     className="stardust-particle"
                     style={{
                         top: '50%',
                         left: '50%',
-                        '--tw-translate-x': `${(Math.random() - 0.5) * 400}px`,
-                        '--tw-translate-y': `${(Math.random() - 0.5) * 400}px`,
-                        animationDelay: `${Math.random() * 2}s`,
+                        '--tw-translate-x': `${(Math.random() - 0.5) * 600}px`,
+                        '--tw-translate-y': `${(Math.random() - 0.5) * 600}px`,
+                        animationDelay: `${Math.random() * 3}s`,
+                        width: `${Math.random() * 3 + 1}px`,
+                        height: `${Math.random() * 3 + 1}px`
                     } as any}
                 />
             ))}
@@ -73,49 +63,51 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 🛡️ شاشة التحميل "انفجار النوفا" (Nova Explosion Engine V3.0) 🛡️
+  // 🛡️ شاشة التحميل "انفجار النوفا" (Nova Blast Loading V3.5) 🛡️
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* خلفية سديمية نابضة */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] nova-glow-nebula rounded-full" />
+        {/* هالة السديم النبضية */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] nova-glow-nebula rounded-full" />
         
-        {/* جزيئات الانفجار */}
+        {/* جزيئات الانفجار (Sparks) */}
         <Stardust />
 
-        <div className="relative flex flex-col items-center justify-center scale-110 sm:scale-125">
-            {/* 🌟 محرك النوفا الدوار 🌟 */}
-            <div className="relative flex items-center justify-center w-64 h-64">
-                {/* الحلقة الخلفية */}
-                <div className="absolute inset-0 rounded-full border-[1.5px] border-slate-200/30" />
+        <div className="relative flex flex-col items-center justify-center">
+            {/* 🌟 وحدة النواة والمدار 🌟 */}
+            <div className="relative flex items-center justify-center w-72 h-72 scale-110 sm:scale-125">
+                {/* الدوائر المدارية المتوهجة */}
+                <div className="absolute inset-0 rounded-full border-[1px] border-slate-200/50" />
+                <div className="nova-plasma-ring" />
                 
-                {/* الحلقة المدارية السريعة */}
-                <div className="absolute inset-0 rounded-full border-[4px] border-transparent border-t-[#FF7A00] animate-nova-spin shadow-[0_0_30px_rgba(255,122,0,0.1)]" />
-                
-                {/* الشعار المضيء */}
-                <div className="relative z-20">
-                    <NovaLogo />
+                {/* شعار NOVA السيادي المضيء */}
+                <div className="relative z-20 nova-text-glow">
+                    <span className="text-6xl font-black tracking-tighter text-[#FF7A00]">
+                      NOVA
+                    </span>
                 </div>
             </div>
             
-            <div className="mt-16 text-center space-y-4">
-                <div className="flex items-center justify-center gap-3">
-                    <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-80">جاري الاستعادة</p>
-                    <div className="flex gap-1.5 pt-2">
-                        <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0s' }} />
-                        <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.2s' }} />
-                        <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.4s' }} />
+            <div className="mt-20 text-center space-y-6">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter opacity-90">جاري التحميل</p>
+                        <div className="flex gap-2">
+                            <div className="h-2 w-2 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0s' }} />
+                            <div className="h-2 w-2 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.2s' }} />
+                            <div className="h-2 w-2 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.4s' }} />
+                        </div>
                     </div>
                 </div>
                 
                 {showEmergencyExit && (
-                    <div className="mt-6 animate-in zoom-in-95 duration-500 glass-effect p-5 rounded-[2rem] border-2 border-white shadow-2xl max-w-xs mx-auto">
-                        <p className="text-[10px] font-bold text-slate-400 mb-3">تأخر في الاستجابة السحابية</p>
-                        <div className="flex gap-2">
-                            <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] gap-1.5 border-slate-200">
+                    <div className="mt-8 animate-in zoom-in-95 duration-500 glass-effect p-6 rounded-[2.5rem] border-2 border-white shadow-2xl max-w-xs mx-auto">
+                        <p className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest">تأخر في الاستجابة السحابية</p>
+                        <div className="flex gap-3">
+                            <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-11 rounded-xl font-black text-[10px] gap-2 border-slate-200">
                                 <RefreshCcw className="h-3 w-3" /> تحديث
                             </Button>
-                            <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] gap-1.5 text-red-600">
+                            <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-11 rounded-xl font-black text-[10px] gap-2 text-red-600">
                                 <LogOut className="h-3 w-3" /> خروج
                             </Button>
                         </div>
