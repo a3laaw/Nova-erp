@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -78,7 +79,8 @@ import {
   Calculator,
   BarChart3,
   Sparkles,
-  History
+  History,
+  Coins
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -132,10 +134,10 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية', icon: BookOpen },
+        { href: '/dashboard/accounting/claims', label: 'المطالبات والتحصيل', icon: Coins },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
         { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: RotateCcw },
-        { href: '/dashboard/accounting/recurring', label: 'الالتزامات الدورية', icon: CalendarCheck },
         { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: PieChart },
       ]
     },
