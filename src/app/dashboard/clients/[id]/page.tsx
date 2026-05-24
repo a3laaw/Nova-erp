@@ -130,7 +130,6 @@ export default function ClientProfilePage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   
-  // States for deletions
   const [transactionToDelete, setTransactionToDelete] = useState<ClientTransaction | null>(null);
   const [quotationToDelete, setQuotationToDelete] = useState<Quotation | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -138,8 +137,9 @@ export default function ClientProfilePage() {
   const clientPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}`, tenantId) : null, [id, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
-  const txPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}/transactions`, tenantId) : null, [id, tenantId]);
-  const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, txPath);
+  // 🛡️ التعديل الجذري: قراءة المعاملات من المسار المسطح الموحد 🛡️
+  const txQuery = useMemo(() => [where('clientId', '==', id)], [id]);
+  const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, 'transactions', txQuery);
 
   const qQuery = useMemo(() => [where('clientId', '==', id)], [id]);
   const { data: quotations, loading: quotationsLoading } = useSubscription<Quotation>(firestore, 'quotations', qQuery);
@@ -159,7 +159,7 @@ export default function ClientProfilePage() {
     setIsProcessing(true);
     const newStatus = tx.status === 'on-hold' ? 'new' : 'on-hold';
     try {
-        const docPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId);
+        const docPath = getTenantPath(`transactions/${tx.id}`, tenantId);
         await updateDoc(doc(firestore, docPath!), { 
             status: newStatus,
             updatedAt: serverTimestamp() 
@@ -174,7 +174,7 @@ export default function ClientProfilePage() {
     if (!firestore || !tenantId || !transactionToDelete?.id) return;
     setIsProcessing(true);
     try {
-        const docPath = getTenantPath(`clients/${id}/transactions/${transactionToDelete.id}`, tenantId);
+        const docPath = getTenantPath(`transactions/${transactionToDelete.id}`, tenantId);
         await deleteDoc(doc(firestore, docPath!));
         
         const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
@@ -459,3 +459,4 @@ export default function ClientProfilePage() {
     </div>
   );
 }
+

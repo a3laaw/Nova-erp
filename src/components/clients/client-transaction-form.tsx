@@ -22,7 +22,6 @@ import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { InlineSearchList } from '../ui/inline-search-list';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface ClientTransactionFormProps {
   isOpen: boolean;
@@ -33,8 +32,8 @@ interface ClientTransactionFormProps {
 }
 
 /**
- * نموذج إنشاء المعاملة المطور (V26.0):
- * - إضافة التمييز بين الخدمات عبر إظهار "نوع النشاط" في القائمة المنسدلة.
+ * نموذج إنشاء المعاملة المطور (V26.1):
+ * - تم تسطيح الهيكل (Flat Structure) لضمان عدم الحاجة لفهارس Collection Group المعقدة.
  */
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
@@ -117,7 +116,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         fetchSubServices();
     }, [transactionTypeName, transactionTypes, firestore, tenantId]);
 
-    // ✨ التمييز بين الخدمات عبر إظهار النشاط (Activity Type) ككود تمييزي ✨
     const transactionTypeOptions = useMemo(() => 
         transactionTypes.map(t => ({ 
             value: t.name, 
@@ -178,7 +176,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const newCounter = (client?.transactionCounter || 0) + 1;
             const transactionNumber = `CL${client?.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
             
-            const transactionsPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
+            // 🛡️ التعديل الجذري: الحفظ في مسار مسطح تحت المنشأة 🛡️
+            const transactionsPath = getTenantPath('transactions', tenantId);
             const newTransactionRef = doc(collection(firestore, transactionsPath!));
             
             batch.update(clientRef, { transactionCounter: newCounter });
@@ -300,3 +299,4 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         </Dialog>
     );
 }
+

@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, orderBy, doc, runTransaction, serverTimestamp, limit, getDoc, Timestamp } from 'firebase/firestore';
+import { useFirebase, useSubscription } from '@/firebase';
+import { collection, query, where, getDocs, orderBy, doc, runTransaction, serverTimestamp, getDoc, Timestamp, limit } from 'firebase/firestore';
 import type { Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ import {
     Ruler,
     Building2,
     Workflow,
-    Save
+    Save 
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
@@ -37,6 +37,7 @@ import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/uti
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
@@ -69,13 +70,12 @@ function DirectContractContent() {
     const tenantId = currentUser?.currentCompanyId;
     const savingRef = useRef(false);
 
-    const [clients, setClients] = useState<Client[]>([]);
-    const [transactions, setTransactions] = useState<ClientTransaction[]>([]);
-    const [accounts, setAccounts] = useState<Account[]>([]);
-    const [employees, setEmployees] = useState<Employee[]>([]);
-    const [departments, setDepartments] = useState<Department[]>([]);
-    const [loadingRefs, setLoadingRefs] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
+    // 🛡️ استخدام الاشتراكات المحصنة لضمان ثبات البيانات وتجنب أخطاء الفهارس
+    const { data: allClients, loading: clientsLoading } = useSubscription<Client>(firestore, tenantId ? 'clients' : null);
+    const { data: allTransactions, loading: txLoading } = useSubscription<ClientTransaction>(firestore, tenantId ? 'transactions' : null);
+    const { data: accounts = [] } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null);
+    const { data: employees = [] } = useSubscription<Employee>(firestore, tenantId ? 'employees' : null);
+    const { data: departments = [] } = useSubscription<Department>(firestore, tenantId ? 'departments' : null);
 
     const { register, handleSubmit, control, setValue, reset, watch, formState: { errors } } = useForm<ContractValues>({
         resolver: zodResolver(contractSchema),
@@ -92,59 +92,41 @@ function DirectContractContent() {
     const watchedClauses = watch('clauses');
     const currentTotal = useMemo(() => watchedClauses.reduce((sum, c) => sum + (Number(c.amount) || 0), 0), [watchedClauses]);
 
-    // 🛡️ محرك جلب البيانات المرجعية الموحد (Ref-Sync Engine)
-    useEffect(() => {
-        if (!firestore || !tenantId) return;
-        const fetchRefData = async () => {
-            setLoadingRefs(true);
-            try {
-                const [clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, getTenantPath('clients', tenantId)!), where('isActive', '==', true), orderBy('nameAr'))),
-                    getDocs(query(collection(firestore, getTenantPath('chartOfAccounts', tenantId)!))),
-                    getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!))),
-                    getDocs(query(collection(firestore, getTenantPath('departments', tenantId)!)))
-                ]);
-                
-                setClients(clientsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Client)));
-                setAccounts(accountsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
-                setEmployees(empSnap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
-                setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
-            } finally { setLoadingRefs(false); }
-        };
-        fetchRefData();
-    }, [firestore, tenantId]);
+    // ✨ التصفية والفرز في الذاكرة (Client-side Handling) لضمان عدم توقف النظام بسبب الفهارس ✨
+    const clientOptions = useMemo(() => 
+        allClients
+            .filter(c => c.isActive !== false)
+            .sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar'))
+            .map(c => ({ value: c.id!, label: c.nameAr }))
+    , [allClients]);
 
-    // 🛡️ مزامنة المعاملات عند اختيار العميل
-    useEffect(() => {
-        if (!firestore || !watchedClientId || !tenantId) { setTransactions([]); return; }
-        const fetchTransactions = async () => {
-            const txsPath = getTenantPath(`clients/${watchedClientId}/transactions`, tenantId);
-            const q = query(collection(firestore, txsPath!), where('status', 'in', ['new', 'in-progress']));
-            const snap = await getDocs(q);
-            setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as ClientTransaction)));
-        };
-        fetchTransactions();
-    }, [watchedClientId, firestore, tenantId]);
-
-    const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
-    const transactionOptions = useMemo(() => transactions.map(t => ({ value: t.id!, label: t.transactionType })), [transactions]);
+    const transactionOptions = useMemo(() => 
+        allTransactions
+            .filter(t => t.clientId === watchedClientId && ['new', 'in-progress'].includes(t.status))
+            .map(t => ({ value: t.id!, label: t.transactionType }))
+    , [allTransactions, watchedClientId]);
 
     const onSubmit = async (data: ContractValues) => {
         if (!firestore || !currentUser || !tenantId || savingRef.current) return;
         
-        const selectedClient = clients.find(c => c.id === data.clientId)!;
-        const selectedTx = transactions.find(t => t.id === data.transactionId)!;
-        const coaPath = getTenantPath('chartOfAccounts', tenantId);
+        const selectedClient = allClients.find(c => c.id === data.clientId)!;
+        const selectedTx = allTransactions.find(t => t.id === data.transactionId)!;
 
         savingRef.current = true;
         setIsSaving(true);
 
         try {
-            const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
-            const clientAccSnap = await getDocs(query(collection(firestore, coaPath!), where('name', '==', selectedClient.nameAr), where('parentCode', '==', '1102'), limit(1)));
-
             await runTransaction(firestore, async (transaction_fs) => {
                 const currentYear = new Date().getFullYear();
+                
+                // البحث عن الحسابات
+                const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
+                const revenueAccQuery = query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1));
+                const revenueAccSnap = await getDocs(revenueAccQuery);
+
+                const clientAccQuery = query(collection(firestore, coaPath), where('name', '==', selectedClient.nameAr), where('parentCode', '==', '1102'), limit(1));
+                const clientAccSnap = await getDocs(clientAccQuery);
+
                 const jeCounterRef = doc(firestore, getTenantPath('counters/journalEntries', tenantId)!);
                 const coaSubCounterRef = doc(firestore, getTenantPath('counters/coa_clients', tenantId)!);
                 
@@ -157,7 +139,7 @@ function DirectContractContent() {
                 if (clientAccSnap.empty) {
                     const nextClientNum = (coaSubCounterDoc.data()?.lastNumber || 0) + 1;
                     const clientCode = `1102C${String(nextClientNum).padStart(4, '0')}`;
-                    const newAccRef = doc(collection(firestore, coaPath!));
+                    const newAccRef = doc(collection(firestore, coaPath));
                     clientAccountId = newAccRef.id;
                     transaction_fs.set(newAccRef, {
                         code: clientCode, name: selectedClient.nameAr, type: 'asset', level: 3,
@@ -169,7 +151,7 @@ function DirectContractContent() {
                     clientAccountId = clientAccSnap.docs[0].id;
                 }
 
-                const txRef = doc(firestore, getTenantPath(`clients/${data.clientId}/transactions/${data.transactionId}`, tenantId)!);
+                const txRef = doc(firestore, getTenantPath('transactions', tenantId)!, data.transactionId);
                 
                 transaction_fs.update(txRef, {
                     status: 'in-progress',
@@ -211,6 +193,10 @@ function DirectContractContent() {
         }
     };
 
+    const loading = clientsLoading || txLoading;
+
+    if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin h-10 w-10 mx-auto text-primary" /></div>;
+
     return (
         <div className="max-w-4xl mx-auto space-y-10 pb-20" dir="rtl">
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
@@ -242,7 +228,7 @@ function DirectContractContent() {
                                     <User className="h-3 w-3 text-[#FF7A00]"/> المالك المستهدف *
                                 </Label>
                                 <Controller control={control} name="clientId" render={({ field }) => (
-                                    <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder={loadingRefs ? "جاري التحميل..." : "ابحث عن عميل..."} className="h-14 rounded-2xl border-2" />
+                                    <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن عميل..." className="h-14 rounded-2xl border-2" />
                                 )} />
                             </div>
                             <div className="grid gap-3">
