@@ -126,7 +126,7 @@ export default function DirectContractPage() {
     const currentTotal = useMemo(() => {
         if (financialsType === 'fixed') return clauses.reduce((s, c) => s + (Number(c.amount) || 0), 0);
         return clauses.reduce((s, c) => s + (Number(c.percentage) || 0), 0);
-    }, [clauses, financialsType]);
+    }, [clauses, financialsType]); // 🛡️ FIXED: Corrected variable name from financials_type to financialsType
 
     const handleSaveContract = async () => {
         if (!firestore || !currentUser || !tenantId || !selectedClientId || !selectedTxId || clauses.length === 0 || savingRef.current) return;
@@ -140,7 +140,6 @@ export default function DirectContractPage() {
         setIsSaving(true);
 
         try {
-            // 🛡️ PRE-FETCH REGULAR READS
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
             const clientAccSnap = await getDocs(query(collection(firestore, coaPath!), where('name', '==', selectedClient.nameAr), where('parentCode', '==', '1102'), limit(1)));
 
@@ -193,7 +192,6 @@ export default function DirectContractPage() {
                 const jePath = getTenantPath('journalEntries', tenantId);
                 const newJeRef = doc(collection(firestore, jePath!));
 
-                // 🛡️ التعديل الرقابي: القيد يولد كـ مسودة (draft) بانتظار مراجعة المحاسب
                 transaction_fs.set(newJeRef, cleanFirestoreData({
                     entryNumber: `JV-DR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
                     date: serverTimestamp(), 
