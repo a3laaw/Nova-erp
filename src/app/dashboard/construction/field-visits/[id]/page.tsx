@@ -124,10 +124,6 @@ export default function FieldVisitDetailPage() {
         );
     };
 
-    /**
-     * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V1700.0) ✨
-     * يدعم تحديث المسار الفني والتشعب التلقائي عند إغلاق الزيارة الميدانية.
-     */
     const handleConfirmDone = async () => {
         if (!firestore || !visit || !currentUser || !tenantId || !notes.trim()) return;
 
@@ -165,7 +161,6 @@ export default function FieldVisitDetailPage() {
                         const stage = currentStages[stageIdx];
                         const now = new Date();
 
-                        // معالجة التكرار (Occurrence) كأنه "تعديل"
                         if (stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') {
                             const newCount = (stage.currentCount || 0) + 1;
                             stage.currentCount = newCount;
@@ -181,7 +176,6 @@ export default function FieldVisitDetailPage() {
                             stage.endDate = Timestamp.fromDate(now);
                         }
 
-                        // ✨ تفعيل المسارات التالية آلياً (Multi-Branching Support) ✨
                         if (stage.status === 'completed') {
                             const nextIds = stage.nextStageIds || [];
                             if (nextIds.length > 0) {
@@ -209,12 +203,14 @@ export default function FieldVisitDetailPage() {
 
                         batch.update(txRef, { stages: currentStages, updatedAt: serverTimestamp() });
                         
+                        // ✨ التوثيق الميداني الآلي في التعليقات (Automated Visit Comment) ✨
                         const timelineRef = doc(collection(txRef, 'timelineEvents'));
                         batch.set(timelineRef, {
                             type: 'comment',
-                            content: `**[توثيق ميداني]**\nتم تسجيل إنجاز في المرحلة: ${stage.name}.\n\n**ملاحظات المهندس:**\n${notes}`,
+                            content: `**[محضر زيارة ميدانية]**\nتم توثيق إنجاز في المرحلة: **${stage.name}**.\n**نسبة الإنجاز الميداني:** ${progressAchieved[0]}%\n\n**تقرير المهندس من الموقع:**\n${notes}`,
                             userId: currentUser.id,
                             userName: currentUser.fullName,
+                            userAvatar: currentUser.avatarUrl,
                             createdAt: serverTimestamp(),
                             companyId: tenantId
                         });
@@ -324,13 +320,6 @@ export default function FieldVisitDetailPage() {
                                 rows={4}
                                 className="rounded-3xl border-2 p-6 shadow-inner"
                             />
-                            {!isProcessed && (
-                                <div className="absolute left-4 bottom-4 flex gap-2">
-                                     <Button variant="ghost" size="sm" onClick={() => handleStageActionInVisit('modify')} className="rounded-lg font-bold text-xs h-8 gap-1 border-orange-200 text-orange-700 bg-white shadow-sm">
-                                        <IterationCcw className="h-3 w-3" /> تسجيل تعديل
-                                    </Badge>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </CardContent>
@@ -346,4 +335,3 @@ export default function FieldVisitDetailPage() {
         </div>
     );
 }
-

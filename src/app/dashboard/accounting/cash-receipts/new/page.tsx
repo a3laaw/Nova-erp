@@ -150,7 +150,9 @@ export default function NewCashReceiptPage() {
             const partText = paidOnThisClausePreviously > 0 ? "جزء إضافي" : "جزء أول";
             descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} كـ ${partText} من الدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
             const newRemaining = remainingOnClause - paymentForThisClause;
-            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
+            if (newRemaining > 0) {
+              descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
+            }
           }
           remainingAmountFromCurrentPayment -= paymentForThisClause;
         }
@@ -289,6 +291,21 @@ export default function NewCashReceiptPage() {
                 lines: jeLines, clientId: selectedClientId || null, transactionId: selectedProjectId || null,
                 createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
             }));
+
+            // ✨ التوثيق الآلي في التعليقات (Automated Financial Comment) ✨
+            if (selectedProjectId) {
+                const timelinePath = getTenantPath(`clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`, tenantId);
+                const timelineRef = doc(collection(firestore, timelinePath!));
+                transaction_fs.set(timelineRef, {
+                    type: 'comment',
+                    content: `**[إشعار مالي]**\nتم تحصيل دفعة جديدة بقيمة **${formatCurrency(parseFloat(amount))}**.\n**البيان:** ${description}\n**طريقة الدفع:** ${paymentMethod}`,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
+                });
+            }
 
             transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
         });

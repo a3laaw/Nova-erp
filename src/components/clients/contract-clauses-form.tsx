@@ -69,11 +69,6 @@ import { InlineSearchList } from '../ui/inline-search-list';
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
-/**
- * نموذج توقيع العقد السيادي (Sovereign Contract Engine V1250.0):
- * - تم تعديل حالة القيد المولد ليكون "مسودة" (Draft) لتمكين المراجعة المحاسبية.
- * - إحكام المزامنة الصفرية لضمان انتقال "شرط الاستحقاق" من العرض للعقد بدقة 100%.
- */
 export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName, quotationIdToUpdate }: any) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -169,8 +164,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
     try {
         const coaPath = getTenantPath('chartOfAccounts', tenantId);
-        
-        // 🛡️ Pre-Transaction Reads
         const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
         const clientAccSnap = await getDocs(query(collection(firestore, coaPath!), where('name', '==', clientName), where('parentCode', '==', '1102'), limit(1)));
         
@@ -191,10 +184,8 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             if (clientAccSnap.empty) {
                 const nextClientNum = (coaSubCounterDoc.data()?.lastNumber || 0) + 1;
                 const clientCode = `1102C${String(nextClientNum).padStart(4, '0')}`;
-                
                 const newAccRef = doc(collection(firestore, coaPath!));
                 clientAccountId = newAccRef.id;
-                
                 transaction_fs.set(newAccRef, {
                     code: clientCode, name: clientName, type: 'asset', level: 3,
                     parentCode: '1102', isPayable: true, statement: 'Balance Sheet', balanceType: 'Debit',
@@ -225,13 +216,12 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const jePath = getTenantPath('journalEntries', tenantId);
             const newJeRef = doc(collection(firestore, jePath!));
 
-            // 🛡️ التعديل الرقابي: القيد يولد كـ مسودة (draft) بانتظار مراجعة المحاسب
             transaction_fs.set(newJeRef, cleanFirestoreData({
                 entryNumber: `JV-PR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
                 date: serverTimestamp(), 
                 narration: `[قيد إثبات مديونية] عقد: ${transaction.transactionType || transaction.subject} لـ ${clientName} - بانتظار المراجعة`,
                 totalDebit: totalAmount, totalCredit: totalAmount, 
-                status: 'draft', // 🛡️ تم التغيير لمسودة
+                status: 'draft',
                 lines: [
                     { accountId: clientAccountId, accountName: clientName, debit: totalAmount, credit: 0, auto_profit_center: targetTxId },
                     { accountId: revenueAccSnap.docs[0]?.id || '4101', accountName: revenueAccSnap.docs[0]?.data()?.name || 'إيرادات عقود', debit: 0, credit: totalAmount, auto_profit_center: targetTxId }
@@ -239,18 +229,27 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 clientId, transactionId: targetTxId, createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
             }));
 
+            // ✨ التوثيق الآلي (Automated Comment) ✨
+            const timelineRef = doc(collection(txRef, 'timelineEvents'));
+            transaction_fs.set(timelineRef, {
+                type: 'comment',
+                content: `**[إشعار قانوني]**\nتم توقيع واعتماد العقد المالي للمعاملة بقيمة إجمالية **${formatCurrency(totalAmount)}**.\nتم تأسيس مصفوفة دفعات مكونة من **${finalClauses.length}** مراحل استحقاق.`,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
+
             transaction_fs.set(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum }, { merge: true });
-            
-            const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
-            transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
+            transaction_fs.update(doc(firestore, getTenantPath(`clients/${clientId}`, tenantId)!), { status: 'contracted' });
         });
 
-        toast({ title: '✅ تم توقيع العقد بنجاح', description: 'تم إنشاء قيد المديونية كمسودة للمراجعة المحاسبية.' });
+        toast({ title: '✅ تم توقيع العقد بنجاح' });
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
-        console.error("Critical Transaction Failure:", e);
-        toast({ variant: 'destructive', title: 'خطأ تقني في المعالجة', description: e.message });
+        toast({ variant: 'destructive', title: 'خطأ تقني', description: e.message });
     } finally { setIsSaving(false); savingRef.current = false; }
   };
 

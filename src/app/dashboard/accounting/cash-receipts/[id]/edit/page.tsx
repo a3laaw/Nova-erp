@@ -153,7 +153,9 @@ export default function EditCashReceiptPage() {
             const partText = paidOnThisClausePreviously > 0 ? "جزء إضافي" : "جزء أول";
             descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} كـ ${partText} من الدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
             const newRemaining = remainingOnClause - paymentForThisClause;
-            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
+            if (newRemaining > 0) {
+              descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
+            }
           }
           remainingAmountFromCurrentPayment -= paymentForThisClause;
         }
@@ -204,6 +206,21 @@ export default function EditCashReceiptPage() {
                     date: Timestamp.fromDate(date),
                     totalDebit: parseFloat(amount), totalCredit: parseFloat(amount),
                     narration: `[تعديل تحصيل] ${description}`
+                });
+            }
+
+            // ✨ التوثيق الآلي في التعليقات (Automated Financial Update Comment) ✨
+            if (selectedProjectId) {
+                const timelinePath = getTenantPath(`clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`, tenantId);
+                const timelineRef = doc(collection(firestore, timelinePath!));
+                transaction_fs.set(timelineRef, {
+                    type: 'comment',
+                    content: `**[تعديل مالي]**\nتم تعديل سند القبض رقم **${receipt.voucherNumber}**.\nالقيمة الجديدة: **${formatCurrency(parseFloat(amount))}**.\n**البيان المحدث:** ${description}`,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
                 });
             }
         });

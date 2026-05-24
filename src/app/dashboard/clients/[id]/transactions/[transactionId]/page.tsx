@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -129,10 +128,6 @@ export default function TransactionDetailPage() {
     });
   }, [firestore, tenantId]);
 
-  /**
-   * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V2300.0) ✨
-   * تنفيذ منطق الأزرار الثلاثة والالتزام الصارم بقواعد القوائم المرجعية.
-   */
   const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
         if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId) return;
         setIsProcessing(true);
@@ -149,22 +144,19 @@ export default function TransactionDetailPage() {
             if (action === 'start') {
                 stage.status = 'in-progress';
                 stage.startDate = Timestamp.fromDate(now);
-                
-                // 🛡️ التزام بـ (المدة المتوقعة) المبرمجة في القوائم المرجعية
                 const days = stage.expectedDurationDays || 7; 
                 const expectedEnd = addWorkingDays(now, days, branding?.work_hours?.holidays || [], publicHolidays);
                 stage.expectedEndDate = Timestamp.fromDate(expectedEnd);
-                logContent = `بدأ المهندس ${currentUser.fullName} العمل في مرحلة: ${stage.name}.`;
+                logContent = `بدأ المهندس ${currentUser.fullName} العمل فعلياً في مرحلة: **${stage.name}**.`;
                 
             } else if (action === 'modify') {
                 stage.currentCount = (stage.currentCount || 0) + 1;
-                logContent = `سجل المهندس ${currentUser.fullName} تعديلاً جديداً في مرحلة: ${stage.name} (التعديل رقم ${stage.currentCount}).`;
+                logContent = `سجل المهندس ${currentUser.fullName} تعديلاً/تحديثاً رقم **${stage.currentCount}** في مرحلة: **${stage.name}**.`;
             } else if (action === 'complete') {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
-                logContent = `أتم المهندس ${currentUser.fullName} مرحلة: ${stage.name} بنجاح.`;
+                logContent = `تم إنجاز وإغلاق مرحلة: **${stage.name}** بواسطة المهندس ${currentUser.fullName}.`;
                 
-                // 🛡️ التشعب التلقائي (الالتزام بما في القوائم المرجعية)
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
@@ -179,17 +171,16 @@ export default function TransactionDetailPage() {
                 }
             }
 
-            // تحديث السجل
             await updateDoc(doc(firestore, transactionPath), { 
                 stages: currentStages, 
                 updatedAt: serverTimestamp(),
                 status: 'in-progress'
             });
             
-            // إضافة سجل للأحداث
+            // ✨ التوثيق الآلي في التعليقات (Automated Log/Comment) ✨
             const logPath = `${transactionPath}/timelineEvents`;
             await addDoc(collection(firestore, logPath), {
-                type: 'log',
+                type: 'log', // نستخدم 'log' ليظهر في السجل ولكن يمكن تغييره لـ 'comment' ليظهر في التواصل
                 content: logContent,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
@@ -220,7 +211,7 @@ export default function TransactionDetailPage() {
             
             await addDoc(collection(firestore, `${transactionPath}/timelineEvents`), {
                 type: 'log',
-                content: `قام ${currentUser.fullName} بالتراجع عن إغلاق مرحلة: ${stage.name}.`,
+                content: `قام ${currentUser.fullName} بالتراجع عن إغلاق مرحلة: **${stage.name}**. عادت المرحلة قيد التنفيذ.`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 createdAt: serverTimestamp(),
@@ -293,7 +284,6 @@ export default function TransactionDetailPage() {
                             const expectedDate = toFirestoreDate(stage.expectedEndDate);
                             const isDelayed = stage.status === 'in-progress' && expectedDate && expectedDate < new Date();
                             
-                            // 🛡️ الحماية الرقابية: فحص اكتمال الشروط المسبقة 🛡️
                             const isPredecessorCompleted = idx === 0 || 
                                 transaction.stages?.some(s => s.status === 'completed' && s.nextStageIds?.includes(stage.stageId)) || 
                                 transaction.stages![idx-1].status === 'completed';
