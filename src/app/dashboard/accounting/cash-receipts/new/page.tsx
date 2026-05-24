@@ -31,7 +31,7 @@ import { numberToArabicWords, formatCurrency, cleanFirestoreData, cn, getTenantP
 import { useAuth } from '@/context/auth-context';
 import { useBranding } from '@/context/branding-context';
 import { DateInput } from '@/components/ui/date-input';
-import { Skeleton } from '@/components/ui/skeleton'; // FIXED: Added missing import
+import { Skeleton } from '@/components/ui/skeleton';
 
 const getTotalPaidForProject = async (projectId: string, db: any, tenantId: string) => {
     let total = 0;
@@ -73,7 +73,6 @@ export default function NewCashReceiptPage() {
 
   const tenantId = currentUser?.currentCompanyId;
 
-  // 🛡️ استخدام رادار الجلب اللحظي الموحد لضمان ظهور العملاء والحسابات فوراً 🛡️
   const { data: clients = [], loading: clientsLoading } = useSubscription<Client>(firestore, tenantId ? 'clients' : null, [where('isActive', '==', true)]);
   const { data: accounts = [], loading: accountsLoading } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null, [orderBy('code')]);
   const { data: employees = [] } = useSubscription<Employee>(firestore, tenantId ? 'employees' : null);
@@ -151,11 +150,11 @@ export default function NewCashReceiptPage() {
             // حالة سداد كامل (لأول مرة)
             descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
           } else {
-            // حالة سداد جزء (أول مرة أو إضافي) مع ذكر القيمة الإجمالية
+            // حالة سداد جزء (أول مرة أو إضافي)
             const partText = paidOnThisClausePreviously > 0 ? "جزء إضافي" : "جزء أول";
             descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} كـ ${partText} من الدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
             const newRemaining = remainingOnClause - paymentForThisClause;
-            descriptionParts.push(`(المتبقي من الدفعة: ${formatCurrency(newRemaining)})`);
+            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
           }
           remainingAmountFromCurrentPayment -= paymentForThisClause;
         }
@@ -169,7 +168,9 @@ export default function NewCashReceiptPage() {
       setDescription(descriptionParts.join('\n'));
     };
 
-    generateDescription();
+    if (clientProjects.length > 0) {
+        generateDescription();
+    }
   }, [amount, selectedProjectId, clientProjects, firestore, tenantId]);
 
   useEffect(() => {

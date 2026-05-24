@@ -147,13 +147,13 @@ export default function EditCashReceiptPage() {
           const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
           
           if (paymentForThisClause >= remainingOnClause && paidOnThisClausePreviously > 0) {
-            // حالة الاستكمال مع ذكر القيمة الإجمالية
+            // حالة استكمال السداد مع ذكر القيمة الكلية
             descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} استكمالاً للدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
           } else if (paymentForThisClause >= remainingOnClause) {
             // سداد كامل (لأول مرة)
             descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
           } else {
-            // سداد جزئي
+            // سداد جزئي (أول مرة أو إضافي)
             const partText = paidOnThisClausePreviously > 0 ? "جزء إضافي" : "جزء أول";
             descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} كـ ${partText} من الدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
             const newRemaining = remainingOnClause - paymentForThisClause;
