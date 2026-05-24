@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import type { PaymentApplication, Client, ConstructionProject, CashReceipt } from '@/lib/types';
+import type { PaymentApplication, CashReceipt } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
     Coins, 
@@ -18,6 +17,7 @@ import {
     Activity,
     Landmark,
     Sparkles,
+    Wallet,
     Eye
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -61,7 +61,9 @@ export default function FinancialClaimsPage() {
         const now = new Date();
         return apps.filter(app => app.status !== 'cancelled').map(app => {
             const appDate = toFirestoreDate(app.date) || now;
-            const collectedForThisApp = receipts
+            
+            // مطابقة التحصيلات التي تشير إلى رقم المستخلص في البيان
+            const collectedForThisApp = (receipts || [])
                 .filter(r => r.projectId === app.projectId && r.description.includes(app.applicationNumber))
                 .reduce((sum, r) => sum + r.amount, 0);
 
@@ -85,7 +87,7 @@ export default function FinancialClaimsPage() {
         return processedClaims.filter(c => 
             c.applicationNumber.toLowerCase().includes(lower) || 
             c.clientName.toLowerCase().includes(lower) ||
-            c.projectName.toLowerCase().includes(lower)
+            (c.projectName && c.projectName.toLowerCase().includes(lower))
         );
     }, [processedClaims, searchQuery]);
 
@@ -194,7 +196,7 @@ export default function FinancialClaimsPage() {
                                         </TableCell>
                                         <TableCell className="text-left font-mono font-bold text-slate-400">{formatCurrency(claim.totalAmount)}</TableCell>
                                         <TableCell className="text-left font-mono font-black text-xl text-green-700 bg-green-50/20 border-r border-green-100">
-                                            {claim.remaining > 0 ? formatCurrency(claim.remaining) : <Badge className="bg-green-600">مسدد</Badge>}
+                                            {claim.remaining > 0 ? formatCurrency(claim.remaining) : <Badge className="bg-green-600 text-white">مسدد</Badge>}
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Badge variant="outline" className={cn(
@@ -232,7 +234,7 @@ export default function FinancialClaimsPage() {
 
 function StatCard({ title, value, icon, color, description, isCount }: any) {
     return (
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group hover-lift">
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-8 group hover:scale-[1.02] transition-all duration-300">
             <div className="flex justify-between items-start mb-4">
                 <div className={cn("p-3 rounded-2xl shadow-inner", color)}>
                     {icon}
