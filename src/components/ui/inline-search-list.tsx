@@ -36,10 +36,10 @@ interface InlineSearchListProps {
 }
 
 /**
- * مكون البحث والاختيار السيادي المطور (Sovereign Clarity Engine V26.0):
- * - تم حل مشكلة تشابه الأسماء عبر إظهار الـ searchKey (الكود/القسم) في كبسولة جانبية.
- * - تحسين التباين اللوني (Text Contrast) لضمان سهولة القراءة القصوى (Black Text).
- * - معالجة الفشل في جلب الاسم عند التحميل عبر البحث في قائمة الخيارات المحدثة.
+ * مكون البحث والاختيار السيادي المطور (Sovereign Clarity Engine V26.1):
+ * - تم حل مشكلة ظهور الـ ID بدلاً من الاسم عبر رادار الانتظار الذكي.
+ * - تحسين تباين النصوص (Solid Black) لضمان الوضوح المطلق.
+ * - معالجة التفاعل الخارجي لضمان الإغلاق التلقائي.
  */
 export function InlineSearchList({
   value,
@@ -57,14 +57,16 @@ export function InlineSearchList({
     if (!open) setSearchValue('');
   }, [open]);
 
-  // ✨ محرك الوضوح: البحث عن التسمية الصحيحة بناءً على المعرف (Value)
+  // ✨ محرك الوضوح: البحث عن التسمية الصحيحة ومنع ظهور الـ ID أثناء التحميل
   const displayText = React.useMemo(() => {
     if (!value) return placeholder;
     const option = options.find((opt) => opt.value === value);
     if (option) return option.label;
-    // إذا لم نجد الاسم (أثناء التحميل مثلاً)، نبحث في المصفوفة بمرونة أكبر أو نظهر النص الحالي
-    return value; 
-  }, [options, value, placeholder]);
+    
+    // 🛡️ درع الحماية: إذا كان هناك قيمة ولكنها غير موجودة في القائمة، فهذا يعني أن البيانات قيد التحميل
+    // لا نظهر الـ ID للمستخدم بل نظهر حالة الانتظار
+    return disabled ? "جاري التحميل..." : (allowCustomValue ? value : "جاري استرجاع الاسم..."); 
+  }, [options, value, placeholder, disabled, allowCustomValue]);
 
   const showCustomAdd = React.useMemo(() => {
     if (!allowCustomValue || !searchValue.trim()) return false;
@@ -79,8 +81,8 @@ export function InlineSearchList({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "w-full justify-between h-10 rounded-xl border-2 transition-all px-4 text-right shadow-sm",
-            "bg-white border-slate-200 hover:border-primary/40 text-sm font-black text-[#1e1b4b]",
+            "w-full justify-between h-11 rounded-xl border-2 transition-all px-4 text-right shadow-sm",
+            "bg-white border-slate-200 hover:border-primary/40 text-sm font-black text-black", // نصوص سوداء واضحة
             !value && "text-muted-foreground font-medium",
             className
           )}
@@ -94,6 +96,8 @@ export function InlineSearchList({
         className="w-[--radix-popover-trigger-width] p-0 z-[999999999] border-2 border-primary/20 shadow-2xl rounded-2xl overflow-hidden bg-white" 
         align="start"
         dir="rtl"
+        // 🛡️ ضمان عدم اعتراض الأحداث لتمكين الإغلاق التلقائي
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <Command className="bg-white">
           <div className="flex items-center border-b px-3 bg-slate-50/80">
@@ -102,7 +106,7 @@ export function InlineSearchList({
                 placeholder="ابحث هنا (بالاسم أو الكود)..." 
                 value={searchValue}
                 onValueChange={setSearchValue}
-                className="h-11 text-sm font-black border-none bg-transparent placeholder:text-slate-400" 
+                className="h-11 text-sm font-black border-none bg-transparent placeholder:text-slate-400 text-black" 
             />
           </div>
           <CommandList className="max-h-[280px] p-2 scrollbar-none">
@@ -135,7 +139,7 @@ export function InlineSearchList({
                     setOpen(false);
                     setSearchValue('');
                   }}
-                  className="cursor-pointer font-black text-[#1e1b4b] py-3 px-4 rounded-xl mb-1 aria-selected:bg-primary/10 aria-selected:text-primary transition-all flex items-center justify-between text-sm"
+                  className="cursor-pointer font-black text-black py-3 px-4 rounded-xl mb-1 aria-selected:bg-primary/10 aria-selected:text-primary transition-all flex items-center justify-between text-sm"
                 >
                   <div className="flex items-center gap-3 overflow-hidden">
                     <span className="truncate">{option.label}</span>

@@ -99,7 +99,6 @@
   /* هذا الجزء يضمن استجابة الماوس، الإغلاق التلقائي، واللون الأسود للنصوص */
   [data-radix-popper-content-wrapper] {
     z-index: 999999999 !important;
-    pointer-events: auto !important;
   }
 
   [role="listbox"], 
@@ -107,7 +106,6 @@
   [data-radix-select-content], 
   [data-radix-popover-content] {
     z-index: 999999999 !important;
-    pointer-events: auto !important;
     background-color: #ffffff !important; /* خلفية بيضاء مصمتة */
     border: 2px solid #FF7A00 !important;
     border-radius: 1.25rem !important;
@@ -119,7 +117,6 @@
   [role="menuitem"], 
   [cmdk-item] {
     cursor: pointer !important;
-    pointer-events: auto !important;
     color: #000000 !important; /* نصوص سوداء في الخيارات */
     font-weight: 900 !important; /* خط عريض للوضوح */
   }
