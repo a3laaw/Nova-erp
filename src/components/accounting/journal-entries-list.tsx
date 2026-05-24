@@ -14,7 +14,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import type { JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
 import { BookOpen, MoreHorizontal, Eye, Pencil, Trash2, Loader2, CheckCircle, Undo2, Search, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
@@ -30,6 +30,8 @@ import { searchJournalEntries } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
 import { DateInput } from '../ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
@@ -47,6 +49,8 @@ export function JournalEntriesList() {
   const router = useRouter();
   const { toast } = useToast();
   
+  const tenantId = currentUser?.currentCompanyId;
+
   const [entryToDelete, setEntryToDelete] = useState<JournalEntry | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
@@ -85,31 +89,78 @@ export function JournalEntriesList() {
   };
 
   const handlePostEntry = async (entryId: string) => {
-    if (!firestore || isPosting || isUnposting) return;
+    if (!firestore || !tenantId || isPosting || isUnposting) return;
     setIsPosting(true);
-    try {
-        await updateDoc(doc(firestore, 'journalEntries', entryId), { status: 'posted' });
+    
+    const entryPath = getTenantPath(`journalEntries/${entryId}`, tenantId);
+    const docRef = doc(firestore, entryPath!);
+    const updateData = { status: 'posted' as const };
+
+    updateDoc(docRef, updateData)
+      .then(() => {
         toast({ title: 'نجاح', description: 'تم ترحيل القيد بنجاح.' });
-    } finally { setIsPosting(false); }
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: entryPath!,
+          operation: 'update',
+          requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setIsPosting(false);
+      });
   };
   
   const handleUnpostEntry = async (entryId: string) => {
-    if (!firestore || isPosting || isUnposting) return;
+    if (!firestore || !tenantId || isPosting || isUnposting) return;
     setIsUnposting(true);
-    try {
-        await updateDoc(doc(firestore, 'journalEntries', entryId), { status: 'draft' });
+    
+    const entryPath = getTenantPath(`journalEntries/${entryId}`, tenantId);
+    const docRef = doc(firestore, entryPath!);
+    const updateData = { status: 'draft' as const };
+
+    updateDoc(docRef, updateData)
+      .then(() => {
         toast({ title: 'نجاح', description: 'تم التراجع عن ترحيل القيد.' });
-    } finally { setIsUnposting(false); }
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: entryPath!,
+          operation: 'update',
+          requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setIsUnposting(false);
+      });
   };
 
   const handleDelete = async () => {
-    if (!entryToDelete || !firestore) return;
+    if (!entryToDelete || !firestore || !tenantId) return;
     setIsDeleting(true);
-    try {
-        await deleteDoc(doc(firestore, 'journalEntries', entryToDelete.id!));
+    
+    const entryPath = getTenantPath(`journalEntries/${entryToDelete.id}`, tenantId);
+    const docRef = doc(firestore, entryPath!);
+
+    deleteDoc(docRef)
+      .then(() => {
         toast({ title: 'نجاح', description: 'تم حذف قيد اليومية.' });
-    } finally { setIsDeleting(false); setEntryToDelete(null); }
-  }
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: entryPath!,
+          operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setIsDeleting(false);
+        setEntryToDelete(null);
+      });
+  };
 
   if (loading) return <Skeleton className="h-64 w-full rounded-2xl" />;
 
@@ -180,18 +231,29 @@ export function JournalEntriesList() {
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4" /></Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" dir="rtl" className="rounded-xl">
-                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}`)}><Eye className="ml-2 h-4 w-4" /> عرض</DropdownMenuItem>
+                                    <DropdownMenuContent align="end" dir="rtl" className="rounded-xl p-2 shadow-2xl border-none">
+                                        <DropdownMenuLabel className="font-black px-3 py-2 text-[#1e1b4b]">خيارات القيد</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                            <Eye className="ml-2 h-4 w-4 text-primary" /> عرض وتصدير
+                                        </DropdownMenuItem>
                                         {entry.status === 'draft' && (
                                             <>
-                                                <DropdownMenuItem onClick={() => handlePostEntry(entry.id!)} className="text-green-600"><CheckCircle className="ml-2 h-4 w-4" /> ترحيل</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}/edit`)}><Pencil className="ml-2 h-4 w-4" /> تعديل</DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={() => setEntryToDelete(entry)} className="text-destructive"><Trash2 className="ml-2 h-4 w-4" /> حذف</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handlePostEntry(entry.id!)} className="text-green-600 font-bold gap-3 py-3 rounded-lg cursor-pointer hover:bg-green-50">
+                                                    <CheckCircle className="ml-2 h-4 w-4" /> ترحيل القيد
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}/edit`)} className="font-bold gap-3 py-3 rounded-lg cursor-pointer">
+                                                    <Pencil className="ml-2 h-4 w-4 text-primary" /> تعديل البيانات
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator className="bg-slate-100" />
+                                                <DropdownMenuItem onClick={() => setEntryToDelete(entry)} className="text-red-600 font-black gap-3 py-3 rounded-lg cursor-pointer focus:bg-red-50">
+                                                    <Trash2 className="ml-2 h-4 w-4" /> حذف نهائي
+                                                </DropdownMenuItem>
                                             </>
                                         )}
                                         {entry.status === 'posted' && (
-                                            <DropdownMenuItem onClick={() => handleUnpostEntry(entry.id!)} className="text-orange-600"><Undo2 className="ml-2 h-4 w-4" /> تراجع</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleUnpostEntry(entry.id!)} className="text-orange-600 font-bold gap-3 py-3 rounded-lg cursor-pointer hover:bg-orange-50">
+                                                <Undo2 className="ml-2 h-4 w-4" /> تراجع عن الترحيل
+                                            </DropdownMenuItem>
                                         )}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -204,11 +266,19 @@ export function JournalEntriesList() {
         </div>
         
          <AlertDialog open={!!entryToDelete} onOpenChange={() => setEntryToDelete(null)}>
-            <AlertDialogContent dir="rtl" className="rounded-3xl">
-                <AlertDialogHeader><AlertDialogTitle>تأكيد الحذف؟</AlertDialogTitle><AlertDialogDescription>سيتم حذف القيد رقم "{entryToDelete?.entryNumber}" بشكل دائم.</AlertDialogDescription></AlertDialogHeader>
-                <AlertDialogFooter className="gap-2">
-                    <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive rounded-xl">نعم، حذف</AlertDialogAction>
+            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
+                <AlertDialogHeader>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><Trash2 className="h-8 w-8"/></div>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">
+                        سيتم حذف القيد رقم <strong className="text-foreground">"{entryToDelete?.entryNumber}"</strong> بشكل دائم من السجلات. هذا الإجراء سيؤثر على ميزان المراجعة والحسابات المرتبطة.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-8 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
+                        {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
+                    </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

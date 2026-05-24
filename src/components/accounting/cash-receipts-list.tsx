@@ -16,8 +16,8 @@ import { collection, query, orderBy, doc, deleteDoc, writeBatch, where, getDocs,
 import type { CashReceipt } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { formatCurrency } from '@/lib/utils';
-import { MoreHorizontal, Eye, Pencil, Trash2, Search, ArrowDownLeft, User } from 'lucide-react';
+import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
+import { MoreHorizontal, Eye, Pencil, Trash2, Search, ArrowDownLeft, User, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,9 @@ import { Input } from '@/components/ui/input';
 import { searchCashReceipts } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
 import { DateInput } from '../ui/date-input';
+import { useAuth } from '@/context/auth-context';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
@@ -39,9 +42,11 @@ const paymentMethodTranslations: Record<string, string> = {
 
 export function CashReceiptsList() {
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
+  const tenantId = currentUser?.currentCompanyId;
   const [receiptToDelete, setReceiptToDelete] = useState<CashReceipt | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,23 +74,32 @@ export function CashReceiptsList() {
   };
   
   const handleDelete = async () => {
-    if (!receiptToDelete || !firestore) return;
+    if (!receiptToDelete || !firestore || !tenantId) return;
     setIsDeleting(true);
-    try {
-        const batch = writeBatch(firestore);
-        const receiptRef = doc(firestore, 'cashReceipts', receiptToDelete.id!);
-        batch.delete(receiptRef);
-        if (receiptToDelete.journalEntryId) {
-            batch.delete(doc(firestore, 'journalEntries', receiptToDelete.journalEntryId));
-        }
-        await batch.commit();
-        toast({ title: 'نجاح التطهير', description: 'تم حذف سند القبض والقيد المحاسبي المرتبط به نهائياً.' });
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
-    } finally { 
-        setIsDeleting(false); 
-        setReceiptToDelete(null); 
+    
+    const receiptPath = getTenantPath(`cashReceipts/${receiptToDelete.id}`, tenantId);
+    const batch = writeBatch(firestore);
+    batch.delete(doc(firestore, receiptPath!));
+
+    if (receiptToDelete.journalEntryId) {
+        const jePath = getTenantPath(`journalEntries/${receiptToDelete.journalEntryId}`, tenantId);
+        batch.delete(doc(firestore, jePath!));
     }
+
+    batch.commit()
+      .then(() => {
+        toast({ title: 'نجاح التطهير', description: 'تم حذف سند القبض والقيد المحاسبي المرتبط به نهائياً.' });
+      })
+      .catch(async (serverError) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: receiptPath!,
+            operation: 'delete'
+        }));
+      })
+      .finally(() => {
+        setIsDeleting(false);
+        setReceiptToDelete(null);
+      });
   };
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-20 w-full rounded-2xl" /><Skeleton className="h-64 w-full rounded-2xl" /></div>;
@@ -131,7 +145,7 @@ export function CashReceiptsList() {
                             </TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-[#F8F9FE] rounded-full">
+                                    <div className="p-2 bg-[#F8F9FE] rounded-full group-hover:bg-white transition-colors">
                                         <User className="h-4 w-4 text-[#7209B7]" />
                                     </div>
                                     {receipt.clientId ? (
@@ -155,20 +169,20 @@ export function CashReceiptsList() {
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4" /></Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none">
-                                        <DropdownMenuLabel className="font-black px-3 py-2">خيارات السند</DropdownMenuLabel>
-                                        <DropdownMenuItem asChild className="rounded-xl py-3 cursor-pointer">
+                                    <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
+                                        <DropdownMenuLabel className="font-black px-3 py-2 text-[#1e1b4b]">خيارات السند</DropdownMenuLabel>
+                                        <DropdownMenuItem asChild className="rounded-xl py-3 cursor-pointer font-bold gap-3">
                                             <Link href={`/dashboard/accounting/cash-receipts/${receipt.id}`} className="flex items-center gap-2">
-                                                <Eye className="h-4 w-4" /> عرض السند والطباعة
+                                                <Eye className="h-4 w-4 text-primary" /> عرض السند والطباعة
                                             </Link>
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem asChild className="rounded-xl py-3 cursor-pointer">
+                                        <DropdownMenuItem asChild className="rounded-xl py-3 cursor-pointer font-bold gap-3">
                                             <Link href={`/dashboard/accounting/cash-receipts/${receipt.id}/edit`} className="flex items-center gap-2">
-                                                <Pencil className="h-4 w-4" /> تعديل البيانات
+                                                <Pencil className="h-4 w-4 text-primary" /> تعديل البيانات
                                             </Link>
                                         </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setReceiptToDelete(receipt)} className="text-red-600 font-black rounded-xl py-3 cursor-pointer focus:bg-red-50">
+                                        <DropdownMenuSeparator className="bg-slate-100" />
+                                        <DropdownMenuItem onClick={() => setReceiptToDelete(receipt)} className="text-red-600 font-black rounded-xl py-3 cursor-pointer gap-3 focus:bg-red-50">
                                             <Trash2 className="ml-2 h-4 w-4" /> حذف السند نهائياً
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
@@ -182,17 +196,17 @@ export function CashReceiptsList() {
         </div>
         
          <AlertDialog open={!!receiptToDelete} onOpenChange={() => setReceiptToDelete(null)}>
-            <AlertDialogContent dir="rtl" className="rounded-[2rem] p-10 border-none shadow-2xl">
+            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
                 <AlertDialogHeader>
                     <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><Trash2 className="h-8 w-8"/></div>
                     <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
-                    <AlertDialogDescription className="text-lg font-medium leading-relaxed">
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">
                         سيتم حذف السند رقم <strong className="text-foreground">"{receiptToDelete?.voucherNumber}"</strong> وكافة قيوده المحاسبية المرتبطة. هذا الإجراء سيؤثر على ميزان المراجعة ومديونية العميل.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter className="mt-6 gap-3">
-                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12">
+                <AlertDialogFooter className="mt-8 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
                         {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
