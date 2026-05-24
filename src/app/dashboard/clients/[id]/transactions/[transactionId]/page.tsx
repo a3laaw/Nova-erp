@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, Timestamp, addDoc, where } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, Timestamp, addDoc, where, writeBatch, limit } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -59,7 +59,8 @@ import {
     Undo2,
     MessageCircleIcon,
     Save,
-    Banknote
+    Banknote,
+    Coins
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -168,12 +169,10 @@ export default function TransactionDetailPage() {
     if (!firestore || !tenantId || !transaction?.contract?.clauses) return null;
 
     try {
-        // 1. جلب كافة سندات القبض التاريخية للمشروع
         const receiptsPath = getTenantPath('cashReceipts', tenantId);
         const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath!), where('projectId', '==', transactionId)));
         const totalReceived = receiptsSnap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
 
-        // 2. تحليل شروط العقد وحساب الاستحقاق التراكمي
         const clauses = transaction.contract.clauses;
         let totalRequiredUntilNow = 0;
         let foundCurrent = false;
@@ -203,9 +202,10 @@ export default function TransactionDetailPage() {
   };
 
   const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete', note: string) => {
-        if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId) return;
+        if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId || !client) return;
         setIsProcessing(true);
         try {
+            const batch = writeBatch(firestore);
             const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
             const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
             if (stageIndex === -1) throw new Error("Stage not found");
@@ -247,6 +247,41 @@ export default function TransactionDetailPage() {
                     
                     commentContent += claimMsg;
                     financialUpdate = claim;
+
+                    // ✨ التوليد الفوري للمستخلص الرسمي ليظهر في شاشة المطالبات ✨
+                    const appCounterPath = getTenantPath('counters/paymentApplications', tenantId);
+                    const appCounterDoc = await getDoc(doc(firestore, appCounterPath!));
+                    const currentYear = new Date().getFullYear();
+                    const appNextNumber = ((appCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+                    const appNumber = `APP-AUTO-${currentYear}-${String(appNextNumber).padStart(4, '0')}`;
+                    
+                    const appsPath = getTenantPath('payment_applications', tenantId);
+                    const newAppRef = doc(collection(firestore, appsPath!));
+                    
+                    batch.set(newAppRef, {
+                        applicationNumber: appNumber,
+                        date: serverTimestamp(),
+                        projectId: transactionId,
+                        clientId: clientId,
+                        clientName: client.nameAr,
+                        projectName: transaction.transactionType,
+                        items: [{
+                            boqItemId: stage.stageId,
+                            description: `إنجاز مرحلة فنية: ${stage.name}`,
+                            unit: 'مرحلة',
+                            unitPrice: claim.totalDebt,
+                            previousQuantity: 0,
+                            currentQuantity: 1,
+                            totalAmount: claim.totalDebt
+                        }],
+                        totalAmount: claim.totalDebt,
+                        status: 'approved',
+                        companyId: tenantId,
+                        createdAt: serverTimestamp(),
+                        createdBy: currentUser.id
+                    });
+                    
+                    batch.set(doc(firestore, appCounterPath!), { counts: { [currentYear]: appNextNumber } }, { merge: true });
                 }
 
                 const nextIds = stage.nextStageIds || [];
@@ -263,7 +298,6 @@ export default function TransactionDetailPage() {
                 }
             }
 
-            // تحديث العقد لإثبات استحقاق الدفعات
             let updatedClauses = transaction.contract?.clauses || null;
             if (action === 'complete' && updatedClauses) {
                 updatedClauses = updatedClauses.map((c: any) => 
@@ -271,7 +305,7 @@ export default function TransactionDetailPage() {
                 );
             }
 
-            await updateDoc(doc(firestore, transactionPath), cleanFirestoreData({ 
+            batch.update(doc(firestore, transactionPath), cleanFirestoreData({ 
                 stages: currentStages, 
                 updatedAt: serverTimestamp(),
                 status: 'in-progress',
@@ -280,7 +314,7 @@ export default function TransactionDetailPage() {
             
             const logPath = `${transactionPath}/timelineEvents`;
             
-            await addDoc(collection(firestore, logPath), {
+            batch.set(doc(collection(firestore, logPath)), {
                 type: 'log',
                 content: logContent,
                 userId: currentUser.id,
@@ -291,7 +325,7 @@ export default function TransactionDetailPage() {
             });
 
             if (commentContent) {
-                await addDoc(collection(firestore, logPath), {
+                batch.set(doc(collection(firestore, logPath)), {
                     type: 'comment',
                     content: commentContent,
                     userId: currentUser.id,
@@ -302,20 +336,7 @@ export default function TransactionDetailPage() {
                 });
             }
 
-            // إرسال إشعار للمحاسب في حال وجود مطالبة
-            if (financialUpdate) {
-                const accountantsQuery = query(collection(firestore, getTenantPath('users', tenantId)!), where('role', '==', 'Accountant'));
-                const accountantsSnap = await getDocs(accountantsQuery);
-                accountantsSnap.forEach(accDoc => {
-                    createNotification(firestore, {
-                        userId: accDoc.id,
-                        title: '⚠️ مطالبة مالية مستحقة',
-                        body: `استحق مبلغ ${formatCurrency(financialUpdate.totalDebt)} للعميل ${client?.nameAr} بعد إنجاز ${stage.name}.`,
-                        link: `/dashboard/clients/${clientId}/transactions/${transactionId}`
-                    });
-                });
-            }
-
+            await batch.commit();
             toast({ title: 'تم توثيق الإجراء', description: 'تم ترحيل البيانات وتحديث الموقف المالي آلياً.' });
             setActionDialog({ ...actionDialog, isOpen: false });
         } catch (e: any) {
@@ -525,7 +546,6 @@ export default function TransactionDetailPage() {
             </TabsContent>
         </Tabs>
 
-        {/* --- نافذة مبررات الإجراء (Action Justification Dialog) --- */}
         <Dialog open={actionDialog.isOpen} onOpenChange={(v) => setActionDialog({ ...actionDialog, isOpen: v })}>
             <DialogContent dir="rtl" className="max-w-lg rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
                 <DialogHeader className={cn(
@@ -560,7 +580,7 @@ export default function TransactionDetailPage() {
                     </div>
                     <div className="p-4 bg-muted/20 rounded-xl border-2 border-dashed border-primary/10 flex items-center gap-2">
                         <AlertCircle className="h-4 w-4 text-primary opacity-40" />
-                        <p className="text-[10px] font-bold text-slate-500 leading-relaxed">سيتم نشر هذه الملاحظات آلياً في "تبويب التعليقات" لضمان الشفافية الإدارية والربط المالي.</p>
+                        <p className="text-[10px] font-bold text-slate-500 leading-relaxed">سيتم نشر هذه الملاحظات آلياً في "تبويب التعليقات" وتوليد مطالبة مالية إذا كانت المرحلة مرتبطة بدفعة.</p>
                     </div>
                 </div>
 

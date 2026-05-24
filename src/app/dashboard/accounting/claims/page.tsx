@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -200,7 +201,7 @@ export default function FinancialClaimsPage() {
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Badge variant="outline" className={cn(
-                                                "font-mono font-black px-3 h-6",
+                                                "font-mono font-black px-4",
                                                 claim.isCritical ? "bg-red-600 text-white border-none animate-pulse" : 
                                                 claim.isOverdue ? "bg-orange-100 text-orange-700 border-orange-200" : 
                                                 "bg-blue-50 text-blue-700 border-blue-100"
