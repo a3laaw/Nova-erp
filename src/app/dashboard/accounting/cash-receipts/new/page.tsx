@@ -117,7 +117,6 @@ export default function NewCashReceiptPage() {
     }
   }, [amount]);
 
-  // ✨ محرك توصيف الدفعات المطور (Precise Narrative Engine V1600.0) ✨
   useEffect(() => {
     const generateDescription = async () => {
       if (!selectedProjectId || !amount || parseFloat(amount) <= 0 || !firestore || !tenantId) {
@@ -144,13 +143,10 @@ export default function NewCashReceiptPage() {
           const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
           
           if (paymentForThisClause >= remainingOnClause && paidOnThisClausePreviously > 0) {
-            // حالة استكمال الدفعة مع ذكر القيمة الإجمالية
             descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} استكمالاً للدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
           } else if (paymentForThisClause >= remainingOnClause) {
-            // حالة سداد كامل (لأول مرة)
             descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
           } else {
-            // حالة سداد جزء (أول مرة أو إضافي)
             const partText = paidOnThisClausePreviously > 0 ? "جزء إضافي" : "جزء أول";
             descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} كـ ${partText} من الدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
             const newRemaining = remainingOnClause - paymentForThisClause;
@@ -373,7 +369,17 @@ export default function NewCashReceiptPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="grid gap-2">
                     <Label className="font-black text-[#1e1b4b] pr-1">المبلغ المحصل *</Label>
-                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr h-14 text-3xl font-black text-[#1e1b4b] rounded-2xl' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
+                    <Input 
+                      id="amount" 
+                      type="number" 
+                      step="0.001" 
+                      placeholder="0.000" 
+                      className='text-left dir-ltr h-14 text-3xl font-black text-[#1e1b4b] rounded-2xl' 
+                      value={amount} 
+                      onChange={e => setAmount(e.target.value)} 
+                      disabled={isSaving}
+                      onWheel={(e) => e.currentTarget.blur()}
+                    />
                 </div>
                 <div className="md:col-span-2 grid gap-2">
                 <Label className="text-xs font-black text-muted-foreground uppercase pr-1">مبلغ وقدره (كتابة)</Label>
