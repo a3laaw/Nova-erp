@@ -35,9 +35,6 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
-/**
- * محرك حساب إجمالي المسدد سابقاً للمشروع (Sovereign Audit Helper)
- */
 const getTotalPaidForProject = async (projectId: string, db: any, tenantId: string) => {
     let total = 0;
     if (!projectId || !db || !tenantId) return total;
@@ -78,7 +75,6 @@ export default function NewCashReceiptPage() {
 
   const tenantId = currentUser?.currentCompanyId;
 
-  // 🛡️ استخدام الاشتراكات اللحظية بدلاً من getDocs لضمان استقرار المزامنة 🛡️
   const { data: clients = [], loading: clientsLoading } = useSubscription<Client>(firestore, tenantId ? 'clients' : null, [where('isActive', '==', true)]);
   const { data: accounts = [], loading: accountsLoading } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null, [orderBy('code')]);
   const { data: employees = [] } = useSubscription<Employee>(firestore, tenantId ? 'employees' : null);
@@ -87,7 +83,6 @@ export default function NewCashReceiptPage() {
   const [clientProjects, setClientProjects] = useState<ClientTransaction[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
 
-  // 🛡️ محرك توليد رقم السند السيادي
   useEffect(() => {
     if (!firestore || !tenantId) return;
 
@@ -124,7 +119,7 @@ export default function NewCashReceiptPage() {
     }
   }, [amount]);
 
-  // ✨ محرك توليد البيان الذكي (Smart Description Engine) ✨
+  // ✨ محرك تحليل الدفعات المطور (Precise Narrative Engine V1500.0) ✨
   useEffect(() => {
     const generateDescription = async () => {
       if (!selectedProjectId || !amount || parseFloat(amount) <= 0 || !firestore || !tenantId) {
@@ -138,32 +133,37 @@ export default function NewCashReceiptPage() {
       
       let remainingAmountFromCurrentPayment = parseFloat(amount);
       const descriptionParts: string[] = [];
-      let allocatedPaid = 0;
+      let allocatedPaidSoFar = 0;
 
       for (const clause of project.contract.clauses) {
         if (remainingAmountFromCurrentPayment <= 0) break;
         
         const clauseAmount = clause.amount;
-        const paidOnThisClausePreviously = Math.max(0, Math.min(clauseAmount, totalPaidPreviously - allocatedPaid));
+        // حساب ما تم دفعه سابقاً لهذا البند تحديداً
+        const paidOnThisClausePreviously = Math.max(0, Math.min(clauseAmount, totalPaidPreviously - allocatedPaidSoFar));
         const remainingOnClause = clauseAmount - paidOnThisClausePreviously;
 
         if (remainingOnClause > 0) {
           const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
           
           if (paymentForThisClause >= remainingOnClause) {
-            descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(remainingOnClause)}`);
+            // حالة إتمام سداد البند
+            const prefix = paidOnThisClausePreviously > 0 ? "استكمال سداد" : "سداد كامل";
+            descriptionParts.push(`${prefix} للدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
           } else {
-            descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
+            // حالة السداد الجزئي
+            const partText = paidOnThisClausePreviously > 0 ? "جزء إضافي" : "جزء أول";
+            descriptionParts.push(`${partText} من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
             const newRemaining = remainingOnClause - paymentForThisClause;
-            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
+            descriptionParts.push(`(المتبقي من الدفعة: ${formatCurrency(newRemaining)})`);
           }
           remainingAmountFromCurrentPayment -= paymentForThisClause;
         }
-        allocatedPaid += clauseAmount;
+        allocatedPaidSoFar += clauseAmount;
       }
 
       if (remainingAmountFromCurrentPayment > 0) {
-        descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة على الحساب.`);
+        descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة خارج بنود العقد.`);
       }
       
       setDescription(descriptionParts.join('\n'));
@@ -172,7 +172,6 @@ export default function NewCashReceiptPage() {
     generateDescription();
   }, [amount, selectedProjectId, clientProjects, firestore, tenantId]);
 
-  // تحديث قائمة المشاريع عند تغيير العميل
   useEffect(() => {
     if (!firestore || !selectedClientId || !tenantId) {
         setClientProjects([]);
@@ -307,7 +306,7 @@ export default function NewCashReceiptPage() {
   };
 
   const clientAccountOptions = useMemo(() => 
-    accounts.filter(a => a.parentCode === '1102').map(a => ({
+    accounts.filter(a => a.parentCode === '1102' || a.code.startsWith('1102')).map(a => ({
       value: a.id!,
       label: `${a.name} (${a.code})`,
       searchKey: a.code
@@ -361,8 +360,8 @@ export default function NewCashReceiptPage() {
                     <Target className="h-5 w-5"/> ربط بعقد/مشروع (مركز ربحية)
                 </Label>
                 <InlineSearchList 
-                    value={selectedProjectId}
-                    onSelect={setSelectedProjectId}
+                    value={selectedProjectId} 
+                    onSelect={setSelectedProjectId} 
                     options={clientProjects.map(p => ({ value: p.id!, label: p.transactionType }))}
                     placeholder={!selectedClientId ? 'اختر حساب العميل أولاً' : projectsLoading ? 'جاري التحميل...' : 'اختر المشروع (اختياري)...'}
                     disabled={!selectedClientId || projectsLoading || isSaving}
