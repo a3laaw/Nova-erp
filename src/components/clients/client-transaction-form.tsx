@@ -31,10 +31,6 @@ interface ClientTransactionFormProps {
   fromAppointmentId?: string | null;
 }
 
-/**
- * نموذج إنشاء المعاملة المطور (V26.1):
- * - تم تسطيح الهيكل (Flat Structure) لضمان عدم الحاجة لفهارس Collection Group المعقدة.
- */
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -176,8 +172,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const newCounter = (client?.transactionCounter || 0) + 1;
             const transactionNumber = `CL${client?.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
             
-            // 🛡️ التعديل الجذري: الحفظ في مسار مسطح تحت المنشأة 🛡️
-            const transactionsPath = getTenantPath('transactions', tenantId);
+            // 🛡️ استعادة التخزين في المسار القديم المجلد تحت العميل لضمان ظهور البيانات 🛡️
+            const transactionsPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
             const newTransactionRef = doc(collection(firestore, transactionsPath!));
             
             batch.update(clientRef, { transactionCounter: newCounter });
@@ -290,7 +286,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                     <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
                         <Button type="submit" disabled={isSaving || !transactionTypeName} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2 bg-[#7209B7] text-white">
-                            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+                            {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="ml-2 h-4 w-4" />}
                             بدء مسار المعاملة
                         </Button>
                     </DialogFooter>
@@ -299,4 +295,3 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         </Dialog>
     );
 }
-

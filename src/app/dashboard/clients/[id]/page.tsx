@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -145,7 +144,7 @@ export default function ClientProfilePage() {
   const clientPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}`, tenantId) : null, [id, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
-  // 🛡️ استعادة المسار الأصلي: العودة للبحث في المجلد الفرعي للعميل 🛡️
+  // 🛡️ استعادة المسار الأصيل للمعاملات 🛡️
   const txRelativePath = useMemo(() => id ? `clients/${id}/transactions` : null, [id]);
   const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, txRelativePath, [orderBy('createdAt', 'desc')]);
 
@@ -155,7 +154,7 @@ export default function ClientProfilePage() {
   useEffect(() => {
     if (!firestore || !tenantId) return;
     const empPath = getTenantPath('employees', tenantId);
-    getDocs(query(collection(firestore, empPath!))).then(snap => {
+    getDocs(query(collection(firestore, empPath!), where('status', '==', 'active'))).then(snap => {
         const newMap = new Map<string, string>();
         snap.forEach(doc => newMap.set(doc.id, doc.data().fullName));
         setEmployeesMap(newMap);

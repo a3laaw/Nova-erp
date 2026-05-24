@@ -68,11 +68,12 @@ function DirectContractContent() {
     const searchParams = useSearchParams();
 
     const tenantId = currentUser?.currentCompanyId;
+    const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
 
-    // 🛡️ استخدام الاشتراكات المحصنة لضمان ثبات البيانات وتجنب أخطاء الفهارس
+    // 🛡️ استخدام الاشتراكات المحصنة لضمان ثبات البيانات
     const { data: allClients, loading: clientsLoading } = useSubscription<Client>(firestore, tenantId ? 'clients' : null);
-    const { data: allTransactions, loading: txLoading } = useSubscription<ClientTransaction>(firestore, tenantId ? 'transactions' : null);
+    const { data: allTransactions, loading: txLoading } = useSubscription<ClientTransaction>(firestore, tenantId ? 'transactions' : null, [], true);
     const { data: accounts = [] } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null);
     const { data: employees = [] } = useSubscription<Employee>(firestore, tenantId ? 'employees' : null);
     const { data: departments = [] } = useSubscription<Department>(firestore, tenantId ? 'departments' : null);
@@ -92,7 +93,6 @@ function DirectContractContent() {
     const watchedClauses = watch('clauses');
     const currentTotal = useMemo(() => watchedClauses.reduce((sum, c) => sum + (Number(c.amount) || 0), 0), [watchedClauses]);
 
-    // ✨ التصفية والفرز في الذاكرة (Client-side Handling) لضمان عدم توقف النظام بسبب الفهارس ✨
     const clientOptions = useMemo(() => 
         allClients
             .filter(c => c.isActive !== false)
@@ -118,9 +118,8 @@ function DirectContractContent() {
         try {
             await runTransaction(firestore, async (transaction_fs) => {
                 const currentYear = new Date().getFullYear();
-                
-                // البحث عن الحسابات
                 const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
+                
                 const revenueAccQuery = query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1));
                 const revenueAccSnap = await getDocs(revenueAccQuery);
 
@@ -151,7 +150,8 @@ function DirectContractContent() {
                     clientAccountId = clientAccSnap.docs[0].id;
                 }
 
-                const txRef = doc(firestore, getTenantPath('transactions', tenantId)!, data.transactionId);
+                const txPath = getTenantPath(`clients/${data.clientId}/transactions/${data.transactionId}`, tenantId);
+                const txRef = doc(firestore, txPath!);
                 
                 transaction_fs.update(txRef, {
                     status: 'in-progress',
