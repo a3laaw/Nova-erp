@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -102,12 +101,12 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync V18.0) ✨
+  // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync V19.0) ✨
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
         
-        // 1. مزامنة المواصفات الإنشائية
+        // 1. مزامنة المواصفات الإنشائية من عرض السعر
         setSpecs({
             totalArea: Number(q.totalArea || q.contract?.specs?.totalArea || 0),
             floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount || 1),
@@ -192,22 +191,24 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const totalAmount = financials.type === 'fixed' ? currentTotalInput : financials.totalAmount;
             const contractData = { clauses: finalClauses, totalAmount, financialsType: financials.type, specs };
 
-            // 🛡️ ذكاء التعرف على المعاملة المرتبطة (Fixed Path Logic) 🛡️
+            // 🛡️ ذكاء التعرف على المعاملة المرتبطة (Preventing TX Duplication) 🛡️
             const existingTxId = (transaction as any).transactionId;
             let txRef;
             
             if (existingTxId) {
-                // تحديث المعاملة القائمة (مثل TX01) لمنع ظهور TX03 مكرر
                 const txPath = getTenantPath(`clients/${clientId}/transactions/${existingTxId}`, tenantId);
                 txRef = doc(firestore, txPath!);
                 
                 transaction_fs.update(txRef, {
                     status: 'in-progress',
                     contract: cleanFirestoreData(contractData),
+                    // ✨ الحفاظ على الهوية الفنية المسحوبة ✨
+                    transactionType: transaction?.transactionType || transaction?.subject || 'عقد مبيعات',
+                    subServiceName: transaction?.subServiceName || null,
+                    assignedEngineerId: transaction?.assignedEngineerId || null,
                     updatedAt: serverTimestamp()
                 });
             } else {
-                // إنشاء معاملة جديدة فقط إذا لم يكن عرض السعر مربوطاً مسبقاً
                 const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
                 const clientRef = doc(firestore, clientPath!);
                 const clientSnap = await transaction_fs.get(clientRef);
@@ -234,7 +235,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 transaction_fs.update(clientRef, { transactionCounter: nextTxCount, status: 'contracted' });
             }
 
-            // تحديث حالة العميل للمنظمة بالكامل
             const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
             transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
 
@@ -274,12 +274,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
       <DialogContent 
         className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl bg-white" 
         dir="rtl"
-        onInteractOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[role="listbox"]') || target.closest('[data-radix-select-content]') || target.closest('[data-inline-search-list-options]')) {
-                e.preventDefault();
-            }
-        }}
       >
         <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-4">

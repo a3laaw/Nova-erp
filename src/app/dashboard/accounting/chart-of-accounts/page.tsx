@@ -82,7 +82,9 @@ export default function ChartOfAccountsPage() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
-    const tenantId = currentUser?.currentCompanyId;
+    
+    // 🛡️ توجيه المسار للمنشأة المحددة أو المطور
+    const tenantId = currentUser?.currentCompanyId || (currentUser?.role === 'Developer' ? 'master' : null);
     
     const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set(['1', '2', '3', '4', '5']));
     const [isFormOpen, setIsFormOpen] = useState(false);

@@ -63,6 +63,9 @@ const quotationSchema = z.object({
   items: z.array(itemSchema).min(1, 'يجب إضافة بند مالي واحد على الأقل.'),
   financialsType: z.enum(['fixed', 'percentage']),
   totalAmount: z.preprocess((a) => (a === '' || a === null) ? 0 : parseFloat(String(a)), z.number().optional()),
+  // Hidden tracking fields for names
+  transactionTypeName: z.string().optional(),
+  subServiceName: z.string().optional(),
 });
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
@@ -110,6 +113,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
+  // ✨ محرك المزامنة والحقن اللحظي عند التعديل (V10.0)
   useEffect(() => {
     if (initialData) {
         const formattedData: any = {
@@ -135,6 +139,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                 ? initialData.layoutBlocks 
                 : [{ id: 'initial-table', type: 'financial_table' }]
         };
+        // فرض إعادة ضبط النموذج بالبيانات المحملة
         reset(formattedData);
     }
   }, [initialData, reset]);
@@ -201,6 +206,20 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     }
   }, [watchedItems, financials_type]);
 
+  const handleSaveInternal = async (data: QuotationFormValues) => {
+      const selectedType = transactionTypes.find(t => t.id === data.transactionTypeId);
+      const selectedSub = subServices.find(s => s.id === data.subServiceId);
+      
+      // حقن المسميات الفنية لضمان انتقالها للعقد
+      const enhancedData = {
+          ...data,
+          transactionType: selectedType?.name,
+          subServiceName: selectedSub?.name
+      };
+      
+      await onSave(enhancedData);
+  };
+
   const handleTemplateSelect = (templateId: string) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
@@ -237,7 +256,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   }, [specificWorkStages, watchedItems]);
 
   return (
-    <form onSubmit={handleSubmit(onSave)} className="space-y-6 pb-20">
+    <form onSubmit={handleSubmit(handleSaveInternal)} className="space-y-6 pb-20">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-3xl border border-slate-200 no-print">
           <div className="grid gap-1">
               <Label className="font-black text-[9px] uppercase text-slate-400 tracking-widest pr-1">العميل المستهدف *</Label>
