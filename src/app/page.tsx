@@ -15,8 +15,6 @@ import {
     User,
     Building2,
     Sparkles,
-    RefreshCcw,
-    LogOut
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -108,8 +106,8 @@ export default function LoginPage() {
 
   if (globalLoading && !isSubmitting) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-12 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] nova-glow-nebula rounded-full" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] nova-glow-nebula rounded-full" />
           <Stardust />
 
           <div className="relative flex flex-col items-center justify-center">
@@ -117,18 +115,18 @@ export default function LoginPage() {
                   <div className="absolute inset-0 rounded-full border-[1.5px] border-slate-200/30" />
                   <div className="nova-plasma-ring" />
                   <div className="relative z-20 nova-text-glow">
-                      <span className="text-5xl font-black tracking-tighter text-[#FF7A00]">NOVA</span>
+                      <span className="text-5xl font-black tracking-widest text-[#FF7A00] drop-shadow-lg">NOVA</span>
                   </div>
               </div>
               
               <div className="mt-16 text-center space-y-4 relative z-10">
                   <div className="flex items-center justify-center gap-3">
-                      <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-80">جاري التحميل</p>
-                      <div className="flex gap-1.5 pt-2">
-                          <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0s' }} />
-                          <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.2s' }} />
-                          <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.4s' }} />
+                      <div className="flex gap-1.5 pt-2 order-2">
+                          <div className="h-2 w-2 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0s' }} />
+                          <div className="h-2 w-2 bg-[#FFB000] rounded-full animate-bounce-dots" style={{ animationDelay: '0.2s' }} />
+                          <div className="h-2 w-2 bg-[#E66D00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.4s' }} />
                       </div>
+                      <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-90 order-1">جاري التحميل</p>
                   </div>
               </div>
           </div>

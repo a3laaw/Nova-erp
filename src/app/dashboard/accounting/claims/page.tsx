@@ -195,7 +195,7 @@ export default function FinancialClaimsPage() {
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-left font-mono font-bold text-slate-400">{formatCurrency(claim.totalAmount)}</TableCell>
-                                        <TableCell className="text-left font-mono font-black text-xl text-green-700 bg-green-50/20 border-r border-green-100">
+                                        <TableCell className="text-left font-mono font-black text-2xl text-green-700 bg-green-50/20 border-r border-green-100">
                                             {claim.remaining > 0 ? formatCurrency(claim.remaining) : <Badge className="bg-green-600 text-white">مسدد</Badge>}
                                         </TableCell>
                                         <TableCell className="text-center">
