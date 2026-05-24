@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -63,9 +64,10 @@ const quotationSchema = z.object({
   items: z.array(itemSchema).min(1, 'يجب إضافة بند مالي واحد على الأقل.'),
   financialsType: z.enum(['fixed', 'percentage']),
   totalAmount: z.preprocess((a) => (a === '' || a === null) ? 0 : parseFloat(String(a)), z.number().optional()),
-  // Hidden tracking fields for names
-  transactionTypeName: z.string().optional(),
+  // حقول تتبع مخفية للأسماء والربط
+  transactionType: z.string().optional(),
   subServiceName: z.string().optional(),
+  assignedEngineerId: z.string().optional(),
 });
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
@@ -113,7 +115,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
-  // ✨ محرك المزامنة والحقن اللحظي عند التعديل (V10.0)
   useEffect(() => {
     if (initialData) {
         const formattedData: any = {
@@ -139,7 +140,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                 ? initialData.layoutBlocks 
                 : [{ id: 'initial-table', type: 'financial_table' }]
         };
-        // فرض إعادة ضبط النموذج بالبيانات المحملة
         reset(formattedData);
     }
   }, [initialData, reset]);
@@ -210,11 +210,13 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       const selectedType = transactionTypes.find(t => t.id === data.transactionTypeId);
       const selectedSub = subServices.find(s => s.id === data.subServiceId);
       
-      // حقن المسميات الفنية لضمان انتقالها للعقد
+      const clientObj = clients.find(c => c.id === data.clientId);
+
       const enhancedData = {
           ...data,
           transactionType: selectedType?.name,
-          subServiceName: selectedSub?.name
+          subServiceName: selectedSub?.name,
+          assignedEngineerId: clientObj?.assignedEngineer || null
       };
       
       await onSave(enhancedData);

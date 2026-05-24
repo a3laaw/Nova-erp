@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useCallback } from 'react';
@@ -168,7 +169,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                                         onClick={() => setItemToDelete(quotation)} 
                                         className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50"
                                     >
-                                        <Trash2 className="h-4 w-4" /> حذف العرض نهائياً
+                                        <Trash2 className="ml-2 h-4 w-4" /> حذف العرض نهائياً
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>

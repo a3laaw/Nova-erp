@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -101,12 +102,10 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
-  // ✨ محرك المزامنة الصفرية المطلقة (Zero-Click Sync V19.0) ✨
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
         
-        // 1. مزامنة المواصفات الإنشائية من عرض السعر
         setSpecs({
             totalArea: Number(q.totalArea || q.contract?.specs?.totalArea || 0),
             floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount || 1),
@@ -115,7 +114,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             workNature: q.workNature || q.contract?.specs?.workNature || 'labor_only'
         });
 
-        // 2. مزامنة الترتيبات المالية والربط الميداني (WBS LINK)
         const type = q.financialsType || q.contract?.financialsType || 'fixed';
         const rawItems = q.items || q.contract?.clauses || [];
         
@@ -191,7 +189,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const totalAmount = financials.type === 'fixed' ? currentTotalInput : financials.totalAmount;
             const contractData = { clauses: finalClauses, totalAmount, financialsType: financials.type, specs };
 
-            // 🛡️ ذكاء التعرف على المعاملة المرتبطة (Preventing TX Duplication) 🛡️
+            // 🛡️ إصلاح جذري: التعرف على المعاملة المرتبطة بعرض السعر 🛡️
             const existingTxId = (transaction as any).transactionId;
             let txRef;
             
@@ -202,8 +200,8 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 transaction_fs.update(txRef, {
                     status: 'in-progress',
                     contract: cleanFirestoreData(contractData),
-                    // ✨ الحفاظ على الهوية الفنية المسحوبة ✨
-                    transactionType: transaction?.transactionType || transaction?.subject || 'عقد مبيعات',
+                    // نقل المهندس والخدمة بدقة من عرض السعر
+                    transactionType: transaction?.transactionType || transaction?.subject || 'عقد خدمات',
                     subServiceName: transaction?.subServiceName || null,
                     assignedEngineerId: transaction?.assignedEngineerId || null,
                     updatedAt: serverTimestamp()
@@ -234,9 +232,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 
                 transaction_fs.update(clientRef, { transactionCounter: nextTxCount, status: 'contracted' });
             }
-
-            const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
-            transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
 
             if (!revenueAccSnap.empty && !clientAccSnap.empty) {
                 const jePath = getTenantPath('journalEntries', tenantId);
