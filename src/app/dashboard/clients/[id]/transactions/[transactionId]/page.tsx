@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, Timestamp, addDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, Timestamp, addDoc, where } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -57,7 +58,8 @@ import {
     IterationCcw,
     Undo2,
     MessageCircleIcon,
-    Save
+    Save,
+    Banknote
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -67,7 +69,7 @@ import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
+import { formatCurrency, cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
 import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
@@ -75,6 +77,7 @@ import { Progress } from '@/components/ui/progress';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
 import { Textarea } from '@/components/ui/textarea';
+import { createNotification } from '@/services/notification-service';
 
 const transactionStatusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -119,7 +122,6 @@ export default function TransactionDetailPage() {
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // --- نافذة مبررات الإجراء (Justification Dialog State) ---
   const [actionDialog, setActionDialog] = useState<{
       isOpen: boolean;
       stageId: string;
@@ -137,7 +139,7 @@ export default function TransactionDetailPage() {
 
   const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
-  const isAdmin = useMemo(() => ['Admin', 'HR', 'Developer'].includes(currentUser?.role || ''), [currentUser]);
+  const isAdmin = useMemo(() => ['Admin', 'HR', 'Developer', 'Accountant'].includes(currentUser?.role || ''), [currentUser]);
 
   useEffect(() => {
     if (!firestore || !tenantId) return;
@@ -158,6 +160,48 @@ export default function TransactionDetailPage() {
       setActionDialog({ isOpen: true, stageId, stageName, actionType: type });
   };
 
+  /**
+   * محرك الاستحقاق والتقادم المالي (Accrual Engine V2600.0)
+   * يتم استدعاؤه عند إنجاز أي مرحلة لمطابقة الدفعات والديون.
+   */
+  const calculateFinancialClaim = async (stageName: string) => {
+    if (!firestore || !tenantId || !transaction?.contract?.clauses) return null;
+
+    try {
+        // 1. جلب كافة سندات القبض التاريخية للمشروع
+        const receiptsPath = getTenantPath('cashReceipts', tenantId);
+        const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath!), where('projectId', '==', transactionId)));
+        const totalReceived = receiptsSnap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
+
+        // 2. تحليل شروط العقد وحساب الاستحقاق التراكمي
+        const clauses = transaction.contract.clauses;
+        let totalRequiredUntilNow = 0;
+        let foundCurrent = false;
+        let currentClauseAmount = 0;
+
+        for (const clause of clauses) {
+            totalRequiredUntilNow += clause.amount;
+            if (clause.condition === stageName) {
+                foundCurrent = true;
+                currentClauseAmount = clause.amount;
+                break;
+            }
+        }
+
+        if (foundCurrent) {
+            const totalDebt = totalRequiredUntilNow - totalReceived;
+            if (totalDebt > 0) {
+                const prevOwed = totalDebt - currentClauseAmount;
+                return { totalDebt, currentClauseAmount, prevOwed };
+            }
+        }
+        return null;
+    } catch (e) {
+        console.error("Financial Claim Calculation Failed:", e);
+        return null;
+    }
+  };
+
   const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete', note: string) => {
         if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId) return;
         setIsProcessing(true);
@@ -171,6 +215,7 @@ export default function TransactionDetailPage() {
 
             let logContent = '';
             let commentContent = '';
+            let financialUpdate: any = null;
 
             if (action === 'start') {
                 stage.status = 'in-progress';
@@ -191,6 +236,19 @@ export default function TransactionDetailPage() {
                 logContent = `تم إنجاز وإغلاق مرحلة: **${stage.name}** بواسطة المهندس ${currentUser.fullName}.`;
                 commentContent = `**[إشعار إنجاز مرحلة]**\nأكد المهندس ${currentUser.fullName} إتمام العمل في مرحلة **${stage.name}**.\n\n**ملاحظات الإغلاق:**\n${note}`;
                 
+                // 🛡️ تفعيل محرك الاستحقاق والتقادم المالي 🛡️
+                const claim = await calculateFinancialClaim(stage.name);
+                if (claim) {
+                    let claimMsg = `\n\n**[مطالبة مالية آلية]**\nنظراً لإنجاز مرحلة **${stage.name}**، استحقت دفعة بقيمة **${formatCurrency(claim.currentClauseAmount)}**.`;
+                    if (claim.prevOwed > 0) {
+                        claimMsg += `\nيوجد متبقي سابق غير محصل من العقد بقيمة **${formatCurrency(claim.prevOwed)}**.`;
+                    }
+                    claimMsg += `\n**إجمالي المطلوب تحصيله الآن: ${formatCurrency(claim.totalDebt)}**`;
+                    
+                    commentContent += claimMsg;
+                    financialUpdate = claim;
+                }
+
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
@@ -205,11 +263,20 @@ export default function TransactionDetailPage() {
                 }
             }
 
-            await updateDoc(doc(firestore, transactionPath), { 
+            // تحديث العقد لإثبات استحقاق الدفعات
+            let updatedClauses = transaction.contract?.clauses || null;
+            if (action === 'complete' && updatedClauses) {
+                updatedClauses = updatedClauses.map((c: any) => 
+                    c.condition === stage.name ? { ...c, status: 'مستحقة' } : c
+                );
+            }
+
+            await updateDoc(doc(firestore, transactionPath), cleanFirestoreData({ 
                 stages: currentStages, 
                 updatedAt: serverTimestamp(),
-                status: 'in-progress'
-            });
+                status: 'in-progress',
+                ...(updatedClauses && { 'contract.clauses': updatedClauses })
+            }));
             
             const logPath = `${transactionPath}/timelineEvents`;
             
@@ -235,7 +302,21 @@ export default function TransactionDetailPage() {
                 });
             }
 
-            toast({ title: 'تم توثيق الإجراء', description: 'تم ترحيل مبرراتك إلى سجل المعاملة بنجاح.' });
+            // إرسال إشعار للمحاسب في حال وجود مطالبة
+            if (financialUpdate) {
+                const accountantsQuery = query(collection(firestore, getTenantPath('users', tenantId)!), where('role', '==', 'Accountant'));
+                const accountantsSnap = await getDocs(accountantsQuery);
+                accountantsSnap.forEach(accDoc => {
+                    createNotification(firestore, {
+                        userId: accDoc.id,
+                        title: '⚠️ مطالبة مالية مستحقة',
+                        body: `استحق مبلغ ${formatCurrency(financialUpdate.totalDebt)} للعميل ${client?.nameAr} بعد إنجاز ${stage.name}.`,
+                        link: `/dashboard/clients/${clientId}/transactions/${transactionId}`
+                    });
+                });
+            }
+
+            toast({ title: 'تم توثيق الإجراء', description: 'تم ترحيل البيانات وتحديث الموقف المالي آلياً.' });
             setActionDialog({ ...actionDialog, isOpen: false });
         } catch (e: any) {
             toast({ variant: 'destructive', title: 'خطأ', description: e.message });
@@ -479,7 +560,7 @@ export default function TransactionDetailPage() {
                     </div>
                     <div className="p-4 bg-muted/20 rounded-xl border-2 border-dashed border-primary/10 flex items-center gap-2">
                         <AlertCircle className="h-4 w-4 text-primary opacity-40" />
-                        <p className="text-[10px] font-bold text-slate-500 leading-relaxed">سيتم نشر هذه الملاحظات آلياً في "تبويب التعليقات" لضمان الشفافية الإدارية.</p>
+                        <p className="text-[10px] font-bold text-slate-500 leading-relaxed">سيتم نشر هذه الملاحظات آلياً في "تبويب التعليقات" لضمان الشفافية الإدارية والربط المالي.</p>
                     </div>
                 </div>
 
