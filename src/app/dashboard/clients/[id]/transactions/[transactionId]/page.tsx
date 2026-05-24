@@ -56,7 +56,8 @@ import {
     Clock,
     IterationCcw,
     Undo2,
-    MessageCircleIcon
+    MessageCircleIcon,
+    Save
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -149,9 +150,8 @@ export default function TransactionDetailPage() {
   }, [firestore, tenantId]);
 
   const openActionDialog = (stageId: string, stageName: string, type: 'start' | 'modify' | 'complete') => {
-      // بالنسبة للبدء قد لا نحتاج لمبرر دائم، ولكن للتعديل والإنجاز هو ضروري جداً
       if (type === 'start') {
-          handleStageAction(stageId, 'start', 'بدء العمل الفني');
+          handleStageAction(stageId, 'start', 'بدء العمل الفني المخطط.');
           return;
       }
       setActionNote('');
@@ -213,7 +213,6 @@ export default function TransactionDetailPage() {
             
             const logPath = `${transactionPath}/timelineEvents`;
             
-            // 1. تسجيل الحدث الإجرائي (Log)
             await addDoc(collection(firestore, logPath), {
                 type: 'log',
                 content: logContent,
@@ -224,7 +223,6 @@ export default function TransactionDetailPage() {
                 companyId: tenantId
             });
 
-            // 2. تسجيل المبرر كتعليق رسمي (Comment) ليظهر في مركز الملاحظات
             if (commentContent) {
                 await addDoc(collection(firestore, logPath), {
                     type: 'comment',
