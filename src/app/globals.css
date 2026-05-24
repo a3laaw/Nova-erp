@@ -96,7 +96,7 @@
   }
 
   /* 🛡️ درع النفاذية والوضوح النهائي (Sovereign Visibility Logic) 🛡️ */
-  /* نلغي الـ Portal تماماً لضمان وصول نقرة الماوس للعناصر مباشرة */
+  /* تم إلغاء Pointer Events Auto العام لمنع تعارض الإغلاق التلقائي */
   [role="listbox"], 
   [role="menu"], 
   [data-radix-select-content], 

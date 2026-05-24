@@ -6,7 +6,7 @@ import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, getDocs, orderBy, doc, runTransaction, serverTimestamp, getDoc, Timestamp, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, runTransaction, serverTimestamp, getDoc, Timestamp, limit, collectionGroup } from 'firebase/firestore';
 import type { Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,9 +71,20 @@ function DirectContractContent() {
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
 
-    // 🛡️ استخدام الاشتراكات المحصنة لضمان ثبات البيانات
+    // 🛡️ استعادة الاشتراكات المحصنة للمسار الأصيل (Hierarchy Sync)
     const { data: allClients, loading: clientsLoading } = useSubscription<Client>(firestore, tenantId ? 'clients' : null);
-    const { data: allTransactions, loading: txLoading } = useSubscription<ClientTransaction>(firestore, tenantId ? 'transactions' : null, [], true);
+    
+    // 🛡️ محرك البحث عن المعاملات تحت مسار العميل المحدد (Context Search)
+    const watchedClientId = useWatch({ control: undefined as any, name: 'clientId' }); // Placeholder to track below
+    
+    // جلب كافة المعاملات عبر الـ Collection Group لضمان ظهور الكل في القائمة
+    const { data: allTransactions, loading: txLoading } = useSubscription<ClientTransaction>(
+        firestore, 
+        'transactions', 
+        [], 
+        true // isGroup: true لضمان جلب المعاملات من كافة مجلدات العملاء
+    );
+
     const { data: accounts = [] } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null);
     const { data: employees = [] } = useSubscription<Employee>(firestore, tenantId ? 'employees' : null);
     const { data: departments = [] } = useSubscription<Department>(firestore, tenantId ? 'departments' : null);
@@ -89,7 +100,8 @@ function DirectContractContent() {
     });
 
     const { fields, append, remove } = useFieldArray({ control, name: 'clauses' });
-    const watchedClientId = watch('clientId');
+    const currentClientId = watch('clientId');
+    const currentTransactionId = watch('transactionId');
     const watchedClauses = watch('clauses');
     const currentTotal = useMemo(() => watchedClauses.reduce((sum, c) => sum + (Number(c.amount) || 0), 0), [watchedClauses]);
 
@@ -100,11 +112,12 @@ function DirectContractContent() {
             .map(c => ({ value: c.id!, label: c.nameAr }))
     , [allClients]);
 
+    // 🛡️ رادار الخيارات الذكي: يظهر المعاملات الخاصة بالعميل المختار فقط
     const transactionOptions = useMemo(() => 
         allTransactions
-            .filter(t => t.clientId === watchedClientId && ['new', 'in-progress'].includes(t.status))
+            .filter(t => t.clientId === currentClientId && ['new', 'in-progress'].includes(t.status))
             .map(t => ({ value: t.id!, label: t.transactionType }))
-    , [allTransactions, watchedClientId]);
+    , [allTransactions, currentClientId]);
 
     const onSubmit = async (data: ContractValues) => {
         if (!firestore || !currentUser || !tenantId || savingRef.current) return;
@@ -150,6 +163,7 @@ function DirectContractContent() {
                     clientAccountId = clientAccSnap.docs[0].id;
                 }
 
+                // 🛡️ التخزين في المسار الأصيل المجلد لضمان عدم ضياع البيانات
                 const txPath = getTenantPath(`clients/${data.clientId}/transactions/${data.transactionId}`, tenantId);
                 const txRef = doc(firestore, txPath!);
                 
@@ -175,7 +189,7 @@ function DirectContractContent() {
                     status: 'draft', 
                     lines: [
                         { accountId: clientAccountId, accountName: selectedClient.nameAr, debit: currentTotal, credit: 0, auto_profit_center: data.transactionId },
-                        { accountId: revenueAccSnap.docs[0]?.id || '4101', accountName: revenueAccSnap.docs[0]?.data()?.name || 'إيرادات عقود', debit: 0, credit: currentTotal, auto_profit_center: data.transactionId }
+                        { accountId: revenueAccSnap.docs[0]?.id || '4101', accountName: revenueAccSnap.docs[0]?.data()?.name || 'إيرادات عقود', debit: 0, credit: totalAmount, auto_profit_center: data.transactionId }
                     ],
                     clientId: data.clientId, transactionId: data.transactionId, createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
                 }));
@@ -236,7 +250,7 @@ function DirectContractContent() {
                                     <LayoutGrid className="h-3 w-3 text-[#FF7A00]"/> المعاملة المراد تعاقدها *
                                 </Label>
                                 <Controller control={control} name="transactionId" render={({ field }) => (
-                                    <InlineSearchList value={field.value} onSelect={field.onChange} options={transactionOptions} placeholder={!watchedClientId ? "اختر عميلاً أولاً" : "اختر المعاملة المفتوحة..."} disabled={!watchedClientId} className="h-14 rounded-2xl border-2" />
+                                    <InlineSearchList value={field.value} onSelect={field.onChange} options={transactionOptions} placeholder={!currentClientId ? "اختر عميلاً أولاً" : "اختر المعاملة المفتوحة..."} disabled={!currentClientId} className="h-14 rounded-2xl border-2" />
                                 )} />
                             </div>
                         </div>
@@ -300,7 +314,7 @@ function DirectContractContent() {
                             </p>
                             <p className="text-[10px] text-muted-foreground font-bold pr-7">الاعتماد يثبت مديونية العميل في شجرة الحسابات.</p>
                         </div>
-                        <Button type="submit" disabled={isSaving || !watchedClientId || fields.length === 0} className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[350px] gap-4">
+                        <Button type="submit" disabled={isSaving || !currentClientId || fields.length === 0} className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[350px] gap-4">
                             {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
                             توقيـع واعتمـاد العقـد
                         </Button>
