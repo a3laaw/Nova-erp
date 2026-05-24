@@ -79,13 +79,18 @@ import { defaultChartOfAccounts } from '@/lib/default-coa';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 
+/**
+ * شجرة الحسابات السيادية (COA V20.0):
+ * - تم إصلاح أخطاء الاستيراد (serverTimestamp, writeBatch).
+ * - تحصين محرك الاستيراد ليعمل بدقة في بيئة الـ Multi-tenancy.
+ * - دعم العرض الشجري المرن وتحديث الأرصدة اللحظي.
+ */
 export default function ChartOfAccountsPage() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     
-    // 🛡️ توجيه المسار للمنشأة المحددة أو المطور
-    const tenantId = currentUser?.currentCompanyId || (currentUser?.role === 'Developer' ? 'master' : null);
+    const tenantId = currentUser?.currentCompanyId;
     
     const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set(['1', '2', '3', '4', '5']));
     const [isFormOpen, setIsFormOpen] = useState(false);

@@ -44,7 +44,8 @@ import {
   AlertCircle,
   Ruler,
   Building2,
-  Workflow
+  Workflow,
+  UserPlus
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -57,7 +58,6 @@ import {
   runTransaction, 
   limit, 
   where, 
-  collectionGroup, 
   orderBy, 
   getDoc 
 } from 'firebase/firestore';
@@ -68,20 +68,16 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { InlineSearchList } from '../ui/inline-search-list';
 
-interface ContractClausesFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSaveSuccess?: () => void;
-  transaction: any; 
-  clientId: string;
-  clientName: string;
-  quotationIdToUpdate?: string;
-}
-
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
-export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transaction, clientId, clientName, quotationIdToUpdate }: ContractClausesFormProps) {
+/**
+ * نموذج توقيع العقد السيادي (Sovereign Contract Engine V6.5):
+ * - يضمن تحديث المعاملة الأصلية المربوطة بعرض السعر.
+ * - ينشئ حساب العميل في شجرة الحسابات آلياً إذا لم يوجد.
+ * - يولد قيد المديونية ويربطه بمركز الربحية.
+ */
+export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName, quotationIdToUpdate }: any) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -99,7 +95,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   });
   
   const [fetchedStages, setFetchedStages] = useState<{ value: string, label: string }[]>([]);
-  const [isRefLoading, setIsRefLoading] = useState(false);
   const syncedRef = useRef(false);
 
   useEffect(() => {
@@ -135,7 +130,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   useEffect(() => {
     if (!isOpen || !firestore || !tenantId) return;
     const fetchRefData = async () => {
-      setIsRefLoading(true);
       try {
         const stagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages'), where('companyId', '==', tenantId)));
         const stages = Array.from(new Map(stagesSnap.docs.map(doc => {
@@ -144,7 +138,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         })).values());
         setFetchedStages(stages);
       } catch (e) { console.error(e); }
-      finally { setIsRefLoading(false); }
     };
     fetchRefData();
   }, [isOpen, firestore, tenantId]);
@@ -160,12 +153,6 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     (financials.milestones || []).reduce((sum: number, m: any) => sum + (Number(m.value) || 0), 0)
   , [financials.milestones]);
 
-  useEffect(() => {
-    if (financials.type === 'fixed') {
-        setFinancials((prev: any) => ({ ...prev, totalAmount: currentTotalInput }));
-    }
-  }, [currentTotalInput, financials.type]);
-
   const handleSubmit = async () => {
     if (!firestore || !currentUser || !clientId || isSaving || !tenantId) return;
     
@@ -174,13 +161,48 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const coaPath = getTenantPath('chartOfAccounts', tenantId);
+            
+            // 🛡️ 1. محرك التأسيس المالي التلقائي للعميل (Auto-COA Generation)
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
-            const clientAccSnap = await getDocs(query(collection(firestore, coaPath!), where('name', '==', clientName), limit(1)));
-            const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
-            const jeCounterRef = doc(firestore, jeCounterPath!);
-            const jeCounterDoc = await transaction_fs.get(jeCounterRef);
-            const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+            const clientAccQuery = query(collection(firestore, coaPath!), where('name', '==', clientName), where('parentCode', '==', '1102'), limit(1));
+            const clientAccSnap = await getDocs(clientAccQuery);
 
+            let clientAccountId = '';
+            if (clientAccSnap.empty) {
+                // إنشاء حساب جديد للعميل في الشجرة آلياً
+                const counterPath = getTenantPath('counters/coa_clients', tenantId);
+                const counterRef = doc(firestore, counterPath!);
+                const counterDoc = await transaction_fs.get(counterRef);
+                const nextClientNum = (counterDoc.data()?.lastNumber || 0) + 1;
+                const clientCode = `1102C${String(nextClientNum).padStart(4, '0')}`;
+                
+                const newAccRef = doc(collection(firestore, coaPath!));
+                clientAccountId = newAccRef.id;
+                transaction_fs.set(newAccRef, {
+                    code: clientCode,
+                    name: clientName,
+                    type: 'asset',
+                    level: 3,
+                    parentCode: '1102',
+                    isPayable: true,
+                    statement: 'Balance Sheet',
+                    balanceType: 'Debit',
+                    companyId: tenantId,
+                    createdAt: serverTimestamp()
+                });
+                transaction_fs.set(counterRef, { lastNumber: nextClientNum }, { merge: true });
+            } else {
+                clientAccountId = clientAccSnap.docs[0].id;
+            }
+
+            // 🛡️ 2. محرك الربط مع المعاملة الأصلية (Preserve Context)
+            // نستخدم المعرف الموجود في عرض السعر لضمان عدم تكرار المعاملات
+            const targetTxId = transaction.transactionId;
+            if (!targetTxId) throw new Error("⚠️ عرض السعر غير مربوط بمعاملة أصلية. يرجى مراجعة البيانات.");
+
+            const txPath = getTenantPath(`clients/${clientId}/transactions/${targetTxId}`, tenantId);
+            const txRef = doc(firestore, txPath!);
+            
             const finalClauses = financials.milestones.map((m: any) => {
                 const amount = financials.type === 'percentage' ? (m.value / 100) * financials.totalAmount : m.value;
                 return { id: m.id, name: m.name, condition: m.condition, amount, status: 'غير مستحقة', percentage: m.value };
@@ -189,121 +211,87 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             const totalAmount = financials.type === 'fixed' ? currentTotalInput : financials.totalAmount;
             const contractData = { clauses: finalClauses, totalAmount, financialsType: financials.type, specs };
 
-            // 🛡️ إصلاح جذري: التعرف على المعاملة المرتبطة بعرض السعر 🛡️
-            const existingTxId = (transaction as any).transactionId;
-            let txRef;
-            
-            if (existingTxId) {
-                const txPath = getTenantPath(`clients/${clientId}/transactions/${existingTxId}`, tenantId);
-                txRef = doc(firestore, txPath!);
-                
-                transaction_fs.update(txRef, {
-                    status: 'in-progress',
-                    contract: cleanFirestoreData(contractData),
-                    // نقل المهندس والخدمة بدقة من عرض السعر
-                    transactionType: transaction?.transactionType || transaction?.subject || 'عقد خدمات',
-                    subServiceName: transaction?.subServiceName || null,
-                    assignedEngineerId: transaction?.assignedEngineerId || null,
-                    updatedAt: serverTimestamp()
-                });
-            } else {
-                const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
-                const clientRef = doc(firestore, clientPath!);
-                const clientSnap = await transaction_fs.get(clientRef);
-                const nextTxCount = (clientSnap.data()?.transactionCounter || 0) + 1;
-                const txNumber = `CL${clientSnap.data()?.fileNumber}-TX${String(nextTxCount).padStart(2, '0')}`;
-                
-                const txsCollectionPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
-                txRef = doc(collection(firestore, txsCollectionPath!));
-                
-                transaction_fs.set(txRef, cleanFirestoreData({
-                    transactionNumber: txNumber, 
-                    clientId, 
-                    transactionType: transaction?.transactionType || transaction?.subject || 'عقد مبيعات',
-                    transactionTypeId: transaction?.transactionTypeId || null,
-                    subServiceId: transaction?.subServiceId || null,
-                    subServiceName: transaction?.subServiceName || null,
-                    assignedEngineerId: transaction?.assignedEngineerId || null,
-                    status: 'in-progress', 
-                    contract: contractData, 
-                    createdAt: serverTimestamp(),
-                    companyId: tenantId
-                }));
-                
-                transaction_fs.update(clientRef, { transactionCounter: nextTxCount, status: 'contracted' });
-            }
+            transaction_fs.update(txRef, {
+                status: 'in-progress',
+                contract: cleanFirestoreData(contractData),
+                updatedAt: serverTimestamp()
+            });
 
-            if (!revenueAccSnap.empty && !clientAccSnap.empty) {
-                const jePath = getTenantPath('journalEntries', tenantId);
-                const newJeRef = doc(collection(firestore, jePath!));
-                transaction_fs.set(newJeRef, cleanFirestoreData({
-                    entryNumber: `JV-PR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
-                    date: serverTimestamp(), 
-                    narration: `إثبات مديونية عقد: ${transaction?.transactionType || transaction?.subject || ''} لـ ${clientName}`,
-                    totalDebit: totalAmount, totalCredit: totalAmount, status: 'posted',
-                    lines: [
-                        { accountId: clientAccSnap.docs[0].id, accountName: clientName, debit: totalAmount, credit: 0, auto_profit_center: txRef.id },
-                        { accountId: revenueAccSnap.docs[0].id, accountName: revenueAccSnap.docs[0].data().name, debit: 0, credit: totalAmount, auto_profit_center: txRef.id }
-                    ],
-                    clientId, transactionId: txRef.id, createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
-                }));
-                transaction_fs.set(jeCounterRef, { counts: { [currentYear]: nextJeNum } }, { merge: true });
-            }
+            // 🛡️ 3. توليد قيد المديونية المعتمد
+            const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
+            const jeCounterRef = doc(firestore, jeCounterPath!);
+            const jeCounterDoc = await transaction_fs.get(jeCounterRef);
+            const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+
+            const jePath = getTenantPath('journalEntries', tenantId);
+            const newJeRef = doc(collection(firestore, jePath!));
+
+            transaction_fs.set(newJeRef, cleanFirestoreData({
+                entryNumber: `JV-PR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
+                date: serverTimestamp(), 
+                narration: `إثبات مديونية عقد: ${transaction.transactionType || transaction.subject} لـ ${clientName}`,
+                totalDebit: totalAmount, totalCredit: totalAmount, status: 'posted',
+                lines: [
+                    { accountId: clientAccountId, accountName: clientName, debit: totalAmount, credit: 0, auto_profit_center: targetTxId },
+                    { accountId: revenueAccSnap.docs[0]?.id || '4101', accountName: revenueAccSnap.docs[0]?.data()?.name || 'إيرادات عقود', debit: 0, credit: totalAmount, auto_profit_center: targetTxId }
+                ],
+                clientId, transactionId: targetTxId, createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
+            }));
+
+            transaction_fs.set(jeCounterRef, { counts: { [currentYear]: nextJeNum } }, { merge: true });
 
             if (quotationIdToUpdate) {
                 const qPath = getTenantPath(`quotations/${quotationIdToUpdate}`, tenantId);
-                transaction_fs.update(doc(firestore, qPath!), { status: 'accepted', transactionId: txRef.id });
+                transaction_fs.update(doc(firestore, qPath!), { status: 'accepted' });
             }
+            
+            const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
+            transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
         });
 
-        toast({ title: 'تم توقيع العقد', description: 'تم تحديث المعاملة الأصلية والترحيل المالي آلياً.' });
+        toast({ title: 'تم توقيع العقد بنجاح', description: 'تم تحديث المعاملة، إنشاء حساب العميل، وتوليد قيد المديونية.' });
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: e.message });
+        toast({ variant: 'destructive', title: 'خطأ في المسار السيادي', description: e.message });
     } finally { setIsSaving(false); }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
-        className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl bg-white" 
-        dir="rtl"
-      >
-        <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
+      <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0 overflow-hidden rounded-[3rem] border-none shadow-2xl bg-white" dir="rtl">
+        <DialogHeader className="p-8 bg-[#FF7A00]/5 border-b shrink-0">
             <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><FileSignature className="h-8 w-8"/></div>
+                <div className="p-4 bg-gradient-to-br from-[#FFB000] to-[#FF7A00] rounded-3xl text-white shadow-xl">
+                    <FileSignature className="h-8 w-8"/>
+                </div>
                 <div className="text-right">
-                    <DialogTitle className="text-2xl font-black text-[#1e1b4b]">توقيع العقد المعتمد</DialogTitle>
-                    <DialogDescription className="font-bold text-slate-500">مراجعة وتأكيد بنود العرض الفني والمالي لبدء التنفيذ الميداني.</DialogDescription>
+                    <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">الاعتماد النهائي للعقد</DialogTitle>
+                    <DialogDescription className="font-bold text-slate-500">سيتم تحديث المعاملة الحالية آلياً وربطها بالدورة المحاسبية للمنشأة.</DialogDescription>
                 </div>
             </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 bg-white">
-            <div className="p-8 space-y-12">
+        <ScrollArea className="flex-1">
+            <div className="p-10 space-y-12 pb-20">
                 <section className="space-y-6">
                     <h3 className="text-xl font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4">
-                        <Target className="h-7 w-7 text-indigo-600" /> المواصفات الإنشائية (Synced)
+                        <Target className="h-7 w-7 text-indigo-600" /> مراجعة المواصفات الفنية المعتمدة
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-10 border-4 border-slate-50 rounded-[3rem] bg-white shadow-xl relative overflow-hidden">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 p-10 border-4 border-slate-50 rounded-[3.5rem] bg-white shadow-xl relative">
                         <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500/10" />
                         <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1 flex items-center gap-1">
-                                <Ruler className="h-3 w-3" /> المساحة (م²)
-                            </Label>
-                            <Input type="number" value={specs.totalArea} onChange={e => setSpecs({...specs, totalArea: Number(e.target.value)})} className="h-12 font-black text-2xl text-indigo-600 rounded-xl bg-indigo-50/20 border-indigo-100 shadow-inner" />
+                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1 flex items-center gap-1"><Ruler className="h-3 w-3" /> المساحة (م²)</Label>
+                            <Input type="number" value={specs.totalArea} onChange={e => setSpecs({...specs, totalArea: Number(e.target.value)})} className="h-14 font-black text-3xl text-indigo-600 rounded-2xl bg-indigo-50/20 border-indigo-100 shadow-inner" />
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1 flex items-center gap-1">
-                                <Building2 className="h-3 w-3" /> عدد الأدوار
-                            </Label>
-                            <Input type="number" value={specs.floorsCount} onChange={e => setSpecs({...specs, floorsCount: Number(e.target.value)})} className="h-12 font-black text-2xl rounded-xl shadow-inner" />
+                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1 flex items-center gap-1"><Building2 className="h-3 w-3" /> عدد الأدوار</Label>
+                            <Input type="number" value={specs.floorsCount} onChange={e => setSpecs({...specs, floorsCount: Number(e.target.value)})} className="h-14 font-black text-3xl rounded-2xl shadow-inner" />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase text-slate-400 pr-1">السرداب</Label>
                             <Select value={specs.basementType} onValueChange={v => setSpecs({...specs, basementType: v})}>
-                                <SelectTrigger className="h-12 rounded-xl border-2 font-black"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-14 rounded-2xl border-2 font-black text-lg"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                     <SelectItem value="none">بدون سرداب</SelectItem>
                                     <SelectItem value="full">كامل</SelectItem>
@@ -315,7 +303,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase text-slate-400 pr-1">توسعة السطح</Label>
                             <Select value={specs.roofExtension} onValueChange={v => setSpecs({...specs, roofExtension: v})}>
-                                <SelectTrigger className="h-12 rounded-xl border-2 font-black"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-14 rounded-2xl border-2 font-black text-lg"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                     <SelectItem value="none">لا يوجد</SelectItem>
                                     <SelectItem value="quarter">ربع دور</SelectItem>
@@ -327,28 +315,28 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 </section>
 
                 <section className="space-y-8">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-6 pr-4 border-r-8 border-primary">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-6 pr-4 border-r-8 border-[#FF7A00]">
                         <h3 className="text-xl font-black flex items-center gap-3 text-[#1e1b4b]">
-                            <Calculator className="h-7 w-7 text-primary"/> الدفعات المالية (قابل للتعديل)
+                            <Calculator className="h-7 w-7 text-[#FF7A00]"/> مصفوفة الدفعات المالية المعتمدة
                         </h3>
                         <div className="flex items-center gap-4 bg-muted/20 p-3 rounded-2xl border no-print">
-                            <Label className="text-xs font-bold text-slate-500">نظام الدفع:</Label>
-                            <Select value={financials.type} onValueChange={(v: any) => setFinancials({...financials, type: v})}>
-                                <SelectTrigger className="w-44 h-10 rounded-xl border-none bg-white font-black text-primary shadow-md"><SelectValue /></SelectTrigger>
+                            <Label className="text-[10px] font-black text-slate-400 uppercase">نظام التسعير المعتمد:</Label>
+                            <Select value={financials.type} onValueChange={(v: any) => setFinancials({...financials, type: v, milestones: []})}>
+                                <SelectTrigger className="w-48 h-10 rounded-xl border-none bg-white font-black text-[#FF7A00] shadow-md"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
-                                    <SelectItem value="fixed">مبالغ ثابتة KD</SelectItem>
-                                    <SelectItem value="percentage">نسب مئوية %</SelectItem>
+                                    <SelectItem value="fixed">مبالغ ثابتة (KD)</SelectItem>
+                                    <SelectItem value="percentage">نسب مئوية (%)</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                     </div>
 
-                    <div className="border-4 border-slate-50 rounded-[3rem] overflow-hidden shadow-2xl bg-white/95">
+                    <div className="border-4 border-slate-50 rounded-[3.5rem] overflow-hidden shadow-2xl bg-white/95">
                         <Table>
                             <TableHeader className="bg-slate-900 h-16">
                                 <TableRow className="border-none">
                                     <TableHead className="w-24 text-center font-black text-white/40 border-l border-white/10">#</TableHead>
-                                    <TableHead className="px-10 font-black text-white text-right text-lg">شرط الاستحقاق الميداني (WBS LINK)</TableHead>
+                                    <TableHead className="px-10 font-black text-white text-right text-lg">مرحلة الربط الميداني (WBS LINK)</TableHead>
                                     <TableHead className="text-center w-64 font-black text-white text-lg">
                                         {financials.type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                     </TableHead>
@@ -357,7 +345,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                             </TableHeader>
                             <TableBody>
                                 {(financials.milestones || []).map((m: any, i: number) => (
-                                    <TableRow key={m.id} className="h-24 border-b last:border-0 hover:bg-primary/[0.02] transition-all group">
+                                    <TableRow key={m.id} className="h-24 border-b last:border-0 hover:bg-primary/[0.02] group transition-all">
                                         <TableCell className="text-center bg-slate-50/50 border-l">
                                             <Badge variant="secondary" className="font-black text-sm px-4 h-8 rounded-full border bg-white text-slate-900 shadow-sm">{i+1}</Badge>
                                         </TableCell>
@@ -367,7 +355,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                                 onSelect={v => { const newM = [...financials.milestones]; newM[i].condition = v; setFinancials({...financials, milestones: newM}); }} 
                                                 options={wbsOptions} 
                                                 placeholder="اربط بمرحلة ميدانية..." 
-                                                className="h-12 text-sm border-dashed border-2 border-primary/20 bg-primary/[0.02] font-black text-primary rounded-xl" 
+                                                className="h-12 text-sm border-dashed border-2 border-primary/20 bg-primary/[0.02] font-black text-primary rounded-2xl shadow-inner" 
                                             />
                                         </TableCell>
                                         <TableCell className="bg-primary/[0.01] border-r border-slate-50">
@@ -375,25 +363,24 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                                                 type="number" step="any" 
                                                 value={m.value} 
                                                 onChange={e => { const newM = [...financials.milestones]; newM[i].value = parseFloat(e.target.value) || 0; setFinancials({...financials, milestones: newM}); }} 
-                                                className="text-center font-black text-4xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono h-16" 
+                                                className="text-center font-black text-4xl text-[#FF7A00] border-none shadow-none focus-visible:ring-0 bg-transparent font-mono h-16" 
                                             />
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Button variant="ghost" size="icon" onClick={() => setFinancials({...financials, milestones: financials.milestones.filter((x: any) => x.id !== m.id)})} className="text-red-300 hover:text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="h-5 w-5"/></Button>
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => setFinancials({...financials, milestones: financials.milestones.filter((x: any) => x.id !== m.id)})} className="text-red-300 hover:text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="h-5 w-5"/></Button>
                                         </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
-                            <TableFooter className="bg-primary h-28 text-white">
+                            <TableFooter className="bg-[#FF7A00]/5 h-28">
                                 <TableRow className="border-none hover:bg-transparent">
                                     <TableCell colSpan={2} className="text-right px-12">
-                                        <p className="text-3xl font-black tracking-tight">إجمالي قيمة التعاقد المبرم:</p>
+                                        <p className="text-3xl font-black tracking-tight text-[#1e1b4b]">إجمالي قيمة العقد النهائي:</p>
+                                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-1">Total Agreed Contract Sum</p>
                                     </TableCell>
-                                    <TableCell className="text-center border-r border-white/10 bg-white/10">
-                                        <div className="flex flex-col items-center">
-                                            <div className="text-5xl font-black font-mono tracking-tighter">
-                                                {financials.type === 'fixed' ? formatCurrency(currentTotalInput) : `${currentTotalInput}%`}
-                                            </div>
+                                    <TableCell className="text-center border-r border-white/50 bg-white">
+                                        <div className="text-5xl font-black font-mono tracking-tighter text-[#FF7A00]">
+                                            {financials.type === 'fixed' ? formatCurrency(currentTotalInput) : `${currentTotalInput}%`}
                                         </div>
                                     </TableCell>
                                     <TableCell />
@@ -401,8 +388,12 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                             </TableFooter>
                         </Table>
                         <div className="p-8 flex justify-center bg-muted/5 border-t border-dashed no-print">
-                            <Button variant="outline" onClick={() => setFinancials({...financials, milestones: [...financials.milestones, {id: generateId(), name: `الدفعة الجديدة`, value: 0, condition: ''}]})} className="h-14 px-12 rounded-2xl border-dashed border-2 font-black text-primary gap-3 hover:bg-white shadow-xl hover:scale-105 transition-all active:scale-95">
-                                <PlusCircle className="h-6 w-6 text-primary" /> إضافة دفعة استحقاق جديدة +
+                            <Button 
+                                variant="outline" 
+                                onClick={() => setFinancials({...financials, milestones: [...financials.milestones, {id: generateId(), name: `الدفعة الجديدة`, value: 0, condition: ''}]})} 
+                                className="h-16 px-16 rounded-[1.8rem] border-dashed border-2 font-black text-[#FF7A00] gap-3 hover:bg-white shadow-xl hover:scale-105 transition-all active:scale-95"
+                            >
+                                <PlusCircle className="h-6 w-6 text-[#FF7A00]" /> إضافة دفعة استحقاق يدوية +
                             </Button>
                         </div>
                     </div>
@@ -412,20 +403,20 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
 
         <DialogFooter className="p-10 border-t bg-slate-50 flex flex-col md:flex-row justify-between items-center gap-8 shrink-0 no-print">
             <div className="text-right space-y-1">
-                <p className="text-sm font-black text-primary flex items-center gap-2">
-                    <ShieldCheck className="h-5 w-5 animate-pulse"/> سيتم إنشاء قيد مديونية آلي بـ {formatCurrency(financials.type === 'fixed' ? currentTotalInput : financials.totalAmount)}
+                <p className="text-base font-black text-primary flex items-center gap-2">
+                    <ShieldCheck className="h-6 w-6 animate-pulse"/> سيتم إنشاء حساب عميل وقيد مديونية آلي بـ {formatCurrency(financials.type === 'fixed' ? currentTotalInput : financials.totalAmount)}
                 </p>
-                <p className="text-[11px] text-muted-foreground font-bold pr-9">الاعتماد النهائي يغير حالة العميل آلياً ويبدأ دورة التنفيذ الميداني.</p>
+                <p className="text-[11px] text-muted-foreground font-bold pr-9">الاعتماد النهائي غير قابل للتراجع ويؤثر على ميزان المراجعة فوراً.</p>
             </div>
             <div className="flex gap-4">
-                <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8 text-slate-400">إلغاء</Button>
+                <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-2xl font-bold h-14 px-10 text-slate-400">إلغاء</Button>
                 <Button 
                     onClick={handleSubmit} 
                     disabled={isSaving || financials.milestones.length === 0} 
                     className="h-20 px-24 rounded-[2.2rem] font-black text-3xl shadow-2xl shadow-primary/40 gap-4 bg-[#7209B7] text-white border-none transition-all active:scale-[1.02]"
                 >
-                    {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
-                    توقيع واعتـماد العقـد
+                    {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <CheckCircle2 className="h-8 w-8" />}
+                    توقيـع واعتمـاد العقـد
                 </Button>
             </div>
         </DialogFooter>

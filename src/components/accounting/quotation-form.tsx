@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
 import { Separator } from '../ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
+import { useSearchParams } from 'next/navigation';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -50,6 +51,7 @@ const layoutBlockSchema = z.object({
 
 const quotationSchema = z.object({
   clientId: z.string().min(1, 'العميل مطلوب.'),
+  transactionId: z.string().optional(), // 🛡️ الربط مع المعاملة الأصلية
   subject: z.string().min(1, 'الموضوع مطلوب.'),
   date: z.date({ required_error: "التاريخ مطلوب." }),
   validUntil: z.date({ required_error: "تاريخ الانتهاء مطلوب." }),
@@ -64,7 +66,6 @@ const quotationSchema = z.object({
   items: z.array(itemSchema).min(1, 'يجب إضافة بند مالي واحد على الأقل.'),
   financialsType: z.enum(['fixed', 'percentage']),
   totalAmount: z.preprocess((a) => (a === '' || a === null) ? 0 : parseFloat(String(a)), z.number().optional()),
-  // حقول تتبع مخفية للأسماء والربط
   transactionType: z.string().optional(),
   subServiceName: z.string().optional(),
   assignedEngineerId: z.string().optional(),
@@ -78,6 +79,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   
   const [allTemplates, setAllTemplates] = useState<ContractTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -95,6 +97,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         date: new Date(),
         validUntil: new Date(new Date().setDate(new Date().getDate() + 30)),
         financialsType: 'fixed',
+        clientId: searchParams.get('clientId') || '',
+        transactionId: searchParams.get('transactionId') || '',
         transactionTypeId: '',
         subServiceId: '',
         totalArea: 0,
@@ -132,9 +136,9 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                 id: item.id || generateId(),
                 description: item.description || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
                 quantity: Number(item.quantity) || 1,
-                unitPrice: Number(item.unitPrice) || 0,
+                unitPrice: Number(item.unitPrice || item.amount) || 0,
                 percentage: Number(item.percentage) || 0,
-                triggerCondition: item.triggerCondition || '',
+                triggerCondition: item.triggerCondition || item.condition || '',
             })),
             layoutBlocks: initialData.layoutBlocks && initialData.layoutBlocks.length > 0 
                 ? initialData.layoutBlocks 
@@ -209,14 +213,13 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const handleSaveInternal = async (data: QuotationFormValues) => {
       const selectedType = transactionTypes.find(t => t.id === data.transactionTypeId);
       const selectedSub = subServices.find(s => s.id === data.subServiceId);
-      
       const clientObj = clients.find(c => c.id === data.clientId);
 
       const enhancedData = {
           ...data,
-          transactionType: selectedType?.name,
-          subServiceName: selectedSub?.name,
-          assignedEngineerId: clientObj?.assignedEngineer || null
+          transactionType: selectedType?.name || data.transactionType,
+          subServiceName: selectedSub?.name || data.subServiceName,
+          assignedEngineerId: clientObj?.assignedEngineer || data.assignedEngineerId || null
       };
       
       await onSave(enhancedData);
@@ -428,3 +431,4 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     </form>
   );
 }
+
