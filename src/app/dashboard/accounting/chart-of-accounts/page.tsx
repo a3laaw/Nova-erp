@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, doc, updateDoc, deleteDoc, writeBatch, getDocs, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -78,10 +78,6 @@ import { defaultChartOfAccounts } from '@/lib/default-coa';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 
-/**
- * صفحة شجرة الحسابات (Sovereign Chart of Accounts):
- * تم تفعيل محرك الاستيراد السيادي مع نافذة تأكيد رقابية تضمن تأسيس الدليل المالي بدقة 100%.
- */
 export default function ChartOfAccountsPage() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -99,14 +95,12 @@ export default function ChartOfAccountsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isSeeding, setIsSeeding] = useState(false);
 
-    // 🛡️ اشتراك لحظي في حسابات المنشأة المعزولة
     const { data: accounts, loading: accountsLoading } = useSubscription<Account>(
         firestore, 
         tenantId ? 'chartOfAccounts' : null,
         [orderBy('code')]
     );
 
-    // اشتراك في القيود لحساب الأرصدة
     const { data: journalEntries, loading: entriesLoading } = useSubscription<JournalEntry>(
         firestore, 
         tenantId ? 'journalEntries' : null, 
@@ -115,7 +109,6 @@ export default function ChartOfAccountsPage() {
     
     const loading = accountsLoading || entriesLoading;
 
-    // محرك حساب الأرصدة التراكمي (Aggregation Engine)
     const accountBalances = useMemo(() => {
         if (!accounts || !journalEntries) return new Map<string, number>();
         const directBalances = new Map<string, number>();
@@ -172,10 +165,6 @@ export default function ChartOfAccountsPage() {
         });
     };
 
-    /**
-     * 🚀 محرك الاستيراد السيادي (Sovereign Seed Engine):
-     * يقوم بتأسيس الهيكل المالي للمنشأة بضغطة زر واحدة.
-     */
     const handleImportDefaults = async () => {
         if (!firestore || !tenantId || importConfirmText !== 'تأكيد') return;
         setIsSeeding(true);
@@ -183,11 +172,9 @@ export default function ChartOfAccountsPage() {
             const batch = writeBatch(firestore);
             const coaPath = getTenantPath('chartOfAccounts', tenantId);
             
-            // 1. مسح أي سجلات قديمة لضمان نظافة الدليل (Clean Slate)
             const existingSnap = await getDocs(query(collection(firestore, coaPath!)));
             existingSnap.forEach(d => batch.delete(d.ref));
 
-            // 2. حقن الدليل المحاسبي المعتمد
             for (const account of defaultChartOfAccounts) {
                 const newAccRef = doc(collection(firestore, coaPath!));
                 batch.set(newAccRef, cleanFirestoreData({
@@ -224,7 +211,6 @@ export default function ChartOfAccountsPage() {
 
     return (
         <div className="space-y-10" dir="rtl">
-             {/* 🛡️ الهيدر الرئيسي السيادي المحدث 🛡️ */}
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                 <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                 <CardHeader className="pb-10 pt-10 px-10 relative z-10">
@@ -245,7 +231,7 @@ export default function ChartOfAccountsPage() {
                             <Button 
                                 onClick={() => setIsImportConfirmOpen(true)} 
                                 variant="outline" 
-                                className="h-12 px-6 rounded-2xl font-black gap-2 bg-white/20 text-white border-white/40 hover:bg-white/30 backdrop-blur-md shadow-lg" 
+                                className="h-12 px-6 rounded-2xl font-black gap-2 bg-white/20 text-white border-white/40 hover:bg-white/30 backdrop-blur-md shadow-xl" 
                                 disabled={isSeeding}
                             >
                                 {isSeeding ? <Loader2 className="animate-spin h-4 w-4"/> : <DownloadCloud className="h-4 w-4" />} استيراد الدليل
@@ -324,7 +310,6 @@ export default function ChartOfAccountsPage() {
                 </CardContent>
             </Card>
 
-            {/* 🛡️ نافذة تأكيد الاستيراد السيادية 🛡️ */}
             <AlertDialog open={isImportConfirmOpen} onOpenChange={(v) => { setIsImportConfirmOpen(v); setImportConfirmText(''); }}>
                 <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl">
                     <AlertDialogHeader>
@@ -359,7 +344,6 @@ export default function ChartOfAccountsPage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* نافذة حذف الحساب */}
             <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10">
                     <AlertDialogHeader>

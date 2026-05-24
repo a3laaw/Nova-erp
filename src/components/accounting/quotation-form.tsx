@@ -110,8 +110,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
-  // ✨ محرك حقن البيانات السيادي الموحد (V18.0) ✨
-  // تم تحصينه بـ reset صريح لضمان استيراد (السطح، السرداب، WBS LINK) دون أدنى تأخير.
   useEffect(() => {
     if (initialData) {
         const formattedData: any = {
@@ -231,7 +229,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const templateOptions = useMemo(() => allTemplates.map(t => ({ value: t.id!, label: t.title })), [allTemplates]);
   const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.id!, label: t.name })), [transactionTypes]);
 
-  // 🛡️ محرك الخيارات الاحتياطية لضمان ظهور النص المسحوب فوراً 🛡️
   const wbsOptionsForItems = useMemo(() => {
       const currentValues = (watchedItems || []).map(i => i.triggerCondition).filter(Boolean);
       const existingValues = new Set(specificWorkStages.map(s => s.value));
