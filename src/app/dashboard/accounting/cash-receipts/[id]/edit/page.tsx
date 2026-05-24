@@ -37,6 +37,23 @@ import { DateInput } from '@/components/ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
 
+/**
+ * محرك حساب إجمالي المسدد سابقاً للمشروع (بما في ذلك السندات الأخرى)
+ */
+const getTotalPaidForProject = async (projectId: string, db: any, tenantId: string, excludeReceiptId?: string) => {
+    let total = 0;
+    if (!projectId || !db || !tenantId) return total;
+    const receiptsPath = getTenantPath('cashReceipts', tenantId);
+    const receiptsQuery = query(collection(db, receiptsPath!), where('projectId', '==', projectId));
+    const receiptsSnap = await getDocs(receiptsQuery);
+    receiptsSnap.forEach(doc => {
+        if (doc.id !== excludeReceiptId) {
+            total += doc.data().amount || 0;
+        }
+    });
+    return total;
+};
+
 export default function EditCashReceiptPage() {
   const router = useRouter();
   const params = useParams();
@@ -87,7 +104,7 @@ export default function EditCashReceiptPage() {
             const deptPath = getTenantPath('departments', tenantId);
 
             const [clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
-                getDocs(query(collection(firestore, clientsPath!), where('isActive', '==', true))),
+                getDocs(query(collection(firestore, clientsPath!), where('isActive', '==', true), limit(200))),
                 getDocs(query(collection(firestore, coaPath!), orderBy('code'))),
                 getDocs(query(collection(firestore, empPath!))),
                 getDocs(query(collection(firestore, deptPath!)))
@@ -122,6 +139,56 @@ export default function EditCashReceiptPage() {
       if (acc) setSelectedAccountId(acc.id!);
     }
   }, [receiptData, accounts]);
+
+  // ✨ محرك توليد البيان الذكي (Smart Description Engine) عند التعديل ✨
+  useEffect(() => {
+    const generateDescription = async () => {
+      if (!selectedProjectId || !amount || parseFloat(amount) <= 0 || !firestore || !tenantId) {
+        return;
+      }
+      
+      const project = clientProjects.find(p => p.id === selectedProjectId);
+      if (!project || !project.contract?.clauses) return;
+
+      const totalPaidPreviously = await getTotalPaidForProject(selectedProjectId, firestore, tenantId, id as string);
+      
+      let remainingAmountFromCurrentPayment = parseFloat(amount);
+      const descriptionParts: string[] = [];
+      let allocatedPaid = 0;
+
+      for (const clause of project.contract.clauses) {
+        if (remainingAmountFromCurrentPayment <= 0) break;
+        
+        const clauseAmount = clause.amount;
+        const paidOnThisClausePreviously = Math.max(0, Math.min(clauseAmount, totalPaidPreviously - allocatedPaid));
+        const remainingOnClause = clauseAmount - paidOnThisClausePreviously;
+
+        if (remainingOnClause > 0) {
+          const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
+          
+          if (paymentForThisClause >= remainingOnClause) {
+            descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(remainingOnClause)}`);
+          } else {
+            descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
+            const newRemaining = remainingOnClause - paymentForThisClause;
+            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
+          }
+          remainingAmountFromCurrentPayment -= paymentForThisClause;
+        }
+        allocatedPaid += clauseAmount;
+      }
+
+      if (remainingAmountFromCurrentPayment > 0) {
+        descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة على الحساب.`);
+      }
+      
+      setDescription(descriptionParts.join('\n'));
+    };
+
+    if (clientProjects.length > 0) {
+        generateDescription();
+    }
+  }, [amount, selectedProjectId, clientProjects, firestore, tenantId, id]);
 
   const handleAccountChange = (accountId: string) => {
     setSelectedAccountId(accountId);

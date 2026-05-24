@@ -36,9 +36,20 @@ import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * صفحة إصدار سند قبض جديد (Sovereign V1300.0):
- * تم تحصين محرك الجلب ليعمل بدقة داخل مسار المنشأة المعزول.
+ * محرك حساب إجمالي المسدد سابقاً للمشروع (Sovereign Audit Helper)
  */
+const getTotalPaidForProject = async (projectId: string, db: any, tenantId: string) => {
+    let total = 0;
+    if (!projectId || !db || !tenantId) return total;
+    const receiptsPath = getTenantPath('cashReceipts', tenantId);
+    const receiptsQuery = query(collection(db, receiptsPath!), where('projectId', '==', projectId));
+    const receiptsSnap = await getDocs(receiptsQuery);
+    receiptsSnap.forEach(doc => {
+        total += doc.data().amount || 0;
+    });
+    return total;
+};
+
 export default function NewCashReceiptPage() {
   const router = useRouter();
   const { firestore } = useFirebase();
@@ -112,6 +123,55 @@ export default function NewCashReceiptPage() {
     }
   }, [amount]);
 
+  // ✨ محرك توليد البيان الذكي (Smart Description Engine) ✨
+  useEffect(() => {
+    const generateDescription = async () => {
+      if (!selectedProjectId || !amount || parseFloat(amount) <= 0 || !firestore || !tenantId) {
+        return;
+      }
+      
+      const project = clientProjects.find(p => p.id === selectedProjectId);
+      if (!project || !project.contract?.clauses) return;
+
+      const totalPaidPreviously = await getTotalPaidForProject(selectedProjectId, firestore, tenantId);
+      
+      let remainingAmountFromCurrentPayment = parseFloat(amount);
+      const descriptionParts: string[] = [];
+      let allocatedPaid = 0;
+
+      for (const clause of project.contract.clauses) {
+        if (remainingAmountFromCurrentPayment <= 0) break;
+        
+        const clauseAmount = clause.amount;
+        // حساب ما تم دفعه على هذا البند تحديداً من السندات السابقة
+        const paidOnThisClausePreviously = Math.max(0, Math.min(clauseAmount, totalPaidPreviously - allocatedPaid));
+        const remainingOnClause = clauseAmount - paidOnThisClausePreviously;
+
+        if (remainingOnClause > 0) {
+          const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
+          
+          if (paymentForThisClause >= remainingOnClause) {
+            descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(remainingOnClause)}`);
+          } else {
+            descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
+            const newRemaining = remainingOnClause - paymentForThisClause;
+            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
+          }
+          remainingAmountFromCurrentPayment -= paymentForThisClause;
+        }
+        allocatedPaid += clauseAmount;
+      }
+
+      if (remainingAmountFromCurrentPayment > 0) {
+        descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة على الحساب.`);
+      }
+      
+      setDescription(descriptionParts.join('\n'));
+    };
+
+    generateDescription();
+  }, [amount, selectedProjectId, clientProjects, firestore, tenantId]);
+
   // 🛡️ محرك جلب البيانات المرجعية من مسار المنشأة
   useEffect(() => {
     if (!firestore || !tenantId) return;
@@ -125,7 +185,7 @@ export default function NewCashReceiptPage() {
             const deptPath = getTenantPath('departments', tenantId);
 
             const [clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
-                getDocs(query(collection(firestore, clientsPath!), where('isActive', '==', true))),
+                getDocs(query(collection(firestore, clientsPath!), where('isActive', '==', true), limit(200))),
                 getDocs(query(collection(firestore, coaPath!), orderBy('code'))),
                 getDocs(query(collection(firestore, empPath!))),
                 getDocs(query(collection(firestore, deptPath!)))
@@ -138,13 +198,12 @@ export default function NewCashReceiptPage() {
 
         } catch (error) {
             console.error("Error fetching initial data:", error);
-            toast({ variant: 'destructive', title: 'عائق صلاحيات', description: 'لا يمكنك الوصول لبيانات المنشأة الحالية.' });
         } finally {
             setRefDataLoading(false);
         }
     };
     fetchInitialData();
-  }, [firestore, tenantId, toast]);
+  }, [firestore, tenantId]);
   
   useEffect(() => {
     if (accounts.length > 0 && paymentMethod) {
