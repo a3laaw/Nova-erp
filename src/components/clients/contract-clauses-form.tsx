@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -44,8 +43,7 @@ import {
   AlertCircle,
   Ruler,
   Building2,
-  Workflow,
-  UserPlus
+  Workflow
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -72,10 +70,10 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 /**
- * نموذج توقيع العقد السيادي (Sovereign Contract Engine V6.5):
- * - يضمن تحديث المعاملة الأصلية المربوطة بعرض السعر.
- * - ينشئ حساب العميل في شجرة الحسابات آلياً إذا لم يوجد.
- * - يولد قيد المديونية ويربطه بمركز الربحية.
+ * نموذج توقيع العقد السيادي (Sovereign Contract Engine V7.0):
+ * 🛡️ يلتزم بالمسار الصحيح: تحديث المعاملة الأصلية حصراً ومنع التكرار.
+ * 🛡️ ينشئ حساب العميل في الشجرة آلياً.
+ * 🛡️ يولد قيد مديونية ويربطه بمركز الربحية.
  */
 export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName, quotationIdToUpdate }: any) {
   const { firestore } = useFirebase();
@@ -85,6 +83,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
   const tenantId = currentUser?.currentCompanyId;
   const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
   
   const [specs, setSpecs] = useState<any>({
       totalArea: 0, floorsCount: 1, basementType: 'none', roofExtension: 'none', workNature: 'labor_only'
@@ -97,6 +96,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   const [fetchedStages, setFetchedStages] = useState<{ value: string, label: string }[]>([]);
   const syncedRef = useRef(false);
 
+  // حقن البيانات من عرض السعر
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
@@ -127,6 +127,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     }
   }, [isOpen, transaction]);
 
+  // جلب مراحل العمل المعتمدة للربط
   useEffect(() => {
     if (!isOpen || !firestore || !tenantId) return;
     const fetchRefData = async () => {
@@ -154,22 +155,29 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   , [financials.milestones]);
 
   const handleSubmit = async () => {
-    if (!firestore || !currentUser || !clientId || isSaving || !tenantId) return;
+    if (!firestore || !currentUser || !clientId || isSaving || !tenantId || savingRef.current) return;
     
+    // 🛡️ صمام أمان: التأكد من وجود معاملة أصلية للربط بها
+    const targetTxId = transaction.transactionId;
+    if (!targetTxId) {
+        toast({ variant: 'destructive', title: 'فشل الربط', description: 'عذراً، عرض السعر هذا غير مربوط بمعاملة أصلية. يرجى مراجعة المسار الفني.' });
+        return;
+    }
+
+    savingRef.current = true;
     setIsSaving(true);
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const coaPath = getTenantPath('chartOfAccounts', tenantId);
             
-            // 🛡️ 1. محرك التأسيس المالي التلقائي للعميل (Auto-COA Generation)
+            // 🛡️ 1. محرك التأسيس المالي التلقائي (Auto-COA)
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
             const clientAccQuery = query(collection(firestore, coaPath!), where('name', '==', clientName), where('parentCode', '==', '1102'), limit(1));
             const clientAccSnap = await getDocs(clientAccQuery);
 
             let clientAccountId = '';
             if (clientAccSnap.empty) {
-                // إنشاء حساب جديد للعميل في الشجرة آلياً
                 const counterPath = getTenantPath('counters/coa_clients', tenantId);
                 const counterRef = doc(firestore, counterPath!);
                 const counterDoc = await transaction_fs.get(counterRef);
@@ -179,27 +187,16 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 const newAccRef = doc(collection(firestore, coaPath!));
                 clientAccountId = newAccRef.id;
                 transaction_fs.set(newAccRef, {
-                    code: clientCode,
-                    name: clientName,
-                    type: 'asset',
-                    level: 3,
-                    parentCode: '1102',
-                    isPayable: true,
-                    statement: 'Balance Sheet',
-                    balanceType: 'Debit',
-                    companyId: tenantId,
-                    createdAt: serverTimestamp()
+                    code: clientCode, name: clientName, type: 'asset', level: 3,
+                    parentCode: '1102', isPayable: true, statement: 'Balance Sheet', balanceType: 'Debit',
+                    companyId: tenantId, createdAt: serverTimestamp()
                 });
                 transaction_fs.set(counterRef, { lastNumber: nextClientNum }, { merge: true });
             } else {
                 clientAccountId = clientAccSnap.docs[0].id;
             }
 
-            // 🛡️ 2. محرك الربط مع المعاملة الأصلية (Preserve Context)
-            // نستخدم المعرف الموجود في عرض السعر لضمان عدم تكرار المعاملات
-            const targetTxId = transaction.transactionId;
-            if (!targetTxId) throw new Error("⚠️ عرض السعر غير مربوط بمعاملة أصلية. يرجى مراجعة البيانات.");
-
+            // 🛡️ 2. تحديث المعاملة الأصلية (Strict Update - No New Transaction)
             const txPath = getTenantPath(`clients/${clientId}/transactions/${targetTxId}`, tenantId);
             const txRef = doc(firestore, txPath!);
             
@@ -209,11 +206,10 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             });
 
             const totalAmount = financials.type === 'fixed' ? currentTotalInput : financials.totalAmount;
-            const contractData = { clauses: finalClauses, totalAmount, financialsType: financials.type, specs };
-
+            
             transaction_fs.update(txRef, {
                 status: 'in-progress',
-                contract: cleanFirestoreData(contractData),
+                contract: cleanFirestoreData({ clauses: finalClauses, totalAmount, financialsType: financials.type, specs }),
                 updatedAt: serverTimestamp()
             });
 
@@ -249,12 +245,12 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
         });
 
-        toast({ title: 'تم توقيع العقد بنجاح', description: 'تم تحديث المعاملة، إنشاء حساب العميل، وتوليد قيد المديونية.' });
+        toast({ title: 'تم توقيع العقد بنجاح', description: 'تم تحديث المعاملة الأصلية، إنشاء حساب العميل، وتوليد القيد المالي.' });
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ في المسار السيادي', description: e.message });
-    } finally { setIsSaving(false); }
+        toast({ variant: 'destructive', title: 'خطأ في المسار', description: e.message });
+    } finally { setIsSaving(false); savingRef.current = false; }
   };
 
   return (

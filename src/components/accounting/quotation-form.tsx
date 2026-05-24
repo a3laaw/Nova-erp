@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -51,7 +50,7 @@ const layoutBlockSchema = z.object({
 
 const quotationSchema = z.object({
   clientId: z.string().min(1, 'العميل مطلوب.'),
-  transactionId: z.string().optional(), // 🛡️ الربط مع المعاملة الأصلية
+  transactionId: z.string().optional().nullable(), // 🛡️ الرابط الميكانيكي بالمعاملة الأصلية
   subject: z.string().min(1, 'الموضوع مطلوب.'),
   date: z.date({ required_error: "التاريخ مطلوب." }),
   validUntil: z.date({ required_error: "تاريخ الانتهاء مطلوب." }),
@@ -73,7 +72,7 @@ const quotationSchema = z.object({
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
 
-const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
+const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 export function QuotationForm({ onSave, onClose, initialData = null, isSaving = false }: any) {
   const { firestore } = useFirebase();
@@ -119,6 +118,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
+  // ✨ محرك الحقن القسري للبيانات (Strict Data Reset) ✨
   useEffect(() => {
     if (initialData) {
         const formattedData: any = {
@@ -131,6 +131,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
             basementType: initialData.basementType || 'none',
             roofExtension: initialData.roofExtension || 'none',
             workNature: initialData.workNature || 'labor_only',
+            transactionId: initialData.transactionId || null,
             items: (initialData.items || []).map((item: any, idx: number) => ({
                 ...item,
                 id: item.id || generateId(),
@@ -431,4 +432,3 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     </form>
   );
 }
-
