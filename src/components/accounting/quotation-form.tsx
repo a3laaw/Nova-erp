@@ -87,6 +87,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const [specificWorkStages, setSpecificWorkStages] = useState<{ value: string, label: string }[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
   const [isPathLoading, setIsPathLoading] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
   const tenantId = currentUser?.currentCompanyId;
 
@@ -243,23 +244,19 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       await onSave(enhancedData);
   };
 
-  /**
-   * ✨ محرك الاستيراد الشامل (Unified Import Engine V4.0) ✨
-   * يضمن حقن كافة البيانات وفتح الجدول المالي قسرياً.
-   */
   const handleTemplateSelect = (templateId: string) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
     
-    // 1. حقن البيانات الأساسية
-    setValue('subject', template.title, { shouldDirty: true });
-    setValue('workNature', template.workNature || 'labor_only', { shouldDirty: true });
-    setValue('financialsType', template.financials?.type || 'fixed', { shouldDirty: true });
-    setValue('totalAmount', template.financials?.totalAmount || 0, { shouldDirty: true });
-    setValue('transactionTypeId', template.transactionTypeId || '', { shouldDirty: true });
-    setValue('subServiceId', template.subServiceId || '', { shouldDirty: true });
+    setSelectedTemplateId(templateId);
     
-    // 2. حقن الدفعات
+    setValue('subject', template.title, { shouldValidate: true, shouldDirty: true });
+    setValue('workNature', template.workNature || 'labor_only', { shouldValidate: true, shouldDirty: true });
+    setValue('financialsType', template.financials?.type || 'fixed', { shouldValidate: true, shouldDirty: true });
+    setValue('totalAmount', template.financials?.totalAmount || 0, { shouldValidate: true, shouldDirty: true });
+    setValue('transactionTypeId', template.transactionTypeId || '', { shouldValidate: true, shouldDirty: true });
+    setValue('subServiceId', template.subServiceId || '', { shouldValidate: true, shouldDirty: true });
+    
     if (template.financials?.milestones) {
         const newItems = template.financials.milestones.map((m, idx) => ({
             id: generateId(), 
@@ -272,7 +269,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         replaceItems(newItems);
     }
 
-    // 3. 🛡️ الحماية القصوى: فرض إظهار الجدول المالي 🛡️
     const currentBlocks = watch('layoutBlocks') || [];
     if (!currentBlocks.some(b => b.type === 'financial_table')) {
         replaceBlocks([...currentBlocks, { id: 'imported-table', type: 'financial_table' }]);
@@ -303,7 +299,13 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </div>
           <div className="grid gap-1">
               <Label className="font-black text-[9px] uppercase text-primary tracking-widest pr-1 flex items-center gap-1"><Sparkles className="h-3 w-3"/> استيراد قالب مالي</Label>
-              <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً للتعبئة آلياً..." className="h-8 border-primary/20 bg-primary/5" />
+              <InlineSearchList 
+                value={selectedTemplateId} 
+                onSelect={handleTemplateSelect} 
+                options={templateOptions} 
+                placeholder={refDataLoading ? "تحميل القوالب..." : "اختر قالباً للتعبئة آلياً..."} 
+                className="h-8 border-primary/20 bg-primary/5" 
+              />
           </div>
       </div>
 

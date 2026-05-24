@@ -35,9 +35,8 @@ interface InlineSearchListProps {
 }
 
 /**
- * مكون البحث والاختيار المطور (V20.0):
- * - تم إضافة خاصية allowCustomValue للسماح بكتابة قيم غير موجودة في القائمة.
- * - يظهر خيار "إضافة كقيمة مخصصة" عند عدم وجود نتائج بحث.
+ * مكون البحث والاختيار المطور (V22.0):
+ * - تم تحسين عرض القيمة المختارة لضمان ظهور النص حتى لو كانت القيمة مخصصة.
  * - استجابة فورية للنقر بالماوس وتحصين ضد اختفاء القيم.
  */
 export function InlineSearchList({
@@ -57,10 +56,12 @@ export function InlineSearchList({
     if (!open) setSearchValue('');
   }, [open]);
 
-  // البحث عن النص الظاهر المقابل للقيمة
-  const selectedOption = React.useMemo(() => 
-    options.find((option) => option.value === value)
-  , [options, value]);
+  // البحث عن النص الظاهر المقابل للقيمة أو استخدام القيمة نفسها إذا لم يوجد خيار مطابق
+  const displayText = React.useMemo(() => {
+    if (!value) return placeholder;
+    const option = options.find((opt) => opt.value === value);
+    return option ? option.label : value;
+  }, [options, value, placeholder]);
 
   const showCustomAdd = React.useMemo(() => {
     if (!allowCustomValue || !searchValue.trim()) return false;
@@ -82,7 +83,7 @@ export function InlineSearchList({
           )}
           disabled={disabled}
         >
-          <span className="truncate">{selectedOption ? selectedOption.label : (value || placeholder)}</span>
+          <span className="truncate">{displayText}</span>
           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40 text-primary" />
         </Button>
       </PopoverTrigger>
@@ -134,7 +135,7 @@ export function InlineSearchList({
                   key={option.value}
                   value={option.label}
                   onSelect={() => {
-                    onSelect(option.value === value ? "" : option.value);
+                    onSelect(option.value);
                     setOpen(false);
                     setSearchValue('');
                   }}
