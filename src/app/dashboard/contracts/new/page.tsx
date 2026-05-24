@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, orderBy, doc, runTransaction, serverTimestamp, limit, getDoc, Timestamp } from 'firebase/firestore';
-import type { Client, ClientTransaction, Account } from '@/lib/types';
+import type { Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -39,11 +39,7 @@ import { Badge } from '@/components/ui/badge';
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
-/**
- * صفحة توقيع العقد المباشر (Direct Contract V1260.0):
- * تم إصلاح الخلل المرجعي عبر إضافة أيقونة Save المفقودة وتأمين كافة المراجع البصرية.
- */
-export default function DirectContractPage() {
+function DirectContractContent() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
@@ -59,6 +55,8 @@ export default function DirectContractPage() {
     const [clients, setClients] = useState<Client[]>([]);
     const [transactions, setTransactions] = useState<ClientTransaction[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [departments, setDepartments] = useState<Department[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -76,21 +74,26 @@ export default function DirectContractPage() {
             try {
                 const clientPath = getTenantPath('clients', tenantId);
                 const coaPath = getTenantPath('chartOfAccounts', tenantId);
+                const empPath = getTenantPath('employees', tenantId);
+                const deptPath = getTenantPath('departments', tenantId);
 
-                const [clientsSnap, accountsSnap] = await Promise.all([
+                const [clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
                     getDocs(query(collection(firestore, clientPath!), where('isActive', '==', true), orderBy('nameAr'))),
-                    getDocs(query(collection(firestore, coaPath!)))
+                    getDocs(query(collection(firestore, coaPath!))),
+                    getDocs(query(collection(firestore, empPath!))),
+                    getDocs(query(collection(firestore, deptPath!)))
                 ]);
                 
                 setClients(clientsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Client)));
                 setAccounts(accountsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
+                setEmployees(empSnap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
+                setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
             } catch (e) { 
                 console.error("Fetch Ref Error:", e);
-                toast({ variant: 'destructive', title: 'خطأ في جلب البيانات' });
             } finally { setLoading(false); }
         };
         fetchRefData();
-    }, [firestore, tenantId, toast]);
+    }, [firestore, tenantId]);
 
     useEffect(() => {
         if (!firestore || !selectedClientId || !tenantId) {
@@ -110,6 +113,10 @@ export default function DirectContractPage() {
         clauses.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
     , [clauses]);
 
+    // 🛡️ مصفوفات الخيارات الموجهة والمثبتة (Stable Memoized Options)
+    const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
+    const transactionOptions = useMemo(() => transactions.map(t => ({ value: t.id!, label: t.transactionType })), [transactions]);
+
     const handleSaveContract = async () => {
         if (!firestore || !currentUser || !tenantId || !selectedClientId || !selectedTxId || clauses.length === 0 || savingRef.current) return;
         
@@ -126,7 +133,6 @@ export default function DirectContractPage() {
 
             await runTransaction(firestore, async (transaction_fs) => {
                 const currentYear = new Date().getFullYear();
-                
                 const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
                 const coaSubCounterPath = getTenantPath('counters/coa_clients', tenantId);
                 const jeCounterRef = doc(firestore, jeCounterPath!);
@@ -189,7 +195,6 @@ export default function DirectContractPage() {
                 const clientPath = getTenantPath(`clients/${selectedClientId}`, tenantId);
                 transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
 
-                // ✨ تعليق آلي في المعاملة
                 const timelineRef = doc(collection(txRef, 'timelineEvents'));
                 transaction_fs.set(timelineRef, {
                     type: 'comment',
@@ -202,7 +207,7 @@ export default function DirectContractPage() {
             });
 
             toast({ title: '✅ تم توقيع العقد بنجاح' });
-            router.push(`/dashboard/construction/projects/new?clientId=${selectedClientId}&transactionId=${selectedTxId}`);
+            router.push(`/dashboard/clients/${selectedClientId}`);
 
         } catch (e: any) {
             console.error("Transaction Error:", e);
@@ -214,7 +219,6 @@ export default function DirectContractPage() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-10 pb-20" dir="rtl">
-            {/* الهيدر البرتقالي الموحد */}
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                 <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                 <CardHeader className="p-10 relative z-10">
@@ -225,7 +229,7 @@ export default function DirectContractPage() {
                             </div>
                             <div className="text-right">
                                 <CardTitle className="text-3xl font-black text-white tracking-tighter">توقيع عقد مباشر</CardTitle>
-                                <CardDescription className="text-white/90 font-bold text-sm">تثبيت الأثر المالي والقانوني للمعاملات القائمة دون تكرار السجلات.</CardDescription>
+                                <CardDescription className="text-white/90 font-bold text-sm">تثبيت الأثر المالي والقانوني للمشاريع المعتمدة.</CardDescription>
                             </div>
                         </div>
                         <Button onClick={() => router.back()} variant="outline" className="h-12 px-8 rounded-2xl font-black gap-2 bg-white/10 text-white border-white/40 hover:bg-white/20">
@@ -245,7 +249,7 @@ export default function DirectContractPage() {
                             <InlineSearchList 
                                 value={selectedClientId} 
                                 onSelect={setSelectedClientId} 
-                                options={clients.map(c => ({ value: c.id!, label: c.nameAr }))} 
+                                options={clientOptions} 
                                 placeholder={loading ? "جاري جلب الملفات..." : "ابحث عن عميل..."}
                                 className="h-14 rounded-2xl border-2 shadow-inner"
                             />
@@ -257,7 +261,7 @@ export default function DirectContractPage() {
                             <InlineSearchList 
                                 value={selectedTxId} 
                                 onSelect={setSelectedTxId} 
-                                options={transactions.map(t => ({ value: t.id!, label: t.transactionType }))} 
+                                options={transactionOptions} 
                                 placeholder={!selectedClientId ? "اختر عميلاً أولاً" : "اختر المعاملة المفتوحة..."}
                                 disabled={!selectedClientId}
                                 className="h-14 rounded-2xl border-2 shadow-inner"
@@ -273,7 +277,7 @@ export default function DirectContractPage() {
                             <Label className="text-xl font-black text-[#1e1b4b]">مصفوفة الدفعات المالية المعتمدة</Label>
                         </div>
 
-                        <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-xl">
+                        <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-xl bg-white">
                             <Table>
                                 <TableHeader className="bg-slate-900 h-14">
                                     <TableRow className="border-none">
@@ -343,7 +347,7 @@ export default function DirectContractPage() {
                     <Button 
                         onClick={handleSaveContract} 
                         disabled={isSaving || !selectedTxId || clauses.length === 0}
-                        className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[350px] gap-3"
+                        className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[350px] gap-4"
                     >
                         {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
                         توقيـع واعتمـاد العقـد
@@ -351,5 +355,13 @@ export default function DirectContractPage() {
                 </CardFooter>
             </Card>
         </div>
+    );
+}
+
+export default function NewDirectContractPage() {
+    return (
+        <Suspense fallback={<div className="p-20 text-center"><Loader2 className="animate-spin h-10 w-10 mx-auto text-primary" /></div>}>
+            <DirectContractContent />
+        </Suspense>
     );
 }

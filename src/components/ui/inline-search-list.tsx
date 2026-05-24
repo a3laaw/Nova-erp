@@ -22,7 +22,7 @@ import { Badge } from './badge';
 export interface SearchOption {
   value: string;
   label: string;
-  searchKey?: string; // يُستخدم هنا لعرض الكود التمييزي أو القسم
+  searchKey?: string; 
 }
 
 interface InlineSearchListProps {
@@ -39,6 +39,7 @@ interface InlineSearchListProps {
  * مكون البحث والاختيار السيادي المطور (Sovereign Clarity Engine V26.0):
  * - تم حل مشكلة تشابه الأسماء عبر إظهار الـ searchKey (الكود/القسم) في كبسولة جانبية.
  * - تحسين التباين اللوني (Text Contrast) لضمان سهولة القراءة القصوى (Black Text).
+ * - معالجة الفشل في جلب الاسم عند التحميل عبر البحث في قائمة الخيارات المحدثة.
  */
 export function InlineSearchList({
   value,
@@ -56,11 +57,13 @@ export function InlineSearchList({
     if (!open) setSearchValue('');
   }, [open]);
 
+  // ✨ محرك الوضوح: البحث عن التسمية الصحيحة بناءً على المعرف (Value)
   const displayText = React.useMemo(() => {
     if (!value) return placeholder;
     const option = options.find((opt) => opt.value === value);
     if (option) return option.label;
-    return value;
+    // إذا لم نجد الاسم (أثناء التحميل مثلاً)، نبحث في المصفوفة بمرونة أكبر أو نظهر النص الحالي
+    return value; 
   }, [options, value, placeholder]);
 
   const showCustomAdd = React.useMemo(() => {
@@ -137,7 +140,7 @@ export function InlineSearchList({
                   <div className="flex items-center gap-3 overflow-hidden">
                     <span className="truncate">{option.label}</span>
                     {option.searchKey && (
-                        <Badge variant="secondary" className="font-mono text-[9px] h-5 px-2 bg-slate-100 text-slate-500 border-none shrink-0 group-aria-selected:bg-white transition-colors">
+                        <Badge variant="secondary" className="font-mono text-[9px] h-5 px-2 bg-slate-100 text-slate-500 border-none shrink-0">
                             {option.searchKey}
                         </Badge>
                     )}

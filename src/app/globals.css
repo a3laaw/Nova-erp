@@ -51,7 +51,6 @@
   }
   
   /* 🌟 محرك أنيميشن "النوفا الصامت" V4.0 (Silent Nova Engine) 🌟 */
-  
   .nova-glow-nebula {
     background: radial-gradient(circle, rgba(255,122,0,0.12) 0%, rgba(255,253,240,0) 70%);
     filter: blur(60px);
@@ -81,7 +80,6 @@
     100% { transform: rotate(360deg); }
   }
 
-  /* جزيئات غبار النجوم الهادئة جداً */
   .stardust-particle {
     position: absolute;
     background: #FF7A00;
@@ -97,27 +95,8 @@
     100% { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) scale(0); opacity: 0; }
   }
 
-  .nova-text-glow {
-    text-shadow: 0 0 20px rgba(255, 122, 0, 0.2);
-    animation: text-breathing 4s ease-in-out infinite;
-  }
-
-  @keyframes text-breathing {
-    0%, 100% { transform: scale(1); opacity: 0.9; }
-    50% { transform: scale(1.02); opacity: 1; }
-  }
-
-  .animate-bounce-dots {
-    animation: bounce-dots 0.8s infinite alternate;
-  }
-
-  @keyframes bounce-dots {
-    from { transform: translateY(0); opacity: 0.4; }
-    to { transform: translateY(-3px); opacity: 1; }
-  }
-
-  /* 🛡️ درع النفاذية النهائي (Sovereign Pointer Fix) 🛡️ */
-  /* هذا الجزء يضمن استجابة الماوس لكافة القوائم المنسدلة */
+  /* 🛡️ درع الوضوح والنفاذية النهائي (Sovereign Visibility Fix) 🛡️ */
+  /* هذا الجزء يضمن استجابة الماوس، الإغلاق التلقائي، واللون الأسود للنصوص */
   [data-radix-popper-content-wrapper] {
     z-index: 999999999 !important;
     pointer-events: auto !important;
@@ -129,10 +108,11 @@
   [data-radix-popover-content] {
     z-index: 999999999 !important;
     pointer-events: auto !important;
-    background-color: white !important;
-    border: 1px solid #FF7A00 !important;
+    background-color: #ffffff !important; /* خلفية بيضاء مصمتة */
+    border: 2px solid #FF7A00 !important;
     border-radius: 1.25rem !important;
-    box-shadow: 0 20px 50px rgba(255, 122, 0, 0.15) !important;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2) !important;
+    color: #000000 !important; /* نصوص سوداء واضحة */
   }
 
   [role="option"], 
@@ -140,6 +120,13 @@
   [cmdk-item] {
     cursor: pointer !important;
     pointer-events: auto !important;
+    color: #000000 !important; /* نصوص سوداء في الخيارات */
+    font-weight: 900 !important; /* خط عريض للوضوح */
+  }
+
+  [role="option"][aria-selected="true"],
+  [cmdk-item][aria-selected="true"] {
+    background-color: rgba(255, 122, 0, 0.1) !important;
   }
 }
 
