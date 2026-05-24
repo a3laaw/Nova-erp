@@ -21,7 +21,8 @@ import {
     Building2, 
     TrendingUp,
     Clock,
-    Activity
+    Activity,
+    IterationCcw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -123,6 +124,10 @@ export default function FieldVisitDetailPage() {
         );
     };
 
+    /**
+     * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V1700.0) ✨
+     * يدعم تحديث المسار الفني والتشعب التلقائي عند إغلاق الزيارة الميدانية.
+     */
     const handleConfirmDone = async () => {
         if (!firestore || !visit || !currentUser || !tenantId || !notes.trim()) return;
 
@@ -145,7 +150,6 @@ export default function FieldVisitDetailPage() {
                 }
             });
 
-            // ✨ ذكاء التبعية المتعددة: تحديث المعاملة المرتبطة (WBS Chain Progression) ✨
             if (visit.transactionId) {
                 const txPath = getTenantPath(`clients/${visit.clientId}/transactions/${visit.transactionId}`, tenantId);
                 const txRef = doc(firestore, txPath!);
@@ -155,14 +159,13 @@ export default function FieldVisitDetailPage() {
                     const txData = txSnap.data();
                     const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(txData.stages || []));
                     
-                    // البحث عن المرحلة المطابقة بالاسم أو المعرف
                     const stageIdx = currentStages.findIndex(s => s.name.includes(actualStage?.name || '') || s.stageId === selectedStageId);
                     
                     if (stageIdx > -1) {
                         const stage = currentStages[stageIdx];
                         const now = new Date();
 
-                        // معالجة التكرار (Occurrence)
+                        // معالجة التكرار (Occurrence) كأنه "تعديل"
                         if (stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') {
                             const newCount = (stage.currentCount || 0) + 1;
                             stage.currentCount = newCount;
@@ -193,7 +196,6 @@ export default function FieldVisitDetailPage() {
                                     }
                                 });
                             } else {
-                                // التتبع التسلسلي التلقائي في حال عدم وجود تشعب محدد
                                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                                 if (nextStage && nextStage.status === 'pending') {
                                     nextStage.status = 'in-progress';
@@ -207,7 +209,6 @@ export default function FieldVisitDetailPage() {
 
                         batch.update(txRef, { stages: currentStages, updatedAt: serverTimestamp() });
                         
-                        // توثيق في التايم لاين
                         const timelineRef = doc(collection(txRef, 'timelineEvents'));
                         batch.set(timelineRef, {
                             type: 'comment',
@@ -314,14 +315,23 @@ export default function FieldVisitDetailPage() {
                         <Label className="font-black text-lg flex items-center gap-2">
                             <ClipboardCheck className="h-5 w-5 text-primary" /> التقرير الفني الميداني
                         </Label>
-                        <Textarea 
-                            value={notes} 
-                            onChange={e => setNotes(e.target.value)} 
-                            readOnly={isProcessed}
-                            placeholder="اشرح الأعمال التي تم تنفيذها اليوم ليراها العميل والمكتب..."
-                            rows={4}
-                            className="rounded-3xl border-2 p-6 shadow-inner"
-                        />
+                        <div className="relative">
+                            <Textarea 
+                                value={notes} 
+                                onChange={e => setNotes(e.target.value)} 
+                                readOnly={isProcessed}
+                                placeholder="اشرح الأعمال التي تم تنفيذها اليوم ليراها العميل والمكتب..."
+                                rows={4}
+                                className="rounded-3xl border-2 p-6 shadow-inner"
+                            />
+                            {!isProcessed && (
+                                <div className="absolute left-4 bottom-4 flex gap-2">
+                                     <Button variant="ghost" size="sm" onClick={() => handleStageActionInVisit('modify')} className="rounded-lg font-bold text-xs h-8 gap-1 border-orange-200 text-orange-700 bg-white shadow-sm">
+                                        <IterationCcw className="h-3 w-3" /> تسجيل تعديل
+                                    </Badge>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </CardContent>
                 
@@ -336,3 +346,4 @@ export default function FieldVisitDetailPage() {
         </div>
     );
 }
+

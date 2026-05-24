@@ -52,7 +52,8 @@ import {
     RotateCcw,
     Clock,
     Plus,
-    Undo2
+    Undo2,
+    IterationCcw
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -146,7 +147,11 @@ export default function TransactionDetailPage() {
     });
   }, [firestore, tenantId]);
 
-  const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
+  /**
+   * ✨ محرك المزامنة المتطور (WBS Sovereign Engine V1700.0) ✨
+   * يدعم الأزرار الثلاثة: بدء، تعديل تكراري، إنهاء مع تشعب تلقائي.
+   */
+  const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
         if (!firestore || !currentUser || !transaction || !transactionPath) return;
         setIsProcessing(true);
         try {
@@ -155,26 +160,22 @@ export default function TransactionDetailPage() {
             if (stageIndex === -1) throw new Error("Stage not found");
             
             const stage = currentStages[stageIndex];
-            stage.status = newStatus;
             const now = new Date();
-            
-            if (newStatus === 'in-progress' && !stage.startDate) {
+
+            if (action === 'start') {
+                stage.status = 'in-progress';
                 stage.startDate = Timestamp.fromDate(now);
                 if (stage.expectedDurationDays) {
-                    const expectedEnd = addWorkingDays(
-                        now, 
-                        stage.expectedDurationDays, 
-                        branding?.work_hours?.holidays || [], 
-                        publicHolidays
-                    );
+                    const expectedEnd = addWorkingDays(now, stage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays);
                     stage.expectedEndDate = Timestamp.fromDate(expectedEnd);
                 }
-            }
-            
-            if (newStatus === 'completed') {
+            } else if (action === 'modify') {
+                stage.currentCount = (stage.currentCount || 0) + 1;
+            } else if (action === 'complete') {
+                stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 
-                // ✨ محرك التبعية المتعددة: فتح كافة المسارات المتفرعة آلياً ✨
+                // ✨ تفعيل المسارات المتفرعة آلياً (Automatic Chain Reaction) ✨
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
@@ -200,7 +201,12 @@ export default function TransactionDetailPage() {
             }
 
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: 'تم التحديث', description: newStatus === 'completed' ? 'تم إنجاز المرحلة وتفعيل المسارات التالية آلياً.' : 'بدأ العمل في المرحلة.' });
+            
+            toast({ 
+                title: 'تحديث المسار', 
+                description: action === 'complete' ? 'تم إنجاز المرحلة وتفعيل المسارات التالية آلياً.' : 
+                             action === 'modify' ? 'تم تسجيل جولة تعديل جديدة.' : 'بدأ العمل في المرحلة.' 
+            });
         } finally { setIsProcessing(false); }
   };
 
@@ -255,7 +261,7 @@ export default function TransactionDetailPage() {
         <Tabs defaultValue="stages" dir="rtl" className="w-full">
             <div className="flex justify-center mb-8">
                 <TabsList className="bg-white/60 backdrop-blur-xl p-1.5 rounded-[2rem] border shadow-2xl h-16 w-full max-w-3xl">
-                    <TabsTrigger value="stages" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">سير العمل (WBS)</TabsTrigger>
+                    <TabsTrigger value="stages" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">سير العمل الموحد (WBS)</TabsTrigger>
                     <TabsTrigger value="boq" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">المقايسة (BOQ)</TabsTrigger>
                     <TabsTrigger value="history" className="rounded-[1.5rem] flex-1 font-black gap-2 h-full transition-all">سجل الأحداث</TabsTrigger>
                 </TabsList>
@@ -267,7 +273,7 @@ export default function TransactionDetailPage() {
                         <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
                             <Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الميداني (WBS)
                         </CardTitle>
-                        <CardDescription className="text-xs font-bold">يمكن للمهندس أو السكرتارية تفعيل المراحل وتأكيد الإنجاز لتشغيل السلسلة آلياً.</CardDescription>
+                        <CardDescription className="text-xs font-bold">إدارة ذكية للمراحل؛ الانتهاء من مرحلة يُفعل التبعات التالية آلياً.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
                         {(transaction.stages || []).map((stage) => {
@@ -276,7 +282,7 @@ export default function TransactionDetailPage() {
                             return (
                                 <div key={stage.stageId} className={cn(
                                     "flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent rounded-[2rem] transition-all relative overflow-hidden group",
-                                    stage.status === 'in-progress' ? "bg-blue-50/40 border-blue-200" : "bg-muted/20 hover:bg-white hover:border-primary/20",
+                                    stage.status === 'in-progress' ? "bg-blue-50/40 border-blue-200 ring-2 ring-primary/5 shadow-lg" : "bg-muted/20 hover:bg-white hover:border-primary/20",
                                     stage.status === 'completed' && "bg-green-50/20 opacity-80"
                                 )}>
                                     <div className="flex items-center gap-6">
@@ -311,16 +317,21 @@ export default function TransactionDetailPage() {
                                         </div>
                                     </div>
                                     
-                                    <div className="flex items-center gap-4 mt-4 sm:mt-0 no-print">
+                                    <div className="flex items-center gap-3 mt-4 sm:mt-0 no-print">
                                         {canEdit && stage.status === 'pending' && (
-                                            <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.stageId, 'in-progress')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 border-2 px-6 shadow-sm hover:bg-blue-600 hover:text-white transition-all">
+                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 shadow-md hover:scale-105 transition-all">
                                                 <Play className="ml-2 h-4 w-4"/> بدء العمل
                                             </Button>
                                         )}
                                         {canEdit && stage.status === 'in-progress' && (
-                                            <Button size="sm" onClick={() => handleStageStatusChange(stage.stageId, 'completed')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 hover:bg-green-700 text-white gap-2 shadow-lg shadow-green-100 transition-all">
-                                                <Check className="ml-2 h-4 w-4"/> تأكيد الإنجاز
-                                            </Button>
+                                            <>
+                                                <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-6 border-orange-200 text-orange-700 hover:bg-orange-50 gap-2">
+                                                    <IterationCcw className="h-4 w-4" /> تعديل ({stage.currentCount || 0})
+                                                </Button>
+                                                <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} disabled={isProcessing} className="rounded-xl font-black text-xs h-10 px-8 bg-green-600 hover:bg-green-700 text-white gap-2 shadow-lg shadow-green-100 transition-all">
+                                                    <Check className="ml-2 h-4 w-4"/> إنهاء وإنجاز
+                                                </Button>
+                                            </>
                                         )}
                                         {stage.status === 'completed' && isAdmin && (
                                             <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-9 w-9 rounded-xl text-orange-400 hover:text-orange-600 hover:bg-orange-50" title="تراجع عن الإكمال">
@@ -355,3 +366,4 @@ export default function TransactionDetailPage() {
     </div>
   );
 }
+
