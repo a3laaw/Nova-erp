@@ -70,11 +70,10 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 /**
- * نموذج توقيع العقد السيادي (Sovereign Contract Engine V7.0):
- * 🛡️ يلتزم بالمسار الصحيح: تحديث المعاملة الأصلية حصراً ومنع التكرار.
- * 🛡️ ينشئ حساب العميل في الشجرة آلياً.
- * 🛡️ يولد قيد مديونية ويربطه بمركز الربحية.
- * 🛡️ يدعم الإدخال اليدوي لشروط الاستحقاق (WBS LINK).
+ * نموذج توقيع العقد السيادي (Sovereign Contract Engine V8.0):
+ * 🛡️ تحويل حقل WBS LINK إلى حقل هجين (اختيار + كتابة مخصصة).
+ * 🛡️ دعم المزامنة الصفرية المطلقة لشرط الاستحقاق من العرض.
+ * 🛡️ التأسيس المالي التلقائي للعملاء الجدد في شجرة الحسابات.
  */
 export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName, quotationIdToUpdate }: any) {
   const { firestore } = useFirebase();
@@ -119,6 +118,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
+                // 🛡️ الربط الميكانيكي: نقل "شرط الاستحقاق" فوراً
                 condition: item.triggerCondition || item.condition || (idx === 0 ? 'عند توقيع العقد' : ''), 
                 value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
             }))
@@ -139,7 +139,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             return [name, { value: name, label: name }];
         })).values());
         
-        // 🛡️ إضافة الخيار الافتراضي الموحد 🛡️
         setFetchedStages([
             { value: 'عند توقيع العقد', label: 'عند توقيع العقد' },
             ...stages
@@ -165,7 +164,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     
     const targetTxId = transaction.transactionId;
     if (!targetTxId) {
-        toast({ variant: 'destructive', title: 'فشل الربط', description: 'عذراً، عرض السعر هذا غير مربوط بمعاملة أصلية. يرجى مراجعة المسار الفني.' });
+        toast({ variant: 'destructive', title: 'فشل الربط', description: 'عذراً، عرض السعر هذا غير مربوط بمعاملة أصلية.' });
         return;
     }
 
@@ -247,11 +246,11 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             transaction_fs.update(doc(firestore, clientPath!), { status: 'contracted' });
         });
 
-        toast({ title: 'تم توقيع العقد بنجاح', description: 'تم تحديث المعاملة الأصلية، إنشاء حساب العميل، وتوليد القيد المالي.' });
+        toast({ title: '✅ تم توقيع العقد', description: 'تم تأسيس الحسابات والقيود المالية آلياً.' });
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ في المسار', description: e.message });
+        toast({ variant: 'destructive', title: 'خطأ', description: e.message });
     } finally { setIsSaving(false); savingRef.current = false; }
   };
 
@@ -265,7 +264,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                 </div>
                 <div className="text-right">
                     <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">الاعتماد النهائي للعقد</DialogTitle>
-                    <DialogDescription className="font-bold text-slate-500">سيتم تحديث المعاملة الحالية آلياً وربطها بالدورة المحاسبية للمنشأة.</DialogDescription>
+                    <DialogDescription className="font-bold text-slate-500">مراجعة المواصفات والربط المالي الصارم بالمسار الفني.</DialogDescription>
                 </div>
             </div>
         </DialogHeader>
@@ -334,7 +333,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                             <TableHeader className="bg-slate-900 h-16">
                                 <TableRow className="border-none">
                                     <TableHead className="w-24 text-center font-black text-white/40 border-l border-white/10">#</TableHead>
-                                    <TableHead className="px-10 font-black text-white text-right text-lg">مرحلة الربط الميداني (اختر أو اكتب)</TableHead>
+                                    <TableHead className="px-10 font-black text-white text-right text-lg">مرحلة الربط الميداني (WBS LINK)</TableHead>
                                     <TableHead className="text-center w-64 font-black text-white text-lg">
                                         {financials.type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                     </TableHead>
@@ -348,6 +347,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                             <Badge variant="secondary" className="font-black text-sm px-4 h-8 rounded-full border bg-white text-slate-900 shadow-sm">{i+1}</Badge>
                                         </TableCell>
                                         <TableCell className="px-10">
+                                            {/* 🛡️ الحقل الهجين: يدعم الاختيار أو الكتابة المخصصة 🛡️ */}
                                             <InlineSearchList 
                                                 value={m.condition} 
                                                 onSelect={v => { const newM = [...financials.milestones]; newM[i].condition = v; setFinancials({...financials, milestones: newM}); }} 
@@ -403,9 +403,9 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         <DialogFooter className="p-10 border-t bg-slate-50 flex flex-col md:flex-row justify-between items-center gap-8 shrink-0 no-print">
             <div className="text-right space-y-1">
                 <p className="text-base font-black text-primary flex items-center gap-2">
-                    <ShieldCheck className="h-6 w-6 animate-pulse"/> سيتم إنشاء حساب عميل وقيد مديونية آلي بـ {formatCurrency(financials.type === 'fixed' ? currentTotalInput : financials.totalAmount)}
+                    <ShieldCheck className="h-6 w-6 animate-pulse"/> سيتم إنشاء حساب عميل وقيد مديونية آلي
                 </p>
-                <p className="text-[11px] text-muted-foreground font-bold pr-9">الاعتماد النهائي غير قابل للتراجع ويؤثر على ميزان المراجعة فوراً.</p>
+                <p className="text-[11px] text-muted-foreground font-bold pr-9">الاعتماد النهائي يثبت مديونية العميل في شجرة الحسابات فوراً.</p>
             </div>
             <div className="flex gap-4">
                 <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-2xl font-bold h-14 px-10 text-slate-400">إلغاء</Button>

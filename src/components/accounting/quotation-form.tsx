@@ -90,7 +90,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
   const tenantId = currentUser?.currentCompanyId;
 
-  // 🛡️ استخلاص البيانات القادمة من الرادار أو ملف العميل لضمان المزامنة التلقائية
   const prefilledClientId = searchParams.get('clientId') || '';
   const prefilledTransactionId = searchParams.get('transactionId') || '';
 
@@ -114,7 +113,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     }
   });
 
-  const { fields: itemFields, replace: replaceItems, append: appendItem, remove: removeItem } = useFieldArray({ control, name: 'items' });
+  const { fields: itemFields, replace: replaceItems } = useFieldArray({ control, name: 'items' });
   const { fields: blockFields, replace: replaceBlocks, append: appendBlock, remove: removeBlock } = useFieldArray({ control, name: 'layoutBlocks' });
 
   const watchedItems = useWatch({ control, name: "items" });
@@ -122,7 +121,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
-  // ✨ محرك الحقن القسري للبيانات (Strict Data Injection) ✨
   useEffect(() => {
     if (initialData) {
         const formattedData: any = {
@@ -151,7 +149,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         };
         reset(formattedData);
     } else if (prefilledClientId) {
-        // 🛡️ تفعيل الربط التلقائي عند فتح صفحة جديدة من مسار معاملة
         setValue('clientId', prefilledClientId);
         setValue('transactionId', prefilledTransactionId);
     }
@@ -175,7 +172,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         setAllTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
         setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
         
-        // 🛡️ إذا كان هناك معاملة أصلية، نقوم بسحب بياناتها فوراً لتعبئة الخدمة
         if (prefilledClientId && prefilledTransactionId) {
             const txPath = getTenantPath(`clients/${prefilledClientId}/transactions/${prefilledTransactionId}`, tenantId);
             const txSnap = await getDoc(doc(firestore, txPath!));
@@ -216,7 +212,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           try {
               const stagesPath = getTenantPath(`transactionTypes/${selectedTransactionTypeId}/subServices/${selectedSubServiceId}/workStages`, tenantId);
               const snap = await getDocs(query(collection(firestore, stagesPath!), orderBy('order')));
-              setSpecificWorkStages(snap.docs.map(d => ({ value: d.data().name, label: d.data().name })));
+              const stages = snap.docs.map(d => ({ value: d.data().name, label: d.data().name }));
+              setSpecificWorkStages([{ value: 'عند توقيع العقد', label: 'عند توقيع العقد' }, ...stages]);
           } catch (e) { console.error(e); }
       };
       fetchStages();
@@ -246,28 +243,42 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       await onSave(enhancedData);
   };
 
+  /**
+   * ✨ محرك الاستيراد الشامل (Unified Import Engine V4.0) ✨
+   * يضمن حقن كافة البيانات وفتح الجدول المالي قسرياً.
+   */
   const handleTemplateSelect = (templateId: string) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
     
-    setValue('subject', template.title);
-    setValue('workNature', template.workNature || 'labor_only');
-    setValue('financialsType', template.financials?.type || 'fixed');
-    setValue('totalAmount', template.financials?.totalAmount || 0);
-    setValue('transactionTypeId', template.transactionTypeId || '');
-    setValue('subServiceId', template.subServiceId || '');
+    // 1. حقن البيانات الأساسية
+    setValue('subject', template.title, { shouldDirty: true });
+    setValue('workNature', template.workNature || 'labor_only', { shouldDirty: true });
+    setValue('financialsType', template.financials?.type || 'fixed', { shouldDirty: true });
+    setValue('totalAmount', template.financials?.totalAmount || 0, { shouldDirty: true });
+    setValue('transactionTypeId', template.transactionTypeId || '', { shouldDirty: true });
+    setValue('subServiceId', template.subServiceId || '', { shouldDirty: true });
     
+    // 2. حقن الدفعات
     if (template.financials?.milestones) {
         const newItems = template.financials.milestones.map((m, idx) => ({
             id: generateId(), 
             description: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-            triggerCondition: m.name, 
+            triggerCondition: m.name || m.condition || '', 
             quantity: 1,
             unitPrice: template.financials?.type === 'fixed' ? Number(m.value) : 0,
             percentage: template.financials?.type === 'percentage' ? Number(m.value) : 0,
         }));
         replaceItems(newItems);
     }
+
+    // 3. 🛡️ الحماية القصوى: فرض إظهار الجدول المالي 🛡️
+    const currentBlocks = watch('layoutBlocks') || [];
+    if (!currentBlocks.some(b => b.type === 'financial_table')) {
+        replaceBlocks([...currentBlocks, { id: 'imported-table', type: 'financial_table' }]);
+    }
+    
+    toast({ title: '✅ تم استيراد القالب', description: 'تم تعبئة البيانات المالية والفنية وفتح جدول الدفعات آلياً.' });
   };
 
   const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
@@ -403,14 +414,21 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                   <TableCell className="text-center bg-slate-50/30 border-l"><Badge variant="secondary" className="font-black text-[8px] px-2 h-5 rounded-full bg-white text-slate-400 border">{itemIdx + 1}</Badge></TableCell>
                                                   <TableCell className="px-4">
                                                       <Controller control={control} name={`items.${itemIdx}.triggerCondition`} render={({ field: condField }) => (
-                                                          <InlineSearchList value={condField.value} onSelect={condField.onChange} options={wbsOptionsForItems} placeholder="اربط بمرحلة..." className="font-bold text-xs border-dashed border-primary/20 text-primary h-7" />
+                                                          <InlineSearchList 
+                                                            value={condField.value} 
+                                                            onSelect={condField.onChange} 
+                                                            options={wbsOptionsForItems} 
+                                                            placeholder="اربط بمرحلة..." 
+                                                            allowCustomValue={true}
+                                                            className="font-bold text-xs border-dashed border-primary/20 text-primary h-7" 
+                                                          />
                                                       )} />
                                                   </TableCell>
                                                   <TableCell className="bg-primary/[0.01] border-r border-slate-50">
                                                       <Input type="number" step="any" {...register(financials_type === 'percentage' ? `items.${itemIdx}.percentage` : `items.${itemIdx}.unitPrice`)} className="text-center font-black text-base text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono h-8" placeholder="0" />
                                                   </TableCell>
                                                   <TableCell className="text-center no-print">
-                                                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(itemIdx)} disabled={itemFields.length <= 1} className="h-6 w-6 text-red-300 hover:text-red-600 rounded-full opacity-0 group-hover/row:opacity-100"><Trash2 className="h-3 w-3"/></Button>
+                                                      <Button type="button" variant="ghost" size="icon" onClick={() => removeBlock(index)} disabled={itemFields.length <= 1} className="h-6 w-6 text-red-300 hover:text-red-600 rounded-full opacity-0 group-hover/row:opacity-100"><Trash2 className="h-3 w-3"/></Button>
                                                   </TableCell>
                                               </TableRow>
                                           ))}
@@ -427,9 +445,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                           </TableRow>
                                       </TableFooter>
                                   </Table>
-                                  <div className="p-3 flex justify-center bg-muted/5 border-t no-print">
-                                    <Button type="button" variant="ghost" onClick={() => appendItem({ id: generateId(), description: `الدفعة ${arabicOrdinals[itemFields.length] || ''}`, triggerCondition: '', quantity: 1, unitPrice: 0, percentage: 0 })} className="h-7 px-6 rounded-xl border-dashed border-2 font-bold text-[9px] text-primary gap-1.5 hover:bg-white" disabled={!selectedSubServiceId}><PlusCircle className="h-3 w-3" /> إضافة دفعة استحقاق +</Button>
-                                  </div>
                               </div>
                           </div>
                       )}
