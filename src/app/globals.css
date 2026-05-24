@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 @import "react-day-picker/dist/style.css";
 @tailwind base;
@@ -95,30 +96,28 @@
     100% { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) scale(0); opacity: 0; }
   }
 
-  /* 🛡️ درع الوضوح والنفاذية النهائي (Sovereign Visibility Fix) 🛡️ */
-  /* هذا الجزء يضمن استجابة الماوس، الإغلاق التلقائي، واللون الأسود للنصوص */
-  [data-radix-popper-content-wrapper] {
-    z-index: 999999999 !important;
-  }
-
+  /* 🛡️ درع النفاذية والوضوح النهائي (Sovereign Visibility Logic) 🛡️ */
+  /* نلغي الـ Portal تماماً لضمان وصول نقرة الماوس للعناصر مباشرة */
   [role="listbox"], 
   [role="menu"], 
   [data-radix-select-content], 
   [data-radix-popover-content] {
     z-index: 999999999 !important;
-    background-color: #ffffff !important; /* خلفية بيضاء مصمتة */
+    background-color: #ffffff !important;
     border: 2px solid #FF7A00 !important;
     border-radius: 1.25rem !important;
     box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2) !important;
-    color: #000000 !important; /* نصوص سوداء واضحة */
+    pointer-events: auto !important;
+    color: #000000 !important;
   }
 
   [role="option"], 
   [role="menuitem"], 
   [cmdk-item] {
     cursor: pointer !important;
-    color: #000000 !important; /* نصوص سوداء في الخيارات */
-    font-weight: 900 !important; /* خط عريض للوضوح */
+    color: #000000 !important;
+    font-weight: 800 !important;
+    pointer-events: auto !important;
   }
 
   [role="option"][aria-selected="true"],

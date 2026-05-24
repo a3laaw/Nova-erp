@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -13,7 +14,8 @@ import {
     updateDoc, 
     deleteDoc, 
     addDoc,
-    where
+    where,
+    orderBy
 } from 'firebase/firestore';
 import {
   Card,
@@ -22,6 +24,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -137,9 +145,9 @@ export default function ClientProfilePage() {
   const clientPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}`, tenantId) : null, [id, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
-  // 🛡️ التعديل الجذري: قراءة المعاملات من المسار المسطح الموحد 🛡️
-  const txQuery = useMemo(() => [where('clientId', '==', id)], [id]);
-  const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, 'transactions', txQuery);
+  // 🛡️ استعادة المسار الأصلي: العودة للبحث في المجلد الفرعي للعميل 🛡️
+  const txRelativePath = useMemo(() => id ? `clients/${id}/transactions` : null, [id]);
+  const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, txRelativePath, [orderBy('createdAt', 'desc')]);
 
   const qQuery = useMemo(() => [where('clientId', '==', id)], [id]);
   const { data: quotations, loading: quotationsLoading } = useSubscription<Quotation>(firestore, 'quotations', qQuery);
@@ -155,11 +163,11 @@ export default function ClientProfilePage() {
   }, [firestore, tenantId]);
 
   const handleToggleFreeze = async (tx: ClientTransaction) => {
-    if (!firestore || !tenantId || !tx.id) return;
+    if (!firestore || !tenantId || !tx.id || !id) return;
     setIsProcessing(true);
     const newStatus = tx.status === 'on-hold' ? 'new' : 'on-hold';
     try {
-        const docPath = getTenantPath(`transactions/${tx.id}`, tenantId);
+        const docPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId);
         await updateDoc(doc(firestore, docPath!), { 
             status: newStatus,
             updatedAt: serverTimestamp() 
@@ -171,10 +179,10 @@ export default function ClientProfilePage() {
   };
 
   const handleConfirmDeleteTransaction = async () => {
-    if (!firestore || !tenantId || !transactionToDelete?.id) return;
+    if (!firestore || !tenantId || !transactionToDelete?.id || !id) return;
     setIsProcessing(true);
     try {
-        const docPath = getTenantPath(`transactions/${transactionToDelete.id}`, tenantId);
+        const docPath = getTenantPath(`clients/${id}/transactions/${transactionToDelete.id}`, tenantId);
         await deleteDoc(doc(firestore, docPath!));
         
         const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
@@ -198,7 +206,7 @@ export default function ClientProfilePage() {
   };
 
   const handleConfirmDeleteQuotation = async () => {
-    if (!firestore || !tenantId || !quotationToDelete?.id) return;
+    if (!firestore || !tenantId || !quotationToDelete?.id || !id) return;
     setIsProcessing(true);
     try {
         const qPath = getTenantPath(`quotations/${quotationToDelete.id}`, tenantId);
@@ -430,7 +438,7 @@ export default function ClientProfilePage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-10 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmDeleteTransaction} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl">
+                    <AlertDialogAction onClick={handleConfirmDeleteTransaction} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
                         {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
@@ -450,7 +458,7 @@ export default function ClientProfilePage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-10 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmDeleteQuotation} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl">
+                    <AlertDialogAction onClick={handleConfirmDeleteQuotation} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
                         {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف العرض'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
@@ -459,4 +467,3 @@ export default function ClientProfilePage() {
     </div>
   );
 }
-
