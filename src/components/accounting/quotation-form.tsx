@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -74,10 +75,6 @@ type QuotationFormValues = z.infer<typeof quotationSchema>;
 
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
-/**
- * نموذج عرض السعر (V10.0):
- * - تم تحصين المزامنة الصفرية لضمان عدم ضياع شروط الاستحقاق والمواصفات الفنية.
- */
 export function QuotationForm({ onSave, onClose, initialData = null, isSaving = false }: any) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -118,7 +115,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     }
   });
 
-  const { fields: itemFields, replace: replaceItems } = useFieldArray({ control, name: 'items' });
+  const { fields: itemFields, replace: replaceItems, remove: removeItem, append: appendItem } = useFieldArray({ control, name: 'items' });
   const { fields: blockFields, replace: replaceBlocks, append: appendBlock, remove: removeBlock } = useFieldArray({ control, name: 'layoutBlocks' });
 
   const watchedItems = useWatch({ control, name: "items" });
@@ -126,7 +123,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
-  // ✨ محرك المزامنة الصفرية: حقن البيانات القديمة قسرياً عند التعديل
   useEffect(() => {
     if (initialData) {
         const formattedData: any = {
@@ -175,7 +171,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           getDocs(query(collection(firestore, typesPath!), orderBy('order'))),
         ]);
         setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
-        setAllTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
+        setAllTemplates(templatesSnapshot.snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
         setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
         
         if (prefilledClientId && prefilledTransactionId) {
@@ -234,21 +230,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     }
   }, [watchedItems, financials_type]);
 
-  const handleSaveInternal = async (data: QuotationFormValues) => {
-      const selectedType = transactionTypes.find(t => t.id === data.transactionTypeId);
-      const selectedSub = subServices.find(s => s.id === data.subServiceId);
-      const clientObj = clients.find(c => c.id === data.clientId);
-
-      const enhancedData = {
-          ...data,
-          transactionType: selectedType?.name || data.transactionType,
-          subServiceName: selectedSub?.name || data.subServiceName,
-          assignedEngineerId: clientObj?.assignedEngineer || data.assignedEngineerId || null
-      };
-      
-      await onSave(enhancedData);
-  };
-
   const handleTemplateSelect = (templateId: string) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
@@ -262,10 +243,12 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     setValue('transactionTypeId', template.transactionTypeId || '', { shouldValidate: true, shouldDirty: true });
     setValue('subServiceId', template.subServiceId || '', { shouldValidate: true, shouldDirty: true });
     
+    // ✨ محرك استيراد الدفعات والظهور الصريح للجدول المالي ✨
     if (template.financials?.milestones) {
         const newItems = template.financials.milestones.map((m, idx) => ({
             id: generateId(), 
             description: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
+            // 🛡️ المزامنة المطلقة: إعطاء الأولوية للشرط المبرمج في القالب 🛡️
             triggerCondition: m.condition || m.name || '', 
             quantity: 1,
             unitPrice: template.financials?.type === 'fixed' ? Number(m.value) : 0,
@@ -279,7 +262,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         replaceBlocks([...currentBlocks, { id: 'imported-table', type: 'financial_table' }]);
     }
     
-    toast({ title: '✅ تم استيراد القالب' });
+    toast({ title: '✅ تم استيراد القالب والربط المالي' });
   };
 
   const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
@@ -294,7 +277,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   }, [specificWorkStages, watchedItems]);
 
   return (
-    <form onSubmit={handleSubmit(handleSaveInternal)} className="space-y-6 pb-20">
+    <form onSubmit={handleSubmit((data: any) => onSave(data))} className="space-y-6 pb-20">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-3xl border border-slate-200 no-print">
           <div className="grid gap-1">
               <Label className="font-black text-[9px] uppercase text-slate-400 tracking-widest pr-1">العميل المستهدف *</Label>
@@ -303,13 +286,13 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
               )} />
           </div>
           <div className="grid gap-1">
-              <Label className="font-black text-[9px] uppercase text-primary tracking-widest pr-1 flex items-center gap-1"><Sparkles className="h-3 w-3"/> استيراد قالب مالي</Label>
+              <Label className="font-black text-[9px] uppercase text-primary tracking-widest pr-1 flex items-center gap-1"><Sparkles className="h-3 w-3"/> استيراد قالب مالي جاهز</Label>
               <InlineSearchList 
                 value={importedTemplateId} 
                 onSelect={handleTemplateSelect} 
                 options={templateOptions} 
                 placeholder={refDataLoading ? "تحميل القوالب..." : "اختر قالباً للتعبئة آلياً..."} 
-                className="h-8 border-primary/20 bg-primary/5" 
+                className="h-8 border-primary/20 bg-primary/5 shadow-sm" 
               />
           </div>
       </div>
@@ -331,7 +314,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
       <div className="space-y-2">
           <h3 className="text-sm font-black text-[#1e1b4b] flex items-center gap-2 px-1">
-              <Layers className="h-4 w-4 text-indigo-600" /> المواصفات والمسار الفني
+              <Layers className="h-4 w-4 text-indigo-600" /> المواصفات والمسار الفني المخطط
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-5 rounded-[2rem] border-2 border-slate-100 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 right-0 w-1 h-full bg-indigo-500/20" />
@@ -366,85 +349,108 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       <div className="space-y-4">
           <div className="flex justify-between items-center px-1 no-print">
             <h3 className="text-sm font-black text-[#1e1b4b] flex items-center gap-2">
-                <LayoutGrid className="h-4 w-4 text-primary" /> أقسام العرض المالي
+                <LayoutGrid className="h-4 w-4 text-primary" /> أقسام وتنسيق مستند العرض
             </h3>
-            <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateId(), type: 'preamble', title: '', content: '' })} className="rounded-xl h-8 px-4 font-bold text-[10px] gap-2 border-primary/20 text-primary">
-                <PlusCircle className="h-3.5 w-3.5" /> إضافة نص +
-            </Button>
+            <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateId(), type: 'preamble', title: 'بند إضافي', content: '' })} className="rounded-xl h-8 px-4 font-bold text-[10px] gap-2 border-primary/20 text-primary">
+                    <PlusCircle className="h-3.5 w-3.5" /> إضافة نص +
+                </Button>
+                {!blockFields.some(b => b.type === 'financial_table') && (
+                    <Button type="button" variant="outline" onClick={() => appendBlock({ id: generateId(), type: 'financial_table' })} className="rounded-xl h-8 px-4 font-bold text-[10px] gap-2 border-green-200 text-green-700 bg-green-50">
+                        <Calculator className="h-3.5 w-3.5" /> إدراج جدول الدفعات
+                    </Button>
+                )}
+            </div>
           </div>
           
-          <div className="space-y-3">
+          <div className="space-y-4">
               {blockFields.map((block, index) => (
-                  <div key={block.id} className="p-5 rounded-[2rem] border bg-white shadow-sm hover:border-primary/20 mb-4">
+                  <div key={block.id} className="p-6 rounded-[2rem] border-2 bg-white shadow-md hover:border-primary/20 transition-all">
                       {block.type === 'preamble' ? (
-                          <div className="space-y-2">
-                              <div className="flex justify-between items-center mb-2">
-                                  <Badge variant="ghost" className="text-[8px] font-black uppercase opacity-40">بند نصي</Badge>
-                                  <Button type="button" variant="ghost" size="icon" onClick={() => removeBlock(index)} className="h-6 w-6 text-red-400 rounded-full"><Trash2 className="h-3 w-3"/></Button>
+                          <div className="space-y-3">
+                              <div className="flex justify-between items-center mb-1">
+                                  <Badge variant="ghost" className="text-[8px] font-black uppercase opacity-40">بند تحريري مخصص</Badge>
+                                  <Button type="button" variant="ghost" size="icon" onClick={() => removeBlock(index)} className="h-7 w-7 text-red-400 rounded-full hover:bg-red-50"><Trash2 className="h-3.5 w-3.5"/></Button>
                               </div>
-                              <Input {...register(`layoutBlocks.${index}.title`)} placeholder="عنوان البند..." className="h-8 border-none font-black text-base text-[#1e1b4b] bg-transparent focus-visible:ring-0 px-0" />
-                              <Textarea {...register(`layoutBlocks.${index}.content`)} placeholder="نص البند..." className="rounded-xl border-none bg-slate-50/50 shadow-inner text-sm font-medium leading-relaxed p-4" rows={2} />
+                              <Input {...register(`layoutBlocks.${index}.title`)} placeholder="عنوان البند (مثال: الشروط العامة)..." className="h-9 border-none font-black text-lg text-[#1e1b4b] bg-transparent focus-visible:ring-0 px-0" />
+                              <Textarea {...register(`layoutBlocks.${index}.content`)} placeholder="اكتب نص البند هنا..." className="rounded-2xl border-none bg-slate-50/50 shadow-inner text-base font-medium leading-relaxed p-6" rows={3} />
                           </div>
                       ) : (
-                          <div className="space-y-4">
-                              <div className="flex justify-between items-center bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-                                  <div className="flex items-center gap-2">
-                                      <Calculator className="h-4 w-4 text-primary"/>
-                                      <Label className="text-sm font-black text-[#1e1b4b]">دفعات الاستحقاق المالية</Label>
+                          <div className="space-y-5">
+                              <div className="flex justify-between items-center bg-primary/5 p-5 rounded-2xl border border-primary/10">
+                                  <div className="flex items-center gap-3">
+                                      <div className="p-2 bg-white rounded-xl shadow-sm text-primary"><Calculator className="h-5 w-5"/></div>
+                                      <Label className="text-base font-black text-[#1e1b4b]">دفعات الاستحقاق المالية المعتمدة</Label>
                                   </div>
-                                  <div className="flex items-center gap-3 no-print">
-                                      <Controller name="financialsType" control={control} render={({ field }) => (
-                                          <Select value={field.value} onValueChange={field.onChange}>
-                                              <SelectTrigger className="w-32 h-7 rounded-lg border-none bg-white font-black text-primary text-[10px] shadow-sm"><SelectValue /></SelectTrigger>
-                                              <SelectContent dir="rtl" className="text-xs"><SelectItem value="fixed">مبلغ ثابت (KD)</SelectItem><SelectItem value="percentage">نسب مئوية (%)</SelectItem></SelectContent>
-                                          </Select>
-                                      )} />
-                                      <Input type="number" step="any" {...register('totalAmount')} readOnly={financials_type === 'fixed'} className={cn("w-20 h-7 border-none text-center font-black text-sm text-primary rounded-lg shadow-sm", financials_type === 'fixed' ? "bg-muted/50" : "bg-white")} />
+                                  <div className="flex items-center gap-4 no-print">
+                                      <div className="grid gap-1">
+                                          <Label className="text-[8px] font-black uppercase text-slate-400 text-center">نظام التسعير</Label>
+                                          <Controller name="financialsType" control={control} render={({ field }) => (
+                                            <Select value={field.value} onValueChange={field.onChange}>
+                                                <SelectTrigger className="w-36 h-8 rounded-xl border-none bg-white font-black text-primary text-xs shadow-md"><SelectValue /></SelectTrigger>
+                                                <SelectContent dir="rtl" className="text-xs"><SelectItem value="fixed">مبالغ ثابتة (KWD)</SelectItem><SelectItem value="percentage">نسب مئوية (%)</SelectItem></SelectContent>
+                                            </Select>
+                                          )} />
+                                      </div>
+                                      <div className="grid gap-1">
+                                          <Label className="text-[8px] font-black uppercase text-slate-400 text-center">القيمة الإجمالية</Label>
+                                          <Input type="number" step="any" {...register('totalAmount')} readOnly={financials_type === 'fixed'} className={cn("w-24 h-8 border-none text-center font-black text-base text-primary rounded-xl shadow-md", financials_type === 'fixed' ? "bg-muted/50" : "bg-white")} />
+                                      </div>
                                   </div>
                               </div>
 
-                              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
-                                  <Table className="table-fixed">
-                                      <TableHeader className="bg-slate-50 h-8">
+                              <div className="border-2 border-slate-100 rounded-[2.2rem] overflow-hidden shadow-xl bg-white/50">
+                                  <Table>
+                                      <TableHeader className="bg-slate-900 h-12">
                                         <TableRow className="border-none">
-                                            <TableHead className="w-20 text-center font-black text-[9px] text-slate-400 border-l border-white/20">#</TableHead>
-                                            <TableHead className="px-4 font-black text-[9px] text-slate-400 text-right">شرط الاستحقاق (WBS)</TableHead>
-                                            <TableHead className="text-center font-black text-[9px] text-slate-400 w-40">
+                                            <TableHead className="w-20 text-center font-black text-[10px] text-white/40 border-l border-white/10">#</TableHead>
+                                            <TableHead className="px-6 font-black text-xs text-white text-right">شرط الاستحقاق (WBS LINK)</TableHead>
+                                            <TableHead className="text-center font-black text-xs text-white w-48">
                                                 {financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
                                             </TableHead>
-                                            <TableHead className="w-10 no-print"></TableHead>
+                                            <TableHead className="w-16 no-print"></TableHead>
                                         </TableRow>
                                       </TableHeader>
                                       <TableBody>
                                           {itemFields.map((field, itemIdx) => (
-                                              <TableRow key={field.id} className="h-12 border-b last:border-0 hover:bg-primary/[0.01] group/row transition-all">
-                                                  <TableCell className="text-center bg-slate-50/30 border-l"><Badge variant="secondary" className="font-black text-[8px] px-2 h-5 rounded-full bg-white text-slate-400 border">{itemIdx + 1}</Badge></TableCell>
-                                                  <TableCell className="px-4">
-                                                      <Controller control={control} name={`items.${itemIdx}.triggerCondition`} render={({ field: condField }) => (
-                                                          <InlineSearchList 
-                                                            value={condField.value} 
-                                                            onSelect={condField.onChange} 
-                                                            options={wbsOptionsForItems} 
-                                                            placeholder="اربط بمرحلة..." 
-                                                            allowCustomValue={true}
-                                                            className="font-bold text-xs border-dashed border-primary/20 text-primary h-7" 
-                                                          />
-                                                      )} />
+                                              <TableRow key={field.id} className="h-16 border-b last:border-0 hover:bg-primary/[0.02] group/row transition-all">
+                                                  <TableCell className="text-center bg-slate-50/50 border-l">
+                                                      <Badge variant="secondary" className="font-black text-[10px] px-3 h-6 rounded-full bg-white text-slate-500 border shadow-sm">{itemIdx + 1}</Badge>
+                                                  </TableCell>
+                                                  <TableCell className="px-6">
+                                                      <div className="flex flex-col gap-1">
+                                                          <Controller control={control} name={`items.${itemIdx}.triggerCondition`} render={({ field: condField }) => (
+                                                            <InlineSearchList 
+                                                                value={condField.value} 
+                                                                onSelect={condField.onChange} 
+                                                                options={wbsOptionsForItems} 
+                                                                placeholder="اربط بمرحلة أو اكتب شرطاً مخصصاً..." 
+                                                                allowCustomValue={true}
+                                                                className="font-black text-xs border-dashed border-2 border-primary/20 text-primary h-9 bg-white" 
+                                                            />
+                                                          )} />
+                                                          <span className="text-[8px] font-black text-slate-300 uppercase pr-2">دفعة {arabicOrdinals[itemIdx] || (itemIdx+1)}</span>
+                                                      </div>
                                                   </TableCell>
                                                   <TableCell className="bg-primary/[0.01] border-r border-slate-50">
-                                                      <Input type="number" step="any" {...register(financials_type === 'percentage' ? `items.${itemIdx}.percentage` : `items.${itemIdx}.unitPrice`)} className="text-center font-black text-base text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono h-8" placeholder="0" />
+                                                      <Input 
+                                                        type="number" step="any" 
+                                                        {...register(financials_type === 'percentage' ? `items.${itemIdx}.percentage` : `items.${itemIdx}.unitPrice`)} 
+                                                        className="text-center font-black text-3xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono h-10" 
+                                                        placeholder="0" 
+                                                      />
                                                   </TableCell>
                                                   <TableCell className="text-center no-print">
-                                                      <Button type="button" variant="ghost" size="icon" onClick={() => removeBlock(index)} disabled={itemFields.length <= 1} className="h-6 w-6 text-red-300 hover:text-red-600 rounded-full opacity-0 group-hover/row:opacity-100"><Trash2 className="h-3 w-3"/></Button>
+                                                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(itemIdx)} disabled={itemFields.length <= 1} className="h-8 w-8 text-red-300 hover:text-red-600 rounded-full opacity-0 group-hover/row:opacity-100 transition-all"><Trash2 className="h-4 w-4"/></Button>
                                                   </TableCell>
                                               </TableRow>
                                           ))}
                                       </TableBody>
-                                      <TableFooter className="bg-slate-50 h-12">
+                                      <TableFooter className="bg-primary/5 h-16">
                                           <TableRow className="border-none hover:bg-transparent">
-                                            <TableCell colSpan={2} className="text-right px-8"><p className="text-xs font-black text-slate-800">إجمالي قيمة العرض:</p></TableCell>
-                                            <TableCell className="text-center border-r border-slate-100 bg-white">
-                                                <div className="text-lg font-black font-mono tracking-tighter text-primary">
+                                            <TableCell colSpan={2} className="text-right px-10"><p className="text-base font-black text-slate-900 tracking-tight">إجمالي قيمة العرض:</p></TableCell>
+                                            <TableCell className="text-center border-r border-slate-200 bg-white">
+                                                <div className="text-2xl font-black font-mono tracking-tighter text-primary">
                                                     {financials_type === 'fixed' ? formatCurrency(totalCalculatedValue) : `${totalCalculatedValue}%`}
                                                 </div>
                                             </TableCell>
@@ -452,6 +458,11 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                           </TableRow>
                                       </TableFooter>
                                   </Table>
+                                  <div className="p-4 flex justify-center bg-muted/5 border-t border-dashed no-print">
+                                      <Button type="button" variant="ghost" onClick={() => appendItem({ id: generateId(), triggerCondition: '', quantity: 1, unitPrice: 0, description: `الدفعة ${arabicOrdinals[itemFields.length] || (itemFields.length+1)}` })} className="h-10 px-8 rounded-xl border-dashed border-2 font-bold text-xs text-primary gap-2 hover:bg-white shadow-sm">
+                                          <PlusCircle className="h-4 w-4" /> إضافة دفعة استحقاق يدوية +
+                                      </Button>
+                                  </div>
                               </div>
                           </div>
                       )}
@@ -460,17 +471,18 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </div>
       </div>
 
-      <DialogFooter className="pt-8 border-t flex flex-col md:flex-row gap-4 no-print items-center">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-11 px-8 rounded-xl font-bold text-slate-400">إلغاء</Button>
+      <DialogFooter className="pt-10 border-t flex flex-col md:flex-row gap-4 no-print items-center">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-14 px-12 rounded-2xl font-bold text-slate-400">إلغاء</Button>
           <Button 
             type="submit" 
             disabled={isSaving || refDataLoading || (financials_type === 'percentage' && totalCalculatedValue !== 100)} 
-            className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl flex-1 gap-3 transition-all hover:scale-[1.01] bg-[#7209B7] text-white border-none"
+            className="h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-2xl shadow-primary/30 flex-1 gap-4 transition-all hover:scale-[1.02] bg-[#7209B7] text-white border-none"
           >
-              {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-              اعتماد وحفظ العرض المالي
+              {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+              اعتماد ونشر العرض المالي
           </Button>
       </DialogFooter>
     </form>
   );
 }
+

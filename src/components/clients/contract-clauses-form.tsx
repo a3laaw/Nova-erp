@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -70,8 +71,9 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 /**
- * نموذج توقيع العقد السيادي (Sovereign Contract Engine V9.0):
+ * نموذج توقيع العقد السيادي (Sovereign Contract Engine V1100.0):
  * - تم إحكام المزامنة الصفرية لضمان انتقال "شرط الاستحقاق" من العرض للعقد بدقة 100%.
+ * - دعم الحقول الهجينة للكتابة اليدوية والآلية.
  */
 export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName, quotationIdToUpdate }: any) {
   const { firestore } = useFirebase();
@@ -94,7 +96,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   const [fetchedStages, setFetchedStages] = useState<{ value: string, label: string }[]>([]);
   const syncedRef = useRef(false);
 
-  // ✨ محرك المزامنة الصفرية: حقن البيانات من عرض السعر قسرياً
+  // ✨ محرك المزامنة الصفرية: حقن البيانات من عرض السعر قسرياً ✨
   useEffect(() => {
     if (isOpen && transaction && !syncedRef.current) {
         const q = transaction as any;
@@ -116,7 +118,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
                 name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                // 🛡️ المزامنة المطلقة: مسح كافة احتمالات تسمية حقل الربط الميداني
+                // 🛡️ المزامنة المطلقة: مسح كافة احتمالات تسمية حقل الربط الميداني 🛡️
                 condition: item.triggerCondition || item.condition || (idx === 0 ? 'عند توقيع العقد' : ''), 
                 value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
             }))
@@ -126,7 +128,6 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     }
   }, [isOpen, transaction]);
 
-  // جلب مراحل العمل المعتمدة للربط
   useEffect(() => {
     if (!isOpen || !firestore || !tenantId) return;
     const fetchRefData = async () => {
@@ -420,3 +421,4 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     </Dialog>
   );
 }
+
