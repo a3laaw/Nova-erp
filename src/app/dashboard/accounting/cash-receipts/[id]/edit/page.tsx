@@ -28,7 +28,7 @@ import type { CashReceipt, Client, ClientTransaction, Account, Employee, Departm
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { numberToArabicWords, formatCurrency, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { useBranding } from '@/context/branding-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
@@ -36,19 +36,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DateInput } from '@/components/ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
-
-const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
-    let total = 0;
-    if (!projectId || !db) return total;
-    const receiptsQuery = query(collection(db, 'cashReceipts'), where('projectId', '==', projectId));
-    const receiptsSnap = await getDocs(receiptsQuery);
-    receiptsSnap.forEach(doc => {
-        if (doc.id !== excludeReceiptId) {
-            total += doc.data().amount || 0;
-        }
-    });
-    return total;
-};
 
 export default function EditCashReceiptPage() {
   const router = useRouter();
@@ -71,6 +58,8 @@ export default function EditCashReceiptPage() {
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
 
+  const tenantId = currentUser?.currentCompanyId;
+
   // Form state
   const [date, setDate] = useState<Date | undefined>();
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -83,30 +72,38 @@ export default function EditCashReceiptPage() {
   const [reference, setReference] = useState('');
   const [debitAccountId, setDebitAccountId] = useState('');
   
-  const receiptRef = useMemo(() => (firestore && id ? doc(firestore, 'cashReceipts', id) : null), [firestore, id]);
-  const { data: receiptData, loading: receiptLoading } = useDocument<CashReceipt>(firestore, receiptRef ? receiptRef.path : null);
+  const receiptPath = useMemo(() => id && tenantId ? getTenantPath(`cashReceipts/${id}`, tenantId) : null, [id, tenantId]);
+  const { data: receiptData, loading: receiptLoading } = useDocument<CashReceipt>(firestore, receiptPath);
 
+  // 🛡️ جلب البيانات المرجعية من مسار المنشأة
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || !tenantId) return;
     const fetchRefData = async () => {
         setRefDataLoading(true);
         try {
+            const clientsPath = getTenantPath('clients', tenantId);
+            const coaPath = getTenantPath('chartOfAccounts', tenantId);
+            const empPath = getTenantPath('employees', tenantId);
+            const deptPath = getTenantPath('departments', tenantId);
+
             const [clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
-                getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
-                getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
-                getDocs(query(collection(firestore, 'employees'))),
-                getDocs(query(collection(firestore, 'departments')))
+                getDocs(query(collection(firestore, clientsPath!), where('isActive', '==', true))),
+                getDocs(query(collection(firestore, coaPath!), orderBy('code'))),
+                getDocs(query(collection(firestore, empPath!))),
+                getDocs(query(collection(firestore, deptPath!)))
             ]);
             setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
             setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
             setEmployees(empSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
             setDepartments(deptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+        } catch (e) {
+            console.error("Reference data error:", e);
         } finally {
             setRefDataLoading(false);
         }
     };
     fetchRefData();
-  }, [firestore]);
+  }, [firestore, tenantId]);
 
   useEffect(() => {
     if (receiptData && accounts.length > 0) {
@@ -121,7 +118,6 @@ export default function EditCashReceiptPage() {
       setSelectedProjectId(receiptData.projectId || '');
       setSelectedClientId(receiptData.clientId || '');
 
-      // تحديد الحساب المالي المختار بناءً على اسم العميل المسجل في السند
       const acc = accounts.find(a => a.name === receiptData.clientNameAr && a.parentCode === '1102');
       if (acc) setSelectedAccountId(acc.id!);
     }
@@ -141,19 +137,20 @@ export default function EditCashReceiptPage() {
   };
 
   useEffect(() => {
-    if (!firestore || !selectedClientId) {
+    if (!firestore || !selectedClientId || !tenantId) {
         setClientProjects([]);
         return;
     }
     const fetchProjects = async () => {
-        const snapshot = await getDocs(query(collection(firestore, `clients/${selectedClientId}/transactions`)));
+        const txsPath = getTenantPath(`clients/${selectedClientId}/transactions`, tenantId);
+        const snapshot = await getDocs(query(collection(firestore, txsPath!)));
         setClientProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction)).filter(tx => !!tx.contract));
     };
     fetchProjects();
-  }, [firestore, selectedClientId]);
+  }, [firestore, selectedClientId, tenantId]);
 
   const handleSave = async () => {
-    if (!firestore || !currentUser || !id || !originalReceipt || !date || savingRef.current) return;
+    if (!firestore || !currentUser || !id || !originalReceipt || !date || !tenantId || savingRef.current) return;
 
     if (!selectedAccountId || !amount || !paymentMethod || !debitAccountId) {
         toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).'});
@@ -175,7 +172,8 @@ export default function EditCashReceiptPage() {
             }
             const netBankDeposit = parseFloat(amount) - commissionAmount;
 
-            transaction_fs.update(doc(firestore, 'cashReceipts', id), {
+            const recPath = getTenantPath(`cashReceipts/${id}`, tenantId);
+            transaction_fs.update(doc(firestore, recPath!), {
                 receiptDate: date,
                 clientId: selectedClientId || null,
                 clientNameAr: clientAccount.name,
@@ -205,7 +203,8 @@ export default function EditCashReceiptPage() {
             }
 
             if (originalReceipt.journalEntryId) {
-                transaction_fs.update(doc(firestore, 'journalEntries', originalReceipt.journalEntryId), {
+                const jePath = getTenantPath(`journalEntries/${originalReceipt.journalEntryId}`, tenantId);
+                transaction_fs.update(doc(firestore, jePath!), {
                     date: Timestamp.fromDate(date),
                     lines: jeLines,
                     totalDebit: parseFloat(amount),

@@ -20,14 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, Loader2, Target, Banknote } from 'lucide-react';
+import { Save, Loader2, Target, Banknote, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, orderBy } from 'firebase/firestore';
 import type { Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
-import { numberToArabicWords, formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
+import { numberToArabicWords, formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { useBranding } from '@/context/branding-context';
 import { DateInput } from '@/components/ui/date-input';
@@ -36,8 +36,8 @@ import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * صفحة إصدار سند قبض جديد:
- * تم ترميم كافة الأيقونات والمكونات لضمان أعلى درجات الدقة الرقابية والجمالية.
+ * صفحة إصدار سند قبض جديد (Sovereign V1300.0):
+ * تم تحصين محرك الجلب ليعمل بدقة داخل مسار المنشأة المعزول.
  */
 export default function NewCashReceiptPage() {
   const router = useRouter();
@@ -73,15 +73,20 @@ export default function NewCashReceiptPage() {
   const [voucherNumber, setVoucherNumber] = useState('جاري التوليد...');
   const [isGeneratingVoucher, setIsGeneratingVoucher] = useState(true);
 
+  const tenantId = currentUser?.currentCompanyId;
+
+  // 🛡️ محرك توليد رقم السند السيادي
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || !tenantId) return;
 
     const generateVoucherNumber = async () => {
         setIsGeneratingVoucher(true);
         try {
             const currentYear = new Date().getFullYear();
-            const counterRef = doc(firestore, 'counters', 'cashReceipts');
+            const counterPath = getTenantPath('counters/cashReceipts', tenantId);
+            const counterRef = doc(firestore, counterPath!);
             const counterDoc = await getDoc(counterRef);
+            
             let nextNumber = 1;
             if (counterDoc.exists()) {
                 const counts = counterDoc.data()?.counts || {};
@@ -90,14 +95,14 @@ export default function NewCashReceiptPage() {
             setVoucherNumber(`CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
         } catch (error) {
             console.error("Error generating voucher number:", error);
-            setVoucherNumber('خطأ');
+            setVoucherNumber('خطأ: العداد غير متاح');
         } finally {
             setIsGeneratingVoucher(false);
         }
     };
 
     generateVoucherNumber();
-  }, [firestore]);
+  }, [firestore, tenantId]);
 
   useEffect(() => {
     if (amount && !isNaN(parseFloat(amount))) {
@@ -107,17 +112,23 @@ export default function NewCashReceiptPage() {
     }
   }, [amount]);
 
+  // 🛡️ محرك جلب البيانات المرجعية من مسار المنشأة
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || !tenantId) return;
 
     const fetchInitialData = async () => {
         setRefDataLoading(true);
         try {
+            const clientsPath = getTenantPath('clients', tenantId);
+            const coaPath = getTenantPath('chartOfAccounts', tenantId);
+            const empPath = getTenantPath('employees', tenantId);
+            const deptPath = getTenantPath('departments', tenantId);
+
             const [clientsSnap, accountsSnap, empSnap, deptSnap] = await Promise.all([
-                getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
-                getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
-                getDocs(query(collection(firestore, 'employees'))),
-                getDocs(query(collection(firestore, 'departments')))
+                getDocs(query(collection(firestore, clientsPath!), where('isActive', '==', true))),
+                getDocs(query(collection(firestore, coaPath!), orderBy('code'))),
+                getDocs(query(collection(firestore, empPath!))),
+                getDocs(query(collection(firestore, deptPath!)))
             ]);
 
             setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
@@ -127,12 +138,13 @@ export default function NewCashReceiptPage() {
 
         } catch (error) {
             console.error("Error fetching initial data:", error);
+            toast({ variant: 'destructive', title: 'عائق صلاحيات', description: 'لا يمكنك الوصول لبيانات المنشأة الحالية.' });
         } finally {
             setRefDataLoading(false);
         }
     };
     fetchInitialData();
-  }, [firestore]);
+  }, [firestore, tenantId, toast]);
   
   useEffect(() => {
     if (accounts.length > 0 && paymentMethod) {
@@ -165,7 +177,7 @@ export default function NewCashReceiptPage() {
   };
 
   useEffect(() => {
-    if (!firestore || !selectedClientId) {
+    if (!firestore || !selectedClientId || !tenantId) {
         setClientProjects([]);
         return;
     }
@@ -173,7 +185,8 @@ export default function NewCashReceiptPage() {
     const fetchClientProjects = async () => {
         setProjectsLoading(true);
         try {
-            const projectsQuery = query(collection(firestore, `clients/${selectedClientId}/transactions`));
+            const projectsPath = getTenantPath(`clients/${selectedClientId}/transactions`, tenantId);
+            const projectsQuery = query(collection(firestore, projectsPath!));
             const snapshot = await getDocs(projectsQuery);
             const fetchedProjects = snapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction))
@@ -188,10 +201,10 @@ export default function NewCashReceiptPage() {
     };
 
     fetchClientProjects();
-  }, [firestore, selectedClientId]);
+  }, [firestore, selectedClientId, tenantId]);
   
   const handleSave = async () => {
-    if (!firestore || !currentUser) return;
+    if (!firestore || !currentUser || !tenantId) return;
     if (savingRef.current) return;
     
     if (!selectedAccountId || !amount || !date || !paymentMethod || !debitAccountId) {
@@ -206,7 +219,8 @@ export default function NewCashReceiptPage() {
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
-            const counterRef = doc(firestore, 'counters', 'cashReceipts');
+            const counterPath = getTenantPath('counters/cashReceipts', tenantId);
+            const counterRef = doc(firestore, counterPath!);
             const counterDoc = await transaction_fs.get(counterRef);
             
             const clientAccount = accounts.find(acc => acc.id === selectedAccountId);
@@ -222,7 +236,8 @@ export default function NewCashReceiptPage() {
             }
             
             const newVoucherNumber = `CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
-            const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
+            const receiptsPath = getTenantPath('cashReceipts', tenantId);
+            const newReceiptRef = doc(collection(firestore, receiptsPath!));
             newReceiptId = newReceiptRef.id;
 
             const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
@@ -240,7 +255,8 @@ export default function NewCashReceiptPage() {
                 };
             }
 
-            const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
+            const jePath = getTenantPath('journalEntries', tenantId);
+            const newJournalEntryRef = doc(collection(firestore, jePath!));
 
             const selectedMethodData = branding?.payment_methods?.find(m => m.name === paymentMethod);
             let commissionAmount = 0;
@@ -258,6 +274,7 @@ export default function NewCashReceiptPage() {
                 paymentMethod: paymentMethod, description: description, reference: reference, journalEntryId: newJournalEntryRef.id,
                 commissionAmount,
                 createdAt: serverTimestamp(),
+                companyId: tenantId
             };
             
             if (selectedProjectId && selectedProject) {
@@ -286,6 +303,7 @@ export default function NewCashReceiptPage() {
                 lines: jeLines,
                 clientId: selectedClientId || null, transactionId: selectedProjectId || null,
                 createdAt: serverTimestamp(), createdBy: currentUser.id,
+                companyId: tenantId
             };
 
             transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
@@ -338,16 +356,23 @@ export default function NewCashReceiptPage() {
     <Card className={cn("max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden glass-effect")} dir="rtl">
         <CardHeader className={cn("pb-8 rounded-t-[2.5rem] border-b bg-white/10")}>
             <div className="flex justify-between items-start">
-                <div>
-                    <CardTitle className="text-3xl font-black text-[#1e1b4b]">سـنـد قـبـض / Cash Receipt</CardTitle>
-                    <CardDescription className="font-black text-[#1e1b4b]/60">{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-[#FF7A00]/10 rounded-2xl text-[#FF7A00] shadow-inner">
+                        <Banknote className="h-8 w-8" />
+                    </div>
+                    <div>
+                        <CardTitle className="text-3xl font-black text-[#1e1b4b]">سـنـد قـبـض / Cash Receipt</CardTitle>
+                        <CardDescription className="font-black text-[#1e1b4b]/60">
+                            {isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند المعتمد
+                        </CardDescription>
+                    </div>
                 </div>
             </div>
         </CardHeader>
         <CardContent className="space-y-8 p-10 bg-white/95">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-end">
                 <div className="md:col-span-2 grid gap-2">
-                <Label className="font-black text-[#1e1b4b] pr-1">استلمنا من (حساب العميل في الشجرة) *</Label>
+                <Label className="font-black text-[#1e1b4b] pr-1">استلمنا من (حساب العميل المالي) *</Label>
                 <InlineSearchList 
                     value={selectedAccountId}
                     onSelect={handleAccountChange}
@@ -414,7 +439,8 @@ export default function NewCashReceiptPage() {
       <CardFooter className="flex justify-end gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
         <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black h-12 text-[#1e1b4b]/60">إلغاء</Button>
         <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 gap-3 min-w-[350px] bg-[#7209B7] text-white">
-            {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />} اعتماد وإصدار السند
+            {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+            اعتماد وإصدار السند
         </Button>
       </CardFooter>
     </Card>
