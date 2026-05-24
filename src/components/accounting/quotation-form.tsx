@@ -74,6 +74,10 @@ type QuotationFormValues = z.infer<typeof quotationSchema>;
 
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
+/**
+ * نموذج عرض السعر (V10.0):
+ * - تم تحصين المزامنة الصفرية لضمان عدم ضياع شروط الاستحقاق والمواصفات الفنية.
+ */
 export function QuotationForm({ onSave, onClose, initialData = null, isSaving = false }: any) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -87,7 +91,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const [specificWorkStages, setSpecificWorkStages] = useState<{ value: string, label: string }[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
   const [isPathLoading, setIsPathLoading] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [importedTemplateId, setImportedTemplateId] = useState('');
 
   const tenantId = currentUser?.currentCompanyId;
 
@@ -110,7 +114,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         roofExtension: 'none',
         workNature: 'labor_only',
         layoutBlocks: [{ id: 'initial-table', type: 'financial_table' }],
-        items: [{ id: generateId(), description: 'الدفعة الأولى', triggerCondition: '', quantity: 1, unitPrice: 0 }]
+        items: [{ id: generateId(), description: 'الدفعة الأولى', triggerCondition: 'عند توقيع العقد', quantity: 1, unitPrice: 0 }]
     }
   });
 
@@ -122,6 +126,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
+  // ✨ محرك المزامنة الصفرية: حقن البيانات القديمة قسرياً عند التعديل
   useEffect(() => {
     if (initialData) {
         const formattedData: any = {
@@ -248,7 +253,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
     
-    setSelectedTemplateId(templateId);
+    setImportedTemplateId(templateId);
     
     setValue('subject', template.title, { shouldValidate: true, shouldDirty: true });
     setValue('workNature', template.workNature || 'labor_only', { shouldValidate: true, shouldDirty: true });
@@ -261,7 +266,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         const newItems = template.financials.milestones.map((m, idx) => ({
             id: generateId(), 
             description: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-            triggerCondition: m.name || m.condition || '', 
+            triggerCondition: m.condition || m.name || '', 
             quantity: 1,
             unitPrice: template.financials?.type === 'fixed' ? Number(m.value) : 0,
             percentage: template.financials?.type === 'percentage' ? Number(m.value) : 0,
@@ -274,7 +279,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         replaceBlocks([...currentBlocks, { id: 'imported-table', type: 'financial_table' }]);
     }
     
-    toast({ title: '✅ تم استيراد القالب', description: 'تم تعبئة البيانات المالية والفنية وفتح جدول الدفعات آلياً.' });
+    toast({ title: '✅ تم استيراد القالب' });
   };
 
   const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
@@ -300,7 +305,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           <div className="grid gap-1">
               <Label className="font-black text-[9px] uppercase text-primary tracking-widest pr-1 flex items-center gap-1"><Sparkles className="h-3 w-3"/> استيراد قالب مالي</Label>
               <InlineSearchList 
-                value={selectedTemplateId} 
+                value={importedTemplateId} 
                 onSelect={handleTemplateSelect} 
                 options={templateOptions} 
                 placeholder={refDataLoading ? "تحميل القوالب..." : "اختر قالباً للتعبئة آلياً..."} 

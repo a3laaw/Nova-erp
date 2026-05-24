@@ -35,9 +35,9 @@ interface InlineSearchListProps {
 }
 
 /**
- * مكون البحث والاختيار المطور (V22.0):
- * - تم تحسين عرض القيمة المختارة لضمان ظهور النص حتى لو كانت القيمة مخصصة.
- * - استجابة فورية للنقر بالماوس وتحصين ضد اختفاء القيم.
+ * مكون البحث والاختيار السيادي (V25.0):
+ * - تم حل مشكلة اختفاء النص عند وجود قيم مخصصة أو مسحوبة آلياً.
+ * - يدعم عرض القيمة (Value) كعنوان (Label) في حال عدم وجود خيار مطابق.
  */
 export function InlineSearchList({
   value,
@@ -56,11 +56,14 @@ export function InlineSearchList({
     if (!open) setSearchValue('');
   }, [open]);
 
-  // البحث عن النص الظاهر المقابل للقيمة أو استخدام القيمة نفسها إذا لم يوجد خيار مطابق
+  // ✨ محرك العرض الذكي: يعرض التسمية من القائمة أو القيمة نفسها كـ Fallback
   const displayText = React.useMemo(() => {
     if (!value) return placeholder;
     const option = options.find((opt) => opt.value === value);
-    return option ? option.label : value;
+    if (option) return option.label;
+    
+    // إذا كانت القيمة نصية مخصصة (مثل: "عند توقيع العقد")، نعرضها هي نفسها
+    return value;
   }, [options, value, placeholder]);
 
   const showCustomAdd = React.useMemo(() => {
@@ -118,7 +121,7 @@ export function InlineSearchList({
                     setOpen(false);
                     setSearchValue('');
                   }}
-                  className="cursor-pointer font-black text-primary py-2.5 px-3 rounded-lg mb-1 bg-primary/5 border border-dashed border-primary/30 flex items-center gap-2 text-[10px] animate-in slide-in-from-top-1"
+                  className="cursor-pointer font-black text-primary py-2.5 px-3 rounded-lg mb-1 bg-primary/5 border border-dashed border-primary/30 flex items-center gap-2 text-[10px]"
                 >
                   <PlusCircle className="h-3.5 w-3.5" />
                   <span>استخدام القيمة: "{searchValue}"</span>

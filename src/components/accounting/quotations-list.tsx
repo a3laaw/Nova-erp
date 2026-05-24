@@ -146,7 +146,7 @@ export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = '
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl border bg-slate-50 transition-all">
-                                        <MoreHorizontal className="h-5 w-5"/>
+                                        <MoreHorizontal className="h-4 w-4"/>
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" dir="rtl" className="rounded-xl p-2 shadow-2xl border-none bg-white">
