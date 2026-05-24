@@ -1,11 +1,10 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import type { PaymentApplication, CashReceipt } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { 
     Coins, 
     Search, 
@@ -180,7 +179,7 @@ export default function FinancialClaimsPage() {
                         </TableHeader>
                         <TableBody>
                             {filteredClaims.length === 0 ? (
-                                <TableRow><TableCell colSpan={6} className="h-64 text-center opacity-30 italic font-black text-xl">لا توجد مطالبات نشطة.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="h-48 text-center opacity-30 italic font-black text-xl">لا توجد مطالبات نشطة.</TableCell></TableRow>
                             ) : (
                                 filteredClaims.map(claim => (
                                     <TableRow key={claim.id} className={cn("h-20 hover:bg-[#F3E8FF]/20 group transition-colors", claim.isCritical && "bg-red-50/30")}>
