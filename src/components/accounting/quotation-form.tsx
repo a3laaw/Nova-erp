@@ -21,7 +21,7 @@ import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/uti
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { collection, getDocs, query, orderBy, where, limit, doc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where, limit, doc, getDoc } from 'firebase/firestore';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -50,7 +50,7 @@ const layoutBlockSchema = z.object({
 
 const quotationSchema = z.object({
   clientId: z.string().min(1, 'العميل مطلوب.'),
-  transactionId: z.string().optional().nullable(), // 🛡️ الرابط الميكانيكي بالمعاملة الأصلية
+  transactionId: z.string().optional().nullable(),
   subject: z.string().min(1, 'الموضوع مطلوب.'),
   date: z.date({ required_error: "التاريخ مطلوب." }),
   validUntil: z.date({ required_error: "تاريخ الانتهاء مطلوب." }),
@@ -90,14 +90,18 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
   const tenantId = currentUser?.currentCompanyId;
 
+  // 🛡️ استخلاص البيانات القادمة من الرادار أو ملف العميل لضمان المزامنة التلقائية
+  const prefilledClientId = searchParams.get('clientId') || '';
+  const prefilledTransactionId = searchParams.get('transactionId') || '';
+
   const { register, handleSubmit, control, watch, setValue, reset, formState: { errors } } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
     defaultValues: {
         date: new Date(),
         validUntil: new Date(new Date().setDate(new Date().getDate() + 30)),
         financialsType: 'fixed',
-        clientId: searchParams.get('clientId') || '',
-        transactionId: searchParams.get('transactionId') || '',
+        clientId: prefilledClientId,
+        transactionId: prefilledTransactionId,
         transactionTypeId: '',
         subServiceId: '',
         totalArea: 0,
@@ -118,7 +122,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const selectedTransactionTypeId = watch("transactionTypeId");
   const selectedSubServiceId = watch("subServiceId");
 
-  // ✨ محرك الحقن القسري للبيانات (Strict Data Reset) ✨
+  // ✨ محرك الحقن القسري للبيانات (Strict Data Injection) ✨
   useEffect(() => {
     if (initialData) {
         const formattedData: any = {
@@ -146,8 +150,12 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                 : [{ id: 'initial-table', type: 'financial_table' }]
         };
         reset(formattedData);
+    } else if (prefilledClientId) {
+        // 🛡️ تفعيل الربط التلقائي عند فتح صفحة جديدة من مسار معاملة
+        setValue('clientId', prefilledClientId);
+        setValue('transactionId', prefilledTransactionId);
     }
-  }, [initialData, reset]);
+  }, [initialData, reset, prefilledClientId, prefilledTransactionId, setValue]);
 
   useEffect(() => {
     if (!firestore || !tenantId) return;
@@ -166,10 +174,22 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
         setAllTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
         setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
+        
+        // 🛡️ إذا كان هناك معاملة أصلية، نقوم بسحب بياناتها فوراً لتعبئة الخدمة
+        if (prefilledClientId && prefilledTransactionId) {
+            const txPath = getTenantPath(`clients/${prefilledClientId}/transactions/${prefilledTransactionId}`, tenantId);
+            const txSnap = await getDoc(doc(firestore, txPath!));
+            if (txSnap.exists()) {
+                const txData = txSnap.data();
+                setValue('transactionTypeId', txData.transactionTypeId || '');
+                setValue('subServiceId', txData.subServiceId || '');
+                setValue('subject', `عرض سعر: ${txData.transactionType}`);
+            }
+        }
       } catch (error) { console.error(error); } finally { setRefDataLoading(false); }
     };
     fetchRefData();
-  }, [firestore, tenantId]);
+  }, [firestore, tenantId, prefilledClientId, prefilledTransactionId, setValue]);
 
   useEffect(() => {
       if (!selectedTransactionTypeId || !firestore || !tenantId) {
@@ -267,7 +287,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           <div className="grid gap-1">
               <Label className="font-black text-[9px] uppercase text-slate-400 tracking-widest pr-1">العميل المستهدف *</Label>
               <Controller control={control} name="clientId" render={({ field }) => (
-                  <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن العميل..." disabled={!!initialData} className="h-8" />
+                  <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن العميل..." className="h-8" />
               )} />
           </div>
           <div className="grid gap-1">
