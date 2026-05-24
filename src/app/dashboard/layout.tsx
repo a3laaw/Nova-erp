@@ -117,7 +117,7 @@ export default function DashboardLayout({
   if (!user || !user.currentCompanyId) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]" dir="rtl">
-        <div className="p-6 bg-red-500/10 rounded-full border-2 border-red-500/20 mb-4">
+        <div className="p-6 bg-red-50/10 rounded-full border-2 border-red-500/20 mb-4">
             <AlertCircle className="h-12 w-12 text-red-400 animate-bounce" />
         </div>
         <h2 className="text-3xl font-black text-[#1e1b4b]">انتهت جلسة العمل</h2>

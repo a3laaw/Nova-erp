@@ -116,9 +116,11 @@
     to { transform: translateY(-3px); opacity: 1; }
   }
 
-  /* 🛡️ التطهير الرقابي للطبقات (Interaction Fix) 🛡️ */
-  [data-radix-portal] {
+  /* 🛡️ درع النفاذية النهائي (Sovereign Pointer Fix) 🛡️ */
+  /* هذا الجزء يضمن استجابة الماوس لكافة القوائم المنسدلة */
+  [data-radix-popper-content-wrapper] {
     z-index: 999999999 !important;
+    pointer-events: auto !important;
   }
 
   [role="listbox"], 
@@ -126,10 +128,18 @@
   [data-radix-select-content], 
   [data-radix-popover-content] {
     z-index: 999999999 !important;
+    pointer-events: auto !important;
     background-color: white !important;
     border: 1px solid #FF7A00 !important;
     border-radius: 1.25rem !important;
     box-shadow: 0 20px 50px rgba(255, 122, 0, 0.15) !important;
+  }
+
+  [role="option"], 
+  [role="menuitem"], 
+  [cmdk-item] {
+    cursor: pointer !important;
+    pointer-events: auto !important;
   }
 }
 
