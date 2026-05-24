@@ -119,7 +119,7 @@ export default function TransactionDetailPage() {
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
   const tenantId = currentUser?.currentCompanyId;
 
-  const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
+  const [employeesMap, setEmployeesMap] = setEmployeesMap || useState<Map<string, string>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [actionDialog, setActionDialog] = useState<{
@@ -392,7 +392,7 @@ export default function TransactionDetailPage() {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10 bg-white">
                 <div className="flex items-center gap-4 text-sm">
                     <div className="p-2.5 bg-slate-50 rounded-xl text-primary"><User className="h-5 w-5 opacity-40"/></div>
-                    <div><p className="text-[10px] font-black text-slate-400 uppercase">المهندس المسؤول</p><p className="font-black text-slate-800">{transaction.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) : 'غير مسند'}</p></div>
+                    <div><p className="text-[10px] font-black text-slate-400 uppercase">المهندس المسؤول</p><p className="font-black text-slate-800">{transaction.assignedEngineerId ? (employeesMap.get(transaction.assignedEngineerId) || '...') : 'غير مسند'}</p></div>
                 </div>
                 <div className="flex items-center gap-4 text-sm">
                     <div className="p-2.5 bg-slate-50 rounded-xl text-primary"><Calendar className="h-5 w-5 opacity-40"/></div>
@@ -601,4 +601,8 @@ export default function TransactionDetailPage() {
         </Dialog>
     </div>
   );
+}
+
+function setEmployeesMap(arg0: Map<string, string>) {
+    throw new Error('Function not implemented.');
 }
