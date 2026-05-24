@@ -25,6 +25,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
@@ -47,7 +55,8 @@ import {
     Target,
     Clock,
     IterationCcw,
-    Undo2
+    Undo2,
+    MessageCircleIcon
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -64,6 +73,7 @@ import { UniversalActionTrigger } from '@/components/productivity/universal-acti
 import { Progress } from '@/components/ui/progress';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
+import { Textarea } from '@/components/ui/textarea';
 
 const transactionStatusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -108,6 +118,16 @@ export default function TransactionDetailPage() {
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // --- نافذة مبررات الإجراء (Justification Dialog State) ---
+  const [actionDialog, setActionDialog] = useState<{
+      isOpen: boolean;
+      stageId: string;
+      stageName: string;
+      actionType: 'start' | 'modify' | 'complete';
+  }>({ isOpen: false, stageId: '', stageName: '', actionType: 'modify' });
+  
+  const [actionNote, setActionNote] = useState('');
+
   const transactionPath = useMemo(() => (firestore && clientId && transactionId && tenantId ? getTenantPath(`clients/${clientId}/transactions/${transactionId}`, tenantId) : null), [firestore, clientId, transactionId, tenantId]);
   const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(firestore, transactionPath);
   
@@ -128,7 +148,17 @@ export default function TransactionDetailPage() {
     });
   }, [firestore, tenantId]);
 
-  const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
+  const openActionDialog = (stageId: string, stageName: string, type: 'start' | 'modify' | 'complete') => {
+      // بالنسبة للبدء قد لا نحتاج لمبرر دائم، ولكن للتعديل والإنجاز هو ضروري جداً
+      if (type === 'start') {
+          handleStageAction(stageId, 'start', 'بدء العمل الفني');
+          return;
+      }
+      setActionNote('');
+      setActionDialog({ isOpen: true, stageId, stageName, actionType: type });
+  };
+
+  const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete', note: string) => {
         if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId) return;
         setIsProcessing(true);
         try {
@@ -140,6 +170,7 @@ export default function TransactionDetailPage() {
             const now = new Date();
 
             let logContent = '';
+            let commentContent = '';
 
             if (action === 'start') {
                 stage.status = 'in-progress';
@@ -151,11 +182,14 @@ export default function TransactionDetailPage() {
                 
             } else if (action === 'modify') {
                 stage.currentCount = (stage.currentCount || 0) + 1;
-                logContent = `سجل المهندس ${currentUser.fullName} تعديلاً/تحديثاً رقم **${stage.currentCount}** في مرحلة: **${stage.name}**.`;
+                logContent = `سجل المهندس ${currentUser.fullName} تعديلاً رقم **${stage.currentCount}** في مرحلة: **${stage.name}**.`;
+                commentContent = `**[مبررات تعديل فني]**\nقام المهندس ${currentUser.fullName} بإجراء تعديل في مرحلة **${stage.name}**.\n\n**السبب المذكور:**\n${note}`;
+                
             } else if (action === 'complete') {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 logContent = `تم إنجاز وإغلاق مرحلة: **${stage.name}** بواسطة المهندس ${currentUser.fullName}.`;
+                commentContent = `**[إشعار إنجاز مرحلة]**\nأكد المهندس ${currentUser.fullName} إتمام العمل في مرحلة **${stage.name}**.\n\n**ملاحظات الإغلاق:**\n${note}`;
                 
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
@@ -177,10 +211,11 @@ export default function TransactionDetailPage() {
                 status: 'in-progress'
             });
             
-            // ✨ التوثيق الآلي في التعليقات (Automated Log/Comment) ✨
             const logPath = `${transactionPath}/timelineEvents`;
+            
+            // 1. تسجيل الحدث الإجرائي (Log)
             await addDoc(collection(firestore, logPath), {
-                type: 'log', // نستخدم 'log' ليظهر في السجل ولكن يمكن تغييره لـ 'comment' ليظهر في التواصل
+                type: 'log',
                 content: logContent,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
@@ -189,7 +224,21 @@ export default function TransactionDetailPage() {
                 companyId: tenantId
             });
 
-            toast({ title: 'نجاح التحديث', description: 'تم ترحيل الإجراء الفني بنجاح.' });
+            // 2. تسجيل المبرر كتعليق رسمي (Comment) ليظهر في مركز الملاحظات
+            if (commentContent) {
+                await addDoc(collection(firestore, logPath), {
+                    type: 'comment',
+                    content: commentContent,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
+                });
+            }
+
+            toast({ title: 'تم توثيق الإجراء', description: 'تم ترحيل مبرراتك إلى سجل المعاملة بنجاح.' });
+            setActionDialog({ ...actionDialog, isOpen: false });
         } catch (e: any) {
             toast({ variant: 'destructive', title: 'خطأ', description: e.message });
         } finally { setIsProcessing(false); }
@@ -328,7 +377,7 @@ export default function TransactionDetailPage() {
                                     
                                     <div className="flex items-center gap-3 mt-4 sm:mt-0 no-print">
                                         {stage.status === 'pending' && isPredecessorCompleted && (
-                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-8 bg-orange-600 hover:bg-orange-700 text-white shadow-xl shadow-orange-100">
+                                            <Button size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'start')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-8 bg-orange-600 hover:bg-orange-700 text-white shadow-xl shadow-orange-100">
                                                 <Play className="ml-2 h-4 w-4"/> بدء العمل
                                             </Button>
                                         )}
@@ -336,11 +385,11 @@ export default function TransactionDetailPage() {
                                         {stage.status === 'in-progress' && (
                                             <>
                                                 {(stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') && (
-                                                    <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-6 border-orange-200 text-orange-700 hover:bg-orange-50 gap-2">
+                                                    <Button variant="outline" size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'modify')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-6 border-orange-200 text-orange-700 hover:bg-orange-50 gap-2">
                                                         <IterationCcw className="h-4 w-4" /> سجل تعديل ({stage.currentCount || 0})
                                                     </Button>
                                                 )}
-                                                <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-8 bg-green-600 hover:bg-green-700 text-white gap-2 shadow-xl shadow-green-100">
+                                                <Button size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'complete')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-8 bg-green-600 hover:bg-green-700 text-white gap-2 shadow-xl shadow-green-100">
                                                     <Check className="ml-2 h-4 w-4"/> إنجاز وإغلاق
                                                 </Button>
                                             </>
@@ -396,6 +445,62 @@ export default function TransactionDetailPage() {
                 />
             </TabsContent>
         </Tabs>
+
+        {/* --- نافذة مبررات الإجراء (Action Justification Dialog) --- */}
+        <Dialog open={actionDialog.isOpen} onOpenChange={(v) => setActionDialog({ ...actionDialog, isOpen: v })}>
+            <DialogContent dir="rtl" className="max-w-lg rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+                <DialogHeader className={cn(
+                    "p-8 border-b text-white",
+                    actionDialog.actionType === 'modify' ? "bg-orange-500" : "bg-green-600"
+                )}>
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/20">
+                            {actionDialog.actionType === 'modify' ? <IterationCcw className="h-8 w-8 text-white" /> : <CheckCircle2 className="h-8 w-8 text-white" />}
+                        </div>
+                        <div>
+                            <DialogTitle className="text-2xl font-black text-white">
+                                {actionDialog.actionType === 'modify' ? 'توثيق تعديل فني' : 'تأكيد إنجاز المرحلة'}
+                            </DialogTitle>
+                            <DialogDescription className="text-white/80 font-bold">المرحلة: {actionDialog.stageName}</DialogDescription>
+                        </div>
+                    </div>
+                </DialogHeader>
+                
+                <div className="p-8 space-y-6">
+                    <div className="grid gap-3">
+                        <Label className="font-black text-slate-700 flex items-center gap-2">
+                            <MessageCircleIcon className="h-4 w-4 text-primary" /> مبررات الإجراء والملاحظات *
+                        </Label>
+                        <Textarea 
+                            value={actionNote}
+                            onChange={(e) => setActionNote(e.target.value)}
+                            placeholder={actionDialog.actionType === 'modify' ? "اشرح سبب التعديل المطلوب (مثلاً: رغبة المالك في تغيير اللون)..." : "صف نتائج العمل المنجز في هذه المرحلة..."}
+                            className="rounded-2xl border-2 p-4 text-base font-medium min-h-[140px] focus-visible:ring-primary/20"
+                            autoFocus
+                        />
+                    </div>
+                    <div className="p-4 bg-muted/20 rounded-xl border-2 border-dashed border-primary/10 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-primary opacity-40" />
+                        <p className="text-[10px] font-bold text-slate-500 leading-relaxed">سيتم نشر هذه الملاحظات آلياً في "تبويب التعليقات" لضمان الشفافية الإدارية.</p>
+                    </div>
+                </div>
+
+                <DialogFooter className="p-8 bg-slate-50 border-t flex gap-4">
+                    <Button variant="ghost" onClick={() => setActionDialog({ ...actionDialog, isOpen: false })} disabled={isProcessing} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                    <Button 
+                        onClick={() => handleStageAction(actionDialog.stageId, actionDialog.actionType, actionNote)} 
+                        disabled={isProcessing || !actionNote.trim()} 
+                        className={cn(
+                            "flex-1 h-12 rounded-xl font-black text-lg shadow-xl gap-2",
+                            actionDialog.actionType === 'modify' ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700"
+                        )}
+                    >
+                        {isProcessing ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
+                        اعتماد ونشر الإجراء
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
   );
 }
