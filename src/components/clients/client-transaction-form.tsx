@@ -32,6 +32,10 @@ interface ClientTransactionFormProps {
   fromAppointmentId?: string | null;
 }
 
+/**
+ * نموذج إنشاء المعاملة المطور (V26.0):
+ * - إضافة التمييز بين الخدمات عبر إظهار "نوع النشاط" في القائمة المنسدلة.
+ */
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -113,8 +117,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         fetchSubServices();
     }, [transactionTypeName, transactionTypes, firestore, tenantId]);
 
+    // ✨ التمييز بين الخدمات عبر إظهار النشاط (Activity Type) ككود تمييزي ✨
     const transactionTypeOptions = useMemo(() => 
-        transactionTypes.map(t => ({ value: t.name, label: t.name })), 
+        transactionTypes.map(t => ({ 
+            value: t.name, 
+            label: t.name,
+            searchKey: t.activityType === 'consulting' ? 'استشارات' : t.activityType === 'construction' ? 'مقاولات' : 'مبيعات'
+        })), 
     [transactionTypes]);
 
     const subServiceOptions = useMemo(() => 
@@ -122,7 +131,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     [subServices]);
 
     const engineerOptions = useMemo(() => 
-        engineers.map(e => ({ value: e.id!, label: e.fullName })), 
+        engineers.map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber })), 
     [engineers]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -142,7 +151,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const selectedSub = subServices.find(s => s.id === selectedSubServiceId);
 
-            // ✨ جلب مراحل العمل المعتمدة وحقن ذكاء القوالب (WBS V2000.0) ✨
             let initialStages: any[] = [];
             const stagesPath = getTenantPath(`transactionTypes/${selectedType?.id}/subServices/${selectedSubServiceId}/workStages`, tenantId);
             
@@ -232,7 +240,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                     
                     <div className="p-8 space-y-6">
                         <div className="grid gap-2">
-                            <Label className="font-black text-gray-700 pr-1">الخدمة الرئيسية *</Label>
+                            <Label className="font-black text-gray-700 pr-1">الخدمة الرئيسية المستهدفة *</Label>
                             <InlineSearchList 
                                 value={transactionTypeName} 
                                 onSelect={setTransactionTypeName} 

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, ChevronsUpDown, Search, PlusCircle } from 'lucide-react';
+import { Check, ChevronsUpDown, Search, PlusCircle, Fingerprint } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,11 +17,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { Badge } from './badge';
 
 export interface SearchOption {
   value: string;
   label: string;
-  searchKey?: string;
+  searchKey?: string; // يُستخدم هنا لعرض الكود التمييزي أو القسم
 }
 
 interface InlineSearchListProps {
@@ -35,9 +36,9 @@ interface InlineSearchListProps {
 }
 
 /**
- * مكون البحث والاختيار السيادي (V25.0):
- * - تم حل مشكلة اختفاء النص عند وجود قيم مخصصة أو مسحوبة آلياً.
- * - يدعم عرض القيمة (Value) كعنوان (Label) في حال عدم وجود خيار مطابق.
+ * مكون البحث والاختيار السيادي المطور (V26.0):
+ * - تم حل مشكلة تشابه الأسماء عبر إظهار الـ searchKey (الكود/القسم) في كبسولة جانبية.
+ * - تحسين التباين اللوني (Text Contrast) لضمان سهولة القراءة.
  */
 export function InlineSearchList({
   value,
@@ -51,18 +52,14 @@ export function InlineSearchList({
   const [open, setOpen] = React.useState(false);
   const [searchValue, setSearchValue] = React.useState('');
   
-  // تصفير نص البحث عند إغلاق القائمة
   React.useEffect(() => {
     if (!open) setSearchValue('');
   }, [open]);
 
-  // ✨ محرك العرض الذكي: يعرض التسمية من القائمة أو القيمة نفسها كـ Fallback
   const displayText = React.useMemo(() => {
     if (!value) return placeholder;
     const option = options.find((opt) => opt.value === value);
     if (option) return option.label;
-    
-    // إذا كانت القيمة نصية مخصصة (مثل: "عند توقيع العقد")، نعرضها هي نفسها
     return value;
   }, [options, value, placeholder]);
 
@@ -79,40 +76,33 @@ export function InlineSearchList({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "w-full justify-between h-9 rounded-xl border-2 transition-all px-3 text-right",
-            "bg-white/90 border-slate-200 hover:border-primary/40 text-[11px] font-bold",
+            "w-full justify-between h-10 rounded-xl border-2 transition-all px-4 text-right shadow-sm",
+            "bg-white border-slate-200 hover:border-primary/40 text-sm font-black text-[#1e1b4b]",
             !value && "text-muted-foreground font-medium",
             className
           )}
           disabled={disabled}
         >
           <span className="truncate">{displayText}</span>
-          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40 text-primary" />
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40 text-primary" />
         </Button>
       </PopoverTrigger>
       <PopoverContent 
         className="w-[--radix-popover-trigger-width] p-0 z-[999999999] border-2 border-primary/20 shadow-2xl rounded-2xl overflow-hidden bg-white" 
         align="start"
         dir="rtl"
-        style={{ pointerEvents: 'auto' }}
-        onInteractOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[role="listbox"]') || target.closest('[data-radix-select-content]')) {
-                e.preventDefault();
-            }
-        }}
       >
         <Command className="bg-white">
-          <div className="flex items-center border-b px-2 bg-slate-50/50">
-            <Search className="ml-2 h-3.5 w-3.5 shrink-0 opacity-40 text-primary" />
+          <div className="flex items-center border-b px-3 bg-slate-50/80">
+            <Search className="ml-2 h-4 w-4 shrink-0 opacity-40 text-primary" />
             <CommandInput 
-                placeholder="ابحث أو اكتب هنا..." 
+                placeholder="ابحث هنا (بالاسم أو الكود)..." 
                 value={searchValue}
                 onValueChange={setSearchValue}
-                className="h-9 text-[11px] font-bold border-none bg-transparent" 
+                className="h-11 text-sm font-black border-none bg-transparent placeholder:text-slate-400" 
             />
           </div>
-          <CommandList className="max-h-[220px] p-1 scrollbar-none">
+          <CommandList className="max-h-[280px] p-2 scrollbar-none">
             {showCustomAdd && (
                 <CommandItem
                   value={searchValue}
@@ -121,33 +111,40 @@ export function InlineSearchList({
                     setOpen(false);
                     setSearchValue('');
                   }}
-                  className="cursor-pointer font-black text-primary py-2.5 px-3 rounded-lg mb-1 bg-primary/5 border border-dashed border-primary/30 flex items-center gap-2 text-[10px]"
+                  className="cursor-pointer font-black text-primary py-3 px-4 rounded-xl mb-2 bg-primary/5 border-2 border-dashed border-primary/20 flex items-center gap-3 text-xs"
                 >
-                  <PlusCircle className="h-3.5 w-3.5" />
-                  <span>استخدام القيمة: "{searchValue}"</span>
+                  <PlusCircle className="h-4 w-4" />
+                  <span>استخدام: "{searchValue}"</span>
                 </CommandItem>
             )}
 
-            <CommandEmpty className={cn("py-4 text-center text-[10px] font-bold text-muted-foreground italic", showCustomAdd && "hidden")}>
-                لا توجد نتائج مطابقة..
+            <CommandEmpty className={cn("py-6 text-center text-xs font-bold text-muted-foreground italic", showCustomAdd && "hidden")}>
+                عذراً، لم نجد نتائج مطابقة..
             </CommandEmpty>
             
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label}
+                  value={option.label + (option.searchKey || '')}
                   onSelect={() => {
                     onSelect(option.value);
                     setOpen(false);
                     setSearchValue('');
                   }}
-                  className="cursor-pointer font-bold text-[#1e1b4b] py-2 px-3 rounded-lg mb-0.5 aria-selected:bg-primary/10 aria-selected:text-primary transition-colors flex items-center justify-between text-[11px]"
+                  className="cursor-pointer font-black text-[#1e1b4b] py-3 px-4 rounded-xl mb-1 aria-selected:bg-primary/10 aria-selected:text-primary transition-all flex items-center justify-between text-sm"
                 >
-                  <span className="truncate">{option.label}</span>
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <span className="truncate">{option.label}</span>
+                    {option.searchKey && (
+                        <Badge variant="secondary" className="font-mono text-[9px] h-5 px-2 bg-slate-100 text-slate-500 border-none shrink-0 group-aria-selected:bg-white transition-colors">
+                            {option.searchKey}
+                        </Badge>
+                    )}
+                  </div>
                   <Check
                     className={cn(
-                      "h-3.5 w-3.5 transition-all",
+                      "h-4 w-4 transition-all shrink-0 mr-2",
                       value === option.value ? "opacity-100 scale-100" : "opacity-0 scale-50"
                     )}
                   />
