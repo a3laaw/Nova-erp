@@ -11,7 +11,7 @@ const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
 >(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
-    /* 🛡️ حذفنا الـ Portal لضمان استجابة الماوس المباشرة 🛡️ */
+    /* 🛡️ حذفنا الـ Portal لضمان استجابة الماوس المباشرة للعناصر داخل القائمة 🛡️ */
     <PopoverPrimitive.Content
         ref={ref}
         align={align}

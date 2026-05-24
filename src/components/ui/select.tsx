@@ -33,7 +33,7 @@ const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = "popper", ...props }, ref) => (
-    /* 🛡️ حذفنا الـ Portal لضمان استجابة الماوس المباشرة 🛡️ */
+    /* 🛡️ حذفت الـ Portal لتمكين وصول الماوس المباشر للعناصر 🛡️ */
     <SelectPrimitive.Content
       ref={ref}
       className={cn(

@@ -6,7 +6,19 @@ import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, getDocs, orderBy, doc, runTransaction, serverTimestamp, getDoc, Timestamp, limit, collectionGroup } from 'firebase/firestore';
+import { 
+    collection, 
+    query, 
+    where, 
+    getDocs, 
+    orderBy, 
+    doc, 
+    runTransaction, 
+    serverTimestamp, 
+    getDoc, 
+    Timestamp, 
+    limit 
+} from 'firebase/firestore';
 import type { Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,24 +83,7 @@ function DirectContractContent() {
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
 
-    // 🛡️ استعادة الاشتراكات المحصنة للمسار الأصيل (Hierarchy Sync)
-    const { data: allClients, loading: clientsLoading } = useSubscription<Client>(firestore, tenantId ? 'clients' : null);
-    
-    // 🛡️ محرك البحث عن المعاملات تحت مسار العميل المحدد (Context Search)
-    const watchedClientId = useWatch({ control: undefined as any, name: 'clientId' }); // Placeholder to track below
-    
-    // جلب كافة المعاملات عبر الـ Collection Group لضمان ظهور الكل في القائمة
-    const { data: allTransactions, loading: txLoading } = useSubscription<ClientTransaction>(
-        firestore, 
-        'transactions', 
-        [], 
-        true // isGroup: true لضمان جلب المعاملات من كافة مجلدات العملاء
-    );
-
-    const { data: accounts = [] } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null);
-    const { data: employees = [] } = useSubscription<Employee>(firestore, tenantId ? 'employees' : null);
-    const { data: departments = [] } = useSubscription<Department>(firestore, tenantId ? 'departments' : null);
-
+    // 1. تعريف النموذج أولاً (Initialization Matrix)
     const { register, handleSubmit, control, setValue, reset, watch, formState: { errors } } = useForm<ContractValues>({
         resolver: zodResolver(contractSchema),
         defaultValues: {
@@ -100,10 +95,33 @@ function DirectContractContent() {
     });
 
     const { fields, append, remove } = useFieldArray({ control, name: 'clauses' });
-    const currentClientId = watch('clientId');
-    const currentTransactionId = watch('transactionId');
-    const watchedClauses = watch('clauses');
-    const currentTotal = useMemo(() => watchedClauses.reduce((sum, c) => sum + (Number(c.amount) || 0), 0), [watchedClauses]);
+    
+    // 2. مراقبة التغييرات (Observability)
+    const currentClientId = useWatch({ control, name: 'clientId' });
+    const watchedClauses = useWatch({ control, name: 'clauses' });
+    const currentTotal = useMemo(() => watchedClauses.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0), [watchedClauses]);
+
+    // 3. جلب البيانات المرجعية (Sovereign Sync)
+    const { data: allClients, loading: clientsLoading } = useSubscription<Client>(firestore, tenantId ? 'clients' : null);
+    const { data: accounts = [] } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null);
+    const { data: employees = [] } = useSubscription<Employee>(firestore, tenantId ? 'employees' : null);
+    const { data: departments = [] } = useSubscription<Department>(firestore, tenantId ? 'departments' : null);
+
+    // 🛡️ رادار المعاملات الذكي: يجلب معاملات العميل المختار فقط لمنع أخطاء الفهارس
+    const [clientTransactions, setClientTransactions] = useState<ClientTransaction[]>([]);
+    const [txLoading, setTxLoading] = useState(false);
+
+    useEffect(() => {
+        if (!firestore || !currentClientId || !tenantId) {
+            setClientTransactions([]);
+            return;
+        }
+        setTxLoading(true);
+        const txPath = getTenantPath(`clients/${currentClientId}/transactions`, tenantId);
+        getDocs(query(collection(firestore, txPath!), where('status', 'in', ['new', 'in-progress']))).then(snap => {
+            setClientTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as ClientTransaction)));
+        }).finally(() => setTxLoading(false));
+    }, [currentClientId, firestore, tenantId]);
 
     const clientOptions = useMemo(() => 
         allClients
@@ -112,18 +130,20 @@ function DirectContractContent() {
             .map(c => ({ value: c.id!, label: c.nameAr }))
     , [allClients]);
 
-    // 🛡️ رادار الخيارات الذكي: يظهر المعاملات الخاصة بالعميل المختار فقط
     const transactionOptions = useMemo(() => 
-        allTransactions
-            .filter(t => t.clientId === currentClientId && ['new', 'in-progress'].includes(t.status))
-            .map(t => ({ value: t.id!, label: t.transactionType }))
-    , [allTransactions, currentClientId]);
+        clientTransactions.map(t => ({ value: t.id!, label: t.transactionType }))
+    , [clientTransactions]);
 
     const onSubmit = async (data: ContractValues) => {
         if (!firestore || !currentUser || !tenantId || savingRef.current) return;
         
-        const selectedClient = allClients.find(c => c.id === data.clientId)!;
-        const selectedTx = allTransactions.find(t => t.id === data.transactionId)!;
+        const selectedClient = allClients.find(c => c.id === data.clientId);
+        const selectedTx = clientTransactions.find(t => t.id === data.transactionId);
+
+        if (!selectedClient || !selectedTx) {
+            toast({ variant: 'destructive', title: 'بيانات غير مكتملة', description: 'يرجى اختيار العميل والمعاملة.' });
+            return;
+        }
 
         savingRef.current = true;
         setIsSaving(true);
@@ -163,7 +183,6 @@ function DirectContractContent() {
                     clientAccountId = clientAccSnap.docs[0].id;
                 }
 
-                // 🛡️ التخزين في المسار الأصيل المجلد لضمان عدم ضياع البيانات
                 const txPath = getTenantPath(`clients/${data.clientId}/transactions/${data.transactionId}`, tenantId);
                 const txRef = doc(firestore, txPath!);
                 
@@ -189,13 +208,25 @@ function DirectContractContent() {
                     status: 'draft', 
                     lines: [
                         { accountId: clientAccountId, accountName: selectedClient.nameAr, debit: currentTotal, credit: 0, auto_profit_center: data.transactionId },
-                        { accountId: revenueAccSnap.docs[0]?.id || '4101', accountName: revenueAccSnap.docs[0]?.data()?.name || 'إيرادات عقود', debit: 0, credit: totalAmount, auto_profit_center: data.transactionId }
+                        { accountId: revenueAccSnap.docs[0]?.id || '4101', accountName: revenueAccSnap.docs[0]?.data()?.name || 'إيرادات عقود', debit: 0, credit: currentTotal, auto_profit_center: data.transactionId }
                     ],
                     clientId: data.clientId, transactionId: data.transactionId, createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
                 }));
 
                 transaction_fs.set(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum }, { merge: true });
                 transaction_fs.update(doc(firestore, getTenantPath(`clients/${data.clientId}`, tenantId)!), { status: 'contracted' });
+                
+                // ✨ التوثيق الآلي في سجل المعاملة ✨
+                const timelineRef = doc(collection(txRef, 'timelineEvents'));
+                transaction_fs.set(timelineRef, {
+                    type: 'comment',
+                    content: `**[إشعار قانوني]**\nتم توقيع العقد المالي المباشر بقيمة **${formatCurrency(currentTotal)}**.\nتم تأسيس مصفوفة دفعات مكونة من **${data.clauses.length}** مراحل استحقاق.`,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
+                });
             });
 
             toast({ title: '✅ تم توقيع العقد بنجاح' });
@@ -207,9 +238,7 @@ function DirectContractContent() {
         }
     };
 
-    const loading = clientsLoading || txLoading;
-
-    if (loading) return <div className="p-20 text-center"><Loader2 className="animate-spin h-10 w-10 mx-auto text-primary" /></div>;
+    if (clientsLoading) return <div className="p-20 text-center"><Loader2 className="animate-spin h-10 w-10 mx-auto text-primary" /></div>;
 
     return (
         <div className="max-w-4xl mx-auto space-y-10 pb-20" dir="rtl">
@@ -250,7 +279,14 @@ function DirectContractContent() {
                                     <LayoutGrid className="h-3 w-3 text-[#FF7A00]"/> المعاملة المراد تعاقدها *
                                 </Label>
                                 <Controller control={control} name="transactionId" render={({ field }) => (
-                                    <InlineSearchList value={field.value} onSelect={field.onChange} options={transactionOptions} placeholder={!currentClientId ? "اختر عميلاً أولاً" : "اختر المعاملة المفتوحة..."} disabled={!currentClientId} className="h-14 rounded-2xl border-2" />
+                                    <InlineSearchList 
+                                        value={field.value} 
+                                        onSelect={field.onChange} 
+                                        options={transactionOptions} 
+                                        placeholder={!currentClientId ? "اختر عميلاً أولاً" : txLoading ? "جاري جلب المعاملات..." : "اختر المعاملة المفتوحة..."} 
+                                        disabled={!currentClientId || txLoading} 
+                                        className="h-14 rounded-2xl border-2" 
+                                    />
                                 )} />
                             </div>
                         </div>
@@ -332,3 +368,4 @@ export default function NewDirectContractPage() {
         </Suspense>
     );
 }
+
