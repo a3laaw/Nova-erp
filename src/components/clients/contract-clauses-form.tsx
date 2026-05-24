@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -174,6 +173,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             const currentYear = new Date().getFullYear();
             const coaPath = getTenantPath('chartOfAccounts', tenantId);
             
+            // 🛡️ التأسيس المالي التلقائي (Auto-COA)
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath!), where('code', '==', '4101'), limit(1)));
             const clientAccQuery = query(collection(firestore, coaPath!), where('name', '==', clientName), where('parentCode', '==', '1102'), limit(1));
             const clientAccSnap = await getDocs(clientAccQuery);
@@ -373,7 +373,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
                                 <TableRow className="border-none hover:bg-transparent">
                                     <TableCell colSpan={2} className="text-right px-12">
                                         <p className="text-3xl font-black tracking-tight text-[#1e1b4b]">إجمالي قيمة العقد النهائي:</p>
-                                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-1">Total Agreed Contract Sum</p>
+                                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">Total Agreed Contract Sum</p>
                                     </TableCell>
                                     <TableCell className="text-center border-r border-white/50 bg-white">
                                         <div className="text-5xl font-black font-mono tracking-tighter text-[#FF7A00]">
@@ -421,4 +421,3 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
     </Dialog>
   );
 }
-

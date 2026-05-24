@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -32,6 +31,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { useSearchParams } from 'next/navigation';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
+const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 const itemSchema = z.object({
   id: z.string(),
@@ -72,8 +72,6 @@ const quotationSchema = z.object({
 });
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
-
-const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
 
 export function QuotationForm({ onSave, onClose, initialData = null, isSaving = false }: any) {
   const { firestore } = useFirebase();
@@ -171,7 +169,8 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           getDocs(query(collection(firestore, typesPath!), orderBy('order'))),
         ]);
         setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
-        setAllTemplates(templatesSnapshot.snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
+        // 🛡️ FIXED: Correctly mapping docs from the snapshot
+        setAllTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
         setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
         
         if (prefilledClientId && prefilledTransactionId) {
@@ -184,7 +183,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                 setValue('subject', `عرض سعر: ${txData.transactionType}`);
             }
         }
-      } catch (error) { console.error(error); } finally { setRefDataLoading(false); }
+      } catch (error) { console.error("Reference data error:", error); } finally { setRefDataLoading(false); }
     };
     fetchRefData();
   }, [firestore, tenantId, prefilledClientId, prefilledTransactionId, setValue]);
@@ -243,12 +242,10 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     setValue('transactionTypeId', template.transactionTypeId || '', { shouldValidate: true, shouldDirty: true });
     setValue('subServiceId', template.subServiceId || '', { shouldValidate: true, shouldDirty: true });
     
-    // ✨ محرك استيراد الدفعات والظهور الصريح للجدول المالي ✨
     if (template.financials?.milestones) {
         const newItems = template.financials.milestones.map((m, idx) => ({
             id: generateId(), 
             description: `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-            // 🛡️ المزامنة المطلقة: إعطاء الأولوية للشرط المبرمج في القالب 🛡️
             triggerCondition: m.condition || m.name || '', 
             quantity: 1,
             unitPrice: template.financials?.type === 'fixed' ? Number(m.value) : 0,
@@ -485,4 +482,3 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     </form>
   );
 }
-
