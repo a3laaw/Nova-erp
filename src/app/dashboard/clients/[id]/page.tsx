@@ -101,6 +101,8 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const transactionStatusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -123,11 +125,11 @@ const statusTranslations: Record<string, string> = {
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: any }) {
     if (!value) return null;
     return (
-        <div className="flex items-start gap-2 text-sm">
+        <div className="flex items-start gap-2 text-sm text-black">
             <div className="flex-shrink-0 pt-1 text-muted-foreground">{icon}</div>
             <div>
-                <p className="font-semibold text-muted-foreground">{label}</p>
-                <div className="text-foreground">{value}</div>
+                <p className="font-bold text-muted-foreground">{label}</p>
+                <div className="text-foreground font-black">{value}</div>
             </div>
         </div>
     );
@@ -173,21 +175,28 @@ export default function ClientProfilePage() {
     if (!firestore || !tenantId || !tx.id || !id) return;
     setIsProcessing(true);
     const newStatus = tx.status === 'on-hold' ? 'new' : 'on-hold';
+    const docPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId);
     try {
-        const docPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId);
         await updateDoc(doc(firestore, docPath!), { 
             status: newStatus,
             updatedAt: serverTimestamp() 
         });
         toast({ title: 'نجاح التحديث', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ في التحديث' });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: docPath!,
+            operation: 'update',
+            requestResourceData: { status: newStatus }
+        }));
     } finally { setIsProcessing(false); }
   };
 
   const handleConfirmCancelContract = async () => {
     if (!firestore || !tenantId || !transactionToCancel?.id || !id || !currentUser) return;
     setIsProcessing(true);
+    
+    const finalTxPath = getTenantPath(`clients/${id}/transactions/${transactionToCancel.id}`, tenantId)!;
+
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
@@ -234,7 +243,7 @@ export default function ClientProfilePage() {
                 transaction_fs.update(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum });
             }
 
-            const txRef = doc(firestore, getTenantPath(`clients/${id}/transactions/${transactionToCancel.id}`, tenantId)!);
+            const txRef = doc(firestore, finalTxPath);
             transaction_fs.update(txRef, {
                 status: 'cancelled',
                 'contract.status': 'cancelled',
@@ -257,7 +266,10 @@ export default function ClientProfilePage() {
 
         toast({ title: '✅ تم فسخ العقد', description: 'تم توليد القيد العكسي وتصفير مديونية المتبقي بنجاح.' });
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'فشل الفسخ المالي', description: e.message });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: finalTxPath,
+            operation: 'write'
+        }));
     } finally { 
         setIsProcessing(false); 
         setTransactionToCancel(null); 
@@ -267,8 +279,8 @@ export default function ClientProfilePage() {
   const handleConfirmDeleteTransaction = async () => {
     if (!firestore || !tenantId || !transactionToDelete?.id || !id) return;
     setIsProcessing(true);
+    const docPath = getTenantPath(`clients/${id}/transactions/${transactionToDelete.id}`, tenantId);
     try {
-        const docPath = getTenantPath(`clients/${id}/transactions/${transactionToDelete.id}`, tenantId);
         await deleteDoc(doc(firestore, docPath!));
         
         const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
@@ -284,7 +296,10 @@ export default function ClientProfilePage() {
 
         toast({ title: 'تم الحذف', description: 'تم مسح سجل المعاملة نهائياً.' });
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: docPath!,
+            operation: 'delete'
+        }));
     } finally { 
         setIsProcessing(false); 
         setTransactionToDelete(null); 
@@ -294,8 +309,8 @@ export default function ClientProfilePage() {
   const handleConfirmDeleteQuotation = async () => {
     if (!firestore || !tenantId || !quotationToDelete?.id || !id) return;
     setIsProcessing(true);
+    const qPath = getTenantPath(`quotations/${quotationToDelete.id}`, tenantId);
     try {
-        const qPath = getTenantPath(`quotations/${quotationToDelete.id}`, tenantId);
         await deleteDoc(doc(firestore, qPath!));
         
         const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
@@ -311,7 +326,10 @@ export default function ClientProfilePage() {
 
         toast({ title: 'تم الحذف', description: 'تم مسح عرض السعر من سجلات العميل.' });
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: qPath!,
+            operation: 'delete'
+        }));
     } finally { 
         setIsProcessing(false); 
         setQuotationToDelete(null); 
@@ -351,8 +369,8 @@ export default function ClientProfilePage() {
                 </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-8 p-10 bg-white">
-                <InfoRow icon={<BadgeInfo className="h-5 w-5 text-primary opacity-40"/>} label="الرقم المدني" value={<span className="font-mono font-black">{client.civilId}</span>} />
-                <InfoRow icon={<Phone className="h-5 w-5 text-primary opacity-40"/>} label="رقم الجوال" value={<span dir="ltr" className="font-mono font-black">{client.mobile}</span>} />
+                <InfoRow icon={<BadgeInfo className="h-5 w-5 text-primary opacity-40"/>} label="الرقم المدني" value={<span className="font-mono font-black text-black">{client.civilId}</span>} />
+                <InfoRow icon={<Phone className="h-5 w-5 text-primary opacity-40"/>} label="رقم الجوال" value={<span dir="ltr" className="font-mono font-black text-black">{client.mobile}</span>} />
                 <div className="text-left"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">رقم الملف الموحد</p><p className="text-xl font-black font-mono text-primary">{client.fileId}</p></div>
             </CardContent>
         </Card>
@@ -396,17 +414,17 @@ export default function ClientProfilePage() {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
                                             <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase tracking-widest">إجراءات العرض</DropdownMenuLabel>
-                                            <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/${q.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                            <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/${q.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-black">
                                                 <Eye className="h-4 w-4 text-primary"/> عرض التفاصيل
                                             </DropdownMenuItem>
                                             {q.status !== 'accepted' && (
-                                                <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/${q.id}/edit`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                                <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/${q.id}/edit`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-black">
                                                     <Pencil className="h-4 w-4 text-primary"/> تعديل البيانات
                                                 </DropdownMenuItem>
                                             )}
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onSelect={() => setQuotationToDelete(q)} className="text-red-600 font-black rounded-lg py-3 gap-3 cursor-pointer focus:bg-red-50">
-                                                <Trash2 className="h-4 w-4" /> حذف العرض
+                                                <Trash2 className="ml-2 h-4 w-4" /> حذف العرض
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -472,7 +490,7 @@ export default function ClientProfilePage() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
                                                     <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase tracking-widest">إجراءات المعاملة</DropdownMenuLabel>
-                                                    <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                                    <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-black">
                                                         <Eye className="h-4 w-4 text-primary"/> فتح المسار الفني
                                                     </DropdownMenuItem>
                                                     
@@ -496,7 +514,7 @@ export default function ClientProfilePage() {
 
                                                     <DropdownMenuSeparator className="bg-slate-100" />
 
-                                                    <DropdownMenuItem onSelect={() => handleToggleFreeze(tx)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
+                                                    <DropdownMenuItem onSelect={() => handleToggleFreeze(tx)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-black">
                                                         {tx.status === 'on-hold' ? <FolderOpen className="h-4 w-4 text-green-600"/> : <FolderLock className="h-4 w-4 text-orange-600"/>}
                                                         {tx.status === 'on-hold' ? 'إعادة تفعيل' : 'تجميد المعاملة'}
                                                     </DropdownMenuItem>
@@ -542,7 +560,7 @@ export default function ClientProfilePage() {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-10 gap-3">
-                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2 text-black">تراجع</AlertDialogCancel>
                     <AlertDialogAction onClick={handleConfirmCancelContract} disabled={isProcessing} className="bg-orange-600 hover:bg-orange-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-orange-100">
                         {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، فسخ وتسوية'}
                     </AlertDialogAction>
@@ -559,7 +577,7 @@ export default function ClientProfilePage() {
                     <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">سيتم مسح كافة البيانات الفنية والمراحل الموثقة لـ "{transactionToDelete?.subServiceName || transactionToDelete?.transactionType}" نهائياً.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-10 gap-3">
-                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2 text-black">تراجع</AlertDialogCancel>
                     <AlertDialogAction onClick={handleConfirmDeleteTransaction} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
                         {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
                     </AlertDialogAction>
@@ -579,7 +597,7 @@ export default function ClientProfilePage() {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-10 gap-3">
-                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">إلغاء</AlertDialogCancel>
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2 text-black">إلغاء</AlertDialogCancel>
                     <AlertDialogAction onClick={handleConfirmDeleteQuotation} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
                         {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف العرض'}
                     </AlertDialogAction>

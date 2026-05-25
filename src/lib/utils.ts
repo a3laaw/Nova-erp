@@ -40,7 +40,7 @@ export function numberToArabicWords(inputNumber: number | string): string {
     const convertToWords = (n: number): string => {
         const units = ["", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة", "عشرة", "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر", "سبعة عشر", "ثمانية عشر", "تسعة عشر"];
         const tens = ["", "", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"];
-        const hundreds = ["", "مائة", "مائتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعمائة"];
+        const hundreds = ["", "مائة", "مائتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعة مائة"];
 
         if (n === 0) return "";
         if (n < 20) return units[n];
@@ -66,8 +66,8 @@ export function numberToArabicWords(inputNumber: number | string): string {
 }
 
 /**
- * محرك توجيه المسارات المعتمد (Tenant Router):
- * تم تحديثه ليشمل المسارات العالمية (Master Paths) لضمان ظهور البيانات للمطور.
+ * محرك توجيه المسارات المعتمد (Tenant Router V2.0):
+ * تم تحرير 'counters' و 'hub_posts' من المسارات العالمية لضمان سيادة المنشأة عليها.
  */
 export function getTenantPath(path: string | null | undefined, tenantId: string | null | undefined): string | null {
   if (!path) return null;
@@ -77,8 +77,8 @@ export function getTenantPath(path: string | null | undefined, tenantId: string 
       'global_users', 
       'company_requests', 
       'holidays', 
-      'counters',
-      'hub_posts',
+      // 'counters', // 🛡️ تم التحرير: العدادات تتبع المنشأة الآن
+      // 'hub_posts', // 🛡️ تم التحرير: الحائط يتبع المنشأة الآن
       'system_lexicon',
       'framework_config'
   ];
