@@ -213,10 +213,14 @@ function DirectContractContent() {
         setIsSaving(true);
 
         try {
-            const selectedClient = allClients.find(c => c.id === data.clientId)!;
-            const selectedTx = clientTransactions.find(t => t.id === data.transactionId)!;
-            const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
+            const selectedClient = allClients.find(c => c.id === data.clientId);
+            const selectedTx = clientTransactions.find(t => t.id === data.transactionId);
 
+            if (!selectedClient || !selectedTx) {
+                throw new Error("يرجى التأكد من اختيار العميل والمعاملة المستهدفة.");
+            }
+
+            const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1)));
             const clientAccSnap = await getDocs(query(collection(firestore, coaPath), where('name', '==', selectedClient.nameAr), where('parentCode', '==', '1102'), limit(1)));
 
@@ -284,7 +288,7 @@ function DirectContractContent() {
                 }));
 
                 transaction_fs.set(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum }, { merge: true });
-                transaction_fs.update(doc(firestore, getTenantPath(`clients/${clientId}`, tenantId)!), { status: 'contracted' });
+                transaction_fs.update(doc(firestore, getTenantPath(`clients/${data.clientId}`, tenantId)!), { status: 'contracted' });
             });
 
             toast({ title: '✅ تم توقيع العقد بنجاح' });
@@ -295,10 +299,6 @@ function DirectContractContent() {
             savingRef.current = false;
         }
     };
-
-    const clientOptions = useMemo(() => (allClients || []).filter(c => c.isActive !== false).map(c => ({ value: c.id!, label: c.nameAr })), [allClients]);
-    const transactionOptions = useMemo(() => clientTransactions.map(t => ({ value: t.id!, label: t.subServiceName ? `${t.subServiceName} (${t.transactionType})` : t.transactionType })), [clientTransactions]);
-    const templateOptions = useMemo(() => (templates || []).map(t => ({ value: t.id!, label: t.title })), [templates]);
 
     return (
         <div className="max-w-5xl mx-auto space-y-8 pb-20" dir="rtl">
@@ -315,14 +315,14 @@ function DirectContractContent() {
                                 <CardDescription className="text-white/90 font-bold text-sm">اعتماد المسار القانوني والمالي للخدمة المختارة آلياً.</CardDescription>
                             </div>
                         </div>
-                        <Button onClick={() => router.back()} variant="outline" className="h-12 px-8 rounded-2xl font-black gap-2 bg-white/10 text-white border-white/40 hover:bg-white/20 no-print">
+                        <Button type="button" onClick={() => router.back()} variant="outline" className="h-12 px-8 rounded-2xl font-black gap-2 bg-white/10 text-white border-white/40 hover:bg-white/20 no-print">
                             <ArrowRight className="h-5 w-5" /> تراجع
                         </Button>
                     </div>
                 </CardHeader>
             </Card>
 
-            <form onSubmit={handleSubmit(onSubmit)}>
+            <form onSubmit={handleSubmit(onSubmit, (err) => console.error("Validation Errors:", err))}>
                 <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white/95">
                     <CardContent className="p-10 space-y-10">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
