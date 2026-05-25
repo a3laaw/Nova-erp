@@ -79,7 +79,7 @@ import { Progress } from '@/components/ui/progress';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
 import { Textarea } from '@/components/ui/textarea';
-import { createNotification } from '@/services/notification-service';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const transactionStatusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
