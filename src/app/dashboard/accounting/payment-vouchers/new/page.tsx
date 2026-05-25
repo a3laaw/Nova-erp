@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -160,7 +160,10 @@ export default function NewPaymentVoucherPage() {
     const creditAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'asset' && acc.isPayable).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
     const debitAccountOptions = useMemo(() => accounts.filter(acc => acc.type === 'expense' || (acc.type === 'liability' && acc.isPayable)).map(acc => ({value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code})), [accounts]);
     const employeePayeeOptions = useMemo(() => employees.map(e => ({ value: e.fullName, label: e.fullName })), [employees]);
-    const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
+    const projectOptions = useMemo(() => projects.map(p => ({ 
+        value: `${p.clientId}/${p.id}`, 
+        label: `${p.clientName} - ${p.subServiceName || p.transactionType} (${p.transactionNumber})` 
+    })), [projects]);
 
     const onSubmit = async (data: PaymentVoucherFormValues) => {
         if (!firestore || !currentUser || isGeneratingVoucher) return;
@@ -371,9 +374,9 @@ export default function NewPaymentVoucherPage() {
                                 control={control}
                                 render={({ field }) => (
                                     <InlineSearchList 
-                                        value={field.value || ''}
-                                        onSelect={field.onChange}
-                                        options={debitAccountOptions}
+                                        value={field.value || ''} 
+                                        onSelect={field.onChange} 
+                                        options={debitAccountOptions} 
                                         placeholder={refDataLoading ? "تحميل..." : "اختر حساب المصروف أو المورد..."}
                                         disabled={refDataLoading}
                                     />

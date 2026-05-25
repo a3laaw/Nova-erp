@@ -166,7 +166,10 @@ export default function NewJournalEntryPage() {
     }))
   , [accounts]);
 
-  const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
+  const projectOptions = useMemo(() => projects.map(p => ({ 
+    value: `${p.clientId}/${p.id}`, 
+    label: `${p.clientName} - ${p.subServiceName || p.transactionType} (${p.transactionNumber})` 
+  })), [projects]);
 
   const onSubmit = async (data: JournalEntryFormValues) => {
     if (!firestore || !currentUser || !tenantId || submittingRef.current) return;
@@ -349,8 +352,8 @@ export default function NewJournalEntryPage() {
             </CardContent>
             <CardFooter className="flex justify-end gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
                 <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSubmitting} className="h-14 px-10 rounded-2xl font-bold">إلغاء</Button>
-                <Button type="submit" disabled={isSubmitting || Math.abs(balance) > 0.001} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 min-w-[320px] gap-3">
-                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>}
+                <Button type="submit" disabled={isSubmitting || Math.abs(balance) > 0.001} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-xl shadow-primary/30 min-w-[320px] gap-4 bg-[#7209B7] text-white border-none transition-all active:scale-95 group">
+                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="h-5 w-5"/>}
                     اعتماد القيد
                 </Button>
             </CardFooter>

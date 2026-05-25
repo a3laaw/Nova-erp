@@ -244,6 +244,13 @@ export default function EditCashReceiptPage() {
     }))
   , [accounts]);
 
+  const projectOptions = useMemo(() => 
+    clientProjects.map(p => ({ 
+        value: p.id!, 
+        label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})`
+    }))
+  , [clientProjects]);
+
   const debitAccountOptions = useMemo(() => {
     if (!paymentMethod) return [];
     const isCash = paymentMethod === 'Cash';
@@ -281,10 +288,7 @@ export default function EditCashReceiptPage() {
                 <InlineSearchList 
                     value={selectedProjectId}
                     onSelect={setSelectedProjectId}
-                    options={clientProjects.map(p => ({ 
-                        value: p.id!, 
-                        label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})` 
-                    }))}
+                    options={projectOptions}
                     placeholder="اختر الخدمة الفنية..."
                     disabled={!selectedClientId}
                 />

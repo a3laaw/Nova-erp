@@ -47,7 +47,7 @@ const getTotalPaidForProject = async (projectId: string, db: any, tenantId: stri
     return total;
 };
 
-export default function NewCashReceiptPage() {
+export function NewCashReceiptPage() {
   const router = useRouter();
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -325,6 +325,13 @@ export default function NewCashReceiptPage() {
     }))
   , [accounts]);
 
+  const projectOptions = useMemo(() => 
+    clientProjects.map(p => ({ 
+        value: p.id!, 
+        label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})`
+    }))
+  , [clientProjects]);
+
   const debitAccountOptions = useMemo(() => {
     if (!paymentMethod) return [];
     const isCash = paymentMethod === 'Cash';
@@ -374,10 +381,7 @@ export default function NewCashReceiptPage() {
                 <InlineSearchList 
                     value={selectedProjectId} 
                     onSelect={setSelectedProjectId} 
-                    options={clientProjects.map(p => ({ 
-                        value: p.id!, 
-                        label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})`
-                    }))}
+                    options={projectOptions}
                     placeholder={!selectedClientId ? 'اختر حساب العميل أولاً' : projectsLoading ? 'جاري التحميل...' : 'اختر الخدمة الفنية (اختياري)...'}
                     disabled={!selectedClientId || projectsLoading || isSaving}
                     className="h-12 bg-white rounded-2xl"

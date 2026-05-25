@@ -156,7 +156,10 @@ export default function EditJournalEntryPage() {
     }))
   , [accounts]);
 
-  const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
+  const projectOptions = useMemo(() => projects.map(p => ({ 
+    value: `${p.clientId}/${p.id}`, 
+    label: `${p.clientName} - ${p.subServiceName || p.transactionType} (${p.transactionNumber})` 
+  })), [projects]);
 
   const onSubmit = async (data: JournalEntryFormValues) => {
     if (!firestore || !entry) return;
