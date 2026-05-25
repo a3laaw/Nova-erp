@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -18,10 +17,12 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { where, orderBy, limit, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
+import { Button } from '@/components/ui/button'; // 🛡️ التطهير: إضافة الاستيراد المفقود 🛡️
+import { useAuth } from '@/context/auth-context';
 
 /**
- * لوحة تحكم الإدارة (Executive View V68.0):
- * تم إضافة قسم "المهام الشخصية المجدولة" لربط المسار الفني بالإنتاجية اليومية.
+ * لوحة تحكم الإدارة (Executive View V72.0):
+ * تم إصلاح خطأ الـ Button وتثبيت رادار المهام الشخصية المجدولة.
  */
 export function ExecutiveDashboard({ data, user }: any) {
     const { firestore } = useFirebase();
@@ -33,7 +34,6 @@ export function ExecutiveDashboard({ data, user }: any) {
         where('userId', '==', user?.id),
         where('entryType', '==', 'task'),
         where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc'),
         limit(5)
     ], [user?.id]);
 
@@ -108,9 +108,9 @@ export function ExecutiveDashboard({ data, user }: any) {
                         <CardContent className="p-8 space-y-4">
                             {tasksLoading ? <div className="space-y-3"><Skeleton className="h-16 w-full rounded-2xl"/><Skeleton className="h-16 w-full rounded-2xl"/></div> : 
                              myTasks.length === 0 ? (
-                                <div className="p-10 text-center opacity-30 italic font-bold">لا توجد مهام مجدولة اليوم.</div>
+                                <div className="p-10 text-center opacity-30 italic font-bold text-black">لا توجد مهام مجدولة اليوم.</div>
                              ) : (
-                                myTasks.map(task => (
+                                [...myTasks].sort((a,b) => (toFirestoreDate(b.createdAt)?.getTime() || 0) - (toFirestoreDate(a.createdAt)?.getTime() || 0)).map(task => (
                                     <div key={task.id} className="p-4 bg-muted/20 rounded-2xl border-2 border-transparent hover:border-primary/20 hover:bg-white transition-all group">
                                         <div className="flex justify-between items-start">
                                             <p className="font-black text-xs text-black line-clamp-2 leading-relaxed flex-1 pr-1">{task.title}</p>
@@ -124,7 +124,7 @@ export function ExecutiveDashboard({ data, user }: any) {
                                                     const path = getTenantPath(`userProductivity/${task.id}`, tenantId);
                                                     await updateDoc(doc(firestore!, path!), { status: 'completed', completedAt: serverTimestamp() });
                                                 }}
-                                                className="h-7 px-3 rounded-lg bg-green-50 text-green-700 text-[10px] font-black hover:bg-green-600 hover:text-white"
+                                                className="h-7 px-3 rounded-lg bg-green-50 text-green-700 text-[10px] font-black hover:bg-green-600 hover:text-white border-none"
                                             >
                                                 <CheckCircle2 className="h-3 w-3 ml-1"/> إتمام
                                             </Button>
