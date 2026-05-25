@@ -11,15 +11,19 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 
+/**
+ * لوحة تحكم المالية (Financial View):
+ * تم تحديث الإحصائيات لضمان عرض الأعداد الصحيحة بوضوح.
+ */
 export function FinancialDashboard({ data, user }: any) {
     const financialStats = useMemo(() => {
-        const posted = data.journalEntries.filter((e: any) => e.status === 'posted');
-        const liquidAccs = data.accounts.filter((a: any) => a.code.startsWith('1101')).map((a: any) => a.id);
+        const posted = (data.journalEntries || []).filter((e: any) => e.status === 'posted');
+        const liquidAccs = (data.accounts || []).filter((a: any) => a.code.startsWith('1101')).map((a: any) => a.id);
         const cashBalance = posted.flatMap((e: any) => e.lines)
             .filter((l: any) => liquidAccs.includes(l.accountId))
             .reduce((sum: number, l: any) => sum + (l.debit || 0) - (l.credit || 0), 0);
         
-        const draftCount = data.journalEntries.filter((e: any) => e.status === 'draft').length;
+        const draftCount = (data.journalEntries || []).filter((e: any) => e.status === 'draft').length;
         
         return { cashBalance, draftCount };
     }, [data]);
@@ -27,8 +31,20 @@ export function FinancialDashboard({ data, user }: any) {
     return (
         <div className="space-y-10 animate-in fade-in duration-1000">
             <div className="grid gap-6 md:grid-cols-3">
-                <StatCard title="رصيد الكاش المتوفر" value={financialStats.cashBalance} icon={<Wallet className="h-5 w-5" />} colorClass="bg-green-100 text-green-700" isCurrency />
-                <StatCard title="قيود بانتظار المراجعة" value={financialStats.draftCount} icon={<History className="h-5 w-5" />} colorClass="bg-orange-100 text-[#FF7A00]" />
+                <StatCard 
+                    title="رصيد الكاش المتوفر" 
+                    value={financialStats.cashBalance} 
+                    icon={<Wallet className="h-5 w-5" />} 
+                    colorClass="bg-green-100 text-green-700" 
+                    isCurrency={true} 
+                />
+                <StatCard 
+                    title="قيود بانتظار المراجعة" 
+                    value={financialStats.draftCount} 
+                    icon={<History className="h-5 w-5" />} 
+                    colorClass="bg-orange-100 text-[#FF7A00]" 
+                    isCurrency={false}
+                />
                 <Card className="rounded-[2.5rem] bg-indigo-600 text-white p-6 border-none shadow-xl flex items-center justify-between">
                     <div>
                         <p className="text-[10px] font-black uppercase opacity-60">حالة الميزانية</p>
@@ -61,7 +77,7 @@ export function FinancialDashboard({ data, user }: any) {
                                 <TableRow><TableHead className="px-6">المستفيد</TableHead><TableHead className="text-left px-6">المبلغ</TableHead></TableRow>
                             </TableHeader>
                             <TableBody>
-                                {data.purchaseOrders.slice(0, 5).map((po: any) => (
+                                {(data.purchaseOrders || []).slice(0, 5).map((po: any) => (
                                     <TableRow key={po.id} className="h-16">
                                         <TableCell className="px-6 font-bold">{po.vendorName}</TableCell>
                                         <TableCell className="text-left px-6 font-black text-primary">{formatCurrency(po.totalAmount)}</TableCell>
