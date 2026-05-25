@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -22,13 +22,14 @@ import {
     FileText,
     Pencil,
     RefreshCw,
-    RotateCcw
+    RotateCcw,
+    CheckCircle2
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, orderBy, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
+import { cn, cleanFirestoreData } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -63,11 +64,10 @@ export function LexiconDictionary() {
         module: 'General'
     });
 
-    const tenantId = user?.currentCompanyId;
-    
+    // 🛡️ استخدام المسار العالمي الموحد للقاموس لضمان عمله للمطور 🛡️
     const { data: lexicon, loading } = useSubscription<any>(
         firestore, 
-        tenantId ? `companies/${tenantId}/system_lexicon` : null, 
+        'system_lexicon', 
         [orderBy('namespace'), orderBy('key')]
     );
 
@@ -88,56 +88,56 @@ export function LexiconDictionary() {
     }, [lexicon, activeNamespace, searchQuery]);
 
     const handleSaveEntry = async () => {
-        if (!firestore || !tenantId || !formData.key || !formData.valueAr) return;
+        if (!firestore || !formData.key || !formData.valueAr) return;
         setIsSaving(true);
         try {
-            const lexiconPath = `companies/${tenantId}/system_lexicon`;
             const payload = cleanFirestoreData({
                 ...formData,
                 updatedAt: serverTimestamp(),
-                companyId: tenantId
             });
 
             if (editingItem) {
-                await updateDoc(doc(firestore, lexiconPath, editingItem.id), payload);
+                await updateDoc(doc(firestore, 'system_lexicon', editingItem.id), payload);
                 toast({ title: '✅ تم تحديث المصطلح' });
             } else {
-                await addDoc(collection(firestore, lexiconPath), { ...payload, createdAt: serverTimestamp() });
+                await addDoc(collection(firestore, 'system_lexicon'), { ...payload, createdAt: serverTimestamp() });
                 toast({ title: '✅ تم إضافة المصطلح' });
             }
             setIsFormOpen(false);
             setEditingItem(null);
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
-        } finally { setIsSaving(true); }
+        } finally { setIsSaving(false); }
     };
 
     /**
-     * محرك تحديث المنظومة (Publish & Refresh):
-     * يقوم بتحديث الطابع الزمني للإعدادات لإجبار كافة واجهات الموظفين على المزامنة.
+     * محرك تحديث المنظومة (Publish & Sync):
+     * يقوم بتحديث الطابع الزمني لإعدادات الإطار العملي لفرض المزامنة على كافة الواجهات.
      */
     const handleUpdateSystem = async () => {
-        if (!firestore || !tenantId) return;
+        if (!firestore) return;
         setIsUpdating(true);
         try {
-            const configPath = `companies/${tenantId}/settings/system_config`;
-            await updateDoc(doc(firestore, configPath), {
+            const configRef = doc(firestore, 'framework_config', 'main_sync');
+            await setDoc(configRef, {
                 lastLexiconUpdate: serverTimestamp(),
                 updatedBy: user?.id
-            });
+            }, { merge: true });
             toast({ title: '✅ تم تحديث المنظومة', description: 'تم نشر كافة التعديلات اللغوية لكافة الموظفين فوراً.' });
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ في التحديث' });
         } finally { setIsUpdating(false); }
     };
 
+    /**
+     * محرك استيراد الأساسيات المطور:
+     * تم تحصينه لضمان العمل من المسارات العالمية وبدون تكرار.
+     */
     const handleImportDefaults = async () => {
-        if (!firestore || !tenantId) return;
+        if (!firestore) return;
         setIsImporting(true);
         try {
             const batch = writeBatch(firestore);
-            const lexiconPath = `companies/${tenantId}/system_lexicon`;
-            
             const defaults = [
                 { key: 'btn_save', namespace: 'actions', valueAr: 'حفظ التعديلات', valueEn: 'Save Changes' },
                 { key: 'btn_cancel', namespace: 'actions', valueAr: 'إلغاء', valueEn: 'Cancel' },
@@ -161,19 +161,20 @@ export function LexiconDictionary() {
 
             for (const item of defaults) {
                 if (!existingKeys.has(item.key)) {
-                    const newRef = doc(collection(firestore, lexiconPath));
-                    batch.set(newRef, { ...item, companyId: tenantId, createdAt: serverTimestamp() });
+                    const newRef = doc(collection(firestore, 'system_lexicon'));
+                    batch.set(newRef, { ...item, createdAt: serverTimestamp() });
                     addedCount++;
                 }
             }
 
             if (addedCount > 0) {
                 await batch.commit();
-                toast({ title: '✅ تم استيراد الأساسيات', description: `تمت إضافة ${addedCount} مصطلحاً جديداً للقاموس.` });
+                toast({ title: '✅ تم استيراد الأساسيات', description: `تمت إضافة ${addedCount} مصطلحاً جديداً للقاموس العالمي.` });
             } else {
                 toast({ title: 'القاموس مكتمل', description: 'كافة المصطلحات الأساسية موجودة بالفعل.' });
             }
         } catch (e) {
+            console.error("Import Error:", e);
             toast({ variant: 'destructive', title: 'فشل الاستيراد' });
         } finally { setIsImporting(false); }
     };
@@ -203,24 +204,24 @@ export function LexiconDictionary() {
                                 {isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : <RotateCcw className="h-4 w-4" />} تحديث المنظومة
                             </Button>
 
-                            {/* زر الاستيراد - مخطط */}
+                            {/* زر الاستيراد - مخطط مطابق للصورة */}
                             <Button 
                                 variant="outline" 
                                 onClick={handleImportDefaults} 
                                 disabled={isImporting || loading} 
-                                className="h-12 px-10 rounded-2xl font-black gap-2 border-2 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm"
+                                className="h-12 px-10 rounded-2xl font-bold text-sm gap-2 border-2 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm"
                             >
                                 {isImporting ? <Loader2 className="animate-spin h-4 w-4"/> : <DownloadCloud className="h-4 w-4" />} استيراد الأساسيات
                             </Button>
                             
-                            {/* زر الإضافة - برتقالي بارز */}
+                            {/* زر الإضافة - برتقالي بارز مطابق للصورة */}
                             <Button 
                                 onClick={() => { 
                                     setEditingItem(null); 
                                     setFormData({ key: '', namespace: 'actions', valueAr: '', valueEn: '', description: '', module: 'General' }); 
                                     setIsFormOpen(true); 
                                 }} 
-                                className="h-12 px-10 rounded-2xl font-black gap-2 shadow-2xl bg-[#FF7A00] hover:bg-[#E66D00] text-white border-none transition-all active:scale-95 group"
+                                className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-2xl bg-[#FF7A00] hover:bg-[#E66D00] text-white border-none transition-all active:scale-95 group"
                             >
                                 <PlusCircle className="h-6 w-6 group-hover:rotate-90 transition-transform" /> إضافة مصطلح
                             </Button>
@@ -295,7 +296,7 @@ export function LexiconDictionary() {
                     </div>
                 </CardContent>
                 <CardFooter className="bg-muted/10 p-6 flex justify-center border-t border-indigo-50">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Nova ERP — Comprehensive Lexicon Engine v1.0</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Nova ERP — Comprehensive Framework Lexicon v1.0</p>
                 </CardFooter>
             </Card>
 

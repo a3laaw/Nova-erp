@@ -78,7 +78,9 @@ export function getTenantPath(path: string | null | undefined, tenantId: string 
       'company_requests', 
       'holidays', 
       'counters',
-      'hub_posts'
+      'hub_posts',
+      'system_lexicon',
+      'framework_config'
   ];
   const isMaster = masterCollections.some(mc => path.startsWith(mc));
   if (isMaster) return path;
