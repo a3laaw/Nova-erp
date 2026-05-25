@@ -11,6 +11,7 @@ import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
+import Image from 'next/image';
 
 export default function DashboardLayout({
   children,
@@ -39,51 +40,49 @@ export default function DashboardLayout({
 
   if (loading || !mounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* ✨ محرك السديم المطور المطابق للصورة تماماً ✨ */}
-        <div className="nova-nebula-container">
-            <div className="nova-dust-field" />
-            <div className="nova-nebula-ring" />
-            <div className="nova-nebula-core" />
-            
-            <div className="nova-text-glow">
-                <span>NOVA</span>
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#fdfaf3] relative overflow-hidden" dir="rtl">
+        {/* BEGIN: محرك السديم المطور المعتمد من المهندس */}
+        <main className="relative w-full h-screen flex flex-col items-center justify-center p-6 select-none overflow-hidden">
+            <div className="relative flex items-center justify-center">
+                <div className="relative z-10 overflow-hidden rounded-full">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                        alt="Nova Nebula" 
+                        className="max-w-[120vw] md:max-w-[800px] h-auto object-contain nova-nebula-img" 
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEtNlSBtckngBW_Ee7zv-W5tmEJ6EZBDeaCR6TlVQDGr64SCn8e28U9zGFo9V4IkUKHFNKjJpKWJDmm0Dm70aTBpbOmQZf6UQA0ybHv9-MwgNx_ggEcDJMuTRkrXNatfJzL7PcSVxTZQ32ULGzS5chJStYZuU5UR_UbU52fAlJ36EievnwnvfcpyBNJA9jYr6wELbgtj3XmBrT56mjy5mrBdCum65Ftkl91BG77W6GFbzPAI-6fsiKCJ_7Nb8hFQ8CfvdxHJdiB9-O"
+                    />
+                </div>
             </div>
-        </div>
-        
-        {/* نص التحميل في الأسفل */}
-        <div className="absolute bottom-20 left-0 right-0 flex flex-col items-center justify-center space-y-6 z-30">
-            <div className="flex items-center justify-center gap-4">
-                <p className="text-[#FF7A00] font-black text-2xl tracking-tight">جاري التحميل</p>
-                <div className="flex gap-2.5 pt-2">
-                    <div className="h-3 w-3 bg-[#FFB000] rounded-full animate-bounce shadow-lg shadow-amber-200" style={{ animationDelay: '0s' }} />
-                    <div className="h-3 w-3 bg-[#FF7A00] rounded-full animate-bounce shadow-lg shadow-orange-200" style={{ animationDelay: '0.2s' }} />
-                    <div className="h-3 w-3 bg-[#E66D00] rounded-full animate-bounce shadow-lg shadow-orange-400" style={{ animationDelay: '0.4s' }} />
+
+            <div className="absolute bottom-20 flex flex-row-reverse items-center gap-2">
+                <span className="text-[#333333] text-lg font-black tracking-wide">جاري التحميل</span>
+                <div className="flex flex-row-reverse items-center gap-1 mt-1">
+                    <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0s' }}></span>
+                    <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0.2s' }}></span>
+                    <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0.4s' }}></span>
                 </div>
             </div>
             
             {showEmergencyExit && (
-                <div className="animate-in zoom-in-95 duration-500 glass-effect p-6 rounded-[2.5rem] border-2 border-white shadow-2xl max-w-xs mx-auto">
-                    <div className="flex gap-3">
-                        <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-11 rounded-2xl font-black text-xs border-slate-200 text-black shadow-sm">تحديث</Button>
-                        <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-11 rounded-2xl font-black text-xs text-red-600">خروج</Button>
-                    </div>
+                <div className="absolute bottom-6 animate-in zoom-in-95 duration-500 glass-effect p-4 rounded-3xl border-2 border-white shadow-xl flex gap-3 z-50">
+                    <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="h-9 rounded-xl font-bold text-xs border-slate-200">تحديث</Button>
+                    <Button onClick={handleSafeExit} variant="ghost" size="sm" className="h-9 rounded-xl font-bold text-xs text-red-600">خروج</Button>
                 </div>
             )}
-        </div>
+        </main>
       </div>
     );
   }
 
   if (!user || !user.currentCompanyId) {
     return (
-       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]" dir="rtl">
+       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#fdfaf3]" dir="rtl">
         <div className="p-6 bg-red-50/10 rounded-full border-2 border-red-500/20 mb-4">
             <AlertCircle className="h-12 w-12 text-red-400 animate-bounce" />
         </div>
-        <h2 className="text-3xl font-black text-[#1e1b4b]">انتهى وقت الدخول</h2>
-        <p className="text-slate-500 font-bold max-w-xs mx-auto">يرجى إعادة الدخول للوصول لبياناتك.</p>
-        <Button onClick={handleSafeExit} className="bg-[#FF7A00] text-white font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:bg-[#E66D00] active:scale-95 transition-all">دخول</Button>
+        <h2 className="text-3xl font-black text-[#1e1b4b]">انتهت جلسة العمل</h2>
+        <p className="text-slate-500 font-bold max-w-xs mx-auto">يرجى إعادة تسجيل الدخول للوصول لبيانات المنشأة.</p>
+        <Button onClick={handleSafeExit} className="bg-[#e87c24] text-white font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:bg-[#d06b1e] active:scale-95 transition-all">دخول</Button>
       </div>
     );
   }

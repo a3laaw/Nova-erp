@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap');
 @import "react-day-picker/dist/style.css";
 @tailwind base;
 @tailwind components;
@@ -6,25 +6,25 @@
 
 @layer base {
   :root {
-    --background: 40 100% 98%; 
+    --background: 40 100% 98%; /* #fdfaf3 */
     --foreground: 240 60% 10%;
     --card: 0 0% 100% / 0.8;
     --card-foreground: 240 60% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 60% 10%;
-    --primary: 29 100% 50%; 
+    --primary: 27 82% 53%; /* #e87c24 - Nova Orange */
     --primary-foreground: 0 0% 100%;
     --secondary: 240 10% 96%;
     --secondary-foreground: 240 60% 10%;
     --muted: 240 10% 96%;
     --muted-foreground: 240 5% 45%;
-    --accent: 29 100% 50% / 0.1;
-    --accent-foreground: 29 100% 50%;
+    --accent: 27 82% 53% / 0.1;
+    --accent-foreground: 27 82% 53%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 29 100% 90%;
-    --input: 29 100% 95%;
-    --ring: 29 100% 50%;
+    --border: 27 82% 90%;
+    --input: 27 82% 95%;
+    --ring: 27 82% 53%;
     --radius: 2.5rem;
   }
 }
@@ -32,10 +32,9 @@
 @layer base {
   * { @apply border-border; }
   body {
-    background: linear-gradient(135deg, #FFFDF0 0%, #FFF5E6 100%);
-    background-attachment: fixed;
+    background-color: #fdfaf3;
     color: #1e1b4b;
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'IBM Plex Sans Arabic', sans-serif;
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
   }
@@ -55,85 +54,38 @@
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 122, 0, 0.1);
-    box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
+    border: 1px solid rgba(232, 124, 36, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(232, 124, 36, 0.05);
   }
   
-  /* ✨ محرك السديم السينمائي المطور (Cinemagraph Nebula Engine V2.0) ✨ */
-  .nova-nebula-container {
-    @apply relative flex items-center justify-center w-full h-full;
-    perspective: 1000px;
+  /* ✨ محرك السديم المتفجر (The Explosion Nebula Engine) ✨ */
+  .nova-nebula-img {
+    mix-blend-mode: multiply;
+    animation: explosion-pulse 2.5s ease-in-out infinite;
   }
 
-  .nova-nebula-ring {
-    position: absolute;
-    width: 600px;
-    height: 600px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255, 122, 0, 0.4) 0%, rgba(255, 122, 0, 0.2) 40%, transparent 70%);
-    filter: blur(40px);
-    animation: nebula-pulse 8s ease-in-out infinite;
-    z-index: 1;
+  @keyframes explosion-pulse {
+    0%, 100% { transform: scale(0.95); opacity: 0.9; }
+    50% { transform: scale(1.05); opacity: 1; }
   }
 
-  .nova-nebula-core {
-    position: absolute;
-    width: 400px;
-    height: 400px;
-    background: radial-gradient(circle, rgba(255, 122, 0, 0.25) 0%, rgba(255, 122, 0, 0.1) 60%, transparent 80%);
-    filter: blur(60px);
-    animation: nebula-pulse 6s ease-in-out infinite reverse;
-    z-index: 1;
+  @keyframes dot-fade {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
   }
 
-  .nova-dust-field {
-    position: absolute;
-    inset: -100px;
-    background-image: radial-gradient(circle, rgba(255, 122, 0, 0.3) 1.5px, transparent 1.5px);
-    background-size: 50px 50px;
-    opacity: 0.15;
-    mask-image: radial-gradient(circle, black 20%, transparent 80%);
-    animation: dust-drift 30s ease-in-out infinite;
-    z-index: 0;
+  .animate-dot-fade {
+    animation: dot-fade 1.4s infinite linear;
   }
 
-  @keyframes nebula-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.4; }
-    50% { transform: scale(1.2); opacity: 0.7; }
-  }
-
-  @keyframes dust-drift {
-    0%, 100% { transform: translate(0, 0) rotate(0deg); }
-    50% { transform: translate(-20px, -20px) rotate(2deg); }
-  }
-
-  .nova-text-glow {
-    color: #FF7A00;
-    font-weight: 900;
-    font-size: 6rem;
-    letter-spacing: 0.5em;
-    text-shadow: 
-        0 0 30px rgba(255, 122, 0, 0.4),
-        0 0 60px rgba(255, 122, 0, 0.2);
-    animation: text-shimmer 4s ease-in-out infinite;
-    position: relative;
-    z-index: 20;
-    user-select: none;
-  }
-
-  @keyframes text-shimmer {
-    0%, 100% { opacity: 0.9; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.02); }
-  }
-
-  /* نصوص القوائم المنسدلة والجداول - أسود داكن 100% للوضوح */
+  /* نصوص القوائم المنسدلة والجداول - أسود داكن 100% للوضوح الملكي */
   [role="listbox"], 
   [role="menu"], 
   [data-radix-select-content], 
   [data-radix-popover-content],
   .table-body td {
     color: #000000 !important;
-    font-weight: 800 !important;
+    font-weight: 700 !important;
   }
 
   [role="option"], 
@@ -141,7 +93,7 @@
   [cmdk-item] {
     cursor: pointer !important;
     color: #000000 !important;
-    font-weight: 800 !important;
+    font-weight: 700 !important;
   }
 }
 

@@ -82,46 +82,44 @@ export default function LoginPage() {
 
   if (globalLoading && !isSubmitting) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* ✨ محرك السديم المطور المطابق للصورة تماماً ✨ */}
-        <div className="nova-nebula-container">
-            <div className="nova-dust-field" />
-            <div className="nova-nebula-ring" />
-            <div className="nova-nebula-core" />
-            
-            <div className="nova-text-glow">
-                <span>NOVA</span>
-            </div>
-        </div>
-        
-        {/* نص التحميل */}
-        <div className="absolute bottom-20 left-0 right-0 flex flex-col items-center justify-center space-y-6 z-30">
-            <div className="flex items-center justify-center gap-4">
-                <p className="text-[#FF7A00] font-black text-2xl tracking-tight">جاري التحميل</p>
-                <div className="flex gap-2.5 pt-2">
-                    <div className="h-3 w-3 bg-[#FFB000] rounded-full animate-bounce shadow-lg shadow-amber-200" style={{ animationDelay: '0s' }} />
-                    <div className="h-3 w-3 bg-[#FF7A00] rounded-full animate-bounce shadow-lg shadow-orange-200" style={{ animationDelay: '0.2s' }} />
-                    <div className="h-3 w-3 bg-[#E66D00] rounded-full animate-bounce shadow-lg shadow-orange-400" style={{ animationDelay: '0.4s' }} />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#fdfaf3] relative overflow-hidden" dir="rtl">
+        <main className="relative w-full h-screen flex flex-col items-center justify-center p-6 select-none overflow-hidden">
+            <div className="relative flex items-center justify-center">
+                <div className="relative z-10 overflow-hidden rounded-full">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                        alt="Nova Nebula" 
+                        className="max-w-[120vw] md:max-w-[800px] h-auto object-contain nova-nebula-img" 
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEtNlSBtckngBW_Ee7zv-W5tmEJ6EZBDeaCR6TlVQDGr64SCn8e28U9zGFo9V4IkUKHFNKjJpKWJDmm0Dm70aTBpbOmQZf6UQA0ybHv9-MwgNx_ggEcDJMuTRkrXNatfJzL7PcSVxTZQ32ULGzS5chJStYZuU5UR_UbU52fAlJ36EievnwnvfcpyBNJA9jYr6wELbgtj3XmBrT56mjy5mrBdCum65Ftkl91BG77W6GFbzPAI-6fsiKCJ_7Nb8hFQ8CfvdxHJdiB9-O"
+                    />
                 </div>
             </div>
-        </div>
+            <div className="absolute bottom-20 flex flex-row-reverse items-center gap-2">
+                <span className="text-[#333333] text-lg font-black tracking-wide">جاري التحميل</span>
+                <div className="flex flex-row-reverse items-center gap-1 mt-1">
+                    <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0s' }}></span>
+                    <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0.2s' }}></span>
+                    <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0.4s' }}></span>
+                </div>
+            </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-white/10 relative overflow-hidden" dir="rtl">
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#FFB000]/10 rounded-full blur-[80px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/10 rounded-full blur-[80px] pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#fdfaf3] relative overflow-hidden" dir="rtl">
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#e87c24]/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#e87c24]/5 rounded-full blur-[100px] pointer-events-none" />
 
-      <div className="p-1 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#FF7A00] shadow-2xl animate-in zoom-in-95 duration-1000 relative z-10">
+      <div className="p-1 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#e87c24] shadow-2xl animate-in zoom-in-95 duration-1000 relative z-10">
         <Card className="w-full max-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
             <CardHeader className="py-10 px-8 text-center">
-                <div className="bg-gradient-to-br from-[#FF7A00] to-[#E66D00] p-6 rounded-[2.2rem] w-fit mx-auto mb-6 shadow-xl border-4 border-white/30 transition-transform hover:scale-105 duration-500">
+                <div className="bg-gradient-to-br from-[#e87c24] to-[#c26514] p-6 rounded-[2.2rem] w-fit mx-auto mb-6 shadow-xl border-4 border-white/30 transition-transform hover:scale-105 duration-500">
                     <LogIn className="h-10 w-10 text-white" />
                 </div>
                 <CardTitle className="text-4xl font-black text-[#1e1b4b] tracking-tighter">Nova</CardTitle>
-                <CardDescription className="text-[#FF7A00] font-black mt-2 text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2">
+                <CardDescription className="text-[#e87c24] font-black mt-2 text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2">
                     <Sparkles className="h-3 w-3 animate-pulse" />
                     دخول الموظفين
                 </CardDescription>
@@ -165,19 +163,19 @@ export default function LoginPage() {
                         </div>
 
                         <div className="space-y-4">
-                            <Button type="submit" className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none transition-all active:scale-95 group">
+                            <Button type="submit" className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl bg-gradient-to-r from-[#e87c24] to-[#FFB000] text-white border-none transition-all active:scale-95 group">
                                 {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول"}
                                 {!isSubmitting && <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform rotate-180" />}
                             </Button>
                             
                             <div className="flex flex-col items-center gap-4">
-                                <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-black text-slate-400 hover:text-[#FF7A00] transition-colors">نسيت كلمة المرور؟</button>
+                                <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-black text-slate-400 hover:text-[#e87c24] transition-colors">نسيت كلمة المرور؟</button>
                                 
                                 <Separator className="w-1/2 opacity-10" />
                                 
                                 <div className="text-center pt-2">
                                     <p className="text-[10px] font-bold text-slate-400 mb-3">هل تملك شركة؟</p>
-                                    <Button asChild variant="outline" className="h-12 px-10 rounded-2xl border-2 border-orange-200 text-[#FF7A00] font-black text-sm gap-2 hover:bg-orange-50 shadow-sm transition-all">
+                                    <Button asChild variant="outline" className="h-12 px-10 rounded-2xl border-2 border-orange-200 text-[#e87c24] font-black text-sm gap-2 hover:bg-orange-50 shadow-sm transition-all">
                                         <Link href="/register">
                                             <Building2 className="h-5 w-5" />
                                             طلب فتح حساب شركة
@@ -193,7 +191,7 @@ export default function LoginPage() {
                             <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد المسجل</Label>
                             <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg shadow-inner bg-[#F8F9FB]" required placeholder="your@email.com" />
                         </div>
-                        <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg gap-3 bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white shadow-xl">
+                        <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg gap-3 bg-gradient-to-r from-[#e87c24] to-[#FFB000] text-white shadow-xl">
                             {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
                             إرسال رابط استعادة
                         </Button>
