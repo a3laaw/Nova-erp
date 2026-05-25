@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -8,16 +8,15 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { 
     Zap, Save, Loader2, GitMerge, Settings2, 
-    ArrowRightLeft, FileText, Calculator, 
-    AlertTriangle, Sparkles, DatabaseZap, Clock,
-    PlusCircle, Trash2
+    ArrowRightLeft, PlusCircle, Trash2, Activity
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, doc, addDoc, serverTimestamp, orderBy, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import { cleanFirestoreData, cn } from '@/lib/utils';
+import { cleanFirestoreData } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * محرك الأحداث (Event-Driven Automation Engine):
@@ -115,14 +114,13 @@ export function AutomationEngine() {
                 <CardContent className="p-6">
                     {loading ? <div className="space-y-3"><Skeleton className="h-16 w-full rounded-2xl"/><Skeleton className="h-16 w-full rounded-2xl"/></div> :
                      workflows.length === 0 ? <p className="text-center opacity-20 italic py-10 font-black">لا توجد قواعد أتمتة حالية.</p> :
-                     workflows.map(flow => (
+                     workflows.map((flow: any) => (
                         <div key={flow.id} className="p-5 bg-white rounded-3xl border-2 mb-4 hover:border-orange-400 transition-all group shadow-sm">
                             <div className="flex justify-between items-start mb-3">
                                 <Badge className="bg-orange-100 text-orange-700 border-none font-black text-[9px] uppercase tracking-widest">{flow.triggerEvent}</Badge>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteDoc(doc(firestore!, `companies/${user?.currentCompanyId}/system_automations`, flow.id!))}><Trash2 className="h-4 w-4"/></Button>
                             </div>
                             <p className="font-black text-sm text-slate-800 flex items-center gap-2">
-                                <Sparkles className="h-4 w-4 text-orange-500 animate-pulse" />
                                 {flow.actionEffect === 'create_draft_voucher' ? 'توليد قيد استحقاق آلي' : 'تنبيه إداري فوري'}
                             </p>
                         </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -8,15 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
     PlusCircle, Trash2, LayoutGrid, Save, Loader2, 
-    Layers, Link2, Database, Sparkles, Workflow, 
-    Building2, Users, Calculator, Trash, Network
+    Layers, Workflow, Network
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import { cleanFirestoreData, cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
+import { cleanFirestoreData } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
@@ -66,10 +64,10 @@ export function ScreenBuilder() {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <Card className="lg:col-span-8 rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white/80 backdrop-blur-xl border border-white/60">
+            <Card className="lg:col-span-8 rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white/80 backdrop-blur-xl border border-white/40">
                 <CardHeader className="bg-primary/5 p-8 border-b">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Workflow className="h-6 w-6"/></div>
+                        <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Workflow className="h-6 w-6" /></div>
                         <div>
                             <CardTitle className="text-xl font-black">محرر هياكل الشاشات (No-Code UI)</CardTitle>
                             <CardDescription>عرّف الحقول واربطها بالبيانات؛ ستظهر الشاشة آلياً في القائمة الجانبية.</CardDescription>
@@ -97,7 +95,7 @@ export function ScreenBuilder() {
 
                     <div className="space-y-4">
                         <div className="flex justify-between items-center px-1">
-                            <Label className="font-black text-lg flex items-center gap-2"><Layers className="h-5 w-5 text-primary"/> مصفوفة الحقول والارتباطات</Label>
+                            <Label className="font-black text-lg flex items-center gap-2"><Layers className="h-5 w-5 text-primary" /> مصفوفة الحقول والارتباطات</Label>
                             <Button onClick={addField} variant="outline" className="rounded-xl border-dashed border-2 h-9 px-4 text-xs font-bold gap-2">
                                 <PlusCircle className="h-4 w-4" /> إضافة حقل +
                             </Button>
@@ -154,17 +152,17 @@ export function ScreenBuilder() {
                 </CardContent>
                 <CardFooter className="p-8 bg-muted/10 border-t flex justify-end">
                     <Button onClick={handleSaveScreen} disabled={isSaving || !screenNameAr} className="h-14 px-16 rounded-2xl font-black text-xl gap-3 shadow-xl">
-                        {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6"/>} اعتماد هيكل الشاشة
+                        {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />} اعتماد هيكل الشاشة
                     </Button>
                 </CardFooter>
             </Card>
 
             <Card className="lg:col-span-4 rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white/80 backdrop-blur-xl border border-white/60 h-fit sticky top-24">
                 <CardHeader className="bg-indigo-600 text-white p-8">
-                    <CardTitle className="text-xl font-black flex items-center gap-2"><Network className="h-5 w-5"/> قائمة الشاشات الديناميكية</CardTitle>
+                    <CardTitle className="text-xl font-black flex items-center gap-2"><Network className="h-5 w-5" /> قائمة الشاشات الديناميكية</CardTitle>
                 </CardHeader>
                 <CardContent className="p-8 space-y-4">
-                    {dynamicScreens.length === 0 ? <p className="text-center opacity-30 italic py-10">لا توجد شاشات مخصصة.</p> :
+                    {loading ? <Skeleton className="h-20 w-full" /> : dynamicScreens.length === 0 ? <p className="text-center opacity-30 italic py-10">لا توجد شاشات مخصصة.</p> :
                      dynamicScreens.map((screen: any) => (
                         <div key={screen.id} className="p-4 bg-white rounded-2xl border-2 hover:border-primary/30 transition-all flex items-center justify-between group">
                             <div className="flex items-center gap-3">
@@ -174,7 +172,6 @@ export function ScreenBuilder() {
                                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{screen.module}</p>
                                 </div>
                             </div>
-                            <Button variant="ghost" size="icon" className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteDoc(doc(firestore!, `companies/${user?.currentCompanyId}/dynamic_screens`, screen.id!))}><Trash2 className="h-4 w-4"/></Button>
                         </div>
                      ))}
                 </CardContent>
