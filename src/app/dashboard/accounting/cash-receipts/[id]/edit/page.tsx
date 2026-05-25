@@ -190,11 +190,14 @@ export default function EditCashReceiptPage() {
             if (!clientAccount || !debitAccount) throw new Error("الحسابات المطلوبة غير موجودة.");
 
             const recPath = getTenantPath(`cashReceipts/${id}`, tenantId);
+            const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
+
             transaction_fs.update(doc(firestore, recPath!), {
                 receiptDate: date,
                 clientId: selectedClientId || null,
                 clientNameAr: clientAccount.name,
                 projectId: selectedProjectId || null,
+                projectNameAr: selectedProject?.subServiceName || selectedProject?.transactionType || null,
                 amount: parseFloat(amount),
                 amountInWords: numberToArabicWords(amount),
                 description, paymentMethod, reference
@@ -260,7 +263,7 @@ export default function EditCashReceiptPage() {
         <CardContent className="space-y-8 p-10 bg-white">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-end">
                 <div className="md:col-span-2 grid gap-2">
-                    <Label className="font-bold">استلمنا من (حساب العميل المالي) *</Label>
+                    <Label className="font-bold text-black pr-1">استلمنا من (حساب العميل المالي) *</Label>
                     <InlineSearchList 
                         value={selectedAccountId}
                         onSelect={handleAccountChange}
@@ -269,50 +272,53 @@ export default function EditCashReceiptPage() {
                     />
                 </div>
                 <div className="grid gap-2">
-                    <Label className="font-bold">التاريخ *</Label>
+                    <Label className="font-bold text-black pr-1">التاريخ *</Label>
                     <DateInput value={date} onChange={setDate} className="h-12 rounded-xl" />
                 </div>
             </div>
             
             <div className="grid gap-2 p-6 bg-primary/5 rounded-3xl border-2 border-dashed">
-                <Label className="font-black flex items-center gap-2 text-primary"><Target className="h-5 w-5"/> العقد المرتبط</Label>
+                <Label className="font-black flex items-center gap-2 text-primary"><Target className="h-5 w-5"/> العقد المرتبط (مركز الربحية)</Label>
                 <InlineSearchList 
                     value={selectedProjectId}
                     onSelect={setSelectedProjectId}
-                    options={clientProjects.map(p => ({ value: p.id!, label: p.transactionType }))}
-                    placeholder="اختر المشروع..."
+                    options={clientProjects.map(p => ({ 
+                        value: p.id!, 
+                        label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})` 
+                    }))}
+                    placeholder="اختر الخدمة الفنية..."
                     disabled={!selectedClientId}
                 />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="grid gap-2">
-                    <Label className="font-bold">المبلغ *</Label>
+                    <Label className="font-bold text-black pr-1">المبلغ *</Label>
                     <Input 
                       type="number" 
                       step="0.001" 
-                      className='text-left dir-ltr h-12 text-2xl font-black' 
+                      className='text-left dir-ltr h-12 text-2xl font-black text-black' 
                       value={amount} 
                       onChange={e => setAmount(e.target.value)} 
                       onWheel={(e) => e.currentTarget.blur()}
                     />
                 </div>
                 <div className="md:col-span-2 grid gap-2">
-                    <Label className="text-xs font-bold text-muted-foreground">المبلغ كتابةً</Label>
-                    <div className='p-3 text-sm font-bold border-2 border-dashed rounded-xl bg-muted/20 min-h-[48px] flex items-center justify-center'>{amountInWords}</div>
+                    <Label className="text-xs font-black text-muted-foreground pr-1">المبلغ كتابةً</Label>
+                    <div className='p-3 text-sm font-black border-2 border-dashed rounded-xl bg-muted/20 min-h-[48px] flex items-center justify-center text-black/70'>{amountInWords}</div>
                 </div>
             </div>
 
             <div className="grid gap-2">
-                <Label className="font-bold">البيان / وذلك عن</Label>
-                <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="rounded-2xl" />
+                <Label className="font-bold text-black pr-1">البيان / وذلك عن</Label>
+                <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="rounded-2xl font-bold text-black" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t">
                 <div className="grid gap-2">
-                    <Label className="font-bold">طريقة الدفع *</Label>
+                    <Label className="font-bold text-black pr-1">طريقة الدفع *</Label>
                     <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod}>
-                        <SelectTrigger className="h-12 rounded-xl border-2"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-12 rounded-xl border-2 font-bold text-black"><SelectValue /></SelectTrigger>
                         <SelectContent dir="rtl">
                             <SelectItem value="Cash">نقداً</SelectItem>
                             <SelectItem value="Cheque">شيك</SelectItem>
@@ -321,12 +327,12 @@ export default function EditCashReceiptPage() {
                     </Select>
                 </div>
                  <div className="grid gap-2">
-                    <Label className="font-bold">حساب الإيداع *</Label>
+                    <Label className="font-bold text-black pr-1">حساب الإيداع *</Label>
                     <InlineSearchList value={debitAccountId} onSelect={setDebitAccountId} options={debitAccountOptions} placeholder="اختر الحساب..." />
                 </div>
                 <div className="grid gap-2">
-                    <Label className="font-bold">المرجع</Label>
-                    <Input value={reference} onChange={e => setReference(e.target.value)} className="h-12 rounded-xl" />
+                    <Label className="font-bold text-black pr-1">المرجع</Label>
+                    <Input value={reference} onChange={e => setReference(e.target.value)} className="h-12 rounded-xl font-mono font-bold text-black" />
                 </div>
             </div>
         </CardContent>

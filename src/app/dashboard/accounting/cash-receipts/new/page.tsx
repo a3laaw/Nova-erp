@@ -273,7 +273,7 @@ export default function NewCashReceiptPage() {
                 amount: parseFloat(amount), amountInWords, receiptDate: date,
                 paymentMethod, description, reference, journalEntryId: newJournalEntryRef.id,
                 commissionAmount, createdAt: serverTimestamp(), companyId: tenantId,
-                ...(selectedProjectId && { projectId: selectedProjectId, projectNameAr: selectedProject?.transactionType })
+                ...(selectedProjectId && { projectId: selectedProjectId, projectNameAr: selectedProject?.subServiceName || selectedProject?.transactionType })
             }));
 
             const jeLines = [
@@ -307,7 +307,7 @@ export default function NewCashReceiptPage() {
                 });
             }
 
-            transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+            transaction_fs.set(jeCounterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
         });
         
         toast({ title: 'نجاح الحفظ', description: 'تم إصدار السند والترحيل المالي بنجاح.' });
@@ -376,7 +376,10 @@ export default function NewCashReceiptPage() {
                 <InlineSearchList 
                     value={selectedProjectId} 
                     onSelect={setSelectedProjectId} 
-                    options={clientProjects.map(p => ({ value: p.id!, label: p.transactionType }))}
+                    options={clientProjects.map(p => ({ 
+                        value: p.id!, 
+                        label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})`
+                    }))}
                     placeholder={!selectedClientId ? 'اختر حساب العميل أولاً' : projectsLoading ? 'جاري التحميل...' : 'اختر المشروع (اختياري)...'}
                     disabled={!selectedClientId || projectsLoading || isSaving}
                     className="h-12 bg-white rounded-2xl"
