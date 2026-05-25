@@ -35,7 +35,10 @@ import { ar } from 'date-fns/locale';
 import type { UserProductivityItem } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 
-const StatCard = ({ title, value, icon, description, colorClass, loading, subText }: any) => (
+/**
+ * مكون بطاقة الإحصائيات: تم تحديثه ليدعم التمييز بين المبالغ المالية والأعداد المجردة.
+ */
+const StatCard = ({ title, value, icon, description, colorClass, loading, subText, isCurrency = true }: any) => (
     <Card className="overflow-hidden border-white/30 bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] hover-lift group">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="flex items-center gap-3">
@@ -46,7 +49,7 @@ const StatCard = ({ title, value, icon, description, colorClass, loading, subTex
         <CardContent>
             {loading ? <Skeleton className="h-10 w-32 mt-1" /> : (
                 <div className={cn("text-3xl font-black font-mono tracking-tighter text-foreground")}>
-                    {typeof value === 'number' ? formatCurrency(value) : value}
+                    {(typeof value === 'number' && isCurrency) ? formatCurrency(value) : value}
                 </div>
             )}
             <p className="text-[10px] text-muted-foreground mt-1 font-bold">{subText || description}</p>
@@ -179,6 +182,7 @@ export default function DashboardPage() {
                 <StatCard 
                     title="المشاريع النشطة" 
                     value={loading ? 0 : stats?.activeProjectsCount || 0} 
+                    isCurrency={false}
                     icon={<Activity className="h-5 w-5" />} 
                     subText="مشاريع قيد التنفيذ حالياً"
                     colorClass="bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400"
@@ -187,6 +191,7 @@ export default function DashboardPage() {
                 <StatCard 
                     title="إجمالي الإيرادات" 
                     value={loading ? 0 : stats?.totalRevenue || 0} 
+                    isCurrency={true}
                     icon={<Wallet className="h-5 w-5" />} 
                     subText="بناءً على السجلات المالية"
                     colorClass="bg-orange-100 dark:bg-primary/20 text-primary"
@@ -206,6 +211,7 @@ export default function DashboardPage() {
                 <StatCard 
                     title="قاعدة العملاء" 
                     value={loading ? 0 : stats?.totalClientsCount || 0} 
+                    isCurrency={false}
                     icon={<Users className="h-5 w-5" />} 
                     subText="إجمالي الملفات المسجلة"
                     colorClass="bg-orange-50 dark:bg-orange-900/20 text-primary"
