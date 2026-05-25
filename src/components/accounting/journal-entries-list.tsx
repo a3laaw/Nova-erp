@@ -15,7 +15,7 @@ import { collection, query, orderBy, doc, deleteDoc, updateDoc } from 'firebase/
 import type { JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
-import { BookOpen, MoreHorizontal, Eye, Pencil, Trash2, Loader2, CheckCircle, Undo2, Search, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { BookOpen, MoreHorizontal, Eye, Pencil, Trash2, Loader2, CheckCircle, Undo2, Search, ShieldCheck } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -98,7 +98,7 @@ export function JournalEntriesList() {
 
     updateDoc(docRef, updateData)
       .then(() => {
-        toast({ title: 'نجاح', description: 'تم ترحيل القيد بنجاح.' });
+        toast({ title: 'نجاح الترحيل', description: 'تم ترحيل القيد بنجاح للحسابات الختامية.' });
       })
       .catch(async (serverError) => {
         const permissionError = new FirestorePermissionError({
@@ -123,7 +123,7 @@ export function JournalEntriesList() {
 
     updateDoc(docRef, updateData)
       .then(() => {
-        toast({ title: 'نجاح', description: 'تم التراجع عن ترحيل القيد.' });
+        toast({ title: 'تراجع عن الترحيل', description: 'عاد القيد لحالة المسودة للتحرير.' });
       })
       .catch(async (serverError) => {
         const permissionError = new FirestorePermissionError({
@@ -147,7 +147,7 @@ export function JournalEntriesList() {
 
     deleteDoc(docRef)
       .then(() => {
-        toast({ title: 'نجاح', description: 'تم حذف قيد اليومية.' });
+        toast({ title: 'حذف القيد', description: 'تم مسح القيد نهائياً من الدفاتر.' });
       })
       .catch(async (serverError) => {
         const permissionError = new FirestorePermissionError({
@@ -170,21 +170,21 @@ export function JournalEntriesList() {
             <div className="relative w-full lg:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
                 <Input
-                    placeholder="ابحث بالرقم أو البيان..."
+                    placeholder="بحث برقم القيد أو البيان..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-11 rounded-xl bg-white border-none shadow-sm font-bold"
+                    className="pl-10 h-11 rounded-xl bg-white border-none shadow-sm font-bold text-black"
                 />
             </div>
             <div className="flex flex-wrap gap-2 items-center">
-                <DateInput value={dateFrom} onChange={(d) => setDateFrom(d ? format(d, 'yyyy-MM-dd') : '')} className="w-36 h-9 text-xs" placeholder="من تاريخ"/>
-                <DateInput value={dateTo} onChange={(d) => setDateTo(d ? format(d, 'yyyy-MM-dd') : '')} className="w-36 h-9 text-xs" placeholder="إلى تاريخ"/>
+                <DateInput value={dateFrom ? new Date(dateFrom) : undefined} onChange={(d) => setDateFrom(d ? format(d, 'yyyy-MM-dd') : '')} className="w-36 h-9 text-xs" placeholder="من تاريخ"/>
+                <DateInput value={dateTo ? new Date(dateTo) : undefined} onChange={(d) => setDateTo(d ? format(d, 'yyyy-MM-dd') : '')} className="w-36 h-9 text-xs" placeholder="إلى تاريخ"/>
                 <Select value={entryTypeFilter} onValueChange={setEntryTypeFilter}>
-                    <SelectTrigger className="w-32 h-9 text-xs bg-white rounded-xl"><SelectValue /></SelectTrigger>
-                    <SelectContent dir="rtl">
+                    <SelectTrigger className="w-32 h-9 text-xs bg-white rounded-xl text-black font-bold"><SelectValue /></SelectTrigger>
+                    <SelectContent dir="rtl" className="bg-white">
                         <SelectItem value="all">الكل</SelectItem>
-                        <SelectItem value="manual">يدوي</SelectItem>
-                        <SelectItem value="commission">عمولات</SelectItem>
+                        <SelectItem value="manual">قيود يدوية</SelectItem>
+                        <SelectItem value="commission">قيود العمولات</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -192,7 +192,7 @@ export function JournalEntriesList() {
 
         <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
           <Table>
-            <TableHeader className="bg-[#F8F9FE]">
+            <TableHeader className="bg-[#F8F9FE] h-14">
               <TableRow className="border-none">
                 <TableHead className="px-8 py-5 font-black text-[#7209B7]">رقم القيد</TableHead>
                 <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
@@ -209,40 +209,40 @@ export function JournalEntriesList() {
                     filteredEntries.map((entry) => {
                         const isSystemEntry = entry.narration?.startsWith('[') || entry.linkedReceiptId;
                         return (
-                        <TableRow key={entry.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16">
-                            <TableCell className="px-8 font-mono font-black text-primary">
+                        <TableRow key={entry.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16 border-b last:border-0">
+                            <TableCell className="px-8 font-mono font-black text-primary text-sm">
                                 <Link href={`/dashboard/accounting/journal-entries/${entry.id}`} className="hover:underline">{entry.entryNumber}</Link>
                             </TableCell>
                             <TableCell className="font-bold text-xs opacity-60">{formatDate(entry.date)}</TableCell>
                             <TableCell className="max-w-xs truncate">
                                 <div className="flex items-center gap-2">
                                     {isSystemEntry && <ShieldCheck className="h-3 w-3 text-blue-500 shrink-0" />}
-                                    <span className="font-medium text-gray-700">{entry.narration}</span>
+                                    <span className="font-bold text-gray-800">{entry.narration}</span>
                                 </div>
                             </TableCell>
                             <TableCell className="text-left font-mono font-black text-[#2E5BCC] text-lg">{formatCurrency(entry.totalDebit)}</TableCell>
                             <TableCell>
-                                <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[entry.status])}>
+                                <Badge variant="outline" className={cn("px-3 font-black text-[10px] border-2", statusColors[entry.status])}>
                                     {statusTranslations[entry.status]}
                                 </Badge>
                             </TableCell>
                             <TableCell className="text-center">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4" /></Button>
+                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20 transition-all"><MoreHorizontal className="h-4 w-4" /></Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" dir="rtl" className="rounded-xl p-2 shadow-2xl border-none">
-                                        <DropdownMenuLabel className="font-black px-3 py-2 text-[#1e1b4b]">خيارات القيد</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
-                                            <Eye className="ml-2 h-4 w-4 text-primary" /> عرض وتصدير
+                                    <DropdownMenuContent align="end" dir="rtl" className="rounded-xl p-2 shadow-2xl border-none bg-white">
+                                        <DropdownMenuLabel className="font-black px-3 py-2 text-[#1e1b4b]">إدارة القيد</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-black">
+                                            <Eye className="h-4 w-4 text-primary" /> عرض وتصدير
                                         </DropdownMenuItem>
                                         {entry.status === 'draft' && (
                                             <>
                                                 <DropdownMenuItem onClick={() => handlePostEntry(entry.id!)} className="text-green-600 font-bold gap-3 py-3 rounded-lg cursor-pointer hover:bg-green-50">
-                                                    <CheckCircle className="ml-2 h-4 w-4" /> ترحيل القيد
+                                                    <CheckCircle className="h-4 w-4" /> ترحيل القيد
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}/edit`)} className="font-bold gap-3 py-3 rounded-lg cursor-pointer">
-                                                    <Pencil className="ml-2 h-4 w-4 text-primary" /> تعديل البيانات
+                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/journal-entries/${entry.id}/edit`)} className="font-bold gap-3 py-3 rounded-lg cursor-pointer text-black">
+                                                    <Pencil className="ml-2 h-4 w-4 text-primary" /> تعديل
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator className="bg-slate-100" />
                                                 <DropdownMenuItem onClick={() => setEntryToDelete(entry)} className="text-red-600 font-black gap-3 py-3 rounded-lg cursor-pointer focus:bg-red-50">
@@ -271,11 +271,11 @@ export function JournalEntriesList() {
                     <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><Trash2 className="h-8 w-8"/></div>
                     <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">
-                        سيتم حذف القيد رقم <strong className="text-foreground">"{entryToDelete?.entryNumber}"</strong> بشكل دائم من السجلات. هذا الإجراء سيؤثر على ميزان المراجعة والحسابات المرتبطة.
+                        سيتم حذف القيد رقم <strong className="text-foreground">"{entryToDelete?.entryNumber}"</strong> بشكل دائم. هذا الإجراء سيؤثر على ميزان المراجعة والحسابات الختامية.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-8 gap-3">
-                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2 text-black">تراجع</AlertDialogCancel>
                     <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
                         {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
                     </AlertDialogAction>

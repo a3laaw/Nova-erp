@@ -78,13 +78,13 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-slate-100 mx-2" />
-                            <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-bold cursor-pointer hover:bg-primary/5 mx-1">
+                            <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-black cursor-pointer hover:bg-primary/5 mx-1 text-black">
                                 <Link href="/dashboard/settings/profile" className="flex items-center gap-3">
                                     <User className="h-4 w-4 text-primary opacity-60" />
                                     <span>ملفي الشخصي</span>
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-bold cursor-pointer hover:bg-primary/5 mx-1">
+                            <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-black cursor-pointer hover:bg-primary/5 mx-1 text-black">
                                 <Link href="/dashboard/settings" className="flex items-center gap-3">
                                     <Settings className="h-4 w-4 text-primary opacity-60" />
                                     <span>إعدادات النظام</span>
@@ -93,7 +93,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                             <DropdownMenuSeparator className="bg-slate-100 mx-2" />
                             <DropdownMenuItem onClick={onLogout} className="rounded-2xl py-3.5 font-black text-red-600 hover:text-white hover:bg-red-600 cursor-pointer mx-1 transition-all">
                                 <LogOut className="ml-2 h-4 w-4" />
-                                <span>تسجيل الخروج</span>
+                                <span>خروج</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -109,7 +109,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="center" className="w-60 rounded-[1.8rem] p-2 shadow-2xl bg-white border-none mt-2" dir="rtl">
                             <DropdownMenuLabel className="font-black text-[10px] text-slate-400 uppercase tracking-widest px-4 py-3 text-right">رادار المواعيد</DropdownMenuLabel>
-                            <DropdownMenuItem asChild className="rounded-xl py-3.5 px-4 font-black cursor-pointer group mb-1">
+                            <DropdownMenuItem asChild className="rounded-xl py-3.5 px-4 font-black cursor-pointer group mb-1 text-black">
                                 <Link href="/dashboard/appointments?tab=architectural" className="flex items-center justify-between w-full">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 bg-orange-50 rounded-xl text-[#FF7A00] group-hover:bg-[#FF7A00] group-hover:text-white transition-colors">
@@ -117,10 +117,9 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                                         </div>
                                         <span>مواعيد المعماري</span>
                                     </div>
-                                    <div className="h-2 w-2 rounded-full bg-orange-400 animate-pulse" />
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild className="rounded-xl py-3.5 px-4 font-black cursor-pointer group">
+                            <DropdownMenuItem asChild className="rounded-xl py-3.5 px-4 font-black cursor-pointer group text-black">
                                 <Link href="/dashboard/appointments?tab=rooms" className="flex items-center justify-between w-full">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 bg-blue-50 rounded-xl text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
@@ -140,8 +139,8 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="center" className="w-56 rounded-[1.8rem] p-2 shadow-2xl bg-white border-none mt-2" dir="rtl">
-                            <DropdownMenuLabel className="font-black text-[10px] text-slate-400 uppercase tracking-widest px-3 py-2 text-right">محرك الإنتاجية</DropdownMenuLabel>
-                            <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group">
+                            <DropdownMenuLabel className="font-black text-[10px] text-slate-400 uppercase tracking-widest px-3 py-2 text-right">أدوات العمل</DropdownMenuLabel>
+                            <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group text-black">
                                 <Link href="/dashboard/productivity?tab=tasks" className="flex items-center gap-3">
                                     <div className="p-1.5 bg-green-50 rounded-lg text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
                                         <ListTodo className="h-4 w-4" />
@@ -149,12 +148,12 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                                     <span>مهامي الشخصية</span>
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group">
+                            <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group text-black">
                                 <Link href="/dashboard/productivity?tab=bookmarks" className="flex items-center gap-3">
                                     <div className="p-1.5 bg-orange-50 rounded-lg text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-colors">
                                         <Bookmark className="h-4 w-4" />
                                     </div>
-                                    <span>مركز المفضلات</span>
+                                    <span>المفضلات</span>
                                 </Link>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -169,7 +168,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         size="icon" 
                         onClick={toggleTheme} 
                         className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
-                        title="تغيير المظهر (فاتح/داكن)"
+                        title="تغيير المظهر"
                     >
                         <Palette className="h-5 w-5" />
                     </Button>
@@ -180,7 +179,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         className="h-10 px-4 rounded-full text-foreground hover:bg-primary/10 hover:text-primary transition-all flex items-center gap-2 group"
                     >
                         <Globe className="h-4 w-4 opacity-70" />
-                        <span className="text-[10px] font-black uppercase tracking-tighter">
+                        <span className="text-[10px] font-black uppercase tracking-tighter text-black">
                             {language === 'ar' ? 'English' : 'عربي'}
                         </span>
                     </Button>
