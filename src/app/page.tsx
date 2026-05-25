@@ -94,9 +94,10 @@ export default function LoginPage() {
                     />
                 </div>
             </div>
-            <div className="absolute bottom-20 flex flex-row-reverse items-center gap-2">
+            {/* ضبط اتجاه نص التحميل السفلي ليكون RTL (نص يمين، نقاط يسار) */}
+            <div className="absolute bottom-20 flex items-center gap-2">
                 <span className="text-[#333333] text-lg font-black tracking-wide">جاري التحميل</span>
-                <div className="flex flex-row-reverse items-center gap-1 mt-1">
+                <div className="flex items-center gap-1 mt-1">
                     <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0s' }}></span>
                     <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0.2s' }}></span>
                     <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0.4s' }}></span>
