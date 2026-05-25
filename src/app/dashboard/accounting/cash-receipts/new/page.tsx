@@ -23,7 +23,7 @@ import {
 import { Save, Loader2, Target, Banknote, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, getDocs, doc, runTransaction, getDoc, orderBy } from 'firebase/firestore';
 import type { Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -226,9 +226,18 @@ export default function NewCashReceiptPage() {
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
+            
+            // 🛡️ تعريف العدادات في بداية الـ Transaction 🛡️
             const counterPath = getTenantPath('counters/cashReceipts', tenantId);
+            const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
+            
             const counterRef = doc(firestore, counterPath!);
-            const counterDoc = await transaction_fs.get(counterRef);
+            const jeCounterRef = doc(firestore, jeCounterPath!); // 🛡️ Fix: Correct definition
+
+            const [counterDoc, jeCounterDoc] = await Promise.all([
+                transaction_fs.get(counterRef),
+                transaction_fs.get(jeCounterRef)
+            ]);
             
             const clientAccount = accounts.find(acc => acc.id === selectedAccountId);
             const debitAccount = accounts.find(acc => acc.id === debitAccountId);
@@ -285,6 +294,9 @@ export default function NewCashReceiptPage() {
                 jeLines.push({ accountId: selectedMethodData.expenseAccountId, accountName: selectedMethodData.expenseAccountName || 'مصروف عمولات بنكية', debit: commissionAmount, credit: 0 });
             }
 
+            // تحديث عداد القيود المحاسبية أيضاً
+            let nextJeNumber = (jeCounterDoc.data()?.counts?.[currentYear] || 0) + 1;
+
             transaction_fs.set(newJournalEntryRef, cleanFirestoreData({
                 entryNumber: `JE-${newVoucherNumber}`, date, narration: `[تحصيل مالي] ${description}`,
                 totalDebit: parseFloat(amount), totalCredit: parseFloat(amount), status: 'posted',
@@ -307,7 +319,8 @@ export default function NewCashReceiptPage() {
                 });
             }
 
-            transaction_fs.set(jeCounterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+            transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+            transaction_fs.set(jeCounterRef, { counts: { [currentYear]: nextJeNumber } }, { merge: true });
         });
         
         toast({ title: 'نجاح الحفظ', description: 'تم إصدار السند والترحيل المالي بنجاح.' });
@@ -380,7 +393,7 @@ export default function NewCashReceiptPage() {
                         value: p.id!, 
                         label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})`
                     }))}
-                    placeholder={!selectedClientId ? 'اختر حساب العميل أولاً' : projectsLoading ? 'جاري التحميل...' : 'اختر المشروع (اختياري)...'}
+                    placeholder={!selectedClientId ? 'اختر حساب العميل أولاً' : projectsLoading ? 'جاري التحميل...' : 'اختر الخدمة الفنية (اختياري)...'}
                     disabled={!selectedClientId || projectsLoading || isSaving}
                     className="h-12 bg-white rounded-2xl"
                 />
