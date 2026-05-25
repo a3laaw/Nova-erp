@@ -40,30 +40,30 @@ export default function DashboardLayout({
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* ✨ سديم النوفا المتوهج والنبضي مطابق للصورة ✨ */}
-        <div className="nova-nebula-glow top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+        {/* ✨ سديم النوفا المتوهج والنبضي مطابق للصورة تماماً ✨ */}
+        <div className="nova-nebula-glow top-1/2 left-1/2" />
         
         <div className="relative flex flex-col items-center justify-center z-10">
-            {/* كلمة NOVA الثابتة والمتوهجة */}
+            {/* كلمة NOVA مع التوهج والتباعد الواسع */}
             <div className="nova-text-glow">
-                <span className="text-8xl font-black tracking-[0.25em] text-[#FF7A00] select-none">
+                <span className="text-8xl font-black tracking-[0.4em] select-none">
                   NOVA
                 </span>
             </div>
             
-            {/* النص السفلي مع النقاط المتحركة */}
-            <div className="mt-24 text-center space-y-4">
+            {/* النص السفلي مع النقاط الملونة المتحركة */}
+            <div className="mt-20 text-center space-y-4">
                 <div className="flex items-center justify-center gap-3">
-                    <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-70 order-1">جاري التحميل</p>
-                    <div className="flex gap-2 order-2 pt-2">
-                        <div className="h-2 w-2 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                        <div className="h-2 w-2 bg-[#FFB000] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                        <div className="h-2 w-2 bg-[#E66D00] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                    <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-70">جاري التحميل</p>
+                    <div className="flex gap-2 pt-2">
+                        <div className="h-2.5 w-2.5 bg-[#FFB000] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                        <div className="h-2.5 w-2.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                        <div className="h-2.5 w-2.5 bg-[#E66D00] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
                     </div>
                 </div>
                 
                 {showEmergencyExit && (
-                    <div className="mt-8 animate-in zoom-in-95 duration-500 glass-effect p-6 rounded-[2.5rem] border-2 border-white shadow-2xl max-w-xs mx-auto">
+                    <div className="mt-12 animate-in zoom-in-95 duration-500 glass-effect p-6 rounded-[2.5rem] border-2 border-white shadow-2xl max-w-xs mx-auto">
                         <div className="flex gap-3">
                             <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] border-slate-200">تحديث</Button>
                             <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] text-red-600">خروج آمن</Button>

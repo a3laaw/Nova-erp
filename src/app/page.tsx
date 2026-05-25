@@ -24,30 +24,6 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 
-/**
- * جزيئات غبار النجوم (Stardust Blast Engine):
- * لضمان تناسق شاشة التحميل في كافة المسارات.
- */
-const Stardust = () => (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {Array.from({ length: 30 }).map((_, i) => (
-            <div 
-                key={i} 
-                className="stardust-particle"
-                style={{
-                    top: '50%',
-                    left: '50%',
-                    '--tw-translate-x': `${(Math.random() - 0.5) * 500}px`,
-                    '--tw-translate-y': `${(Math.random() - 0.5) * 500}px`,
-                    animationDelay: `${Math.random() * 8}s`,
-                    width: '2px',
-                    height: '2px'
-                } as any}
-            />
-        ))}
-    </div>
-);
-
 export default function LoginPage() {
   const { login, resetPassword, user, logout, loading: globalLoading, error: authError } = useAuth();
   const { firestore } = useFirebase();
@@ -107,20 +83,20 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-          <div className="nova-nebula-pulse top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-          <Stardust />
+          {/* ✨ سديم النوفا المتوهج والنبضي مطابق للصورة تماماً ✨ */}
+          <div className="nova-nebula-glow top-1/2 left-1/2" />
 
           <div className="relative flex flex-col items-center justify-center">
               <div className="nova-text-glow">
-                  <span className="text-7xl font-black tracking-[0.25em] text-[#FF7A00] drop-shadow-lg">NOVA</span>
+                  <span className="text-8xl font-black tracking-[0.4em] select-none">NOVA</span>
               </div>
               
               <div className="mt-20 text-center space-y-4 relative z-10">
                   <div className="flex items-center justify-center gap-3">
-                      <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-80 order-1">جاري التحميل</p>
-                      <div className="flex gap-1.5 order-2 pt-1">
-                          <div className="h-2.5 w-2.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                          <div className="h-2.5 w-2.5 bg-[#FFB000] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-70">جاري التحميل</p>
+                      <div className="flex gap-2 pt-2">
+                          <div className="h-2.5 w-2.5 bg-[#FFB000] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                          <div className="h-2.5 w-2.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                           <div className="h-2.5 w-2.5 bg-[#E66D00] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
                       </div>
                   </div>
