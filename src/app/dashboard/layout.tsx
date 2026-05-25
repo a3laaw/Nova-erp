@@ -40,34 +40,38 @@ export default function DashboardLayout({
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        <div className="nova-nebula-glow top-1/2 left-1/2" />
-        
-        <div className="relative flex flex-col items-center justify-center z-10">
-            <div className="nova-text-glow">
+        {/* ✨ محرك السديم السينمائي المطبق ✨ */}
+        <div className="nova-nebula-container">
+            <div className="nova-dust-field" />
+            <div className="nova-nebula-ring" />
+            <div className="nova-nebula-core" />
+            
+            <div className="nova-text-glow relative z-20">
                 <span className="text-8xl font-black tracking-[0.4em] select-none">
                   NOVA
                 </span>
             </div>
+        </div>
+        
+        {/* نص التحميل في الأسفل تماماً */}
+        <div className="absolute bottom-20 left-0 right-0 flex flex-col items-center justify-center space-y-6 z-30">
+            <div className="flex items-center justify-center gap-4">
+                <p className="text-[#1e1b4b] font-black text-2xl tracking-tight opacity-90">جاري التحميل</p>
+                <div className="flex gap-2.5 pt-2">
+                    <div className="h-3 w-3 bg-[#FFB000] rounded-full animate-bounce shadow-lg shadow-amber-200" style={{ animationDelay: '0s' }} />
+                    <div className="h-3 w-3 bg-[#FF7A00] rounded-full animate-bounce shadow-lg shadow-orange-200" style={{ animationDelay: '0.2s' }} />
+                    <div className="h-3 w-3 bg-[#E66D00] rounded-full animate-bounce shadow-lg shadow-orange-400" style={{ animationDelay: '0.4s' }} />
+                </div>
+            </div>
             
-            <div className="mt-20 text-center space-y-4">
-                <div className="flex items-center justify-center gap-3">
-                    <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-70">جاري فتح النظام...</p>
-                    <div className="flex gap-2 pt-2">
-                        <div className="h-2.5 w-2.5 bg-[#FFB000] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                        <div className="h-2.5 w-2.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                        <div className="h-2.5 w-2.5 bg-[#E66D00] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+            {showEmergencyExit && (
+                <div className="animate-in zoom-in-95 duration-500 glass-effect p-6 rounded-[2.5rem] border-2 border-white shadow-2xl max-w-xs mx-auto">
+                    <div className="flex gap-3">
+                        <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-11 rounded-2xl font-black text-xs border-slate-200 text-black shadow-sm">تحديث</Button>
+                        <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-11 rounded-2xl font-black text-xs text-red-600">خروج</Button>
                     </div>
                 </div>
-                
-                {showEmergencyExit && (
-                    <div className="mt-12 animate-in zoom-in-95 duration-500 glass-effect p-6 rounded-[2.5rem] border-2 border-white shadow-2xl max-w-xs mx-auto">
-                        <div className="flex gap-3">
-                            <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] border-slate-200 text-black">تحديث</Button>
-                            <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] text-red-600">خروج</Button>
-                        </div>
-                    </div>
-                )}
-            </div>
+            )}
         </div>
       </div>
     );
