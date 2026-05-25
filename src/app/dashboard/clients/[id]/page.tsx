@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -14,7 +15,10 @@ import {
     deleteDoc, 
     addDoc,
     where,
-    orderBy
+    orderBy,
+    getDoc,
+    runTransaction,
+    limit
 } from 'firebase/firestore';
 import {
   Card,
@@ -64,15 +68,17 @@ import {
     Calculator,
     Sparkles,
     FileSignature,
-    AlertCircle
+    AlertCircle,
+    Ban,
+    RotateCcw
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
-import type { Client, ClientTransaction, Employee, Quotation } from '@/lib/types';
+import type { Client, ClientTransaction, Employee, Quotation, Account } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
+import { formatCurrency, cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { ClientHistoryTimeline } from '@/components/clients/client-history-timeline';
 import {
@@ -102,6 +108,7 @@ const transactionStatusColors: Record<string, string> = {
   completed: 'bg-green-100 text-green-800 border-green-200',
   submitted: 'bg-purple-100 text-purple-800 border-purple-200',
   'on-hold': 'bg-gray-100 text-gray-800 border-gray-200',
+  'cancelled': 'bg-red-100 text-red-800 border-red-200',
 };
 
 const statusTranslations: Record<string, string> = {
@@ -110,6 +117,7 @@ const statusTranslations: Record<string, string> = {
   completed: 'مكتملة',
   submitted: 'تم تسليمها',
   'on-hold': 'مجمدة',
+  'cancelled': 'ملغاة / عقد مفسوخ',
 };
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: any }) {
@@ -139,12 +147,12 @@ export default function ClientProfilePage() {
   
   const [transactionToDelete, setTransactionToDelete] = useState<ClientTransaction | null>(null);
   const [quotationToDelete, setQuotationToDelete] = useState<Quotation | null>(null);
+  const [transactionToCancel, setTransactionToCancel] = useState<ClientTransaction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const clientPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}`, tenantId) : null, [id, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
-  // 🛡️ استعادة المسار الأصيل للمعاملات 🛡️
   const txRelativePath = useMemo(() => id ? `clients/${id}/transactions` : null, [id]);
   const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, txRelativePath, [orderBy('createdAt', 'desc')]);
 
@@ -175,6 +183,94 @@ export default function ClientProfilePage() {
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'خطأ في التحديث' });
     } finally { setIsProcessing(false); }
+  };
+
+  /**
+   * 🛠️ محرك فسخ العقد والترصيد العكسي (Sovereign Contract Cancellation V21.0)
+   * يقوم بحساب المتبقي وتوليد قيد إغلاق المديونية آلياً لضمان الصحة المالية.
+   */
+  const handleConfirmCancelContract = async () => {
+    if (!firestore || !tenantId || !transactionToCancel?.id || !id || !currentUser) return;
+    setIsProcessing(true);
+    try {
+        await runTransaction(firestore, async (transaction_fs) => {
+            const currentYear = new Date().getFullYear();
+            
+            // 1. جلب بيانات السندات المربوطة بالمعاملة لحساب "التحصيل الفعلي"
+            const receiptsPath = getTenantPath('cashReceipts', tenantId);
+            const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath!), where('projectId', '==', transactionToCancel.id)));
+            const totalCollected = receiptsSnap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
+            
+            const originalTotal = transactionToCancel.contract?.totalAmount || 0;
+            const amountToReverse = Math.max(0, originalTotal - totalCollected);
+
+            // 2. معالجة القيد المحاسبي العكسي (Reversing Entry)
+            const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
+            const revenueAccSnap = await getDocs(query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1)));
+            const clientAccSnap = await getDocs(query(collection(firestore, coaPath), where('name', '==', client?.nameAr), where('parentCode', '==', '1102'), limit(1)));
+
+            if (amountToReverse > 0 && !revenueAccSnap.empty && !clientAccSnap.empty) {
+                const revenueAccountId = revenueAccSnap.docs[0].id;
+                const clientAccountId = clientAccSnap.docs[0].id;
+
+                const jeCounterRef = doc(firestore, getTenantPath('counters/journalEntries', tenantId)!);
+                const jeCounterDoc = await transaction_fs.get(jeCounterRef);
+                const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+                
+                const newJeRef = doc(collection(firestore, getTenantPath('journalEntries', tenantId)!));
+
+                // القيد العكسي (مدين: إيرادات / دائن: عميل) لتقليل المديونية بالمبلغ الذي لن يُدفع
+                transaction_fs.set(newJeRef, {
+                    entryNumber: `JV-REV-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
+                    date: serverTimestamp(),
+                    narration: `[قيد عكسي - فسخ عقد] إغلاق متبقي مديونية معاملة #${transactionToCancel.transactionNumber} لـ ${client?.nameAr}`,
+                    totalDebit: amountToReverse,
+                    totalCredit: amountToReverse,
+                    status: 'posted',
+                    lines: [
+                        { accountId: revenueAccountId, accountName: 'إيرادات عقود (إغلاق)', debit: amountToReverse, credit: 0, auto_profit_center: transactionToCancel.id },
+                        { accountId: clientAccountId, accountName: client?.nameAr, debit: 0, credit: amountToReverse, auto_profit_center: transactionToCancel.id }
+                    ],
+                    clientId: id,
+                    transactionId: transactionToCancel.id,
+                    createdAt: serverTimestamp(),
+                    createdBy: currentUser.id,
+                    companyId: tenantId
+                });
+
+                transaction_fs.update(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum });
+            }
+
+            // 3. تحديث حالة المعاملة وحذف كائن العقد الفعال
+            const txRef = doc(firestore, getTenantPath(`clients/${id}/transactions/${transactionToCancel.id}`, tenantId)!);
+            transaction_fs.update(txRef, {
+                status: 'cancelled',
+                'contract.status': 'cancelled',
+                'contract.cancellationDate': serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+
+            // 4. توثيق الحدث في السجل التاريخي
+            const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
+            const historyRef = doc(collection(firestore, historyPath!));
+            transaction_fs.set(historyRef, {
+                type: 'log',
+                content: `تم فسخ العقد المالي للمعاملة #${transactionToCancel.transactionNumber} وإغلاق مديونية المتبقي بقيمة ${formatCurrency(amountToReverse)} آلياً.`,
+                createdAt: serverTimestamp(),
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
+                companyId: tenantId
+            });
+        });
+
+        toast({ title: '✅ تم فسخ العقد', description: 'تم توليد القيد العكسي وتصفير مديونية المتبقي بنجاح.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'فشل الفسخ المالي', description: e.message });
+    } finally { 
+        setIsProcessing(false); 
+        setTransactionToCancel(null); 
+    }
   };
 
   const handleConfirmDeleteTransaction = async () => {
@@ -352,7 +448,9 @@ export default function ClientProfilePage() {
                         </div>
                         
                         <div className="grid gap-4">
-                            {txs.map(tx => (
+                            {txs.map(tx => {
+                                const hasSignedContract = !!tx.contract;
+                                return (
                                 <Card key={tx.id} className="rounded-[2rem] border-2 border-transparent bg-white shadow-md hover:border-primary/20 transition-all group overflow-hidden">
                                     <div className="flex flex-col sm:flex-row items-center justify-between p-6 gap-6 px-10">
                                         <div className="flex items-center gap-6">
@@ -389,13 +487,21 @@ export default function ClientProfilePage() {
                                                     
                                                     <DropdownMenuSeparator className="bg-slate-100" />
                                                     
-                                                    <DropdownMenuItem onSelect={() => router.push(`/dashboard/contracts/new?clientId=${id}&transactionId=${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-indigo-700">
-                                                        <FileSignature className="h-4 w-4" /> توقيع عقد مباشر
-                                                    </DropdownMenuItem>
-                                                    
-                                                    <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/new?clientId=${id}&transactionId=${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-emerald-700">
-                                                        <Calculator className="h-4 w-4" /> إصدار عرض سعر
-                                                    </DropdownMenuItem>
+                                                    {!hasSignedContract ? (
+                                                        <>
+                                                            <DropdownMenuItem onSelect={() => router.push(`/dashboard/contracts/new?clientId=${id}&transactionId=${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-indigo-700">
+                                                                <FileSignature className="h-4 w-4" /> توقيع عقد مباشر
+                                                            </DropdownMenuItem>
+                                                            
+                                                            <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/new?clientId=${id}&transactionId=${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-emerald-700">
+                                                                <Calculator className="h-4 w-4" /> إصدار عرض سعر
+                                                            </DropdownMenuItem>
+                                                        </>
+                                                    ) : (
+                                                        <DropdownMenuItem onSelect={() => setTransactionToCancel(tx)} className="rounded-lg py-3 font-black gap-3 cursor-pointer text-orange-600 focus:bg-orange-50">
+                                                            <Ban className="h-4 w-4" /> فسخ وإلغاء العقد المالي
+                                                        </DropdownMenuItem>
+                                                    )}
 
                                                     <DropdownMenuSeparator className="bg-slate-100" />
 
@@ -414,7 +520,7 @@ export default function ClientProfilePage() {
                                         </div>
                                     </div>
                                 </Card>
-                            ))}
+                            )})}
                         </div>
                     </section>
                 ))
@@ -427,6 +533,32 @@ export default function ClientProfilePage() {
 
         {isFormOpen && <ClientTransactionForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} clientId={id} clientName={client.nameAr} />}
         
+        {/* Cancel Contract Confirmation with Financial Settlement Alert */}
+        <AlertDialog open={!!transactionToCancel} onOpenChange={() => setTransactionToCancel(null)}>
+            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
+                <AlertDialogHeader>
+                    <div className="p-4 bg-orange-100 rounded-3xl w-fit mb-4"><Ban className="h-10 w-10 text-orange-600"/></div>
+                    <AlertDialogTitle className="text-2xl font-black text-orange-800 tracking-tighter">تأكيد فسخ العقد والترصيد العكسي؟</AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-4 text-lg font-medium leading-relaxed mt-2 text-slate-600">
+                        <p>أنت على وشك إلغاء التعاقد المالي للمعاملة رقم <strong>{transactionToCancel?.transactionNumber}</strong>.</p>
+                        <Alert className="bg-blue-50 border-blue-200">
+                            <ShieldCheck className="h-5 w-5 text-blue-600" />
+                            <AlertTitle className="text-blue-900 font-black">الإجراء المحاسبي الآلي:</AlertTitle>
+                            <AlertDescription className="text-blue-800">
+                                سيقوم النظام آلياً بتوليد <strong>قيد عكسي</strong> لإغلاق مديونية العميل المتبقية (قيمة العقد - ما تم تحصيله فعلياً) وإلغاء استحقاق الإيرادات لضمان صحة الميزانية.
+                            </AlertDescription>
+                        </Alert>
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-10 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmCancelContract} disabled={isProcessing} className="bg-orange-600 hover:bg-orange-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-orange-100">
+                        {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، فسخ وتسوية'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
         {/* Transaction Delete Confirmation */}
         <AlertDialog open={!!transactionToDelete} onOpenChange={() => setTransactionToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
