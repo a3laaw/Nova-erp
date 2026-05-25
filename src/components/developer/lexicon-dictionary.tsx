@@ -21,15 +21,17 @@ import {
     MousePointer2,
     FileText,
     Pencil,
-    RefreshCw,
     RotateCcw,
-    CheckCircle2
+    CheckCircle2,
+    Sparkles,
+    Activity,
+    Undo2
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, orderBy, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import { cn, cleanFirestoreData } from '@/lib/utils';
+import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -41,6 +43,10 @@ const NAMESPACES = [
     { id: 'ui_prose', name: 'النصوص الثابتة (Static UI)', color: 'bg-orange-100 text-orange-700', icon: Languages },
 ];
 
+/**
+ * محرك القاموس الموحد (Lexicon Engine V48.0):
+ * تم تحصين كافة المسارات والعمليات لتعمل بمستوى سيادي عالمي.
+ */
 export function LexiconDictionary() {
     const { firestore } = useFirebase();
     const { user } = useAuth();
@@ -64,7 +70,7 @@ export function LexiconDictionary() {
         module: 'General'
     });
 
-    // 🛡️ استخدام المسار العالمي الموحد للقاموس لضمان عمله للمطور 🛡️
+    // 🛡️ جلب القاموس العالمي 🛡️
     const { data: lexicon, loading } = useSubscription<any>(
         firestore, 
         'system_lexicon', 
@@ -91,16 +97,17 @@ export function LexiconDictionary() {
         if (!firestore || !formData.key || !formData.valueAr) return;
         setIsSaving(true);
         try {
+            const finalPath = getTenantPath('system_lexicon', null)!;
             const payload = cleanFirestoreData({
                 ...formData,
                 updatedAt: serverTimestamp(),
             });
 
             if (editingItem) {
-                await updateDoc(doc(firestore, 'system_lexicon', editingItem.id), payload);
+                await updateDoc(doc(firestore, finalPath, editingItem.id), payload);
                 toast({ title: '✅ تم تحديث المصطلح' });
             } else {
-                await addDoc(collection(firestore, 'system_lexicon'), { ...payload, createdAt: serverTimestamp() });
+                await addDoc(collection(firestore, finalPath), { ...payload, createdAt: serverTimestamp() });
                 toast({ title: '✅ تم إضافة المصطلح' });
             }
             setIsFormOpen(false);
@@ -110,77 +117,66 @@ export function LexiconDictionary() {
         } finally { setIsSaving(false); }
     };
 
-    /**
-     * محرك تحديث المنظومة (Publish & Sync):
-     * يقوم بتحديث الطابع الزمني لإعدادات الإطار العملي لفرض المزامنة على كافة الواجهات.
-     */
     const handleUpdateSystem = async () => {
         if (!firestore) return;
         setIsUpdating(true);
         try {
-            const configRef = doc(firestore, 'framework_config', 'main_sync');
-            await setDoc(configRef, {
+            const syncRef = doc(firestore, 'framework_config', 'main_sync');
+            await setDoc(syncRef, {
                 lastLexiconUpdate: serverTimestamp(),
                 updatedBy: user?.id
             }, { merge: true });
-            toast({ title: '✅ تم تحديث المنظومة', description: 'تم نشر كافة التعديلات اللغوية لكافة الموظفين فوراً.' });
+            toast({ title: '✅ تم تحديث المنظومة', description: 'تم تفعيل التعديلات اللغوية لكافة المستخدمين.' });
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ في التحديث' });
         } finally { setIsUpdating(false); }
     };
 
-    /**
-     * محرك استيراد الأساسيات المطور:
-     * تم تحصينه لضمان العمل من المسارات العالمية وبدون تكرار.
-     */
     const handleImportDefaults = async () => {
         if (!firestore) return;
         setIsImporting(true);
         try {
             const batch = writeBatch(firestore);
+            const finalPath = getTenantPath('system_lexicon', null)!;
+            
             const defaults = [
                 { key: 'btn_save', namespace: 'actions', valueAr: 'حفظ التعديلات', valueEn: 'Save Changes' },
                 { key: 'btn_cancel', namespace: 'actions', valueAr: 'إلغاء', valueEn: 'Cancel' },
-                { key: 'btn_add', namespace: 'actions', valueAr: 'إضافة جديد', valueEn: 'Add New' },
-                { key: 'btn_edit', namespace: 'actions', valueAr: 'تعديل', valueEn: 'Edit' },
                 { key: 'btn_delete', namespace: 'actions', valueAr: 'حذف نهائي', valueEn: 'Delete' },
                 { key: 'btn_print', namespace: 'actions', valueAr: 'طباعة المستند', valueEn: 'Print' },
-                { key: 'btn_back', namespace: 'actions', valueAr: 'عودة', valueEn: 'Back' },
                 { key: 'lbl_name', namespace: 'fields', valueAr: 'الاسم الكامل', valueEn: 'Full Name' },
-                { key: 'lbl_phone', namespace: 'fields', valueAr: 'رقم الهاتف', valueEn: 'Phone Number' },
+                { key: 'lbl_amount', namespace: 'fields', valueAr: 'المبلغ الإجمالي', valueEn: 'Total Amount' },
                 { key: 'lbl_date', namespace: 'fields', valueAr: 'التاريخ', valueEn: 'Date' },
-                { key: 'lbl_amount', namespace: 'fields', valueAr: 'المبلغ', valueEn: 'Amount' },
-                { key: 'lbl_status', namespace: 'fields', valueAr: 'الحالة', valueEn: 'Status' },
-                { key: 'msg_save_success', namespace: 'alerts', valueAr: 'تم حفظ المستند بنجاح', valueEn: 'Document saved successfully' },
-                { key: 'ui_loading', namespace: 'ui_prose', valueAr: 'جاري تهيئة النظام...', valueEn: 'Initializing System...' },
-                { key: 'ui_search_placeholder', namespace: 'ui_prose', valueAr: 'ابحث عن أي شيء هنا...', valueEn: 'Search anything...' },
+                { key: 'msg_success', namespace: 'alerts', valueAr: 'تمت العملية بنجاح', valueEn: 'Success' },
+                { key: 'ui_loading', namespace: 'ui_prose', valueAr: 'جاري التحميل...', valueEn: 'Loading...' },
+                { key: 'ui_dashboard', namespace: 'ui_prose', valueAr: 'لوحة التحكم', valueEn: 'Dashboard' }
             ];
 
             const existingKeys = new Set((lexicon || []).map((item: any) => item.key));
-            let addedCount = 0;
+            let added = 0;
 
             for (const item of defaults) {
                 if (!existingKeys.has(item.key)) {
-                    const newRef = doc(collection(firestore, 'system_lexicon'));
+                    const newRef = doc(collection(firestore, finalPath));
                     batch.set(newRef, { ...item, createdAt: serverTimestamp() });
-                    addedCount++;
+                    added++;
                 }
             }
 
-            if (addedCount > 0) {
+            if (added > 0) {
                 await batch.commit();
-                toast({ title: '✅ تم استيراد الأساسيات', description: `تمت إضافة ${addedCount} مصطلحاً جديداً للقاموس العالمي.` });
+                toast({ title: '✅ تم الاستيراد', description: `تمت إضافة ${added} مصطلحاً جديداً.` });
             } else {
-                toast({ title: 'القاموس مكتمل', description: 'كافة المصطلحات الأساسية موجودة بالفعل.' });
+                toast({ title: 'القاموس مكتمل', description: 'كافة الأساسيات موجودة مسبقاً.' });
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error("Import Error:", e);
             toast({ variant: 'destructive', title: 'فشل الاستيراد' });
         } finally { setIsImporting(false); }
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 animate-in fade-in duration-700">
             <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white/80 backdrop-blur-xl border border-white/40">
                 <CardHeader className="bg-indigo-600/5 p-10 border-b">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-8">
@@ -189,40 +185,20 @@ export function LexiconDictionary() {
                                 <BookOpen className="h-8 w-8" />
                             </div>
                             <div className="text-right">
-                                <CardTitle className="text-3xl font-black text-[#1e1b4b]">قاموس المصطلحات (Lexicon)</CardTitle>
-                                <CardDescription className="text-slate-500 font-bold">المصدر الوحيد للحقيقة لكافة النصوص والرسائل الظاهرة في النظام.</CardDescription>
+                                <CardTitle className="text-3xl font-black text-[#1e1b4b]">قاموس المنظومة (Lexicon)</CardTitle>
+                                <CardDescription className="text-slate-500 font-bold">تحكم في كل كلمة ورسالة تظهر للموظفين عبر البيانات الوصفية.</CardDescription>
                             </div>
                         </div>
                         <div className="flex gap-4 no-print">
-                            {/* زر تحديث المنظومة - لؤلؤي */}
-                            <Button 
-                                variant="ghost" 
-                                onClick={handleUpdateSystem} 
-                                disabled={isUpdating || loading} 
-                                className="h-12 px-6 rounded-2xl font-black gap-2 text-indigo-600 hover:bg-indigo-50 border-none transition-all"
-                            >
+                            <Button variant="ghost" onClick={handleUpdateSystem} disabled={isUpdating || loading} className="h-12 px-6 rounded-2xl font-black gap-2 text-indigo-600 hover:bg-indigo-50 transition-all border-none">
                                 {isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : <RotateCcw className="h-4 w-4" />} تحديث المنظومة
                             </Button>
 
-                            {/* زر الاستيراد - مخطط مطابق للصورة */}
-                            <Button 
-                                variant="outline" 
-                                onClick={handleImportDefaults} 
-                                disabled={isImporting || loading} 
-                                className="h-12 px-10 rounded-2xl font-bold text-sm gap-2 border-2 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm"
-                            >
+                            <Button variant="outline" onClick={handleImportDefaults} disabled={isImporting || loading} className="h-12 px-8 rounded-2xl font-bold text-sm gap-2 border-2 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm">
                                 {isImporting ? <Loader2 className="animate-spin h-4 w-4"/> : <DownloadCloud className="h-4 w-4" />} استيراد الأساسيات
                             </Button>
                             
-                            {/* زر الإضافة - برتقالي بارز مطابق للصورة */}
-                            <Button 
-                                onClick={() => { 
-                                    setEditingItem(null); 
-                                    setFormData({ key: '', namespace: 'actions', valueAr: '', valueEn: '', description: '', module: 'General' }); 
-                                    setIsFormOpen(true); 
-                                }} 
-                                className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-2xl bg-[#FF7A00] hover:bg-[#E66D00] text-white border-none transition-all active:scale-95 group"
-                            >
+                            <Button onClick={() => { setEditingItem(null); setFormData({ key: '', namespace: 'actions', valueAr: '', valueEn: '', description: '', module: 'General' }); setIsFormOpen(true); }} className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-2xl bg-[#FF7A00] hover:bg-[#E66D00] text-white border-none transition-all active:scale-95 group">
                                 <PlusCircle className="h-6 w-6 group-hover:rotate-90 transition-transform" /> إضافة مصطلح
                             </Button>
                         </div>
@@ -243,12 +219,7 @@ export function LexiconDictionary() {
                         
                         <div className="relative w-full lg:w-96">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input 
-                                placeholder="ابحث بالكود أو النص..." 
-                                value={searchQuery} 
-                                onChange={e => setSearchQuery(e.target.value)} 
-                                className="pl-10 h-12 rounded-2xl border-2 font-bold shadow-inner"
-                            />
+                            <Input placeholder="بحث بالكود أو النص..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl border-2 font-bold shadow-inner" />
                         </div>
                     </div>
 
@@ -256,16 +227,16 @@ export function LexiconDictionary() {
                         <Table>
                             <TableHeader className="bg-slate-50 border-b">
                                 <TableRow className="h-14">
-                                    <TableHead className="px-8 font-black text-slate-900 border-l w-[300px]">(KEY) المعرف البرمجي</TableHead>
+                                    <TableHead className="px-8 font-black text-slate-900 border-l w-[300px]">المعرف (KEY)</TableHead>
                                     <TableHead className="font-black text-slate-900 border-l text-right">النص العربي</TableHead>
-                                    <TableHead className="font-black text-slate-900 border-l text-left px-8">ENGLISH VALUE</TableHead>
+                                    <TableHead className="font-black text-slate-900 border-l text-left px-8">ENGLISH</TableHead>
                                     <TableHead className="font-black text-slate-900 text-center w-48">التصنيف</TableHead>
                                     <TableHead className="w-20"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => (
+                                    Array.from({ length: 3 }).map((_, i) => (
                                         <TableRow key={i}><TableCell colSpan={5} className="p-8"><Skeleton className="h-10 w-full rounded-2xl" /></TableCell></TableRow>
                                     ))
                                 ) : filteredLexicon.length === 0 ? (
@@ -274,12 +245,12 @@ export function LexiconDictionary() {
                                     filteredLexicon.map(item => (
                                         <TableRow key={item.id} className="h-16 hover:bg-indigo-50/20 border-b last:border-0 transition-colors group">
                                             <TableCell className="px-8 border-l bg-slate-50/30">
-                                                <code className="text-[11px] font-black text-indigo-700 bg-white px-3 py-1 rounded-lg border shadow-sm">{item.key}</code>
+                                                <code className="text-[10px] font-black text-indigo-700 bg-white px-2 py-1 rounded-lg border">{item.key}</code>
                                             </TableCell>
                                             <TableCell className="font-black text-black text-base text-right">{item.valueAr}</TableCell>
-                                            <TableCell className="font-bold text-slate-600 font-mono text-left text-sm border-l px-8">{item.valueEn}</TableCell>
+                                            <TableCell className="font-black text-slate-900 font-mono text-left text-sm border-l px-8">{item.valueEn}</TableCell>
                                             <TableCell className="text-center">
-                                                <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[9px] uppercase tracking-widest border-2", NAMESPACES.find(n => n.id === item.namespace)?.color)}>
+                                                <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[9px] border-2", NAMESPACES.find(n => n.id === item.namespace)?.color)}>
                                                     {NAMESPACES.find(n => n.id === item.namespace)?.name.split(' (')[0]}
                                                 </Badge>
                                             </TableCell>
@@ -295,21 +266,18 @@ export function LexiconDictionary() {
                         </Table>
                     </div>
                 </CardContent>
-                <CardFooter className="bg-muted/10 p-6 flex justify-center border-t border-indigo-50">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Nova ERP — Comprehensive Framework Lexicon v1.0</p>
-                </CardFooter>
             </Card>
 
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogContent dir="rtl" className="max-w-lg rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
                     <DialogHeader className="p-8 bg-indigo-600 text-white text-right shrink-0">
                         <DialogTitle className="text-2xl font-black">{editingItem ? 'تعديل مصطلح' : 'إضافة مصطلح جديد'}</DialogTitle>
-                        <DialogDescription className="text-indigo-100 font-bold mt-1">تعديل النصوص يؤثر فوراً على كافة واجهات المستخدم.</DialogDescription>
+                        <DialogDescription className="text-indigo-100 font-bold mt-1">المصطلحات تدار عالمياً وتؤثر على كافة واجهات النظام.</DialogDescription>
                     </DialogHeader>
                     <div className="p-8 space-y-6">
                         <div className="grid gap-2">
-                            <Label className="font-black text-slate-400 text-[10px] uppercase tracking-widest pr-1">المعرف البرمجي (Unique Key) *</Label>
-                            <Input value={formData.key} onChange={e => setFormData({...formData, key: e.target.value.toLowerCase().replace(/\s/g, '_')})} disabled={!!editingItem} placeholder="e.g. btn_confirm_save" className="h-12 rounded-xl font-mono border-2" />
+                            <Label className="font-black text-slate-400 text-[10px] uppercase pr-1">المعرف البرمجي (Key) *</Label>
+                            <Input value={formData.key} onChange={e => setFormData({...formData, key: e.target.value.toLowerCase().replace(/\s/g, '_')})} disabled={!!editingItem} placeholder="e.g. btn_save_invoice" className="h-12 rounded-xl font-mono border-2" />
                         </div>
                         <div className="grid grid-cols-2 gap-6">
                             <div className="grid gap-2">
@@ -326,7 +294,7 @@ export function LexiconDictionary() {
                                 <Select value={formData.module} onValueChange={v => setFormData({...formData, module: v as any})}>
                                     <SelectTrigger className="h-11 rounded-xl border-2"><SelectValue /></SelectTrigger>
                                     <SelectContent dir="rtl">
-                                        <SelectItem value="General">عام (General)</SelectItem>
+                                        <SelectItem value="General">عام (Global)</SelectItem>
                                         <SelectItem value="Accounting">المالية</SelectItem>
                                         <SelectItem value="Construction">المقاولات</SelectItem>
                                         <SelectItem value="HR">الموارد البشرية</SelectItem>
@@ -336,12 +304,12 @@ export function LexiconDictionary() {
                         </div>
                         <div className="grid gap-6">
                             <div className="grid gap-2">
-                                <Label className="font-black text-slate-700 pr-1">القيمة بالعربية *</Label>
+                                <Label className="font-black text-slate-700 pr-1">النص العربي *</Label>
                                 <Input value={formData.valueAr} onChange={e => setFormData({...formData, valueAr: e.target.value})} className="h-12 rounded-xl border-2 font-black text-lg" />
                             </div>
                             <div className="grid gap-2">
                                 <Label className="font-black text-slate-700 pr-1">English Value</Label>
-                                <Input value={formData.valueEn} onChange={e => setFormData({...formData, valueEn: e.target.value})} dir="ltr" className="h-12 rounded-xl border-2 font-bold" />
+                                <Input value={formData.valueEn} onChange={e => setFormData({...formData, valueEn: e.target.value})} dir="ltr" className="h-12 rounded-xl border-2 font-black" />
                             </div>
                         </div>
                     </div>

@@ -16,8 +16,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * خطاف اشتراك لحظي محصن (V81.0):
- * تم تحرير محرك الجلب للسماح بجلب البيانات العالمية للمطور (Master Collections).
+ * خطاف اشتراك لحظي محصن (V82.0):
+ * تم إضافة system_lexicon و framework_config للقائمة السيادية لضمان ظهور البيانات للمطور.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -43,22 +43,25 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
-        // 🛡️ تحديد ما إذا كان المسار عالمياً (Master) لتجاوز حاجز الـ tenantId
+        // 🛡️ رادار المسارات العالمية (Sovereign Master Paths)
         const isMaster = [
             'companies', 
             'developers', 
             'global_users', 
             'company_requests', 
             'holidays', 
-            'counters'
+            'counters',
+            'system_lexicon',
+            'framework_config',
+            'hub_posts'
         ].some(mc => collectionPath.startsWith(mc));
 
         const tenantId = user?.currentCompanyId || null;
         const finalPath = getTenantPath(collectionPath, tenantId);
         
-        // منع الجلب إذا لم نصل لمسار نهائي (لغير المطورين)
         if (!finalPath && !isMaster) {
-            setLoading(true); 
+            setLoading(false);
+            setData([]);
             return;
         }
 
@@ -69,7 +72,7 @@ export function useSubscription<T extends { id?: string }>(
         
         if (isGroup) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
-            if (tenantId) finalConstraints.push(where('companyId', '==', tenantId));
+            if (tenantId && !isMaster) finalConstraints.push(where('companyId', '==', tenantId));
             
             try {
                 const q = query(collectionGroup(firestore, collectionName), ...finalConstraints);
@@ -102,7 +105,7 @@ export function useSubscription<T extends { id?: string }>(
                 setLoading(false);
                 setError(null);
             }, (err) => {
-                if (err.message?.includes('permission-denied') && tenantId && !authLoading) {
+                if (err.message?.includes('permission-denied') && !authLoading) {
                     const permissionError = new FirestorePermissionError({
                         path: finalPath!,
                         operation: 'list'

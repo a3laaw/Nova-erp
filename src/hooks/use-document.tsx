@@ -11,8 +11,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * خطاف استماع لوثيقة واحدة محصن (V15.0):
- * تم تحسين "رادار المطور" للسماح بجلب الوثائق العالمية دون الحاجة لمعرّف شركة.
+ * خطاف استماع لوثيقة واحدة محصن (V16.0):
+ * تم إضافة system_lexicon و framework_config لدعم الوصول المباشر للمطور.
  */
 export function useDocument<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -30,14 +30,23 @@ export function useDocument<T extends { id?: string }>(
       return;
     }
 
-    const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters'];
+    const masterCollections = [
+        'companies', 
+        'developers', 
+        'global_users', 
+        'company_requests', 
+        'counters', 
+        'system_lexicon', 
+        'framework_config',
+        'hub_posts'
+    ];
     const isMasterCollection = masterCollections.some(mc => docPath.startsWith(mc));
     const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
 
     const finalPath = getTenantPath(docPath, tenantId);
     
     if (!finalPath) {
-        setLoading(true);
+        setLoading(false);
         return;
     }
 
@@ -55,7 +64,7 @@ export function useDocument<T extends { id?: string }>(
             setError(null);
           },
           (err) => {
-            if (tenantId && !authLoading) {
+            if (!authLoading) {
                 const permissionError = new FirestorePermissionError({
                     path: finalPath,
                     operation: 'get'
