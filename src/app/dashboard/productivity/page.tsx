@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { orderBy, where, doc, updateDoc, serverTimestamp, deleteDoc, QueryConstraint } from 'firebase/firestore';
+import { where, doc, updateDoc, serverTimestamp, deleteDoc, type QueryConstraint } from 'firebase/firestore';
 import type { UserProductivityItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -34,9 +35,10 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * منصة الإنتاجية الشخصية (Personal Workspace V69.0):
- * تم تحصين الاستعلامات لضمان عدم الانهيار عند غياب الـ User ID.
- * تم فرض اللون الأسود القاتم (#000000) للوضوح المطلق.
+ * منصة الإنتاجية الشخصية (Personal Workspace V70.0):
+ * - تم إلغاء الـ orderBy من الخادم لتجنب خطأ الفهارس (Missing Index).
+ * - تفعيل الفرز المحلي لضمان ظهور البيانات فوراً.
+ * - فرض اللون الأسود القاتم (#000000) للوضوح المطلق.
  */
 export default function PersonalProductivityPage() {
     const { firestore } = useFirebase();
@@ -53,29 +55,33 @@ export default function PersonalProductivityPage() {
 
     const tenantId = user?.currentCompanyId;
     
-    // 🛡️ توجيه الرادار السحابي 🛡️
-    const productivityPath = useMemo(() => 
-        tenantId ? getTenantPath('userProductivity', tenantId) : null
-    , [tenantId]);
-
+    // 🛡️ رادار الاستعلام: نكتفي بالفلترة حسب المستخدم لضمان سرعة الاستجابة بدون فهارس مركبة 🛡️
     const productivityQuery = useMemo<QueryConstraint[] | null>(() => {
         if (!user?.id) return null;
         return [
-            where('userId', '==', user.id),
-            orderBy('createdAt', 'desc')
+            where('userId', '==', user.id)
         ];
     }, [user?.id]);
 
-    const { data: allItems, loading: subscriptionLoading } = useSubscription<UserProductivityItem>(
+    const { data: rawItems, loading: subscriptionLoading } = useSubscription<UserProductivityItem>(
         firestore, 
-        productivityQuery ? productivityPath : null, 
+        user?.id ? 'userProductivity' : null, // استخدام المسار النسبي المباشر
         productivityQuery || []
     );
+
+    // ✨ محرك الفرز المحلي (Client-side Sorting): لضمان ظهور الأحدث أولاً دون أخطاء فهارس ✨
+    const allItems = useMemo(() => {
+        return [...rawItems].sort((a, b) => {
+            const timeA = toFirestoreDate(a.createdAt)?.getTime() || 0;
+            const timeB = toFirestoreDate(b.createdAt)?.getTime() || 0;
+            return timeB - timeA;
+        });
+    }, [rawItems]);
 
     const tasks = useMemo(() => allItems.filter(i => i.entryType === 'task'), [allItems]);
     const bookmarks = useMemo(() => allItems.filter(i => i.entryType === 'bookmark'), [allItems]);
 
-    const globalLoading = authLoading || (productivityQuery && subscriptionLoading);
+    const globalLoading = authLoading || (user?.id && subscriptionLoading && allItems.length === 0);
 
     return (
         <div className="space-y-10" dir="rtl">
@@ -99,7 +105,7 @@ export default function PersonalProductivityPage() {
             </Card>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <div className="flex justify-center mb-10">
+                <div className="flex justify-center mb-10 no-print">
                     <TabsList className="bg-white/40 p-1.5 rounded-[2rem] border border-white/60 shadow-xl h-16 w-full max-w-2xl backdrop-blur-md">
                         <TabsTrigger value="tasks" className="rounded-2xl flex-1 font-black gap-2 h-full transition-all text-sm">
                             <ListChecks className="h-4 w-4" /> مهامي الشخصية المجدولة
@@ -118,7 +124,7 @@ export default function PersonalProductivityPage() {
                             <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale border-4 border-dashed rounded-[3rem] bg-white/40">
                                 <ListChecks className="h-24 w-24 mb-4" />
                                 <p className="text-2xl font-black">لا توجد مهام مجدولة حالياً</p>
-                                <p className="text-sm font-bold mt-2 text-center">استخدم زر "محرك الإنتاجية" من داخل المسار الفني لإضافة مهام هنا.</p>
+                                <p className="text-sm font-bold mt-2 text-center px-6">استخدم زر "محرك الإنتاجية" من داخل المسار الفني أو ملف العميل لإضافة مهام للمتابعة.</p>
                             </div>
                         ) : (
                             tasks.map(task => <TaskCard key={task.id} task={task} />)
@@ -134,6 +140,7 @@ export default function PersonalProductivityPage() {
                             <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale border-4 border-dashed rounded-[3rem] bg-white/40">
                                 <Bookmark className="h-24 w-24 mb-4" />
                                 <p className="text-2xl font-black">المفضلة فارغة</p>
+                                <p className="text-sm font-bold mt-2 text-center px-6">أضف الصفحات المهمة للمفضلة من زر "محرك الإنتاجية" للوصول السريع.</p>
                             </div>
                         ) : (
                             bookmarks.map(bm => <BookmarkCard key={bm.id} bookmark={bm} />)
