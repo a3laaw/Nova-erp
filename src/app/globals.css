@@ -67,9 +67,10 @@
     100% { transform: translateY(-200px) translateX(-10px); opacity: 0; }
   }
 
+  /* ✨ النبض الدراماتيكي المحدث (The Dramatic Expansion) ✨ */
   @keyframes pulse-ring {
     0%, 100% { transform: scale(1); opacity: 0.95; }
-    50% { transform: scale(1.15); opacity: 1; }
+    50% { transform: scale(1.5); opacity: 1; }
   }
 
   @keyframes dot-bounce {
@@ -89,8 +90,8 @@
   }
 
   .nova-image-container {
-    mask-image: radial-gradient(circle, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 80%);
-    -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 80%);
+    mask-image: radial-gradient(circle, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 85%);
+    -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 85%);
     mix-blend-mode: multiply;
   }
 

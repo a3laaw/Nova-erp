@@ -124,7 +124,8 @@ export default function LoginPage() {
         <ParticleBackground />
         
         <main className="relative z-10 flex flex-col items-center justify-center w-full px-6 pointer-events-none">
-            <div className="nova-image-container animate-pulse-nova relative w-full max-w-xs aspect-square flex items-center justify-center pointer-events-auto">
+            {/* 🛡️ تكبير الحاوية للسماح بالنبض الواسع 🛡️ */}
+            <div className="nova-image-container animate-pulse-nova relative w-full max-w-md aspect-square flex items-center justify-center pointer-events-auto">
                 <img 
                     alt="Nova Nebula" 
                     className="w-full h-auto object-contain" 
