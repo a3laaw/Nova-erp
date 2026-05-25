@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -182,7 +183,7 @@ export default function LoginPage() {
                                 <Input 
                                     value={identifier} 
                                     onChange={(e) => setIdentifier(e.target.value)} 
-                                    className="h-14 rounded-2xl border-2 border-slate-100 text-center font-black text-lg bg-[#F8F9FB]/50 focus:bg-white focus:border-orange-500/30 transition-all shadow-inner pr-12" 
+                                    className="h-14 rounded-2xl border-2 border-slate-100 text-center font-black text-lg bg-[#F8F9FB]/50 focus:bg-white focus:border-orange-500/30 transition-all shadow-inner pr-12 text-black" 
                                     required 
                                     placeholder="Username / ID"
                                     autoComplete="off"
@@ -196,7 +197,7 @@ export default function LoginPage() {
                                 type="password" 
                                 value={password} 
                                 onChange={e => setPassword(e.target.value)} 
-                                className="h-14 rounded-2xl border-2 border-slate-100 text-center font-bold text-base bg-[#F8F9FB]/50 focus:bg-white focus:border-orange-500/30 shadow-inner" 
+                                className="h-14 rounded-2xl border-2 border-slate-100 text-center font-bold text-base bg-[#F8F9FB]/50 focus:bg-white focus:border-orange-500/30 shadow-inner text-black" 
                                 required 
                                 placeholder="••••••••"
                                 autoComplete="current-password"
@@ -230,7 +231,7 @@ export default function LoginPage() {
                     <form onSubmit={handleResetPassword} className="space-y-6">
                         <div className="grid gap-3">
                             <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد المسجل</Label>
-                            <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg shadow-inner bg-[#F8F9FB]" required placeholder="your@email.com" />
+                            <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg shadow-inner bg-[#F8F9FB] text-black" required placeholder="your@email.com" />
                         </div>
                         <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg gap-3 bg-gradient-to-r from-[#e87c24] to-[#FFB000] text-white shadow-xl">
                             {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}

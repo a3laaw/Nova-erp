@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -104,7 +105,7 @@ export default function DashboardLayout({
         
         {showEmergencyExit && (
             <div className="absolute bottom-6 animate-in zoom-in-95 duration-500 glass-effect p-4 rounded-3xl border-2 border-white shadow-xl flex gap-3 z-50">
-                <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="h-9 rounded-xl font-bold text-xs border-slate-200">تحديث</Button>
+                <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="h-9 rounded-xl font-bold text-xs border-slate-200 text-black">تحديث</Button>
                 <Button onClick={handleSafeExit} variant="ghost" size="sm" className="h-9 rounded-xl font-bold text-xs text-red-600">خروج</Button>
             </div>
         )}
