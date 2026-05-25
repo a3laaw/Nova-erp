@@ -18,7 +18,8 @@ import {
     serverTimestamp, 
     getDoc, 
     Timestamp, 
-    limit 
+    limit,
+    collectionGroup
 } from 'firebase/firestore'; 
 import type { Client, ClientTransaction, Account, Employee, Department, ContractTemplate, TransactionType } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -171,6 +172,10 @@ function DirectContractContent() {
         return type?.activityType === 'construction';
     }, [clientTransactions, watchedTransactionId, transactionTypesData]);
 
+    const templateOptions = useMemo(() => 
+        templates.map(t => ({ value: t.id!, label: t.title }))
+    , [templates]);
+
     const wbsOptions = useMemo(() => {
         const currentValues = (watchedClauses || []).map((m: any) => m.condition).filter(Boolean);
         const existingValues = new Set(specificWorkStages.map(s => s.value));
@@ -199,6 +204,17 @@ function DirectContractContent() {
         }
         toast({ title: '✅ تم استيراد هيكل العقد وتجهيز الدفعات' });
     };
+
+    const clientOptions = useMemo(() => 
+        allClients.map(c => ({ value: c.id!, label: c.nameAr }))
+    , [allClients]);
+
+    const transactionOptions = useMemo(() => 
+        clientTransactions.map(tx => ({ 
+            value: tx.id!, 
+            label: `${tx.subServiceName || tx.transactionType} (${tx.transactionNumber})` 
+        }))
+    , [clientTransactions]);
 
     const onSubmit = async (data: ContractValues) => {
         if (!firestore || !currentUser || !tenantId || savingRef.current) return;
