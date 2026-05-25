@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { where, doc, updateDoc, serverTimestamp, deleteDoc, type QueryConstraint } from 'firebase/firestore';
-import type { UserProductivityItem } from '@/lib/types';
+import type { UserProductivityItem, ProductivityAction, ProductivityStatus } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -20,9 +20,12 @@ import {
     Target,
     Activity,
     CalendarDays,
-    X
+    X,
+    Pencil,
+    Save,
+    Calendar
 } from 'lucide-react';
-import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
+import { cn, formatCurrency, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -33,12 +36,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DateInput } from '@/components/ui/date-input';
 
 /**
- * منصة الإنتاجية الشخصية (Personal Workspace V70.0):
- * - تم إلغاء الـ orderBy من الخادم لتجنب خطأ الفهارس (Missing Index).
- * - تفعيل الفرز المحلي لضمان ظهور البيانات فوراً.
- * - فرض اللون الأسود القاتم (#000000) للوضوح المطلق.
+ * منصة الإنتاجية الشخصية (Personal Workspace V71.0):
+ * - تم إضافة نظام التعديل والحذف المرن للمهام.
+ * - دعم تغيير التواريخ ونوع الإجراء يدوياً.
  */
 export default function PersonalProductivityPage() {
     const { firestore } = useFirebase();
@@ -46,6 +53,8 @@ export default function PersonalProductivityPage() {
     const searchParams = useSearchParams();
     
     const [activeTab, setActiveTab] = useState('tasks');
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [taskToEdit, setTaskToEdit] = useState<UserProductivityItem | null>(null);
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -55,7 +64,6 @@ export default function PersonalProductivityPage() {
 
     const tenantId = user?.currentCompanyId;
     
-    // 🛡️ رادار الاستعلام: نكتفي بالفلترة حسب المستخدم لضمان سرعة الاستجابة بدون فهارس مركبة 🛡️
     const productivityQuery = useMemo<QueryConstraint[] | null>(() => {
         if (!user?.id) return null;
         return [
@@ -65,11 +73,10 @@ export default function PersonalProductivityPage() {
 
     const { data: rawItems, loading: subscriptionLoading } = useSubscription<UserProductivityItem>(
         firestore, 
-        user?.id ? 'userProductivity' : null, // استخدام المسار النسبي المباشر
+        user?.id ? 'userProductivity' : null,
         productivityQuery || []
     );
 
-    // ✨ محرك الفرز المحلي (Client-side Sorting): لضمان ظهور الأحدث أولاً دون أخطاء فهارس ✨
     const allItems = useMemo(() => {
         return [...rawItems].sort((a, b) => {
             const timeA = toFirestoreDate(a.createdAt)?.getTime() || 0;
@@ -83,9 +90,13 @@ export default function PersonalProductivityPage() {
 
     const globalLoading = authLoading || (user?.id && subscriptionLoading && allItems.length === 0);
 
+    const openEditDialog = (task: UserProductivityItem) => {
+        setTaskToEdit(task);
+        setIsEditDialogOpen(true);
+    };
+
     return (
         <div className="space-y-10" dir="rtl">
-            {/* الهيدر المحدث بالهوية البرتقالية */}
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                 <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                 <CardHeader className="p-10 relative z-10">
@@ -127,7 +138,7 @@ export default function PersonalProductivityPage() {
                                 <p className="text-sm font-bold mt-2 text-center px-6">استخدم زر "محرك الإنتاجية" من داخل المسار الفني أو ملف العميل لإضافة مهام للمتابعة.</p>
                             </div>
                         ) : (
-                            tasks.map(task => <TaskCard key={task.id} task={task} />)
+                            tasks.map(task => <TaskCard key={task.id} task={task} onEdit={openEditDialog} />)
                         )}
                     </div>
                 </TabsContent>
@@ -148,11 +159,19 @@ export default function PersonalProductivityPage() {
                     </div>
                 </TabsContent>
             </Tabs>
+
+            {isEditDialogOpen && taskToEdit && (
+                <EditTaskDialog 
+                    isOpen={isEditDialogOpen} 
+                    onClose={() => setIsEditDialogOpen(false)} 
+                    task={taskToEdit} 
+                />
+            )}
         </div>
     );
 }
 
-function TaskCard({ task }: { task: UserProductivityItem }) {
+function TaskCard({ task, onEdit }: { task: UserProductivityItem, onEdit: (task: UserProductivityItem) => void }) {
     const { firestore } = useFirebase();
     const { user } = useAuth();
     const { toast } = useToast();
@@ -176,7 +195,7 @@ function TaskCard({ task }: { task: UserProductivityItem }) {
     };
 
     const handleDelete = async () => {
-        if (!firestore || !taskPath || !confirm('هل تود حذف هذه المهمة نهائياً؟')) return;
+        if (!firestore || !taskPath || !confirm('هل تود حذف هذه المهمة نهائياً من جدولك؟')) return;
         setIsDeleting(true);
         try {
             await deleteDoc(doc(firestore, taskPath));
@@ -212,9 +231,15 @@ function TaskCard({ task }: { task: UserProductivityItem }) {
                     <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest border-2", actionColors[task.actionType!] || "bg-slate-50 text-slate-500 border-slate-100")}>
                         {actionLabels[task.actionType!] || 'مهمة عمل'}
                     </Badge>
-                    <div className="flex items-center gap-3">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{task.sourceModule}</span>
-                        <div className="p-1.5 bg-muted rounded-lg"><Activity className="h-3 w-3 text-slate-400" /></div>
+                    <div className="flex items-center gap-2 no-print">
+                         {!isCompleted && (
+                            <Button variant="ghost" size="icon" onClick={() => onEdit(task)} className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary">
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                         )}
+                         <Button variant="ghost" size="icon" onClick={handleDelete} disabled={isDeleting} className="h-8 w-8 rounded-full hover:bg-red-50 text-red-300 hover:text-red-600">
+                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                        </Button>
                     </div>
                 </div>
                 <CardTitle className="text-xl font-black text-black leading-tight tracking-tight group-hover:text-primary transition-colors">
@@ -239,7 +264,7 @@ function TaskCard({ task }: { task: UserProductivityItem }) {
                             <Clock className="h-3.5 w-3.5 text-primary opacity-40" />
                             <span className="text-[10px] font-black text-slate-400 uppercase">الحالة</span>
                         </div>
-                        <Badge className={cn("font-black text-[9px] border-none px-3", isCompleted ? "bg-green-600" : "bg-blue-600")}>
+                        <Badge className={cn("font-black text-[9px] border-none px-3", isCompleted ? "bg-green-600 text-white" : "bg-blue-600 text-white")}>
                             {isCompleted ? 'مكتملة' : 'قيد المتابعة'}
                         </Badge>
                     </div>
@@ -251,11 +276,7 @@ function TaskCard({ task }: { task: UserProductivityItem }) {
                     <Link href={task.sourceUrl || '#'}><ArrowUpRight className="h-4 w-4"/> فتح المصدر</Link>
                 </Button>
                 
-                {isCompleted ? (
-                    <Button variant="ghost" size="icon" onClick={handleDelete} className="h-12 w-12 rounded-2xl text-red-400 hover:text-red-600 hover:bg-red-50">
-                        <Trash2 className="h-5 w-5" />
-                    </Button>
-                ) : (
+                {!isCompleted && (
                     <Button onClick={handleComplete} disabled={isUpdating} className="flex-1 h-12 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black gap-2 shadow-xl shadow-green-100">
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4"/>}
                         إتمام المهمة
@@ -263,6 +284,92 @@ function TaskCard({ task }: { task: UserProductivityItem }) {
                 )}
             </CardFooter>
         </Card>
+    );
+}
+
+function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: () => void, task: UserProductivityItem }) {
+    const { firestore } = useFirebase();
+    const { user } = useAuth();
+    const { toast } = useToast();
+    
+    const [title, setTitle] = useState(task.title);
+    const [actionType, setActionType] = useState<string>(task.actionType || 'general');
+    const [dueDate, setDueDate] = useState<Date | undefined>(toFirestoreDate(task.dueDate) || undefined);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleUpdate = async () => {
+        const tenantId = user?.currentCompanyId;
+        if (!firestore || !tenantId) return;
+
+        setIsSaving(true);
+        try {
+            const taskPath = getTenantPath(`userProductivity/${task.id}`, tenantId);
+            await updateDoc(doc(firestore, taskPath!), cleanFirestoreData({
+                title,
+                actionType,
+                dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
+                updatedAt: serverTimestamp()
+            }));
+            toast({ title: '✅ تم تحديث المهمة' });
+            onClose();
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
+        } finally { setIsSaving(false); }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+                <DialogHeader className="p-8 bg-primary/5 border-b">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
+                            <Pencil className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <DialogTitle className="text-xl font-black text-[#1e1b4b]">تعديل مهمة العمل</DialogTitle>
+                            <DialogDescription className="font-bold">تعديل الموعد أو نوع الإجراء المطلوب.</DialogDescription>
+                        </div>
+                    </div>
+                </DialogHeader>
+
+                <div className="p-8 space-y-6">
+                    <div className="grid gap-2">
+                        <Label className="font-black text-slate-400 text-[10px] uppercase pr-2">عنوان المهمة *</Label>
+                        <Input value={title} onChange={e => setTitle(e.target.value)} className="h-12 rounded-xl border-2 font-bold text-black" />
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label className="font-black text-slate-400 text-[10px] uppercase pr-2">نوع الإجراء</Label>
+                        <Select value={actionType} onValueChange={setActionType}>
+                            <SelectTrigger className="h-11 rounded-xl border-2 font-bold">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent dir="rtl">
+                                <SelectItem value="review">مراجعة وتدقيق</SelectItem>
+                                <SelectItem value="decision">اتخاذ قرار</SelectItem>
+                                <SelectItem value="design">تصميم فني</SelectItem>
+                                <SelectItem value="redesign">إعادة تصميم / تعديل</SelectItem>
+                                <SelectItem value="meeting">اجتماع عمل</SelectItem>
+                                <SelectItem value="general">متابعة عامة</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label className="font-black text-slate-400 text-[10px] uppercase pr-2">الموعد النهائي المحدث</Label>
+                        <DateInput value={dueDate} onChange={setDueDate} className="h-11 rounded-xl border-2" />
+                    </div>
+                </div>
+
+                <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
+                    <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                    <Button onClick={handleUpdate} disabled={isSaving || !title.trim()} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-primary/30 gap-2">
+                        {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
+                        حفظ التغييرات
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -277,6 +384,7 @@ function BookmarkCard({ bookmark }: { bookmark: UserProductivityItem }) {
     const handleDelete = async (e: React.MouseEvent) => {
         e.preventDefault(); e.stopPropagation();
         if (!firestore || !path) return;
+        if (!confirm('هل تود حذف هذا الرابط من مفضلاتك؟')) return;
         try {
             await deleteDoc(doc(firestore, path));
             toast({ title: 'تمت الإزالة من المفضلة' });
@@ -307,3 +415,4 @@ function BookmarkCard({ bookmark }: { bookmark: UserProductivityItem }) {
         </Link>
     );
 }
+
