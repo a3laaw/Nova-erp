@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -43,10 +44,6 @@ const NAMESPACES = [
     { id: 'ui_prose', name: 'النصوص الثابتة (Static UI)', color: 'bg-orange-100 text-orange-700', icon: Languages },
 ];
 
-/**
- * محرك القاموس الموحد (Lexicon Engine V48.0):
- * تم تحصين كافة المسارات والعمليات لتعمل بمستوى سيادي عالمي.
- */
 export function LexiconDictionary() {
     const { firestore } = useFirebase();
     const { user } = useAuth();
@@ -70,11 +67,10 @@ export function LexiconDictionary() {
         module: 'General'
     });
 
-    // 🛡️ جلب القاموس العالمي 🛡️
+    // 🛡️ جلب القاموس من المسار العالمي الموحد 🛡️
     const { data: lexicon, loading } = useSubscription<any>(
         firestore, 
-        'system_lexicon', 
-        [orderBy('namespace'), orderBy('key')]
+        'system_lexicon'
     );
 
     const filteredLexicon = useMemo(() => {
@@ -90,14 +86,14 @@ export function LexiconDictionary() {
                 item.valueEn.toLowerCase().includes(lower)
             );
         }
-        return results;
+        return results.sort((a, b) => a.key.localeCompare(b.key));
     }, [lexicon, activeNamespace, searchQuery]);
 
     const handleSaveEntry = async () => {
         if (!firestore || !formData.key || !formData.valueAr) return;
         setIsSaving(true);
         try {
-            const finalPath = getTenantPath('system_lexicon', null)!;
+            const finalPath = 'system_lexicon';
             const payload = cleanFirestoreData({
                 ...formData,
                 updatedAt: serverTimestamp(),
@@ -126,7 +122,7 @@ export function LexiconDictionary() {
                 lastLexiconUpdate: serverTimestamp(),
                 updatedBy: user?.id
             }, { merge: true });
-            toast({ title: '✅ تم تحديث المنظومة', description: 'تم تفعيل التعديلات اللغوية لكافة المستخدمين.' });
+            toast({ title: '✅ تم تحديث المنظومة بنجاح', description: 'تم تفعيل التعديلات اللغوية لكافة الشركات والمستخدمين.' });
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ في التحديث' });
         } finally { setIsUpdating(false); }
@@ -137,19 +133,25 @@ export function LexiconDictionary() {
         setIsImporting(true);
         try {
             const batch = writeBatch(firestore);
-            const finalPath = getTenantPath('system_lexicon', null)!;
+            const finalPath = 'system_lexicon';
             
             const defaults = [
                 { key: 'btn_save', namespace: 'actions', valueAr: 'حفظ التعديلات', valueEn: 'Save Changes' },
                 { key: 'btn_cancel', namespace: 'actions', valueAr: 'إلغاء', valueEn: 'Cancel' },
                 { key: 'btn_delete', namespace: 'actions', valueAr: 'حذف نهائي', valueEn: 'Delete' },
                 { key: 'btn_print', namespace: 'actions', valueAr: 'طباعة المستند', valueEn: 'Print' },
+                { key: 'btn_edit', namespace: 'actions', valueAr: 'تعديل البيانات', valueEn: 'Edit' },
                 { key: 'lbl_name', namespace: 'fields', valueAr: 'الاسم الكامل', valueEn: 'Full Name' },
                 { key: 'lbl_amount', namespace: 'fields', valueAr: 'المبلغ الإجمالي', valueEn: 'Total Amount' },
                 { key: 'lbl_date', namespace: 'fields', valueAr: 'التاريخ', valueEn: 'Date' },
-                { key: 'msg_success', namespace: 'alerts', valueAr: 'تمت العملية بنجاح', valueEn: 'Success' },
+                { key: 'lbl_status', namespace: 'fields', valueAr: 'الحالة الإجرائية', valueEn: 'Status' },
+                { key: 'lbl_notes', namespace: 'fields', valueAr: 'الملاحظات', valueEn: 'Notes' },
+                { key: 'msg_success', namespace: 'alerts', valueAr: 'تمت العملية بنجاح', valueEn: 'Operation Successful' },
+                { key: 'msg_error', namespace: 'alerts', valueAr: 'حدث خطأ في النظام', valueEn: 'System Error' },
+                { key: 'msg_confirm_delete', namespace: 'alerts', valueAr: 'هل أنت متأكد من الحذف النهائي؟', valueEn: 'Confirm permanent deletion?' },
                 { key: 'ui_loading', namespace: 'ui_prose', valueAr: 'جاري التحميل...', valueEn: 'Loading...' },
-                { key: 'ui_dashboard', namespace: 'ui_prose', valueAr: 'لوحة التحكم', valueEn: 'Dashboard' }
+                { key: 'ui_no_data', namespace: 'ui_prose', valueAr: 'لا توجد سجلات لعرضها.', valueEn: 'No data available.' },
+                { key: 'ui_dashboard', namespace: 'ui_prose', valueAr: 'لوحة التحكم المركزية', valueEn: 'Executive Dashboard' }
             ];
 
             const existingKeys = new Set((lexicon || []).map((item: any) => item.key));
@@ -158,16 +160,16 @@ export function LexiconDictionary() {
             for (const item of defaults) {
                 if (!existingKeys.has(item.key)) {
                     const newRef = doc(collection(firestore, finalPath));
-                    batch.set(newRef, { ...item, createdAt: serverTimestamp() });
+                    batch.set(newRef, { ...item, createdAt: serverTimestamp(), module: 'General' });
                     added++;
                 }
             }
 
             if (added > 0) {
                 await batch.commit();
-                toast({ title: '✅ تم الاستيراد', description: `تمت إضافة ${added} مصطلحاً جديداً.` });
+                toast({ title: '✅ تم الاستيراد', description: `تمت إضافة ${added} مصطلحاً تأسيسياً للقاموس.` });
             } else {
-                toast({ title: 'القاموس مكتمل', description: 'كافة الأساسيات موجودة مسبقاً.' });
+                toast({ title: 'القاموس مكتمل', description: 'كافة المصطلحات الأساسية موجودة مسبقاً.' });
             }
         } catch (e: any) {
             console.error("Import Error:", e);
@@ -219,7 +221,7 @@ export function LexiconDictionary() {
                         
                         <div className="relative w-full lg:w-96">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input placeholder="بحث بالكود أو النص..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl border-2 font-bold shadow-inner" />
+                            <Input placeholder="بحث بالكود أو النص..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl border-2 font-bold shadow-inner text-black" />
                         </div>
                     </div>
 
@@ -248,7 +250,7 @@ export function LexiconDictionary() {
                                                 <code className="text-[10px] font-black text-indigo-700 bg-white px-2 py-1 rounded-lg border">{item.key}</code>
                                             </TableCell>
                                             <TableCell className="font-black text-black text-base text-right">{item.valueAr}</TableCell>
-                                            <TableCell className="font-black text-slate-900 font-mono text-left text-sm border-l px-8">{item.valueEn}</TableCell>
+                                            <TableCell className="font-black text-black font-mono text-left text-sm border-l px-8">{item.valueEn}</TableCell>
                                             <TableCell className="text-center">
                                                 <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[9px] border-2", NAMESPACES.find(n => n.id === item.namespace)?.color)}>
                                                     {NAMESPACES.find(n => n.id === item.namespace)?.name.split(' (')[0]}
@@ -277,13 +279,13 @@ export function LexiconDictionary() {
                     <div className="p-8 space-y-6">
                         <div className="grid gap-2">
                             <Label className="font-black text-slate-400 text-[10px] uppercase pr-1">المعرف البرمجي (Key) *</Label>
-                            <Input value={formData.key} onChange={e => setFormData({...formData, key: e.target.value.toLowerCase().replace(/\s/g, '_')})} disabled={!!editingItem} placeholder="e.g. btn_save_invoice" className="h-12 rounded-xl font-mono border-2" />
+                            <Input value={formData.key} onChange={e => setFormData({...formData, key: e.target.value.toLowerCase().replace(/\s/g, '_')})} disabled={!!editingItem} placeholder="e.g. btn_save_invoice" className="h-12 rounded-xl font-mono border-2 text-black font-bold" />
                         </div>
                         <div className="grid grid-cols-2 gap-6">
                             <div className="grid gap-2">
                                 <Label className="font-black text-slate-700 pr-1">التصنيف</Label>
                                 <Select value={formData.namespace} onValueChange={v => setFormData({...formData, namespace: v as any})}>
-                                    <SelectTrigger className="h-11 rounded-xl border-2"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="h-11 rounded-xl border-2 text-black font-bold"><SelectValue /></SelectTrigger>
                                     <SelectContent dir="rtl">
                                         {NAMESPACES.map(ns => <SelectItem key={ns.id} value={ns.id}>{ns.name}</SelectItem>)}
                                     </SelectContent>
@@ -292,7 +294,7 @@ export function LexiconDictionary() {
                             <div className="grid gap-2">
                                 <Label className="font-black text-slate-700 pr-1">الموديول</Label>
                                 <Select value={formData.module} onValueChange={v => setFormData({...formData, module: v as any})}>
-                                    <SelectTrigger className="h-11 rounded-xl border-2"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="h-11 rounded-xl border-2 text-black font-bold"><SelectValue /></SelectTrigger>
                                     <SelectContent dir="rtl">
                                         <SelectItem value="General">عام (Global)</SelectItem>
                                         <SelectItem value="Accounting">المالية</SelectItem>
@@ -305,11 +307,11 @@ export function LexiconDictionary() {
                         <div className="grid gap-6">
                             <div className="grid gap-2">
                                 <Label className="font-black text-slate-700 pr-1">النص العربي *</Label>
-                                <Input value={formData.valueAr} onChange={e => setFormData({...formData, valueAr: e.target.value})} className="h-12 rounded-xl border-2 font-black text-lg" />
+                                <Input value={formData.valueAr} onChange={e => setFormData({...formData, valueAr: e.target.value})} className="h-12 rounded-xl border-2 font-black text-lg text-black" />
                             </div>
                             <div className="grid gap-2">
                                 <Label className="font-black text-slate-700 pr-1">English Value</Label>
-                                <Input value={formData.valueEn} onChange={e => setFormData({...formData, valueEn: e.target.value})} dir="ltr" className="h-12 rounded-xl border-2 font-black" />
+                                <Input value={formData.valueEn} onChange={e => setFormData({...formData, valueEn: e.target.value})} dir="ltr" className="h-12 rounded-xl border-2 font-black text-black" />
                             </div>
                         </div>
                     </div>
@@ -324,3 +326,4 @@ export function LexiconDictionary() {
         </div>
     );
 }
+
