@@ -212,7 +212,6 @@ export default function EditCashReceiptPage() {
                 });
             }
 
-            // ✨ التوثيق الآلي في التعليقات (Automated Financial Update Comment) ✨
             if (selectedProjectId) {
                 const timelinePath = getTenantPath(`clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`, tenantId);
                 const timelineRef = doc(collection(firestore, timelinePath!));
@@ -240,7 +239,7 @@ export default function EditCashReceiptPage() {
   const clientAccountOptions = useMemo(() => 
     accounts.filter(a => a.code.startsWith('1102')).map(a => ({
       value: a.id!,
-      label: `${a.name} (${a.code})`,
+      label: `السيد/ ${a.name} (${a.code})`,
       searchKey: a.code
     }))
   , [accounts]);

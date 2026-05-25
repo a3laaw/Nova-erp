@@ -232,7 +232,7 @@ export default function NewCashReceiptPage() {
             const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
             
             const counterRef = doc(firestore, counterPath!);
-            const jeCounterRef = doc(firestore, jeCounterPath!); // 🛡️ Fix: Correct definition
+            const jeCounterRef = doc(firestore, jeCounterPath!);
 
             const [counterDoc, jeCounterDoc] = await Promise.all([
                 transaction_fs.get(counterRef),
@@ -294,8 +294,8 @@ export default function NewCashReceiptPage() {
                 jeLines.push({ accountId: selectedMethodData.expenseAccountId, accountName: selectedMethodData.expenseAccountName || 'مصروف عمولات بنكية', debit: commissionAmount, credit: 0 });
             }
 
-            // تحديث عداد القيود المحاسبية أيضاً
-            let nextJeNumber = (jeCounterDoc.data()?.counts?.[currentYear] || 0) + 1;
+            let nextJeNumber = (jeCounterDoc.data()?.counts || {})[currentYear] || 0;
+            nextJeNumber++;
 
             transaction_fs.set(newJournalEntryRef, cleanFirestoreData({
                 entryNumber: `JE-${newVoucherNumber}`, date, narration: `[تحصيل مالي] ${description}`,
@@ -303,21 +303,6 @@ export default function NewCashReceiptPage() {
                 lines: jeLines, clientId: selectedClientId || null, transactionId: selectedProjectId || null,
                 createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
             }));
-
-            // ✨ التوثيق الآلي في التعليقات (Automated Financial Comment) ✨
-            if (selectedProjectId) {
-                const timelinePath = getTenantPath(`clients/${selectedClientId}/transactions/${selectedProjectId}/timelineEvents`, tenantId);
-                const timelineRef = doc(collection(firestore, timelinePath!));
-                transaction_fs.set(timelineRef, {
-                    type: 'comment',
-                    content: `**[إشعار مالي]**\nتم تحصيل دفعة جديدة بقيمة **${formatCurrency(parseFloat(amount))}**.\n**البيان:** ${description}\n**طريقة الدفع:** ${paymentMethod}`,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
-                    createdAt: serverTimestamp(),
-                    companyId: tenantId
-                });
-            }
 
             transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             transaction_fs.set(jeCounterRef, { counts: { [currentYear]: nextJeNumber } }, { merge: true });
@@ -335,7 +320,7 @@ export default function NewCashReceiptPage() {
   const clientAccountOptions = useMemo(() => 
     accounts.filter(a => a.code.startsWith('1102')).map(a => ({
       value: a.id!,
-      label: `${a.name} (${a.code})`,
+      label: `السيد/ ${a.name} (${a.code})`,
       searchKey: a.code
     }))
   , [accounts]);
