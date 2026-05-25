@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef, Suspense } from 'react';
@@ -20,7 +19,7 @@ import {
     Timestamp, 
     limit 
 } from 'firebase/firestore';
-import type { Client, ClientTransaction, Account, Employee, Department, ContractTemplate } from '@/lib/types';
+import type { Client, ClientTransaction, Account, Employee, Department, ContractTemplate, TransactionType } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -63,8 +62,9 @@ const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'ا�
 const contractSchema = z.object({
   clientId: z.string().min(1, 'العميل مطلوب.'),
   transactionId: z.string().min(1, 'المعاملة مطلوبة.'),
-  totalArea: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
-  floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
+  // ✨ تصفير القيم: السماح بالنصوص الفارغة بدلاً من الـ 0 الإجباري
+  totalArea: z.preprocess((v) => v === '' ? undefined : parseFloat(String(v)), z.number().min(0).optional()),
+  floorsCount: z.preprocess((v) => v === '' ? undefined : parseInt(String(v), 10), z.number().min(1).optional()),
   basementType: z.enum(['none', 'full', 'half', 'vault']).default('none'),
   roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
   workNature: z.enum(['labor_only', 'with_materials']).default('labor_only'),
@@ -72,11 +72,11 @@ const contractSchema = z.object({
     id: z.string(),
     name: z.string().min(1, "وصف الدفعة مطلوب."),
     condition: z.string().min(1, "شرط الاستحقاق مطلوب."),
-    amount: z.preprocess((a) => parseFloat(String(a || '0')), z.number().min(0, "المبلغ مطلوب.")),
+    amount: z.preprocess((a) => a === '' ? undefined : parseFloat(String(a)), z.number().min(0, "المبلغ مطلوب.").optional()),
     percentage: z.number().optional(),
   })).min(1, 'يجب وجود دفعة واحدة على الأقل.'),
   financialsType: z.enum(['fixed', 'percentage']).default('fixed'),
-  totalAmount: z.preprocess((a) => parseFloat(String(a || '0')), z.number().min(0)),
+  totalAmount: z.preprocess((a) => a === '' ? undefined : parseFloat(String(a)), z.number().min(0).optional()),
 });
 
 type ContractValues = z.infer<typeof contractSchema>;
@@ -98,17 +98,23 @@ function DirectContractContent() {
         defaultValues: {
             clientId: searchParams.get('clientId') || '',
             transactionId: searchParams.get('transactionId') || '',
-            totalArea: 0, floorsCount: 1, basementType: 'none', roofExtension: 'none', workNature: 'labor_only',
+            // ✨ الخانات تأتي فارغة تماماً كما طلبت
+            totalArea: undefined, 
+            floorsCount: undefined, 
+            basementType: 'none', 
+            roofExtension: 'none', 
+            workNature: 'labor_only',
             financialsType: 'fixed',
-            clauses: [{ id: generateId(), name: 'الدفعة الأولى عند توقيع العقد', condition: 'عند توقيع العقد', amount: 0 }]
+            clauses: [{ id: generateId(), name: 'الدفعة الأولى عند توقيع العقد', condition: 'عند توقيع العقد', amount: undefined }]
         }
     });
 
     const { fields, append, remove, replace: replaceClauses } = useFieldArray({ control, name: 'clauses' });
     
-    const currentClientId = useWatch({ control, name: 'clientId' });
-    const watchedClauses = useWatch({ control, name: 'clauses' });
-    const financialsType = useWatch({ control, name: 'financialsType' });
+    const currentClientId = watch('clientId');
+    const currentTransactionId = watch('transactionId');
+    const watchedClauses = watch('clauses');
+    const financialsType = watch('financialsType');
 
     const currentTotalCalculated = useMemo(() => {
         const items = watchedClauses || [];
@@ -124,6 +130,7 @@ function DirectContractContent() {
     const { data: accounts = [] } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null);
     const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees');
     const { data: departments = [] } = useSubscription<Department>(firestore, 'departments');
+    const { data: transactionTypesData = [] } = useSubscription<TransactionType>(firestore, 'transactionTypes');
 
     const [clientTransactions, setClientTransactions] = useState<ClientTransaction[]>([]);
     const [txLoading, setTxLoading] = useState(false);
@@ -143,6 +150,14 @@ function DirectContractContent() {
         }).finally(() => setTxLoading(false));
     }, [currentClientId, firestore, tenantId]);
 
+    // 🛡️ رادار "طبيعة العمل": لا تظهر إلا في المقاولات 🛡️
+    const showWorkNature = useMemo(() => {
+        const selectedTx = clientTransactions.find(t => t.id === currentTransactionId);
+        if (!selectedTx || !transactionTypesData) return false;
+        const type = transactionTypesData.find(t => t.id === selectedTx.transactionTypeId);
+        return type?.activityType === 'construction';
+    }, [clientTransactions, currentTransactionId, transactionTypesData]);
+
     const handleTemplateSelect = (templateId: string) => {
         const template = templates.find(t => t.id === templateId);
         if (!template) return;
@@ -157,7 +172,7 @@ function DirectContractContent() {
                 id: generateId(),
                 name: m.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
                 condition: m.condition || '',
-                amount: template.financials?.type === 'fixed' ? Number(m.value) : 0,
+                amount: template.financials?.type === 'fixed' ? Number(m.value) : undefined,
                 percentage: template.financials?.type === 'percentage' ? Number(m.value) : 0,
                 value: Number(m.value)
             }));
@@ -187,7 +202,7 @@ function DirectContractContent() {
     const onSubmit = async (data: ContractValues) => {
         if (!firestore || !currentUser || !tenantId || savingRef.current) return;
         
-        const totalToSave = financialsType === 'fixed' ? currentTotalCalculated : data.totalAmount;
+        const totalToSave = financialsType === 'fixed' ? currentTotalCalculated : (data.totalAmount || 0);
         if (financialsType === 'percentage' && currentTotalCalculated !== 100) {
             toast({ variant: 'destructive', title: 'خطأ في النسب', description: 'مجموع نسب الدفعات يجب أن يكون 100%.' });
             return;
@@ -228,8 +243,8 @@ function DirectContractContent() {
                 const txRef = doc(firestore, txPath!);
                 
                 const finalClauses = data.clauses.map((c: any) => {
-                    const amount = financialsType === 'percentage' ? (c.percentage / 100) * data.totalAmount : c.amount;
-                    return { ...c, amount, status: 'غير مستحقة' };
+                    const amount = financialsType === 'percentage' ? (c.percentage / 100) * (data.totalAmount || 0) : (c.amount || 0);
+                    return { ...c, amount, status: 'غير مستحقة', percentage: c.percentage || 0 };
                 });
 
                 transaction_fs.update(txRef, {
@@ -238,7 +253,13 @@ function DirectContractContent() {
                         clauses: finalClauses,
                         totalAmount: totalToSave,
                         financialsType: data.financialsType,
-                        specs: { totalArea: data.totalArea, floorsCount: data.floorsCount, basementType: data.basementType, roofExtension: data.roofExtension, workNature: data.workNature }
+                        specs: { 
+                            totalArea: data.totalArea || 0, 
+                            floorsCount: data.floorsCount || 1, 
+                            basementType: data.basementType, 
+                            roofExtension: data.roofExtension, 
+                            workNature: showWorkNature ? data.workNature : 'consulting' 
+                        }
                     }),
                     updatedAt: serverTimestamp()
                 });
@@ -297,7 +318,7 @@ function DirectContractContent() {
             </Card>
 
             <form onSubmit={handleSubmit(onSubmit)}>
-                <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white/95 shadow-2xl">
+                <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white/95">
                     <CardContent className="p-10 space-y-10">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                             <div className="grid gap-3">
@@ -345,18 +366,20 @@ function DirectContractContent() {
                                     />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label className="font-black text-[10px] text-slate-400 uppercase">طبيعة العمل</Label>
-                                        <Controller name="workNature" control={control} render={({ field }) => (
-                                            <Select value={field.value} onValueChange={field.onChange}>
-                                                <SelectTrigger className="h-12 rounded-xl border-2 font-black text-xs text-black"><SelectValue /></SelectTrigger>
-                                                <SelectContent dir="rtl">
-                                                    <SelectItem value="labor_only">مصنعية فقط</SelectItem>
-                                                    <SelectItem value="with_materials">توريد وتنفيذ</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        )} />
-                                    </div>
+                                    {showWorkNature && (
+                                        <div className="grid gap-2 animate-in slide-in-from-top-2">
+                                            <Label className="font-black text-[10px] text-slate-400 uppercase">طبيعة العمل</Label>
+                                            <Controller name="workNature" control={control} render={({ field }) => (
+                                                <Select value={field.value} onValueChange={field.onChange}>
+                                                    <SelectTrigger className="h-12 rounded-xl border-2 font-black text-xs text-black"><SelectValue /></SelectTrigger>
+                                                    <SelectContent dir="rtl">
+                                                        <SelectItem value="labor_only">مصنعية فقط</SelectItem>
+                                                        <SelectItem value="with_materials">توريد وتنفيذ</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            )} />
+                                        </div>
+                                    )}
                                     <div className="grid gap-2">
                                         <Label className="font-black text-[10px] text-slate-400 uppercase">توسعة السطح</Label>
                                         <Controller name="roofExtension" control={control} render={({ field }) => (
@@ -377,11 +400,22 @@ function DirectContractContent() {
                                 <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500/10 rounded-r-3xl" />
                                 <div className="grid gap-2">
                                     <Label className="font-black text-[10px] text-slate-400 uppercase pr-1 flex items-center gap-1"><Ruler className="h-3 w-3 text-indigo-600" /> المساحة م²</Label>
-                                    <Input type="number" {...register('totalArea')} className="h-12 rounded-xl border-2 font-black text-lg text-center shadow-inner text-black" />
+                                    <Input 
+                                        type="number" 
+                                        step="any"
+                                        {...register('totalArea')} 
+                                        onWheel={(e) => e.currentTarget.blur()}
+                                        className="h-12 rounded-xl border-2 font-black text-lg text-center shadow-inner text-black [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                    />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label className="font-black text-[10px] text-slate-400 uppercase pr-1 flex items-center gap-1"><Building2 className="h-3 w-3 text-indigo-600" /> عدد الأدوار</Label>
-                                    <Input type="number" {...register('floorsCount')} className="h-12 rounded-xl border-2 font-black text-lg text-center shadow-inner text-black" />
+                                    <Input 
+                                        type="number" 
+                                        {...register('floorsCount')} 
+                                        onWheel={(e) => e.currentTarget.blur()}
+                                        className="h-12 rounded-xl border-2 font-black text-lg text-center shadow-inner text-black [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                    />
                                 </div>
                                 <div className="grid gap-2 md:col-span-2">
                                     <Label className="font-black text-[10px] text-slate-400 uppercase pr-1 flex items-center gap-1"><Home className="h-3 w-3 text-indigo-600" /> خيار السرداب</Label>
@@ -422,7 +456,13 @@ function DirectContractContent() {
                                     {financialsType === 'percentage' && (
                                         <div className="grid gap-1">
                                             <Label className="text-[10px] font-black text-slate-400 uppercase">إجمالي العقد</Label>
-                                            <Input type="number" {...register('totalAmount')} className="w-28 h-10 rounded-xl bg-white font-black text-lg text-center border-none shadow-md text-black" />
+                                            <Input 
+                                                type="number" 
+                                                step="any"
+                                                {...register('totalAmount')} 
+                                                onWheel={(e) => e.currentTarget.blur()}
+                                                className="w-28 h-10 rounded-xl bg-white font-black text-lg text-center border-none shadow-md text-black [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                            />
                                         </div>
                                     )}
                                 </div>
@@ -450,9 +490,11 @@ function DirectContractContent() {
                                                 </TableCell>
                                                 <TableCell className="bg-[#FF7A00]/5 border-r">
                                                     <Input 
-                                                        type="number" step="any" 
+                                                        type="number" 
+                                                        step="any" 
                                                         {...register(financialsType === 'percentage' ? `clauses.${i}.percentage` : `clauses.${i}.amount`)} 
-                                                        className="text-center font-black text-3xl text-[#FF7A00] border-none shadow-none focus-visible:ring-0 bg-transparent font-mono" 
+                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                        className="text-center font-black text-3xl text-[#FF7A00] border-none shadow-none focus-visible:ring-0 bg-transparent font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-center">
@@ -474,7 +516,7 @@ function DirectContractContent() {
                                     </TableFooter>
                                 </Table>
                                 <div className="p-6 flex justify-center bg-muted/5 border-t">
-                                    <Button type="button" variant="ghost" onClick={() => append({ id: generateId(), name: `الدفعة الجديدة`, condition: '', amount: 0, percentage: 0 })} className="h-12 px-10 rounded-xl border-dashed border-2 font-black text-[#FF7A00] gap-2 hover:bg-white transition-all shadow-sm">
+                                    <Button type="button" variant="ghost" onClick={() => append({ id: generateId(), name: `الدفعة الجديدة`, condition: '', amount: undefined, percentage: 0 } as any)} className="h-12 px-10 rounded-xl border-dashed border-2 font-black text-[#FF7A00] gap-2 hover:bg-white transition-all shadow-sm">
                                         <PlusCircle className="h-5 w-5" /> إضافة دفعة استحقاق يدوية +
                                     </Button>
                                 </div>
@@ -486,7 +528,7 @@ function DirectContractContent() {
                             <p className="text-sm font-black text-[#FF7A00] flex items-center gap-2">
                                 <ShieldCheck className="h-5 w-5 animate-pulse"/> سيتم تجميد المعاملة وفتح المسار المالي والميداني
                             </p>
-                            <p className="text-[10px] text-muted-foreground font-bold pr-7">الاعتماد يولد قيد مديونية مسودة باسم العميل في شجرة الحسابات.</p>
+                            <p className="text-[10px] text-muted-foreground font-bold pr-7">الاعتماد النهائي يثبت مديونية العميل في شجرة الحسابات (كقيد غير مرحل).</p>
                         </div>
                         <Button type="submit" disabled={isSaving || !currentClientId || fields.length === 0} className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-[#FF7A00]/30 min-w-[350px] gap-4 bg-[#FF7A00] text-white border-none">
                             {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
