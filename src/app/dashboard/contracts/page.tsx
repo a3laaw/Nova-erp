@@ -17,7 +17,8 @@ import {
   PlusCircle,
   Construction,
   Sparkles,
-  ArrowUpRight
+  RotateCcw,
+  Filter
 } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,10 @@ import { cn } from '@/lib/utils';
 import { useAppTheme } from '@/context/theme-context';
 import { Badge } from '@/components/ui/badge';
 
+/**
+ * @fileOverview مركز إدارة المبيعات والأرشيف التعاقدي الموحد (V58.0).
+ * يجمع العقود الموقعة (المباشرة والمحولة) وعروض الأسعار في منصة رقابية واحدة.
+ */
 export default function UnifiedContractsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [contractNo, setContractNo] = useState('');
@@ -53,15 +58,15 @@ export default function UnifiedContractsPage() {
 
   return (
     <div className="space-y-10" dir="rtl">
-        {/* --- Header --- */}
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 px-4">
+        {/* --- الهيدر الرئيسي --- */}
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 px-4 no-print">
             <div className="space-y-1 text-center lg:text-right">
-                <h1 className="text-3xl font-black flex items-center justify-center lg:justify-start gap-3 text-[#1e1b4b]">
-                    <FileSignature className="h-8 w-8 text-primary" />
-                    إدارة المبيعات والتعاقدات
+                <h1 className="text-4xl font-black flex items-center justify-center lg:justify-start gap-4 text-[#1e1b4b] tracking-tighter">
+                    <FileSignature className="h-10 w-10 text-[#FF7A00]" />
+                    إدارة المبيعات والأرشيف التعاقدي
                 </h1>
-                <p className="text-base font-bold text-slate-500">
-                    تحويل عروض الأسعار إلى عقود ملزمة وربطها بالمشاريع التشغيلية.
+                <p className="text-base font-bold text-slate-500 pr-2 border-r-4 border-[#FF7A00]/20">
+                    مركز التحكم في عروض الأسعار، العقود المبرمة، ومصفوفات الدفعات المعتمدة.
                 </p>
             </div>
         </div>
@@ -69,75 +74,90 @@ export default function UnifiedContractsPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className={cn(isGlass ? "tabs-frame-primary" : "mb-10")}>
                 <TabsList className={cn(
-                    "w-full h-auto bg-transparent p-0 gap-6",
-                    isGlass ? "tabs-list-cards lg:grid-cols-2" : "grid grid-cols-1 md:grid-cols-2"
+                    "w-full h-auto bg-transparent p-0 gap-8 grid grid-cols-1 md:grid-cols-2 max-w-5xl mx-auto"
                 )}>
+                    {/* تبويب العقود الموقعة - الأرشيف */}
                     <TabsTrigger 
                         value="signed-contracts" 
                         className={cn(
-                            "transition-all duration-500 text-right",
-                            isGlass ? "tabs-trigger-card" : "flex flex-col items-start p-6 rounded-2xl border bg-white shadow-sm h-full"
+                            "transition-all duration-500 text-right h-auto p-8 rounded-[2.5rem] border-2 flex flex-col items-start gap-4 shadow-xl",
+                            activeTab === 'signed-contracts' 
+                                ? "bg-white border-[#FF7A00] shadow-orange-500/10 scale-[1.02]" 
+                                : "bg-white/40 border-transparent text-slate-400 hover:bg-white/60"
                         )}
                     >
-                        <div className="tab-icon-box">
+                        <div className={cn(
+                            "p-3 rounded-2xl shadow-inner",
+                            activeTab === 'signed-contracts' ? "bg-[#FF7A00] text-white" : "bg-slate-100 text-slate-400"
+                        )}>
                             <Construction className="h-6 w-6" />
                         </div>
-                        <Badge variant="outline" className="mb-2 bg-primary/10 text-primary border-primary/20 text-[10px] font-black">المسار القانوني</Badge>
-                        <h3 className="text-xl font-black mb-1">العقود الموقعة</h3>
-                        <p className="text-xs font-bold text-muted-foreground mb-4">إدارة العقود المبرمة ومتابعة دفعات الملاك.</p>
-                        <Button asChild className="w-full h-10 rounded-xl font-black text-xs gap-2 mt-auto">
+                        <div className="space-y-1">
+                            <Badge variant="outline" className={cn("mb-1 font-black text-[9px] uppercase tracking-widest", activeTab === 'signed-contracts' ? "bg-orange-50 text-[#FF7A00] border-[#FF7A00]/20" : "")}>Sovereign Archive</Badge>
+                            <h3 className="text-2xl font-black leading-none">العقود الموقعة</h3>
+                            <p className="text-xs font-bold opacity-60">أرشيف كافة الاتفاقيات المبرمة (مباشرة أو محولة).</p>
+                        </div>
+                        <Button asChild className="w-full h-11 rounded-xl font-black text-sm gap-2 mt-4 bg-[#FF7A00] hover:bg-[#E66D00] shadow-lg shadow-orange-500/20 no-print">
                             <Link href="/dashboard/contracts/new">توقيع عقد مباشر +</Link>
                         </Button>
                     </TabsTrigger>
 
+                    {/* تبويب عروض الأسعار */}
                     <TabsTrigger 
                         value="quotations" 
                         className={cn(
-                            "transition-all duration-500 text-right",
-                            isGlass ? "tabs-trigger-card" : "flex flex-col items-start p-6 rounded-2xl border bg-white shadow-sm h-full"
+                            "transition-all duration-500 text-right h-auto p-8 rounded-[2.5rem] border-2 flex flex-col items-start gap-4 shadow-xl",
+                            activeTab === 'quotations' 
+                                ? "bg-white border-[#7209B7] shadow-indigo-500/10 scale-[1.02]" 
+                                : "bg-white/40 border-transparent text-slate-400 hover:bg-white/60"
                         )}
                     >
-                        <div className="tab-icon-box">
+                        <div className={cn(
+                            "p-3 rounded-2xl shadow-inner",
+                            activeTab === 'quotations' ? "bg-[#7209B7] text-white" : "bg-slate-100 text-slate-400"
+                        )}>
                             <FileText className="h-6 w-6" />
                         </div>
-                        <Badge variant="outline" className="mb-2 bg-indigo-50 text-indigo-700 border-indigo-100 text-[10px] font-black">المسار المالي</Badge>
-                        <h3 className="text-xl font-black mb-1">عروض الأسعار</h3>
-                        <p className="text-xs font-bold text-muted-foreground mb-4">إدارة المقترحات الفنية والمالية للعملاء المحتملين.</p>
-                        <Button asChild variant="outline" className="w-full h-10 rounded-xl font-black text-xs gap-2 mt-auto border-primary/30 text-primary bg-primary/5">
+                        <div className="space-y-1">
+                            <Badge variant="outline" className={cn("mb-1 font-black text-[9px] uppercase tracking-widest", activeTab === 'quotations' ? "bg-indigo-50 text-[#7209B7] border-[#7209B7]/20" : "")}>Price Offers</Badge>
+                            <h3 className="text-2xl font-black leading-none">عروض الأسعار</h3>
+                            <p className="text-xs font-bold opacity-60">إدارة المقترحات الفنية والمالية المقدمة للملاك.</p>
+                        </div>
+                        <Button asChild variant="outline" className="w-full h-11 rounded-xl font-black text-sm gap-2 mt-4 border-[#7209B7]/30 text-[#7209B7] bg-indigo-50/50 hover:bg-indigo-100 no-print">
                             <Link href="/dashboard/accounting/quotations/new">إنشاء عرض سعر جديد +</Link>
                         </Button>
                     </TabsTrigger>
                 </TabsList>
             </div>
 
-            <div className="mt-6 space-y-6">
-                <Card className={cn(
-                    "rounded-[2.5rem] border-none shadow-xl overflow-hidden",
-                    isGlass ? "glass-effect" : "bg-white"
-                )}>
-                    <div className="p-8 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6 rounded-[2rem] border-2 border-dashed border-muted-foreground/10 bg-muted/5">
+            <div className="mt-10 space-y-6">
+                <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white/95">
+                    <div className="p-10 space-y-8">
+                        {/* شريط البحث والفلاتر (The Sovereign Radar) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-8 rounded-[2.5rem] border-2 border-dashed border-slate-100 bg-slate-50/50 no-print">
                             <div className="relative group">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40"/>
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#FF7A00] opacity-40"/>
                                 <Input 
-                                    placeholder="الاسم أو الهاتف..." 
+                                    placeholder="اسم العميل أو الهاتف..." 
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="rounded-xl h-11 border-2 font-bold"
+                                    className="rounded-xl h-12 border-2 bg-white font-black text-black shadow-inner"
                                 />
                             </div>
-                            <Input 
-                                placeholder="رقم العقد..." 
-                                value={contractNo}
-                                onChange={(e) => setContractNo(e.target.value)}
-                                className="rounded-xl h-11 font-mono border-2 font-bold"
-                            />
+                            <div className="relative">
+                                <Input 
+                                    placeholder="رقم العقد / المرجع..." 
+                                    value={contractNo}
+                                    onChange={(e) => setContractNo(e.target.value)}
+                                    className="rounded-xl h-12 font-mono border-2 bg-white font-black text-primary shadow-inner"
+                                />
+                            </div>
                             <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                <SelectTrigger className="rounded-xl h-11 border-2 font-bold">
+                                <SelectTrigger className="rounded-xl h-12 border-2 bg-white font-black text-black shadow-inner">
                                     <SelectValue placeholder="الحالة..." />
                                 </SelectTrigger>
                                 <SelectContent dir="rtl">
-                                    <SelectItem value="all">كل الحالات</SelectItem>
+                                    <SelectItem value="all">كل الحالات التعاقدية</SelectItem>
                                     {activeTab === 'quotations' ? (
                                         <>
                                             <SelectItem value="draft">مسودة</SelectItem>
@@ -146,21 +166,21 @@ export default function UnifiedContractsPage() {
                                         </>
                                     ) : (
                                         <>
-                                            <SelectItem value="in-progress">فعال</SelectItem>
-                                            <SelectItem value="on-hold">متوقف</SelectItem>
-                                            <SelectItem value="completed">مكتمل</SelectItem>
-                                            <SelectItem value="cancelled">ملغي</SelectItem>
+                                            <SelectItem value="in-progress">فعال / نشط</SelectItem>
+                                            <SelectItem value="on-hold">معلق إدارياً</SelectItem>
+                                            <SelectItem value="completed">منتهي / مكتمل</SelectItem>
+                                            <SelectItem value="cancelled" className="text-red-600 font-bold">ملغي / مفسوخ</SelectItem>
                                         </>
                                     )}
                                 </SelectContent>
                             </Select>
                             <div className="flex items-center gap-2">
-                                <DateInput value={dateFrom} onChange={setDateFrom} className="flex-1 rounded-xl h-11 border-2" placeholder="من تاريخ" />
-                                <DateInput value={dateTo} onChange={setDateTo} className="flex-1 rounded-xl h-11 border-2" placeholder="إلى تاريخ" />
+                                <DateInput value={dateFrom} onChange={setDateFrom} className="flex-1 rounded-xl h-12 border-2" placeholder="من" />
+                                <DateInput value={dateTo} onChange={setDateTo} className="flex-1 rounded-xl h-12 border-2" placeholder="إلى" />
                             </div>
                         </div>
 
-                        <TabsContent value="quotations" className="animate-in fade-in zoom-in-95 duration-500 m-0">
+                        <TabsContent value="quotations" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0">
                             <QuotationsList 
                                 searchQuery={searchQuery} 
                                 dateFrom={dateFrom} 
@@ -168,7 +188,8 @@ export default function UnifiedContractsPage() {
                                 statusFilter={statusFilter}
                             />
                         </TabsContent>
-                        <TabsContent value="signed-contracts" className="animate-in fade-in zoom-in-95 duration-500 m-0">
+
+                        <TabsContent value="signed-contracts" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0">
                             <ConstructionContractsList 
                                 searchQuery={searchQuery}
                                 contractNo={contractNo}
