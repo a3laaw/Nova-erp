@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Lock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -65,8 +65,13 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     loaderRef 
   } = useInfiniteScroll<TimelineEvent>(relativePath);
 
+  // 🛡️ درع القفل السيادي 🛡️
+  const isLocked = useMemo(() => {
+    return transaction?.status === 'cancelled' || transaction?.status === 'on-hold';
+  }, [transaction?.status]);
+
   const handlePostComment = async () => {
-    if (!newComment.trim() || !currentUser || !firestore) return;
+    if (!newComment.trim() || !currentUser || !firestore || isLocked) return;
 
     const tenantId = currentUser.currentCompanyId;
     const finalPath = getTenantPath(relativePath, tenantId);
@@ -147,7 +152,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
         </CardTitle>
       </CardHeader>
       <CardContent className="p-8 space-y-8">
-        {showInput && currentUser && (
+        {showInput && currentUser && !isLocked && (
           <div className="flex items-start gap-4 p-8 bg-white rounded-[2.5rem] border-2 border-dashed border-primary/20 shadow-inner group focus-within:border-primary transition-all">
             <Avatar className="h-14 w-14 border-2 border-white shadow-md">
               <AvatarImage src={currentUser?.avatarUrl} className="object-cover" />
@@ -175,10 +180,19 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
           </div>
         )}
 
+        {/* 🔒 بنر القفل للتعليقات 🔒 */}
+        {showInput && isLocked && (
+            <div className="p-8 bg-muted/20 rounded-[2.5rem] border-4 border-dashed border-muted flex flex-col items-center justify-center text-center gap-3 opacity-60">
+                <Lock className="h-10 w-10 text-muted-foreground" />
+                <p className="font-black text-xl text-slate-500">منطقة التعليقات مقفلة</p>
+                <p className="text-xs font-bold text-slate-400">لا يمكن إضافة ملاحظات جديدة على معاملة ملغاة أو مجمدة.</p>
+            </div>
+        )}
+
         <div className="space-y-6">
             {loading && Array.from({length: 2}).map((_, i) => (
                 <div key={i} className="flex gap-4 p-4 animate-pulse">
-                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <Skeleton className="h-10 w-10 rounded-full" />
                     <div className='flex-1 space-y-2'>
                         <Skeleton className="h-4 w-1/4 rounded-lg" />
                         <Skeleton className="h-16 w-full rounded-2xl" />

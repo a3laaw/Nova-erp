@@ -59,7 +59,9 @@ import {
     MessageCircleIcon,
     Save,
     Banknote,
-    Coins
+    Coins,
+    Lock,
+    Ban
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -85,6 +87,7 @@ const transactionStatusColors: Record<string, string> = {
   completed: 'bg-green-100 text-green-800 border-green-200',
   submitted: 'bg-purple-100 text-purple-800 border-purple-200',
   'on-hold': 'bg-gray-100 text-gray-800 border-gray-200',
+  'cancelled': 'bg-red-100 text-red-800 border-red-200',
 };
 
 const statusTranslations: Record<string, string> = {
@@ -92,7 +95,8 @@ const statusTranslations: Record<string, string> = {
   'in-progress': 'قيد التنفيذ',
   completed: 'مكتملة',
   submitted: 'تم تسليمها',
-  'on-hold': 'مجمدة',
+  'on-hold': 'مجمدة إدارياً',
+  'cancelled': 'ملغاة / عقد مفسوخ',
 };
 
 const stageStatusColors: Record<string, string> = {
@@ -139,12 +143,17 @@ export default function TransactionDetailPage() {
 
   const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
+  // 🛡️ درع القفل السيادي 🛡️
+  const isLocked = useMemo(() => {
+    return transaction?.status === 'cancelled' || transaction?.status === 'on-hold';
+  }, [transaction?.status]);
+
   const isAdmin = useMemo(() => ['Admin', 'HR', 'Developer', 'Accountant'].includes(currentUser?.role || ''), [currentUser]);
 
   useEffect(() => {
     if (!firestore || !tenantId) return;
     const empPath = getTenantPath('employees', tenantId);
-    getDocs(query(collection(firestore, empPath!))).then(snap => {
+    getDocs(query(collection(firestore, empPath!), where('status', '==', 'active'))).then(snap => {
         const newMap = new Map<string, string>();
         snap.forEach(doc => newMap.set(doc.id, doc.data().fullName));
         setEmployeesMap(newMap);
@@ -152,6 +161,7 @@ export default function TransactionDetailPage() {
   }, [firestore, tenantId]);
 
   const openActionDialog = (stageId: string, stageName: string, type: 'start' | 'modify' | 'complete') => {
+      if (isLocked) return;
       if (type === 'start') {
           handleStageAction(stageId, 'start', 'بدء العمل الفني المخطط.');
           return;
@@ -197,7 +207,7 @@ export default function TransactionDetailPage() {
   };
 
   const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete', note: string) => {
-        if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId || !client) return;
+        if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId || !client || isLocked) return;
         setIsProcessing(true);
         try {
             const batch = writeBatch(firestore);
@@ -336,7 +346,7 @@ export default function TransactionDetailPage() {
   };
 
   const handleUndoStage = async (stageId: string) => {
-        if (!firestore || !currentUser || !transaction || !transactionPath || !isAdmin || !tenantId) return;
+        if (!firestore || !currentUser || !transaction || !transactionPath || !isAdmin || !tenantId || isLocked) return;
         setIsProcessing(true);
         try {
             const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
@@ -367,13 +377,31 @@ export default function TransactionDetailPage() {
 
   return (
     <div className='space-y-6 max-w-6xl mx-auto pb-20' dir='rtl'>
-        <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
+        {/* 🛡️ بنر القفل السيادي 🛡️ */}
+        {isLocked && (
+            <Alert className={cn(
+                "rounded-[2rem] border-2 shadow-2xl py-6 animate-in slide-in-from-top-4 duration-700",
+                transaction.status === 'cancelled' ? "bg-red-50 border-red-500" : "bg-amber-50 border-amber-500"
+            )}>
+                {transaction.status === 'cancelled' ? <Ban className="h-8 w-8 text-red-600" /> : <Lock className="h-8 w-8 text-amber-600" />}
+                <AlertTitle className={cn("text-2xl font-black mb-1", transaction.status === 'cancelled' ? "text-red-900" : "text-amber-900")}>
+                    {transaction.status === 'cancelled' ? 'المسار الفني ملغى نهائياً' : 'المعاملة مجمدة إدارياً'}
+                </AlertTitle>
+                <AlertDescription className={cn("text-lg font-bold", transaction.status === 'cancelled' ? "text-red-700" : "text-amber-700")}>
+                    {transaction.status === 'cancelled' 
+                        ? 'تم فسخ العقد وإلغاء المعاملة؛ لا يمكن إضافة تعليقات أو تعديل المراحل الفنية.' 
+                        : 'هذه المعاملة مجمدة حالياً بقرار إداري؛ سيتم استعادة كافة الخصائص بمجرد إلغاء التجميد من ملف العميل.'}
+                </AlertDescription>
+            </Alert>
+        )}
+
+        <Card className={cn("rounded-[3rem] border-none shadow-xl overflow-hidden bg-white", isLocked && "opacity-80 grayscale-[0.3]")}>
             <CardHeader className="bg-primary/5 pb-8 px-10 border-b">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="text-right space-y-2">
                         <div className="flex items-center gap-3">
                             <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
-                            <UniversalActionTrigger title={transaction.transactionType} sourceModule="المعاملات" sourceId={transaction.id!} />
+                            {!isLocked && <UniversalActionTrigger title={transaction.transactionType} sourceModule="المعاملات" sourceId={transaction.id!} />}
                         </div>
                         {transaction.subServiceName && <Badge className="bg-primary text-white font-black px-4 h-7 rounded-full border-none shadow-md">{transaction.subServiceName}</Badge>}
                         <CardDescription className="text-base font-medium">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline font-bold'>{client.nameAr}</Link></CardDescription>
@@ -412,7 +440,7 @@ export default function TransactionDetailPage() {
             </div>
 
             <TabsContent value="stages" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
+                <Card className={cn("rounded-[3rem] border-none shadow-xl overflow-hidden bg-white", isLocked && "pointer-events-none")}>
                     <CardHeader className="border-b bg-muted/5 p-8 px-10">
                         <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'>
                             <Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الميداني
@@ -426,7 +454,7 @@ export default function TransactionDetailPage() {
                             
                             const isPredecessorCompleted = idx === 0 || 
                                 transaction.stages?.some(s => s.status === 'completed' && s.nextStageIds?.includes(stage.stageId)) || 
-                                transaction.stages![idx-1].status === 'completed';
+                                (idx > 0 && transaction.stages![idx-1].status === 'completed');
                             
                             const isBlocked = !isPredecessorCompleted && stage.status === 'pending';
 
@@ -467,28 +495,32 @@ export default function TransactionDetailPage() {
                                     </div>
                                     
                                     <div className="flex items-center gap-3 mt-4 sm:mt-0 no-print">
-                                        {stage.status === 'pending' && isPredecessorCompleted && (
-                                            <Button size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'start')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-8 bg-orange-600 hover:bg-orange-700 text-white shadow-xl shadow-orange-100">
-                                                <Play className="ml-2 h-4 w-4"/> بدء العمل
-                                            </Button>
-                                        )}
-                                        
-                                        {stage.status === 'in-progress' && (
+                                        {!isLocked && (
                                             <>
-                                                {(stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') && (
-                                                    <Button variant="outline" size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'modify')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-6 border-orange-200 text-orange-700 hover:bg-orange-50 gap-2">
-                                                        <IterationCcw className="h-4 w-4" /> سجل تعديل ({stage.currentCount || 0})
+                                                {stage.status === 'pending' && isPredecessorCompleted && (
+                                                    <Button size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'start')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-8 bg-orange-600 hover:bg-orange-700 text-white shadow-xl shadow-orange-100">
+                                                        <Play className="ml-2 h-4 w-4"/> بدء العمل
                                                     </Button>
                                                 )}
-                                                <Button size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'complete')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-8 bg-green-600 hover:bg-green-700 text-white gap-2 shadow-xl shadow-green-100">
-                                                    <Check className="ml-2 h-4 w-4"/> إنجاز وإغلاق
-                                                </Button>
+                                                
+                                                {stage.status === 'in-progress' && (
+                                                    <>
+                                                        {(stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') && (
+                                                            <Button variant="outline" size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'modify')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-6 border-orange-200 text-orange-700 hover:bg-orange-50 gap-2">
+                                                                <IterationCcw className="h-4 w-4" /> سجل تعديل ({stage.currentCount || 0})
+                                                            </Button>
+                                                        )}
+                                                        <Button size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'complete')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-8 bg-green-600 hover:bg-green-700 text-white gap-2 shadow-xl shadow-green-100">
+                                                            <Check className="ml-2 h-4 w-4"/> إنجاز وإغلاق
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                {stage.status === 'completed' && isAdmin && (
+                                                    <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-9 w-9 rounded-xl text-orange-400 hover:text-orange-600" title="تراجع">
+                                                        <Undo2 className="h-5 w-5" />
+                                                    </Button>
+                                                )}
                                             </>
-                                        )}
-                                        {stage.status === 'completed' && isAdmin && (
-                                            <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-9 w-9 rounded-xl text-orange-400 hover:text-orange-600" title="تراجع">
-                                                <Undo2 className="h-5 w-5" />
-                                            </Button>
                                         )}
                                     </div>
                                 </div>
@@ -503,7 +535,7 @@ export default function TransactionDetailPage() {
                     clientId={clientId} 
                     transactionId={transactionId} 
                     filterType="comment" 
-                    showInput={true} 
+                    showInput={!isLocked} 
                     title="الملاحظات والتعليقات الفنية" 
                     icon={<MessageSquare className='text-primary h-6 w-6'/>} 
                     client={client} 
@@ -512,12 +544,12 @@ export default function TransactionDetailPage() {
             </TabsContent>
 
             <TabsContent value="boq" className="animate-in fade-in duration-500">
-                <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white p-10">
+                <Card className={cn("rounded-[3rem] border-none shadow-xl overflow-hidden bg-white p-10", isLocked && "opacity-80")}>
                     {transaction.boqId ? <LinkedBoqView boqId={transaction.boqId} /> : (
                         <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] bg-muted/5 space-y-6">
                             <Package className="h-16 w-16 mx-auto opacity-30" />
                             <p className="text-xl font-black text-slate-400">لا يوجد جدول كميات مرتبط.</p>
-                            <Button asChild className="rounded-2xl font-black px-12 h-12 shadow-xl shadow-primary/20"><Link href={`/dashboard/construction/boq/new?projectId=${transaction.id}&clientId=${clientId}`}>إنشاء مقايسة جديدة +</Link></Button>
+                            {!isLocked && <Button asChild className="rounded-2xl font-black px-12 h-12 shadow-xl shadow-primary/20"><Link href={`/dashboard/construction/boq/new?projectId=${transaction.id}&clientId=${clientId}`}>إنشاء مقايسة جديدة +</Link></Button>}
                         </div>
                     )}
                 </Card>
