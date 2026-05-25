@@ -3,14 +3,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات الموحدة (V127.0 - Sovereign Master Edition)
+    // 🛡️ مصفوفة الصلاحيات الموحدة (V130.0 - Sovereign Master Edition)
     
     function isAuthenticated() {
       return request.auth != null;
     }
 
     // ⚡ محرك التعرف على المطور السيادي (Sovereign ID Engine)
-    // يدعم الرتبة (Role) أو البريد المباشر كدرع حماية احتياطي
+    // يدعم الرتبة (Role) أو البريد المباشر كدرع حماية احتياطي للمطور الرئيسي
     function isDeveloper() {
       return isAuthenticated() && 
              (request.auth.token.role == 'Developer' || 
@@ -24,12 +24,13 @@ service cloud.firestore {
               request.auth.token.currentCompanyId == companyId);
     }
 
-    // 🏯 قاعدة الوصول الشاملة للمطور المعتمد
+    // 🏯 قاعدة الوصول الشاملة للمطور المعتمد (Master Key)
     match /{document=**} {
       allow read, write: if isDeveloper();
     }
 
-    // 🌍 محركات النظام العالمية (Root Sovereign Collections)
+    // 🌍 محركات النظام العالمية (Sovereign Global Collections)
+    // مفتوحة للقراءة للجميع (لجلب القاموس) ومقفلة للكتابة إلا للمطور
     match /system_lexicon/{id} {
       allow read: if isAuthenticated();
       allow write: if isDeveloper();
@@ -59,29 +60,6 @@ service cloud.firestore {
     match /company_requests/{id} {
       allow create: if isAuthenticated(); 
       allow read, write: if isDeveloper();
-    }
-
-    // 📊 تحصين الاستعلامات المجمعة (Collection Group Security)
-    match /{path=**}/userProductivity/{id} {
-        allow read: if isAuthenticated() && (isDeveloper() || resource.data.companyId == request.auth.token.companyId);
-        allow write: if isAuthenticated() && (isDeveloper() || request.resource.data.companyId == request.auth.token.companyId);
-    }
-
-    match /{path=**}/transactions/{id} {
-        allow read: if isAuthenticated() && (isDeveloper() || resource.data.companyId == request.auth.token.companyId);
-    }
-
-    match /{path=**}/timelineEvents/{id} {
-        allow read: if isAuthenticated() && (isDeveloper() || resource.data.companyId == request.auth.token.companyId);
-        allow write: if isAuthenticated() && (isDeveloper() || request.resource.data.companyId == request.auth.token.companyId);
-    }
-
-    match /{path=**}/leaveRequests/{id} {
-        allow read: if isAuthenticated() && (isDeveloper() || resource.data.companyId == request.auth.token.companyId);
-    }
-
-    match /{path=**}/permissionRequests/{id} {
-        allow read: if isAuthenticated() && (isDeveloper() || resource.data.companyId == request.auth.token.companyId);
     }
   }
 }

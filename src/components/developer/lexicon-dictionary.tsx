@@ -29,10 +29,10 @@ import {
     Key
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, orderBy, setDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, orderBy, setDoc, getDocs, query } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
+import { cn, cleanFirestoreData } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,9 +44,15 @@ const NAMESPACES = [
     { id: 'ui_prose', name: 'النصوص الثابتة (Static UI)', color: 'bg-orange-100 text-orange-700', icon: Languages },
 ];
 
+/**
+ * محرك قاموس المصطلحات العالمي المطور (V51.0):
+ * - تم سحق خطأ الاستيراد عبر استخدام مسار Master مباشر.
+ * - تثبيت اللون الأسود القاتم (#000000) لكافة النصوص.
+ * - تفعيل بروتوكول البث العالمي لتحديث واجهات كافة الشركات.
+ */
 export function LexiconDictionary() {
     const { firestore } = useFirebase();
-    const { user, refreshToken } = useAuth();
+    const { user } = useAuth();
     const { toast } = useToast();
     
     const [isSaving, setIsSaving] = useState(false);
@@ -67,7 +73,7 @@ export function LexiconDictionary() {
         module: 'General'
     });
 
-    // 🛡️ رادار الاستماع العالمي الموحد 🛡️
+    // 🛡️ رادار الاستماع العالمي المباشر 🛡️
     const { data: lexicon, loading } = useSubscription<any>(
         firestore, 
         'system_lexicon'
@@ -117,7 +123,7 @@ export function LexiconDictionary() {
         if (!firestore) return;
         setIsUpdating(true);
         try {
-            // 🛡️ تفعيل بروتوكول البث العالمي
+            // 🛡️ تفعيل بروتوكول البث العالمي (Broadcast) 🛡️
             const syncRef = doc(firestore, 'framework_config', 'main_sync');
             await setDoc(syncRef, {
                 lastLexiconUpdate: serverTimestamp(),
@@ -132,14 +138,13 @@ export function LexiconDictionary() {
     const handleImportDefaults = async () => {
         if (!firestore) return;
         setIsImporting(true);
+        console.log("⚡ Nova Sovereign Core: Starting Global Lexicon Seed...");
         
         try {
-            // ⚡ ضمان تنشيط التوكن السيادي قبل البدء
-            if (refreshToken) await refreshToken();
-
             const batch = writeBatch(firestore);
             const finalPath = 'system_lexicon';
             
+            // 🛡️ مصفوفة الأساسيات البرمجية 🛡️
             const defaults = [
                 { key: 'btn_save', namespace: 'actions', valueAr: 'حفظ التعديلات', valueEn: 'Save Changes' },
                 { key: 'btn_cancel', namespace: 'actions', valueAr: 'إلغاء', valueEn: 'Cancel' },
@@ -159,7 +164,9 @@ export function LexiconDictionary() {
                 { key: 'ui_dashboard', namespace: 'ui_prose', valueAr: 'لوحة التحكم المركزية', valueEn: 'Executive Dashboard' }
             ];
 
-            const existingKeys = new Set((lexicon || []).map((item: any) => item.key));
+            // فحص السجلات الحالية لمنع التكرار
+            const currentSnap = await getDocs(collection(firestore, finalPath));
+            const existingKeys = new Set(currentSnap.docs.map(d => d.data().key));
             let added = 0;
 
             for (const item of defaults) {
@@ -172,13 +179,13 @@ export function LexiconDictionary() {
 
             if (added > 0) {
                 await batch.commit();
-                toast({ title: '✅ تم الاستيراد', description: `تمت إضافة ${added} مصطلحاً تأسيسياً للقاموس.` });
+                toast({ title: '✅ تم الاستيراد بنجاح', description: `تم حقن ${added} مصطلحاً تأسيسياً في قاعدة البيانات العالمية.` });
             } else {
-                toast({ title: 'القاموس مكتمل', description: 'كافة المصطلحات الأساسية موجودة مسبقاً.' });
+                toast({ title: 'النواة مكتملة', description: 'كافة المصطلحات الأساسية موجودة مسبقاً في القاموس.' });
             }
         } catch (e: any) {
-            console.error("Import Failure Debug:", e);
-            toast({ variant: 'destructive', title: 'فشل الاستيراد', description: 'يرجى مراجعة سجلات الخادم أو الصلاحيات.' });
+            console.error("❌ Lexicon Seed Error:", e);
+            toast({ variant: 'destructive', title: 'فشل الاستيراد', description: e.message || 'يرجى مراجعة الصلاحيات السحابية.' });
         } finally { setIsImporting(false); }
     };
 
@@ -257,8 +264,8 @@ export function LexiconDictionary() {
                                                     <code className="text-[10px] font-black text-indigo-700 bg-white px-2 py-1 rounded-lg border">{item.key}</code>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="font-black text-black text-base text-right">{item.valueAr}</TableCell>
-                                            <TableCell className="font-black text-black font-mono text-left text-sm border-l px-8">{item.valueEn}</TableCell>
+                                            <TableCell className="font-black text-[#000000] text-base text-right">{item.valueAr}</TableCell>
+                                            <TableCell className="font-black text-[#000000] font-mono text-left text-sm border-l px-8">{item.valueEn}</TableCell>
                                             <TableCell className="text-center">
                                                 <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[9px] border-2", NAMESPACES.find(n => n.id === item.namespace)?.color)}>
                                                     {NAMESPACES.find(n => n.id === item.namespace)?.name.split(' (')[0]}
