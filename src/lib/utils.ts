@@ -67,10 +67,19 @@ export function numberToArabicWords(inputNumber: number | string): string {
 
 /**
  * محرك توجيه المسارات المعتمد (Tenant Router):
+ * تم تحديثه ليشمل المسارات العالمية (Master Paths) لضمان ظهور البيانات للمطور.
  */
 export function getTenantPath(path: string | null | undefined, tenantId: string | null | undefined): string | null {
   if (!path) return null;
-  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'holidays'];
+  const masterCollections = [
+      'companies', 
+      'developers', 
+      'global_users', 
+      'company_requests', 
+      'holidays', 
+      'counters',
+      'hub_posts'
+  ];
   const isMaster = masterCollections.some(mc => path.startsWith(mc));
   if (isMaster) return path;
   if (path.startsWith('companies/')) return path;

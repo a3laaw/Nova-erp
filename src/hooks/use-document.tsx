@@ -11,8 +11,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * خطاف استماع لوثيقة واحدة محصن (Standard Document Hook):
- * تم تحصينه بـ "رادار الانتظار" لضمان عدم طلب البيانات قبل توفر التوكن المعتمد.
+ * خطاف استماع لوثيقة واحدة محصن (V15.0):
+ * تم تحسين "رادار المطور" للسماح بجلب الوثائق العالمية دون الحاجة لمعرّف شركة.
  */
 export function useDocument<T extends { id?: string }>(
   firestore: Firestore | null,

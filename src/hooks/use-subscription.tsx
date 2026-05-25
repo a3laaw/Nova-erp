@@ -16,8 +16,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * خطاف اشتراك لحظي محصن (V80.0):
- * تم تحسين "رادار الانتظار" لضمان عدم إطلاق أي طلب قبل استقرار هوية المنشأة.
+ * خطاف اشتراك لحظي محصن (V81.0):
+ * تم تحرير محرك الجلب للسماح بجلب البيانات العالمية للمطور (Master Collections).
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -38,16 +38,26 @@ export function useSubscription<T extends { id?: string }>(
     }, [constraintsHash]);
 
     useEffect(() => {
-        // 🛡️ الحماية القصوى: لا نطلق أي طلب إذا كانت الجلسة قيد التحميل أو غير موجودة
-        if (!firestore || !collectionPath || authLoading || !user?.currentCompanyId) {
+        if (!firestore || !collectionPath || authLoading) {
             setLoading(true);
             return;
         }
 
-        const tenantId = user.currentCompanyId;
+        // 🛡️ تحديد ما إذا كان المسار عالمياً (Master) لتجاوز حاجز الـ tenantId
+        const isMaster = [
+            'companies', 
+            'developers', 
+            'global_users', 
+            'company_requests', 
+            'holidays', 
+            'counters'
+        ].some(mc => collectionPath.startsWith(mc));
+
+        const tenantId = user?.currentCompanyId || null;
         const finalPath = getTenantPath(collectionPath, tenantId);
         
-        if (!finalPath) {
+        // منع الجلب إذا لم نصل لمسار نهائي (لغير المطورين)
+        if (!finalPath && !isMaster) {
             setLoading(true); 
             return;
         }
@@ -59,7 +69,7 @@ export function useSubscription<T extends { id?: string }>(
         
         if (isGroup) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
-            finalConstraints.push(where('companyId', '==', tenantId));
+            if (tenantId) finalConstraints.push(where('companyId', '==', tenantId));
             
             try {
                 const q = query(collectionGroup(firestore, collectionName), ...finalConstraints);
@@ -85,16 +95,16 @@ export function useSubscription<T extends { id?: string }>(
         }
 
         try {
-            const q = query(collection(firestore, finalPath), ...finalConstraints);
+            const q = query(collection(firestore, finalPath!), ...finalConstraints);
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 const newData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
                 setData(newData);
                 setLoading(false);
                 setError(null);
             }, (err) => {
-                if (err.message?.includes('permission-denied')) {
+                if (err.message?.includes('permission-denied') && tenantId && !authLoading) {
                     const permissionError = new FirestorePermissionError({
-                        path: finalPath,
+                        path: finalPath!,
                         operation: 'list'
                     });
                     errorEmitter.emit('permission-error', permissionError);
