@@ -24,6 +24,44 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 
+/**
+ * مكون الجسيمات المتطايرة (Sovereign Particle Renderer)
+ */
+function ParticleBackground() {
+    const [particles, setParticles] = useState<any[]>([]);
+    
+    useEffect(() => {
+        const p = Array.from({ length: 25 }).map((_, i) => ({
+            id: i,
+            size: Math.random() * 3 + 1 + 'px',
+            left: Math.random() * 100 + '%',
+            top: Math.random() * 100 + '%',
+            duration: Math.random() * 5 + 5 + 's',
+            delay: Math.random() * 5 + 's',
+        }));
+        setParticles(p);
+    }, []);
+
+    return (
+        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+            {particles.map((p) => (
+                <div 
+                    key={p.id}
+                    className="particle"
+                    style={{
+                        width: p.size,
+                        height: p.size,
+                        left: p.left,
+                        top: p.top,
+                        animation: `float-particle ${p.duration} linear infinite`,
+                        animationDelay: p.delay
+                    }}
+                />
+            ))}
+        </div>
+    );
+}
+
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading } = useAuth();
   const { firestore } = useFirebase();
@@ -83,27 +121,28 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#fdfaf3] relative overflow-hidden" dir="rtl">
-        <main className="relative w-full h-screen flex flex-col items-center justify-center p-6 select-none overflow-hidden">
-            <div className="relative flex items-center justify-center">
-                <div className="relative z-10 overflow-hidden rounded-full">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                        alt="Nova Nebula" 
-                        className="max-w-[120vw] md:max-w-[800px] h-auto object-contain nova-nebula-img" 
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEtNlSBtckngBW_Ee7zv-W5tmEJ6EZBDeaCR6TlVQDGr64SCn8e28U9zGFo9V4IkUKHFNKjJpKWJDmm0Dm70aTBpbOmQZf6UQA0ybHv9-MwgNx_ggEcDJMuTRkrXNatfJzL7PcSVxTZQ32ULGzS5chJStYZuU5UR_UbU52fAlJ36EievnwnvfcpyBNJA9jYr6wELbgtj3XmBrT56mjy5mrBdCum65Ftkl91BG77W6GFbzPAI-6fsiKCJ_7Nb8hFQ8CfvdxHJdiB9-O"
-                    />
-                </div>
-            </div>
-            {/* ضبط اتجاه نص التحميل السفلي ليكون RTL (نص يمين، نقاط يسار) */}
-            <div className="absolute bottom-20 flex items-center gap-2">
-                <span className="text-[#333333] text-lg font-black tracking-wide">جاري التحميل</span>
-                <div className="flex items-center gap-1 mt-1">
-                    <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0s' }}></span>
-                    <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0.2s' }}></span>
-                    <span className="w-2 h-2 bg-[#e87c24] rounded-full animate-dot-fade" style={{ animationDelay: '0.4s' }}></span>
-                </div>
+        <ParticleBackground />
+        
+        <main className="relative z-10 flex flex-col items-center justify-center w-full px-6 pointer-events-none">
+            <div className="nova-image-container animate-pulse-nova relative w-full max-w-xs aspect-square flex items-center justify-center pointer-events-auto">
+                <img 
+                    alt="Nova Nebula" 
+                    className="w-full h-auto object-contain" 
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuAAwUtP2b2CToLjUJ8eDO6iwFczMu5EfgTZXtRhviSqh4p1FZk1EdVK4Mt4nVqBsE5dqYeVMu8ZKJccZdK7tbyOKef7DJvuqjqe3C91u1shEfJJuzX7cQxegYjwyQSlROGi81TaZaihR3hTDDdmUNS0FDGQ03jl0t-q9xzfNX45G0VAEsH9UjbL1QtLp57Dea6Tfs2ENlRLLWbeZoAkkxautawwahzzBFDgFtEH18arUAkbMW9w5QAyhMiJrflIscMibtocPoyrR_o8"
+                />
             </div>
         </main>
+
+        <footer className="fixed bottom-16 flex flex-col items-center gap-4 z-10">
+            <div className="flex items-center gap-3">
+                <span className="text-[#ea580c] text-xl font-bold tracking-wide">جاري تحميل نظام Nova...</span>
+                <div className="dot-loader flex gap-1 pt-1">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </footer>
       </div>
     );
   }

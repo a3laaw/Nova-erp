@@ -57,28 +57,56 @@
     border: 1px solid rgba(232, 124, 36, 0.1);
     box-shadow: 0 8px 32px 0 rgba(232, 124, 36, 0.05);
   }
-  
-  /* ✨ محرك السديم المتفجر (The Explosion Nebula Engine) ✨ */
-  .nova-nebula-img {
+
+  /* ✨ محرك الجسيمات المتطايرة (Sovereign Particle Engine) ✨ */
+  @keyframes float-particle {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    25% { opacity: 0.6; }
+    50% { transform: translateY(-100px) translateX(20px); opacity: 0.4; }
+    75% { opacity: 0.6; }
+    100% { transform: translateY(-200px) translateX(-10px); opacity: 0; }
+  }
+
+  @keyframes pulse-ring {
+    0%, 100% { transform: scale(1); opacity: 0.95; }
+    50% { transform: scale(1.15); opacity: 1; }
+  }
+
+  @keyframes dot-bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1.0); }
+  }
+
+  .animate-pulse-nova {
+    animation: pulse-ring 4s ease-in-out infinite;
+  }
+
+  .particle {
+    position: absolute;
+    background: #f97316;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .nova-image-container {
+    mask-image: radial-gradient(circle, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 80%);
+    -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 80%);
     mix-blend-mode: multiply;
-    animation: explosion-pulse 2.5s ease-in-out infinite;
   }
 
-  @keyframes explosion-pulse {
-    0%, 100% { transform: scale(0.95); opacity: 0.9; }
-    50% { transform: scale(1.05); opacity: 1; }
+  .dot-loader span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: #ea580c;
+    border-radius: 50%;
+    animation: dot-bounce 1.4s infinite ease-in-out both;
   }
 
-  @keyframes dot-fade {
-    0%, 100% { opacity: 0.2; }
-    50% { opacity: 1; }
-  }
+  .dot-loader span:nth-child(1) { animation-delay: -0.32s; }
+  .dot-loader span:nth-child(2) { animation-delay: -0.16s; }
 
-  .animate-dot-fade {
-    animation: dot-fade 1.4s infinite linear;
-  }
-
-  /* نصوص القوائم المنسدلة والجداول - أسود داكن 100% للوضوح الملكي */
+  /* نصوص الجداول - أسود داكن 100% للوضوح الملكي */
   [role="listbox"], 
   [role="menu"], 
   [data-radix-select-content], 
