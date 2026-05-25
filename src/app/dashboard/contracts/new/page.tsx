@@ -56,10 +56,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
+// 🛡️ مخطط التحقق السيادي الموحد
 const contractSchema = z.object({
   clientId: z.string().min(1, 'العميل مطلوب.'),
   transactionId: z.string().min(1, 'المعاملة مطلوبة.'),
@@ -108,11 +110,13 @@ function DirectContractContent() {
 
     const { fields, append, remove, replace: replaceClauses } = useFieldArray({ control, name: 'clauses' });
     
+    // 🛡️ محركات الرصد اللحظي (Real-time Watchers)
     const watchedClauses = useWatch({ control, name: 'clauses' });
     const watchedClientId = useWatch({ control, name: 'clientId' });
     const watchedTransactionId = useWatch({ control, name: 'transactionId' });
     const financialsType = useWatch({ control, name: 'financialsType' });
 
+    // ✨ محرك حساب المجموع الحي المعتمد (V19.0)
     const currentTotalCalculated = useMemo(() => {
         const items = watchedClauses || [];
         if (financialsType === 'fixed') {
@@ -122,8 +126,9 @@ function DirectContractContent() {
         }
     }, [watchedClauses, financialsType]);
 
-    const { data: allClients = [] } = useSubscription<Client>(firestore, tenantId ? 'clients' : null);
-    const { data: templates = [] } = useSubscription<ContractTemplate>(firestore, tenantId ? 'contractTemplates' : null, [orderBy('title')]);
+    // جلب البيانات المرجعية
+    const { data: allClients = [], loading: clientsLoading } = useSubscription<Client>(firestore, tenantId ? 'clients' : null);
+    const { data: templates = [], loading: templatesLoading } = useSubscription<ContractTemplate>(firestore, tenantId ? 'contractTemplates' : null, [orderBy('title')]);
     const { data: accounts = [] } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null);
     const { data: transactionTypesData = [] } = useSubscription<TransactionType>(firestore, 'transactionTypes');
 
@@ -131,6 +136,7 @@ function DirectContractContent() {
     const [txLoading, setTxLoading] = useState(false);
     const [specificWorkStages, setSpecificWorkStages] = useState<{ value: string, label: string }[]>([]);
 
+    // رادار جلب معاملات العميل المختار
     useEffect(() => {
         if (!firestore || !watchedClientId || !tenantId) {
             setClientTransactions([]);
@@ -146,6 +152,7 @@ function DirectContractContent() {
         }).finally(() => setTxLoading(false));
     }, [watchedClientId, firestore, tenantId]);
 
+    // رادار جلب مراحل العمل المعتمدة للربط الميداني
     useEffect(() => {
         if (!watchedTransactionId || !firestore || !tenantId || clientTransactions.length === 0) {
             setSpecificWorkStages([]);
@@ -183,22 +190,23 @@ function DirectContractContent() {
         return [...specificWorkStages, ...fallbacks];
     }, [specificWorkStages, watchedClauses]);
 
+    // محرك استيراد القالب الفعال
     const handleTemplateSelect = (templateId: string) => {
         const template = templates.find(t => t.id === templateId);
         if (!template) return;
         
         setImportedTemplateId(templateId);
         setValue('workNature', template.workNature || 'labor_only');
-        setValue('financialsType', template.financials?.type || 'fixed');
-        setValue('totalAmount', template.financials?.totalAmount || undefined);
+        setValue('financialsType', template.financials?.type || 'fixed', { shouldValidate: true });
+        setValue('totalAmount', template.financials?.totalAmount || 0, { shouldValidate: true });
         
         if (template.financials?.milestones) {
             const newClauses = template.financials.milestones.map((m, idx) => ({
                 id: generateId(),
                 name: m.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
                 condition: m.condition || '',
-                amount: template.financials?.type === 'fixed' ? Number(m.value) : undefined,
-                percentage: template.financials?.type === 'percentage' ? Number(m.value) : undefined,
+                amount: template.financials?.type === 'fixed' ? Number(m.value) : 0,
+                percentage: template.financials?.type === 'percentage' ? Number(m.value) : 0,
             }));
             replaceClauses(newClauses);
         }
@@ -540,12 +548,20 @@ function DirectContractContent() {
                             </p>
                             <p className="text-[10px] text-muted-foreground font-bold pr-7">سيتم إنشاء قيد يومية مسودة آلياً بكامل قيمة العقد.</p>
                         </div>
-                        <Button type="submit" disabled={isSaving || !watchedClientId || fields.length === 0} className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[350px] gap-4 bg-[#FF7A00] text-white border-none transition-all active:scale-95 group">
+                        <Button type="submit" disabled={isSaving || !watchedClientId || !watchedTransactionId || fields.length === 0} className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[350px] gap-4 bg-[#FF7A00] text-white border-none transition-all active:scale-95 group">
                             {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
                             توقيـع واعتمـاد العقـد
                         </Button>
                     </CardFooter>
                 </Card>
+                
+                {Object.keys(errors).length > 0 && (
+                    <Alert variant="destructive" className="mt-6 rounded-3xl border-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle className="font-black">بيانات ناقصة</AlertTitle>
+                        <AlertDescription className="font-bold">يرجى مراجعة كافة حقول الدفعات والمواصفات؛ تأكد من ملء "شرط الاستحقاق" لكل بند مالي.</AlertDescription>
+                    </Alert>
+                )}
             </form>
         </div>
     );
