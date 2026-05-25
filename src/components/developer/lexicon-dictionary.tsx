@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -26,7 +25,8 @@ import {
     CheckCircle2,
     Sparkles,
     Activity,
-    Undo2
+    Undo2,
+    Key
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, orderBy, setDoc } from 'firebase/firestore';
@@ -46,7 +46,7 @@ const NAMESPACES = [
 
 export function LexiconDictionary() {
     const { firestore } = useFirebase();
-    const { user } = useAuth();
+    const { user, refreshToken } = useAuth();
     const { toast } = useToast();
     
     const [isSaving, setIsSaving] = useState(false);
@@ -67,7 +67,7 @@ export function LexiconDictionary() {
         module: 'General'
     });
 
-    // 🛡️ جلب القاموس من المسار العالمي الموحد 🛡️
+    // 🛡️ رادار الاستماع العالمي الموحد 🛡️
     const { data: lexicon, loading } = useSubscription<any>(
         firestore, 
         'system_lexicon'
@@ -117,6 +117,7 @@ export function LexiconDictionary() {
         if (!firestore) return;
         setIsUpdating(true);
         try {
+            // 🛡️ تفعيل بروتوكول البث العالمي
             const syncRef = doc(firestore, 'framework_config', 'main_sync');
             await setDoc(syncRef, {
                 lastLexiconUpdate: serverTimestamp(),
@@ -131,7 +132,11 @@ export function LexiconDictionary() {
     const handleImportDefaults = async () => {
         if (!firestore) return;
         setIsImporting(true);
+        
         try {
+            // ⚡ ضمان تنشيط التوكن السيادي قبل البدء
+            if (refreshToken) await refreshToken();
+
             const batch = writeBatch(firestore);
             const finalPath = 'system_lexicon';
             
@@ -172,8 +177,8 @@ export function LexiconDictionary() {
                 toast({ title: 'القاموس مكتمل', description: 'كافة المصطلحات الأساسية موجودة مسبقاً.' });
             }
         } catch (e: any) {
-            console.error("Import Error:", e);
-            toast({ variant: 'destructive', title: 'فشل الاستيراد' });
+            console.error("Import Failure Debug:", e);
+            toast({ variant: 'destructive', title: 'فشل الاستيراد', description: 'يرجى مراجعة سجلات الخادم أو الصلاحيات.' });
         } finally { setIsImporting(false); }
     };
 
@@ -188,7 +193,7 @@ export function LexiconDictionary() {
                             </div>
                             <div className="text-right">
                                 <CardTitle className="text-3xl font-black text-[#1e1b4b]">قاموس المنظومة (Lexicon)</CardTitle>
-                                <CardDescription className="text-slate-500 font-bold">تحكم في كل كلمة ورسالة تظهر للموظفين عبر البيانات الوصفية.</CardDescription>
+                                <CardDescription className="text-slate-500 font-bold">تحكم سيادي في كل كلمة ورسالة تظهر للموظفين عبر البيانات الوصفية.</CardDescription>
                             </div>
                         </div>
                         <div className="flex gap-4 no-print">
@@ -247,7 +252,10 @@ export function LexiconDictionary() {
                                     filteredLexicon.map(item => (
                                         <TableRow key={item.id} className="h-16 hover:bg-indigo-50/20 border-b last:border-0 transition-colors group">
                                             <TableCell className="px-8 border-l bg-slate-50/30">
-                                                <code className="text-[10px] font-black text-indigo-700 bg-white px-2 py-1 rounded-lg border">{item.key}</code>
+                                                <div className="flex items-center gap-2">
+                                                    <Key className="h-3 w-3 text-indigo-400" />
+                                                    <code className="text-[10px] font-black text-indigo-700 bg-white px-2 py-1 rounded-lg border">{item.key}</code>
+                                                </div>
                                             </TableCell>
                                             <TableCell className="font-black text-black text-base text-right">{item.valueAr}</TableCell>
                                             <TableCell className="font-black text-black font-mono text-left text-sm border-l px-8">{item.valueEn}</TableCell>
@@ -326,4 +334,3 @@ export function LexiconDictionary() {
         </div>
     );
 }
-
