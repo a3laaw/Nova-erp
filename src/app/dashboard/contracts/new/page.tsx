@@ -19,7 +19,7 @@ import {
     getDoc, 
     Timestamp, 
     limit 
-} from 'firebase/firestore';
+} from 'firebase/firestore'; 
 import type { Client, ClientTransaction, Account, Employee, Department, ContractTemplate, TransactionType } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,8 @@ import {
     Save,
     Home,
     AlertTriangle,
-    IterationCcw
+    IterationCcw,
+    CheckCircle2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
@@ -61,8 +62,8 @@ const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'ا�
 const contractSchema = z.object({
   clientId: z.string().min(1, 'العميل مطلوب.'),
   transactionId: z.string().min(1, 'المعاملة مطلوبة.'),
-  totalArea: z.preprocess((v) => v === '' || v === null ? undefined : parseFloat(String(v)), z.number().min(0).optional()),
-  floorsCount: z.preprocess((v) => v === '' || v === null ? undefined : parseInt(String(v), 10), z.number().min(1).optional()),
+  totalArea: z.preprocess((v) => v === '' || v === null || v === 0 ? undefined : parseFloat(String(v)), z.number().min(0).optional()),
+  floorsCount: z.preprocess((v) => v === '' || v === null || v === 0 ? undefined : parseInt(String(v), 10), z.number().min(1).optional()),
   basementType: z.enum(['none', 'full', 'half', 'vault']).default('none'),
   roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
   workNature: z.enum(['labor_only', 'with_materials', 'consulting']).default('labor_only'),
@@ -74,7 +75,7 @@ const contractSchema = z.object({
     percentage: z.preprocess((a) => a === '' || a === null ? undefined : parseFloat(String(a)), z.number().min(0).optional()),
   })).min(1, 'يجب وجود دفعة واحدة على الأقل.'),
   financialsType: z.enum(['fixed', 'percentage']).default('fixed'),
-  totalAmount: z.preprocess((a) => a === '' || a === null ? undefined : parseFloat(String(a)), z.number().min(0).optional()),
+  totalAmount: z.preprocess((a) => a === '' || a === null ? undefined : parseFloat(String(a)), z.number().optional()),
 });
 
 type ContractValues = z.infer<typeof contractSchema>;
@@ -96,19 +97,16 @@ function DirectContractContent() {
         defaultValues: {
             clientId: searchParams.get('clientId') || '',
             transactionId: searchParams.get('transactionId') || '',
-            totalArea: undefined, 
-            floorsCount: undefined, 
             basementType: 'none', 
             roofExtension: 'none', 
             workNature: 'labor_only',
             financialsType: 'fixed',
-            clauses: [{ id: generateId(), name: 'الدفعة الأولى عند توقيع العقد', condition: 'عند توقيع العقد', amount: undefined }]
+            clauses: [{ id: generateId(), name: 'الدفعة الأولى عند توقيع العقد', condition: 'عند توقيع العقد' }]
         }
     });
 
     const { fields, append, remove, replace: replaceClauses } = useFieldArray({ control, name: 'clauses' });
     
-    // ✨ محرك الرصد اللحظي المطور لضمان تحديث المجموع فوراً ✨
     const watchedClauses = useWatch({ control, name: 'clauses' });
     const watchedClientId = useWatch({ control, name: 'clientId' });
     const watchedTransactionId = useWatch({ control, name: 'transactionId' });
@@ -170,9 +168,15 @@ function DirectContractContent() {
         const selectedTx = clientTransactions.find(t => t.id === watchedTransactionId);
         if (!selectedTx || !transactionTypesData) return false;
         const type = transactionTypesData.find(t => t.id === selectedTx.transactionTypeId);
-        // لا تظهر طبيعة العمل (مصنعية/مواد) إلا في قسم المقاولات
         return type?.activityType === 'construction';
     }, [clientTransactions, watchedTransactionId, transactionTypesData]);
+
+    const wbsOptions = useMemo(() => {
+        const currentValues = (watchedClauses || []).map((m: any) => m.condition).filter(Boolean);
+        const existingValues = new Set(specificWorkStages.map(s => s.value));
+        const fallbacks = currentValues.filter(v => !existingValues.has(v)).map(v => ({ value: v, label: v }));
+        return [...specificWorkStages, ...fallbacks];
+    }, [specificWorkStages, watchedClauses]);
 
     const handleTemplateSelect = (templateId: string) => {
         const template = templates.find(t => t.id === templateId);
@@ -280,7 +284,7 @@ function DirectContractContent() {
                 }));
 
                 transaction_fs.set(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum }, { merge: true });
-                transaction_fs.update(doc(firestore, getTenantPath(`clients/${data.clientId}`, tenantId)!), { status: 'contracted' });
+                transaction_fs.update(doc(firestore, getTenantPath(`clients/${clientId}`, tenantId)!), { status: 'contracted' });
             });
 
             toast({ title: '✅ تم توقيع العقد بنجاح' });
@@ -372,11 +376,11 @@ function DirectContractContent() {
                                         <div className="absolute top-0 right-0 w-1.5 h-full bg-indigo-500/10 rounded-r-3xl" />
                                         <div className="grid gap-2">
                                             <Label className="font-black text-[10px] text-slate-400 uppercase pr-1 flex items-center gap-1"><Ruler className="h-3 w-3 text-indigo-600" /> المساحة م²</Label>
-                                            <Input type="number" step="any" {...register('totalArea')} onWheel={(e) => e.currentTarget.blur()} className="h-12 rounded-xl border-2 font-black text-lg text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                            <Input type="number" step="any" {...register('totalArea')} onWheel={(e) => e.currentTarget.blur()} placeholder="" className="h-12 rounded-xl border-2 font-black text-lg text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                                         </div>
                                         <div className="grid gap-2">
                                             <Label className="font-black text-[10px] text-slate-400 uppercase pr-1 flex items-center gap-1"><Building2 className="h-3 w-3 text-indigo-600" /> عدد الأدوار</Label>
-                                            <Input type="number" {...register('floorsCount')} onWheel={(e) => e.currentTarget.blur()} className="h-12 rounded-xl border-2 font-black text-lg text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                            <Input type="number" {...register('floorsCount')} onWheel={(e) => e.currentTarget.blur()} placeholder="" className="h-12 rounded-xl border-2 font-black text-lg text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                                         </div>
                                         <div className="grid gap-2">
                                             <Label className="font-black text-[10px] text-slate-400 uppercase pr-1 flex items-center gap-1"><Home className="h-3 w-3 text-indigo-600" /> خيار السرداب</Label>
@@ -428,7 +432,7 @@ function DirectContractContent() {
                                 <div className="p-8 border-b-2 border-dashed border-slate-100 flex justify-between items-center">
                                     <div className="flex items-center gap-4">
                                         <div className="p-3 bg-[#FF7A00]/10 rounded-2xl text-[#FF7A00] shadow-inner"><Calculator className="h-6 w-6"/></div>
-                                        <Label className="text-xl font-black text-[#1e1b4b]">مصفوفة الدفعات المالية القابلة للتعديل</Label>
+                                        <Label className="text-xl font-black text-[#1e1b4b]">مصفوفة الدفعات المالية المعتمدة</Label>
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <div className="grid gap-1">
@@ -443,7 +447,7 @@ function DirectContractContent() {
                                         {financialsType === 'percentage' && (
                                             <div className="grid gap-1">
                                                 <Label className="text-[10px] font-black text-slate-400 uppercase">إجمالي العقد</Label>
-                                                <Input type="number" step="any" {...register('totalAmount')} onWheel={(e) => e.currentTarget.blur()} className="w-28 h-10 rounded-xl bg-white font-black text-lg text-center border-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                                <Input type="number" step="any" {...register('totalAmount')} placeholder="" onWheel={(e) => e.currentTarget.blur()} className="w-28 h-10 rounded-xl bg-white font-black text-lg text-center border-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                                             </div>
                                         )}
                                     </div>
@@ -483,6 +487,7 @@ function DirectContractContent() {
                                                         step="any" 
                                                         {...register(financialsType === 'percentage' ? `clauses.${i}.percentage` : `clauses.${i}.amount`)} 
                                                         onWheel={(e) => e.currentTarget.blur()} 
+                                                        placeholder=""
                                                         className="text-center font-black text-3xl text-[#FF7A00] border-none shadow-none focus-visible:ring-0 bg-transparent font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none h-14" 
                                                     />
                                                 </TableCell>
@@ -519,7 +524,7 @@ function DirectContractContent() {
                             </p>
                             <p className="text-[10px] text-muted-foreground font-bold pr-7">سيتم إنشاء قيد يومية مسودة آلياً بكامل قيمة العقد.</p>
                         </div>
-                        <Button type="submit" disabled={isSaving || !watchedClientId || fields.length === 0} className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[350px] gap-4 bg-[#FF7A00] text-white border-none transition-all active:scale-95">
+                        <Button type="submit" disabled={isSaving || !watchedClientId || fields.length === 0} className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[350px] gap-4 bg-[#FF7A00] text-white border-none transition-all active:scale-95 group">
                             {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
                             توقيـع واعتمـاد العقـد
                         </Button>
@@ -537,5 +542,3 @@ export default function NewDirectContractPage() {
         </Suspense>
     );
 }
-
-    
