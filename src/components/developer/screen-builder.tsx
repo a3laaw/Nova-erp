@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
     PlusCircle, Trash2, LayoutGrid, Save, Loader2, 
     Layers, Workflow, Network
@@ -16,12 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { cleanFirestoreData } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
 
-/**
- * باني الشاشات الديناميكي (Dynamic UI Builder):
- * يتيح للمطور تعريف شاشات جديدة وربط حقولها حياً بقاعدة البيانات.
- */
 export function ScreenBuilder() {
     const { firestore } = useFirebase();
     const { user } = useAuth();

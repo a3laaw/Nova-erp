@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -24,10 +23,12 @@ import { useFirebase, useDocument } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import { cn, cleanFirestoreData } from '@/lib/utils';
+import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { DateInput } from '@/components/ui/date-input';
 
 export function GlobalConfigManager() {
     const { firestore } = useFirebase();
@@ -210,5 +211,3 @@ export function GlobalConfigManager() {
         </Card>
     );
 }
-
-import { useMemo } from 'react';

@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
     Zap, Save, Loader2, GitMerge, Settings2, 
     ArrowRightLeft, PlusCircle, Trash2, Activity
@@ -16,12 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { cleanFirestoreData } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
 
-/**
- * محرك الأحداث (Event-Driven Automation Engine):
- * تعريف ردود الفعل المتسلسلة لتوليد القيود أو الإشعارات تلقائياً.
- */
 export function AutomationEngine() {
     const { firestore } = useFirebase();
     const { user } = useAuth();
