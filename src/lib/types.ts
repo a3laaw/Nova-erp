@@ -9,6 +9,45 @@ export interface BaseEntity {
   updatedBy?: string;           
 }
 
+export interface SystemConfig extends BaseEntity {
+    localization: Record<string, string>;
+    hrRules: {
+        annualLeaveQuota: number;
+        indemnityDivisor: number; // 26 or 30
+        probationPeriodDays: number;
+        experienceLetterTemplate: string;
+    };
+    financeConfig: {
+        decimalPrecision: number;
+        currencyCode: string;
+        prefixes: {
+            journalEntry: string;
+            paymentVoucher: string;
+            cashReceipt: string;
+            purchaseOrder: string;
+            rfq: string;
+            grn: string;
+        }
+    };
+    featureFlags: {
+        enableWarehouse: boolean;
+        enableProcurement: boolean;
+        enableHR: boolean;
+        budgetThresholdAlert: number; // e.g. 90%
+        residencyExpiryNoticeDays: number;
+    };
+}
+
+export interface PermissionMatrix extends BaseEntity {
+    roleId: string;
+    permissions: Record<string, {
+        view: boolean;
+        create: boolean;
+        edit: boolean;
+        delete: boolean;
+    }>;
+}
+
 export interface UserProfile extends BaseEntity {
   uid: string;
   username: string;
@@ -32,12 +71,12 @@ export interface UserProfile extends BaseEntity {
 export interface WorkStage extends BaseEntity {
   name: string;
   order: number;
-  parentId: string; // Linked to SubService ID
+  parentId: string; 
   trackingType: 'duration' | 'occurrence' | 'hybrid' | 'none';
   expectedDurationDays?: number;
   maxOccurrences?: number;
   allowedRoles?: string[];
-  nextStageIds?: string[]; // قائمة المراحل التالية المتعددة (التبعية التشعبية)
+  nextStageIds?: string[]; 
 }
 
 export interface TransactionStage {
@@ -52,7 +91,7 @@ export interface TransactionStage {
   maxOccurrences?: number;
   order: number;
   expectedDurationDays?: number;
-  nextStageIds?: string[]; // تتبع التبعيات المتعددة في المعاملة الحالية
+  nextStageIds?: string[]; 
 }
 
 export interface ClientTransaction extends BaseEntity {
@@ -62,7 +101,7 @@ export interface ClientTransaction extends BaseEntity {
     transactionType: string;
     subServiceId?: string | null;
     subServiceName?: string | null;
-    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
+    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold' | 'cancelled';
     assignedEngineerId?: string | null;
     transactionTypeId?: string | null;
     departmentId?: string | null;
