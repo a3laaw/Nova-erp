@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { cleanFirestoreData } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * باني الشاشات الديناميكي (Dynamic UI Builder):
@@ -162,7 +163,7 @@ export function ScreenBuilder() {
                     <CardTitle className="text-xl font-black flex items-center gap-2"><Network className="h-5 w-5" /> قائمة الشاشات الديناميكية</CardTitle>
                 </CardHeader>
                 <CardContent className="p-8 space-y-4">
-                    {loading ? <Skeleton className="h-20 w-full" /> : dynamicScreens.length === 0 ? <p className="text-center opacity-30 italic py-10">لا توجد شاشات مخصصة.</p> :
+                    {loading ? <div className="space-y-4"><Skeleton className="h-20 w-full rounded-2xl" /><Skeleton className="h-20 w-full rounded-2xl" /></div> : dynamicScreens.length === 0 ? <p className="text-center opacity-30 italic py-10">لا توجد شاشات مخصصة.</p> :
                      dynamicScreens.map((screen: any) => (
                         <div key={screen.id} className="p-4 bg-white rounded-2xl border-2 hover:border-primary/30 transition-all flex items-center justify-between group">
                             <div className="flex items-center gap-3">
