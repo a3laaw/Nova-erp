@@ -25,7 +25,7 @@ import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 
 export default function LoginPage() {
-  const { login, resetPassword, user, logout, loading: globalLoading, error: authError } = useAuth();
+  const { login, resetPassword, user, loading: globalLoading } = useAuth();
   const { firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
@@ -83,23 +83,21 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* ✨ محرك السديم السينمائي المطبق ✨ */}
+        {/* ✨ محرك السديم المطور المطابق للصورة تماماً ✨ */}
         <div className="nova-nebula-container">
             <div className="nova-dust-field" />
             <div className="nova-nebula-ring" />
             <div className="nova-nebula-core" />
             
-            <div className="nova-text-glow relative z-20">
-                <span className="text-8xl font-black tracking-[0.4em] select-none">
-                  NOVA
-                </span>
+            <div className="nova-text-glow">
+                <span>NOVA</span>
             </div>
         </div>
         
-        {/* نص التحميل في الأسفل تماماً */}
+        {/* نص التحميل */}
         <div className="absolute bottom-20 left-0 right-0 flex flex-col items-center justify-center space-y-6 z-30">
             <div className="flex items-center justify-center gap-4">
-                <p className="text-[#1e1b4b] font-black text-2xl tracking-tight opacity-90">جاري التحميل</p>
+                <p className="text-[#FF7A00] font-black text-2xl tracking-tight">جاري التحميل</p>
                 <div className="flex gap-2.5 pt-2">
                     <div className="h-3 w-3 bg-[#FFB000] rounded-full animate-bounce shadow-lg shadow-amber-200" style={{ animationDelay: '0s' }} />
                     <div className="h-3 w-3 bg-[#FF7A00] rounded-full animate-bounce shadow-lg shadow-orange-200" style={{ animationDelay: '0.2s' }} />
@@ -113,8 +111,8 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-white/10 relative overflow-hidden" dir="rtl">
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#FFB000]/5 rounded-full blur-[80px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/5 rounded-full blur-[80px] pointer-events-none" />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#FFB000]/10 rounded-full blur-[80px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/10 rounded-full blur-[80px] pointer-events-none" />
 
       <div className="p-1 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#FF7A00] shadow-2xl animate-in zoom-in-95 duration-1000 relative z-10">
         <Card className="w-full max-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
@@ -129,10 +127,10 @@ export default function LoginPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent className="px-10 pb-8 space-y-8">
-                {(authError || localError) && (
+                {(localError) && (
                     <Alert variant="destructive" className="rounded-2xl border-2 animate-in shake-x">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="text-xs font-bold">{localError || authError}</AlertDescription>
+                        <AlertDescription className="text-xs font-bold">{localError}</AlertDescription>
                     </Alert>
                 )}
 

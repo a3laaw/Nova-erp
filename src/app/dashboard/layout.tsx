@@ -40,23 +40,21 @@ export default function DashboardLayout({
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* ✨ محرك السديم السينمائي المطبق ✨ */}
+        {/* ✨ محرك السديم المطور المطابق للصورة تماماً ✨ */}
         <div className="nova-nebula-container">
             <div className="nova-dust-field" />
             <div className="nova-nebula-ring" />
             <div className="nova-nebula-core" />
             
-            <div className="nova-text-glow relative z-20">
-                <span className="text-8xl font-black tracking-[0.4em] select-none">
-                  NOVA
-                </span>
+            <div className="nova-text-glow">
+                <span>NOVA</span>
             </div>
         </div>
         
-        {/* نص التحميل في الأسفل تماماً */}
+        {/* نص التحميل في الأسفل */}
         <div className="absolute bottom-20 left-0 right-0 flex flex-col items-center justify-center space-y-6 z-30">
             <div className="flex items-center justify-center gap-4">
-                <p className="text-[#1e1b4b] font-black text-2xl tracking-tight opacity-90">جاري التحميل</p>
+                <p className="text-[#FF7A00] font-black text-2xl tracking-tight">جاري التحميل</p>
                 <div className="flex gap-2.5 pt-2">
                     <div className="h-3 w-3 bg-[#FFB000] rounded-full animate-bounce shadow-lg shadow-amber-200" style={{ animationDelay: '0s' }} />
                     <div className="h-3 w-3 bg-[#FF7A00] rounded-full animate-bounce shadow-lg shadow-orange-200" style={{ animationDelay: '0.2s' }} />

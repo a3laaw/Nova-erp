@@ -59,7 +59,7 @@
     box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
   }
   
-  /* ✨ محرك السديم السينمائي المطور (Cinemagraph Nebula Engine) ✨ */
+  /* ✨ محرك السديم السينمائي المطور (Cinemagraph Nebula Engine V2.0) ✨ */
   .nova-nebula-container {
     @apply relative flex items-center justify-center w-full h-full;
     perspective: 1000px;
@@ -67,80 +67,73 @@
 
   .nova-nebula-ring {
     position: absolute;
-    width: 500px;
-    height: 500px;
+    width: 600px;
+    height: 600px;
     border-radius: 50%;
-    background: radial-gradient(circle, transparent 40%, rgba(255, 122, 0, 0.1) 60%, rgba(255, 122, 0, 0.3) 70%, transparent 100%);
-    filter: blur(25px);
-    box-shadow: 
-        inset 0 0 100px rgba(255, 122, 0, 0.2),
-        0 0 80px rgba(255, 122, 0, 0.15);
-    animation: nebula-spin 120s linear infinite, nebula-pulse 8s ease-in-out infinite;
+    background: radial-gradient(circle, rgba(255, 122, 0, 0.4) 0%, rgba(255, 122, 0, 0.2) 40%, transparent 70%);
+    filter: blur(40px);
+    animation: nebula-pulse 8s ease-in-out infinite;
+    z-index: 1;
   }
 
   .nova-nebula-core {
     position: absolute;
-    width: 350px;
-    height: 350px;
-    background: radial-gradient(circle, rgba(255, 122, 0, 0.15) 0%, rgba(255, 122, 0, 0.05) 50%, transparent 70%);
-    filter: blur(40px);
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(255, 122, 0, 0.25) 0%, rgba(255, 122, 0, 0.1) 60%, transparent 80%);
+    filter: blur(60px);
     animation: nebula-pulse 6s ease-in-out infinite reverse;
+    z-index: 1;
   }
 
   .nova-dust-field {
     position: absolute;
-    width: 600px;
-    height: 600px;
-    background-image: radial-gradient(circle, #FF7A00 1px, transparent 1px);
-    background-size: 40px 40px;
+    inset: -100px;
+    background-image: radial-gradient(circle, rgba(255, 122, 0, 0.3) 1.5px, transparent 1.5px);
+    background-size: 50px 50px;
     opacity: 0.15;
-    mask-image: radial-gradient(circle, black 30%, transparent 70%);
-    animation: dust-drift 20s ease-in-out infinite;
-  }
-
-  @keyframes nebula-spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    mask-image: radial-gradient(circle, black 20%, transparent 80%);
+    animation: dust-drift 30s ease-in-out infinite;
+    z-index: 0;
   }
 
   @keyframes nebula-pulse {
-    0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.4; }
-    50% { transform: scale(1.15) rotate(5deg); opacity: 0.8; }
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.2); opacity: 0.7; }
   }
 
   @keyframes dust-drift {
-    0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.1; }
-    50% { transform: scale(1.2) translate(-20px, -20px); opacity: 0.3; }
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    50% { transform: translate(-20px, -20px) rotate(2deg); }
   }
 
   .nova-text-glow {
     color: #FF7A00;
     font-weight: 900;
-    letter-spacing: 0.4em;
+    font-size: 6rem;
+    letter-spacing: 0.5em;
     text-shadow: 
-        0 0 20px rgba(255, 122, 0, 0.3),
-        0 0 40px rgba(255, 122, 0, 0.1);
+        0 0 30px rgba(255, 122, 0, 0.4),
+        0 0 60px rgba(255, 122, 0, 0.2);
     animation: text-shimmer 4s ease-in-out infinite;
+    position: relative;
     z-index: 20;
+    user-select: none;
   }
 
   @keyframes text-shimmer {
-    0%, 100% { opacity: 0.8; text-shadow: 0 0 20px rgba(255, 122, 0, 0.2); }
-    50% { opacity: 1; text-shadow: 0 0 40px rgba(255, 122, 0, 0.5); }
+    0%, 100% { opacity: 0.9; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.02); }
   }
 
-  /* نصوص القوائم المنسدلة - أسود داكن 100% */
+  /* نصوص القوائم المنسدلة والجداول - أسود داكن 100% للوضوح */
   [role="listbox"], 
   [role="menu"], 
   [data-radix-select-content], 
-  [data-radix-popover-content] {
-    z-index: 999999999 !important;
-    background-color: #ffffff !important;
-    border: 2px solid #FF7A00 !important;
-    border-radius: 1.25rem !important;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2) !important;
-    pointer-events: auto !important;
+  [data-radix-popover-content],
+  .table-body td {
     color: #000000 !important;
+    font-weight: 800 !important;
   }
 
   [role="option"], 
@@ -149,12 +142,6 @@
     cursor: pointer !important;
     color: #000000 !important;
     font-weight: 800 !important;
-    pointer-events: auto !important;
-  }
-
-  [role="option"][aria-selected="true"],
-  [cmdk-item][aria-selected="true"] {
-    background-color: rgba(255, 122, 0, 0.1) !important;
   }
 }
 
