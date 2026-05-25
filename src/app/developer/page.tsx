@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -20,7 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
     Terminal, Building2, Workflow, Settings2, ShieldCheck, 
     Activity, PlusCircle, Rocket, Sparkles,
-    Database, Network, Zap, LayoutGrid, Loader2, Trash2
+    Database, Network, Zap, LayoutGrid, Loader2, Trash2,
+    BookOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,7 @@ import { ScreenBuilder } from '@/components/developer/screen-builder';
 import { AutomationEngine } from '@/components/developer/automation-engine';
 import { PermissionsMatrix } from '@/components/developer/permissions-matrix';
 import { SystemHealthDashboard } from '@/components/developer/system-health-dashboard';
+import { LexiconDictionary } from '@/components/developer/lexicon-dictionary';
 
 export default function MasterSovereignHub() {
   const { firestore, auth } = useFirebase();
@@ -45,7 +46,7 @@ export default function MasterSovereignHub() {
   const [activeTab, setActiveTab] = useState('tenants');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // جلب البيانات العالمية للمطور
+  // جلب البيانات العالمية للمطور (Master Paths)
   const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', [orderBy('createdAt', 'desc')]);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
 
@@ -97,15 +98,6 @@ export default function MasterSovereignHub() {
     } finally { setIsProcessing(false); }
   };
 
-  const handleDeleteCompany = async (companyId: string) => {
-      if (!firestore || !confirm('هل أنت متأكد من مسح المنشأة نهائياً؟')) return;
-      setIsProcessing(true);
-      try {
-          await deleteDoc(doc(firestore, 'companies', companyId));
-          toast({ title: 'تم الحذف النهائي' });
-      } finally { setIsProcessing(false); }
-  };
-
   return (
     <div className="space-y-10" dir="rtl">
         {/* Header - Glassmorphism Pearl Style */}
@@ -135,24 +127,27 @@ export default function MasterSovereignHub() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex justify-center mb-10">
-                <TabsList className="bg-white/50 p-1.5 rounded-[2.5rem] border border-indigo-50 h-16 w-full max-w-6xl shadow-xl backdrop-blur-xl">
-                    <TabsTrigger value="tenants" className="rounded-full flex-1 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
+            <div className="flex justify-center mb-10 overflow-x-auto pb-4 scrollbar-none">
+                <TabsList className="bg-white/50 p-1.5 rounded-[2.5rem] border border-indigo-50 h-16 w-fit min-w-full md:min-w-0 md:max-w-6xl shadow-xl backdrop-blur-xl">
+                    <TabsTrigger value="tenants" className="rounded-full px-8 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
                         <Building2 className="h-4 w-4" /> المنشآت
                     </TabsTrigger>
-                    <TabsTrigger value="ui-builder" className="rounded-full flex-1 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
+                    <TabsTrigger value="ui-builder" className="rounded-full px-8 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
                         <LayoutGrid className="h-4 w-4" /> باني الشاشات
                     </TabsTrigger>
-                    <TabsTrigger value="automation" className="rounded-full flex-1 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
+                    <TabsTrigger value="lexicon" className="rounded-full px-8 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
+                        <BookOpen className="h-4 w-4" /> القاموس
+                    </TabsTrigger>
+                    <TabsTrigger value="automation" className="rounded-full px-8 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
                         <Zap className="h-4 w-4" /> الأتمتة
                     </TabsTrigger>
-                    <TabsTrigger value="config" className="rounded-full flex-1 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
+                    <TabsTrigger value="config" className="rounded-full px-8 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
                         <Settings2 className="h-4 w-4" /> الثوابت
                     </TabsTrigger>
-                    <TabsTrigger value="permissions" className="rounded-full flex-1 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
+                    <TabsTrigger value="permissions" className="rounded-full px-8 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
                         <ShieldCheck className="h-4 w-4" /> الصلاحيات
                     </TabsTrigger>
-                    <TabsTrigger value="health" className="rounded-full flex-1 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
+                    <TabsTrigger value="health" className="rounded-full px-8 font-black gap-2 h-full text-sm data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all duration-500">
                         <Activity className="h-4 w-4" /> الصحة
                     </TabsTrigger>
                 </TabsList>
@@ -202,6 +197,10 @@ export default function MasterSovereignHub() {
                         </Table>
                     </CardContent>
                 </Card>
+            </TabsContent>
+
+            <TabsContent value="lexicon" className="animate-in fade-in duration-500">
+                <LexiconDictionary />
             </TabsContent>
 
             <TabsContent value="ui-builder" className="animate-in fade-in duration-500">

@@ -39,6 +39,16 @@ export interface SystemConfig extends BaseEntity {
     };
 }
 
+// 🛡️ هيكل قاموس المصطلحات الشامل (Lexicon Metadata)
+export interface LexiconEntry extends BaseEntity {
+    key: string; // المعرف الفريد للنص في الكود
+    namespace: 'actions' | 'fields' | 'alerts' | 'ui_prose';
+    valueAr: string;
+    valueEn: string;
+    description?: string;
+    module?: 'Accounting' | 'Construction' | 'HR' | 'Warehouse' | 'General';
+}
+
 // 🛡️ هيكل الشاشات الديناميكية (Dynamic UI Metadata)
 export interface DynamicField extends BaseEntity {
     screenKey: string;
