@@ -118,7 +118,7 @@ const statusTranslations: Record<string, string> = {
   'in-progress': 'قيد التنفيذ',
   completed: 'مكتملة',
   submitted: 'تم تسليمها',
-  'on-hold': 'مجمدة',
+  'on-hold': 'مجمدة إدارياً',
   'cancelled': 'ملغاة / عقد مفسوخ',
 };
 
@@ -494,6 +494,12 @@ export default function ClientProfilePage() {
                                                         <Eye className="h-4 w-4 text-primary"/> فتح المسار الفني
                                                     </DropdownMenuItem>
                                                     
+                                                    {hasSignedContract && (
+                                                        <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}/contract`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-indigo-700">
+                                                            <FileText className="h-4 w-4" /> عرض العقد المبرم
+                                                        </DropdownMenuItem>
+                                                    )}
+
                                                     <DropdownMenuSeparator className="bg-slate-100" />
                                                     
                                                     {!hasSignedContract ? (
