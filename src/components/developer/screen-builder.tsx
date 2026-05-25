@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -10,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { 
     PlusCircle, Trash2, LayoutGrid, Save, Loader2, 
     Layers, Link2, Database, Sparkles, Workflow, 
-    Building2, Users, Calculator, Trash
+    Building2, Users, Calculator, Trash, Network
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, orderBy } from 'firebase/firestore';
@@ -168,7 +167,7 @@ export function ScreenBuilder() {
                 </CardHeader>
                 <CardContent className="p-8 space-y-4">
                     {dynamicScreens.length === 0 ? <p className="text-center opacity-30 italic py-10">لا توجد شاشات مخصصة.</p> :
-                     dynamicScreens.map(screen => (
+                     dynamicScreens.map((screen: any) => (
                         <div key={screen.id} className="p-4 bg-white rounded-2xl border-2 hover:border-primary/30 transition-all flex items-center justify-between group">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-slate-100 rounded-xl group-hover:bg-primary/10 transition-colors"><LayoutGrid className="h-4 w-4 text-slate-500 group-hover:text-primary"/></div>
