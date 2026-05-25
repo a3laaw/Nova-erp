@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -6,13 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { 
     Activity, ShieldCheck, Database, Loader2, 
-    AlertTriangle, CheckCircle2, Cloud, HardDrive, 
-    RefreshCcw, Search, Scale
+    AlertTriangle, CheckCircle2, Cloud, 
+    RefreshCcw, Scale
 } from 'lucide-react';
-import { useFirebase } from '@/firebase';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 
 /**
  * لوحة صحة النظام (System Health & Integrity):
@@ -45,7 +44,10 @@ export function SystemHealthDashboard() {
                         <Badge className="bg-green-600 text-white border-none font-black text-[9px] uppercase tracking-widest">Cloud Online</Badge>
                     </div>
                     <div className="space-y-2">
-                        <div className="flex justify-between items-end"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">تخزين الوثائق (IDs & Contracts)</p><span className="font-mono font-black">2.4 / 10 GB</span></div>
+                        <div className="flex justify-between items-end">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">تخزين الوثائق (IDs & Contracts)</p>
+                            <span className="font-mono font-black text-xs">2.4 / 10 GB</span>
+                        </div>
                         <Progress value={24} className="h-2 bg-slate-100" />
                     </div>
                 </Card>
@@ -128,5 +130,3 @@ export function SystemHealthDashboard() {
         </div>
     );
 }
-
-import { useMemo } from 'react';
