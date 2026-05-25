@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ import {
     Key
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, orderBy, setDoc, getDocs, query } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, getDocs, query, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { cn, cleanFirestoreData } from '@/lib/utils';
@@ -45,10 +45,10 @@ const NAMESPACES = [
 ];
 
 /**
- * محرك قاموس المصطلحات العالمي المطور (V51.0):
- * - تم سحق خطأ الاستيراد عبر استخدام مسار Master مباشر.
- * - تثبيت اللون الأسود القاتم (#000000) لكافة النصوص.
- * - تفعيل بروتوكول البث العالمي لتحديث واجهات كافة الشركات.
+ * محرك قاموس المصطلحات العالمي المطور (V52.0):
+ * - إصلاح محرك الاستيراد ليعمل مباشرة في النواة العالمية.
+ * - تفعيل زر التحديث (Update System) لنشر التعديلات.
+ * - فرض اللون الأسود القاتم (#000000) للوضوح المطلق.
  */
 export function LexiconDictionary() {
     const { firestore } = useFirebase();
@@ -73,11 +73,7 @@ export function LexiconDictionary() {
         module: 'General'
     });
 
-    // 🛡️ رادار الاستماع العالمي المباشر 🛡️
-    const { data: lexicon, loading } = useSubscription<any>(
-        firestore, 
-        'system_lexicon'
-    );
+    const { data: lexicon, loading } = useSubscription<any>(firestore, 'system_lexicon');
 
     const filteredLexicon = useMemo(() => {
         let results = lexicon || [];
@@ -123,13 +119,12 @@ export function LexiconDictionary() {
         if (!firestore) return;
         setIsUpdating(true);
         try {
-            // 🛡️ تفعيل بروتوكول البث العالمي (Broadcast) 🛡️
             const syncRef = doc(firestore, 'framework_config', 'main_sync');
             await setDoc(syncRef, {
                 lastLexiconUpdate: serverTimestamp(),
                 updatedBy: user?.id
             }, { merge: true });
-            toast({ title: '✅ تم تحديث المنظومة بنجاح', description: 'تم تفعيل التعديلات اللغوية لكافة الشركات والمستخدمين.' });
+            toast({ title: '✅ تم تحديث المنظومة', description: 'تم تفعيل التعديلات اللغوية لكافة الواجهات.' });
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ في التحديث' });
         } finally { setIsUpdating(false); }
@@ -138,13 +133,10 @@ export function LexiconDictionary() {
     const handleImportDefaults = async () => {
         if (!firestore) return;
         setIsImporting(true);
-        console.log("⚡ Nova Sovereign Core: Starting Global Lexicon Seed...");
-        
         try {
             const batch = writeBatch(firestore);
             const finalPath = 'system_lexicon';
             
-            // 🛡️ مصفوفة الأساسيات البرمجية 🛡️
             const defaults = [
                 { key: 'btn_save', namespace: 'actions', valueAr: 'حفظ التعديلات', valueEn: 'Save Changes' },
                 { key: 'btn_cancel', namespace: 'actions', valueAr: 'إلغاء', valueEn: 'Cancel' },
@@ -155,16 +147,12 @@ export function LexiconDictionary() {
                 { key: 'lbl_amount', namespace: 'fields', valueAr: 'المبلغ الإجمالي', valueEn: 'Total Amount' },
                 { key: 'lbl_date', namespace: 'fields', valueAr: 'التاريخ', valueEn: 'Date' },
                 { key: 'lbl_status', namespace: 'fields', valueAr: 'الحالة الإجرائية', valueEn: 'Status' },
-                { key: 'lbl_notes', namespace: 'fields', valueAr: 'الملاحظات', valueEn: 'Notes' },
                 { key: 'msg_success', namespace: 'alerts', valueAr: 'تمت العملية بنجاح', valueEn: 'Operation Successful' },
-                { key: 'msg_error', namespace: 'alerts', valueAr: 'حدث خطأ في النظام', valueEn: 'System Error' },
                 { key: 'msg_confirm_delete', namespace: 'alerts', valueAr: 'هل أنت متأكد من الحذف النهائي؟', valueEn: 'Confirm permanent deletion?' },
                 { key: 'ui_loading', namespace: 'ui_prose', valueAr: 'جاري التحميل...', valueEn: 'Loading...' },
-                { key: 'ui_no_data', namespace: 'ui_prose', valueAr: 'لا توجد سجلات لعرضها.', valueEn: 'No data available.' },
                 { key: 'ui_dashboard', namespace: 'ui_prose', valueAr: 'لوحة التحكم المركزية', valueEn: 'Executive Dashboard' }
             ];
 
-            // فحص السجلات الحالية لمنع التكرار
             const currentSnap = await getDocs(collection(firestore, finalPath));
             const existingKeys = new Set(currentSnap.docs.map(d => d.data().key));
             let added = 0;
@@ -179,13 +167,12 @@ export function LexiconDictionary() {
 
             if (added > 0) {
                 await batch.commit();
-                toast({ title: '✅ تم الاستيراد بنجاح', description: `تم حقن ${added} مصطلحاً تأسيسياً في قاعدة البيانات العالمية.` });
+                toast({ title: '✅ تم الاستيراد', description: `تم حقن ${added} مصطلحاً تأسيسياً.` });
             } else {
-                toast({ title: 'النواة مكتملة', description: 'كافة المصطلحات الأساسية موجودة مسبقاً في القاموس.' });
+                toast({ title: 'البيانات موجودة', description: 'الأساسيات موجودة مسبقاً في القاموس.' });
             }
         } catch (e: any) {
-            console.error("❌ Lexicon Seed Error:", e);
-            toast({ variant: 'destructive', title: 'فشل الاستيراد', description: e.message || 'يرجى مراجعة الصلاحيات السحابية.' });
+            toast({ variant: 'destructive', title: 'فشل الاستيراد', description: e.message });
         } finally { setIsImporting(false); }
     };
 
@@ -200,15 +187,15 @@ export function LexiconDictionary() {
                             </div>
                             <div className="text-right">
                                 <CardTitle className="text-3xl font-black text-[#1e1b4b]">قاموس المنظومة (Lexicon)</CardTitle>
-                                <CardDescription className="text-slate-500 font-bold">تحكم سيادي في كل كلمة ورسالة تظهر للموظفين عبر البيانات الوصفية.</CardDescription>
+                                <CardDescription className="text-slate-500 font-bold">إدارة كل كلمة تظهر للمستخدمين؛ القاموس يغذي كافة واجهات Nova ERP.</CardDescription>
                             </div>
                         </div>
-                        <div className="flex gap-4 no-print">
-                            <Button variant="ghost" onClick={handleUpdateSystem} disabled={isUpdating || loading} className="h-12 px-6 rounded-2xl font-black gap-2 text-indigo-600 hover:bg-indigo-50 transition-all border-none">
+                        <div className="flex gap-4">
+                            <Button variant="ghost" onClick={handleUpdateSystem} disabled={isUpdating || loading} className="h-12 px-6 rounded-2xl font-black gap-2 text-indigo-600 hover:bg-indigo-50 border-none transition-all">
                                 {isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : <RotateCcw className="h-4 w-4" />} تحديث المنظومة
                             </Button>
 
-                            <Button variant="outline" onClick={handleImportDefaults} disabled={isImporting || loading} className="h-12 px-8 rounded-2xl font-bold text-sm gap-2 border-2 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm">
+                            <Button variant="outline" onClick={handleImportDefaults} disabled={isImporting || loading} className="h-12 px-8 rounded-2xl font-bold text-sm gap-2 border-2 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm transition-all">
                                 {isImporting ? <Loader2 className="animate-spin h-4 w-4"/> : <DownloadCloud className="h-4 w-4" />} استيراد الأساسيات
                             </Button>
                             
