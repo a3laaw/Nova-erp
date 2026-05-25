@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useFirebase, useSubscription } from '@/firebase';
 import { 
@@ -12,25 +12,23 @@ import {
     query, 
     where, 
     orderBy, 
+    deleteDoc,
+    updateDoc
 } from 'firebase/firestore';
-import type { Company, CompanyRequest } from '@/lib/types';
+import type { Company, CompanyRequest, UserProfile } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, Trash2, CheckCircle2,
-    Activity, Rocket, UserPlus, Lock, Send, X, RefreshCw, User, Settings2, Pencil, Sparkles, Cloud, Key,
-    Wallet,
-    ShieldCheck,
-    Languages,
-    Zap,
-    History
+    Activity, UserPlus, ShieldCheck, Pencil, Sparkles, Wallet,
+    X, History, Settings2, Key, Zap, Lock
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { cn, getTenantPath } from '@/lib/utils';
+import { cn, getTenantPath, generateStableId } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,56 +47,138 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { format, isPast } from 'date-fns';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { toFirestoreDate } from '@/services/date-converter';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 import { DeveloperHub } from '@/components/developer/developer-hub';
 import { PermissionsMatrix } from '@/components/developer/permissions-matrix';
-import { toFirestoreDate } from '@/services/date-converter';
+import { useAuth } from '@/context/auth-context';
 
 /**
- * غرفة التحكم الرئيسية (Sovereign Master Dashboard):
- * تم تحديث الواجهة لتطابق الصورة المعتمدة مع دمج كافة محركات الإدارة.
+ * غرفة التحكم الرئيسية (Sovereign Master Dashboard V33.0):
+ * - تم سحق خطأ handleDeleteCompany.
+ * - دمج محرك تفعيل المنشآت الذكي (Auto-Provisioning).
+ * - مطابقة المظهر الكحلي والبنفسجي المعتمد.
  */
 export default function DeveloperDashboard() {
-  const { firestore } = useFirebase();
+  const { firestore, auth } = useFirebase();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMainTab, setActiveMainTab] = useState('entities');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
-  // --- Activation States ---
+  // --- حالات التفعيل (Activation) ---
   const [requestToActivate, setRequestToActivate] = useState<CompanyRequest | null>(null);
-  const [activationPassword, setActivationPassword] = useState('');
-  const [activationResult, setActivationResult] = useState<{ email: string, pass: string } | null>(null);
-  
-  const [companyToEdit, setCompanyToEdit] = useState<Company | null>(null);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  const [companyToEdit, setCompanyToEdit] = useState<Company | null>(null);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
 
-  const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
-  const requestsQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
-  const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', requestsQuery);
+  const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies');
+  const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
 
   const filteredCompanies = useMemo(() => {
     if (!companies) return [];
-    return [...companies].sort((a, b) => ((b.updatedAt as any)?.toMillis?.() || 0) - ((a.updatedAt as any)?.toMillis?.() || 0))
+    return [...companies].sort((a, b) => ((b.createdAt as any)?.toMillis?.() || 0) - ((a.createdAt as any)?.toMillis?.() || 0))
       .filter(c => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [companies, searchQuery]);
 
+  // 🛡️ محرك حذف المنشأة نهائياً 🛡️
+  const handleDeleteCompany = async () => {
+    if (!firestore || !companyToDelete) return;
+    setIsProcessing('deleting');
+    try {
+        const batch = writeBatch(firestore);
+        
+        // 1. حذف سجل المنشأة الرئيسي
+        batch.delete(doc(firestore, 'companies', companyToDelete.id!));
+        
+        // 2. تصفية الفهرس العالمي للمستخدمين المرتبطين
+        const globalUsersQuery = query(collection(firestore, 'global_users'), where('companyId', '==', companyToDelete.id));
+        const globalUsersSnap = await getDocs(globalUsersQuery);
+        globalUsersSnap.forEach(d => batch.delete(d.ref));
+
+        await batch.commit();
+        toast({ title: '✅ تم مسح المنشأة', description: 'تم تطهير السجلات وإغلاق الحسابات نهائياً.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'فشل الحذف', description: e.message });
+    } finally {
+        setIsProcessing(null);
+        setCompanyToDelete(null);
+    }
+  };
+
+  // 🛡️ محرك تفعيل المنشأة آلياً (Auto-Provisioning) 🛡️
+  const handleActivateRequest = async () => {
+    if (!firestore || !auth?.currentUser || !requestToActivate) return;
+    setIsProcessing('activating');
+    
+    try {
+        const idToken = await auth.currentUser.getIdToken();
+        const companyId = `comp-${generateStableId()}`;
+        const tempPassword = `Nova@${Math.floor(1000 + Math.random() * 9000)}`;
+
+        // 1. استدعاء محرك إدارة الهوية السحابية (IAM)
+        const response = await fetch('/api/manage-tenant-user', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ 
+                action: 'create_tenant_user',
+                companyId: companyId,
+                email: requestToActivate.email,
+                password: tempPassword,
+                displayName: requestToActivate.contactName,
+                username: requestToActivate.username,
+                role: 'Admin'
+            })
+        });
+
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error);
+
+        // 2. تأسيس سجل المنشأة الفعلي
+        const batch = writeBatch(firestore);
+        const companyRef = doc(firestore, 'companies', companyId);
+        
+        batch.set(companyRef, {
+            name: requestToActivate.companyName,
+            adminEmail: requestToActivate.email.toLowerCase().trim(),
+            adminUsername: requestToActivate.username,
+            activityType: requestToActivate.activity,
+            status: 'active',
+            subscriptionType: 'trial',
+            maxUsersLimit: 5,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+
+        // 3. تحديث حالة الطلب
+        const requestRef = doc(firestore, 'company_requests', requestToActivate.id!);
+        batch.update(requestRef, { status: 'activated', activatedAt: serverTimestamp(), targetCompanyId: companyId });
+
+        await batch.commit();
+
+        toast({ 
+            title: '🎉 تم التفعيل بنجاح', 
+            description: `تم إنشاء حساب لـ ${requestToActivate.username} بكلمة مرور: ${tempPassword}` 
+        });
+        setRequestToActivate(null);
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
+    } finally {
+        setIsProcessing(null);
+    }
+  };
+
   return (
     <div className="space-y-10" dir="rtl">
-        {/* 🛡️ الهيدر المظلم الفاخر المطابق للصورة 🛡️ */}
+        {/* 🛡️ الهيدر المظلم الفاخر 🛡️ */}
         <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-[#0A0D2E]">
             <CardHeader className="p-12 pb-10 bg-[#07091E]/40 border-b border-white/5">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-8">
@@ -121,13 +201,13 @@ export default function DeveloperDashboard() {
         <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
             <div className="flex justify-center mb-8">
                 <TabsList className="bg-white/5 p-1.5 rounded-[2.5rem] border border-white/10 h-16 w-full max-w-4xl backdrop-blur-3xl shadow-2xl">
-                    <TabsTrigger value="entities" className="rounded-full flex-1 font-black gap-3 h-full text-base data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                    <TabsTrigger value="entities" className="rounded-full flex-1 font-black gap-3 h-full text-base data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
                         <Building2 className="h-5 w-5" /> إدارة المنشآت والطلبات
                     </TabsTrigger>
-                    <TabsTrigger value="config" className="rounded-full flex-1 font-black gap-3 h-full text-base data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                    <TabsTrigger value="config" className="rounded-full flex-1 font-black gap-3 h-full text-base data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
                         <Settings2 className="h-5 w-5" /> إعدادات النظام الشاملة
                     </TabsTrigger>
-                    <TabsTrigger value="permissions" className="rounded-full flex-1 font-black gap-3 h-full text-base data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                    <TabsTrigger value="permissions" className="rounded-full flex-1 font-black gap-3 h-full text-base data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
                         <ShieldCheck className="h-5 w-5" /> مصفوفة الصلاحيات
                     </TabsTrigger>
                 </TabsList>
@@ -257,7 +337,7 @@ export default function DeveloperDashboard() {
                                             <TableCell className="text-left px-12">
                                                 {req.status === 'pending' ? (
                                                     <Button 
-                                                        onClick={() => { setRequestToActivate(req); setActivationResult(null); setActivationPassword(''); }}
+                                                        onClick={() => setRequestToActivate(req)}
                                                         className="h-11 px-8 rounded-xl font-black bg-green-600 hover:bg-green-700 shadow-lg shadow-green-100 gap-2"
                                                     >
                                                         <UserPlus className="h-4 w-4" /> مراجعة وتفعيل
@@ -294,18 +374,39 @@ export default function DeveloperDashboard() {
             />
         )}
 
+        {/* 🛡️ واجهة تفعيل المنشآت الجديدة 🛡️ */}
+        <AlertDialog open={!!requestToActivate} onOpenChange={() => setRequestToActivate(null)}>
+            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white max-w-xl">
+                <AlertDialogHeader>
+                    <div className="p-4 bg-green-100 rounded-3xl w-fit mb-4"><Rocket className="h-10 w-10 text-green-600"/></div>
+                    <AlertDialogTitle className="text-2xl font-black text-[#1e1b4b]">تأكيد تفعيل المنشأة؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">
+                        سيقوم النظام بتأسيس منشأة <strong>"{requestToActivate?.companyName}"</strong> وحقن حساب المدير آلياً وإرسال إشعار للمالك.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-10 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleActivateRequest} disabled={isProcessing === 'activating'} className="bg-green-600 hover:bg-green-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-green-100 flex-1">
+                        {isProcessing === 'activating' ? <Loader2 className="animate-spin h-5 w-5"/> : 'نعم، ابدأ التفعيل'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        {/* 🛡️ واجهة الحذف النهائي 🛡️ */}
         <AlertDialog open={!!companyToDelete} onOpenChange={() => setCompanyToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
                 <AlertDialogHeader>
+                    <div className="p-4 bg-red-100 rounded-3xl w-fit mb-4"><Trash2 className="h-10 w-10 text-red-600"/></div>
                     <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tighter">تأكيد حذف المنشأة؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">
-                        أنت على وشك حذف منشأة <strong>"{companyToDelete?.name}"</strong> بالكامل. سيتم مسح كافة البيانات المرتبطة بها نهائياً.
+                        أنت على وشك حذف منشأة <strong>"{companyToDelete?.name}"</strong> بالكامل. سيتم مسح كافة البيانات المعزولة نهائياً.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-8 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2 text-black">تراجع</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteCompany} disabled={!!isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
-                        {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، تأكيد الحذف النهائي'}
+                    <AlertDialogAction onClick={handleDeleteCompany} disabled={isProcessing === 'deleting'} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
+                        {isProcessing === 'deleting' ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، تأكيد الحذف النهائي'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -314,5 +415,4 @@ export default function DeveloperDashboard() {
   );
 }
 
-import { generateStrongPassword } from '@/lib/utils';
-function deleteCompanyFromGlobalIndex() {} // Helper dummy
+import { Rocket } from 'lucide-react';
