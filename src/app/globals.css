@@ -50,34 +50,30 @@
     box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.05);
   }
   
-  /* 🌟 محرك أنيميشن "النوفا الصامت" V4.0 (Silent Nova Engine) 🌟 */
-  .nova-glow-nebula {
-    background: radial-gradient(circle, rgba(255,122,0,0.12) 0%, rgba(255,253,240,0) 70%);
-    filter: blur(60px);
-    animation: nebula-pulse 8s ease-in-out infinite;
+  /* 🌟 محرك أنيميشن "سديم النوفا" V5.0 (Nova Nebula Pulse) 🌟 */
+  .nova-nebula-pulse {
+    background: radial-gradient(circle, rgba(255,122,0,0.25) 0%, rgba(255,253,240,0) 70%);
+    filter: blur(40px);
+    animation: nebula-breathe 4s ease-in-out infinite;
     position: absolute;
+    width: 600px;
+    height: 600px;
     z-index: 0;
   }
 
-  @keyframes nebula-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.2; }
-    50% { transform: scale(1.1); opacity: 0.3; }
+  @keyframes nebula-breathe {
+    0%, 100% { transform: scale(0.9); opacity: 0.3; }
+    50% { transform: scale(1.1); opacity: 0.6; }
   }
 
-  .nova-plasma-ring {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    border: 1px solid rgba(255, 122, 0, 0.03);
-    border-top: 2px solid #FF7A00;
-    filter: drop-shadow(0 0 10px rgba(255, 122, 0, 0.2));
-    animation: plasma-spin 3s linear infinite;
+  .nova-text-glow {
+    text-shadow: 0 0 30px rgba(255, 122, 0, 0.4);
+    animation: text-soft-pulse 4s ease-in-out infinite;
   }
 
-  @keyframes plasma-spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  @keyframes text-soft-pulse {
+    0%, 100% { opacity: 0.8; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
   }
 
   .stardust-particle {
@@ -85,7 +81,7 @@
     background: #FF7A00;
     border-radius: 100%;
     filter: blur(0.5px);
-    animation: particle-float-slow 6s ease-out infinite;
+    animation: particle-float-slow 8s ease-out infinite;
     opacity: 0;
   }
 
@@ -96,7 +92,6 @@
   }
 
   /* 🛡️ درع النفاذية والوضوح النهائي (Sovereign Visibility Logic) 🛡️ */
-  /* تم إلغاء Pointer Events Auto العام لمنع تعارض الإغلاق التلقائي */
   [role="listbox"], 
   [role="menu"], 
   [data-radix-select-content], 

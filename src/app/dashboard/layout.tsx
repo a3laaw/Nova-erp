@@ -19,18 +19,18 @@ import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 const Stardust = () => {
     return (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            {Array.from({ length: 20 }).map((_, i) => (
+            {Array.from({ length: 30 }).map((_, i) => (
                 <div 
                     key={i} 
                     className="stardust-particle"
                     style={{
                         top: '50%',
                         left: '50%',
-                        '--tw-translate-x': `${(Math.random() - 0.5) * 400}px`,
-                        '--tw-translate-y': `${(Math.random() - 0.5) * 400}px`,
-                        animationDelay: `${Math.random() * 5}s`,
-                        width: `${Math.random() * 1.5 + 0.5}px`,
-                        height: `${Math.random() * 1.5 + 0.5}px`
+                        '--tw-translate-x': `${(Math.random() - 0.5) * 500}px`,
+                        '--tw-translate-y': `${(Math.random() - 0.5) * 500}px`,
+                        animationDelay: `${Math.random() * 8}s`,
+                        width: `${Math.random() * 2 + 0.5}px`,
+                        height: `${Math.random() * 2 + 0.5}px`
                     } as any}
                 />
             ))}
@@ -64,39 +64,33 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 🛡️ شاشة التحميل "النوفا الصامتة V4.0" 🛡️
+  // 🛡️ شاشة التحميل "سديم النوفا V5.0" 🛡️
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* هالة السديم النبضية الهادئة */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] nova-glow-nebula rounded-full" />
+        {/* هالة السديم النبضية (تظهر وتختفي ببطء كما في الصورة) */}
+        <div className="nova-nebula-pulse top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
         
-        {/* جزيئات الانفجار الهادئة */}
+        {/* جزيئات غبار النجوم المتطايرة من المركز */}
         <Stardust />
 
-        <div className="relative flex flex-col items-center justify-center scale-90">
-            <div className="relative flex items-center justify-center w-64 h-64">
-                <div className="absolute inset-0 rounded-full border-[0.5px] border-slate-200/20" />
-                
-                {/* المدار البلازمي الرقيق */}
-                <div className="nova-plasma-ring" />
-                
-                {/* شعار NOVA الصامت */}
-                <div className="relative z-20 nova-text-glow">
-                    <span className="text-6xl font-black tracking-[0.2em] text-[#FF7A00] select-none drop-shadow-sm">
-                      NOVA
-                    </span>
-                </div>
+        <div className="relative flex flex-col items-center justify-center z-10">
+            {/* شعار NOVA المتوهج في المركز */}
+            <div className="nova-text-glow">
+                <span className="text-7xl font-black tracking-[0.25em] text-[#FF7A00] select-none">
+                  NOVA
+                </span>
             </div>
             
-            <div className="mt-16 text-center space-y-4 relative z-10">
+            {/* نص التحميل السفلي مع النقاط المتحركة */}
+            <div className="mt-20 text-center space-y-4">
                 <div className="flex items-center justify-center gap-3">
-                    <div className="flex gap-1 order-2">
-                        <div className="h-1.5 w-1.5 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0s' }} />
-                        <div className="h-1.5 w-1.5 bg-[#FFB000] rounded-full animate-bounce-dots" style={{ animationDelay: '0.2s' }} />
-                        <div className="h-1.5 w-1.5 bg-[#E66D00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.4s' }} />
+                    <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-80 order-1">جاري التحميل</p>
+                    <div className="flex gap-1.5 order-2 pt-1">
+                        <div className="h-2 w-2 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                        <div className="h-2 w-2 bg-[#FFB000] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                        <div className="h-2 w-2 bg-[#E66D00] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
                     </div>
-                    <p className="text-[#1e1b4b] font-black text-lg tracking-tight opacity-70 order-1">جاري استعادة الجلسة السيادية</p>
                 </div>
                 
                 {showEmergencyExit && (

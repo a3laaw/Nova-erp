@@ -30,16 +30,16 @@ import { Separator } from '@/components/ui/separator';
  */
 const Stardust = () => (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {Array.from({ length: 24 }).map((_, i) => (
+        {Array.from({ length: 30 }).map((_, i) => (
             <div 
                 key={i} 
                 className="stardust-particle"
                 style={{
                     top: '50%',
                     left: '50%',
-                    '--tw-translate-x': `${(Math.random() - 0.5) * 600}px`,
-                    '--tw-translate-y': `${(Math.random() - 0.5) * 600}px`,
-                    animationDelay: `${Math.random() * 3}s`,
+                    '--tw-translate-x': `${(Math.random() - 0.5) * 500}px`,
+                    '--tw-translate-y': `${(Math.random() - 0.5) * 500}px`,
+                    animationDelay: `${Math.random() * 8}s`,
                     width: '2px',
                     height: '2px'
                 } as any}
@@ -107,26 +107,22 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] nova-glow-nebula rounded-full" />
+          <div className="nova-nebula-pulse top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
           <Stardust />
 
           <div className="relative flex flex-col items-center justify-center">
-              <div className="relative flex items-center justify-center w-64 h-64">
-                  <div className="absolute inset-0 rounded-full border-[1.5px] border-slate-200/30" />
-                  <div className="nova-plasma-ring" />
-                  <div className="relative z-20 nova-text-glow">
-                      <span className="text-5xl font-black tracking-widest text-[#FF7A00] drop-shadow-lg">NOVA</span>
-                  </div>
+              <div className="nova-text-glow">
+                  <span className="text-7xl font-black tracking-[0.25em] text-[#FF7A00] drop-shadow-lg">NOVA</span>
               </div>
               
-              <div className="mt-16 text-center space-y-4 relative z-10">
+              <div className="mt-20 text-center space-y-4 relative z-10">
                   <div className="flex items-center justify-center gap-3">
-                      <div className="flex gap-1.5 pt-2 order-2">
-                          <div className="h-2 w-2 bg-[#FF7A00] rounded-full animate-bounce-dots" style={{ animationDelay: '0s' }} />
-                          <div className="h-2 w-2 bg-[#FFB000] rounded-full animate-bounce-dots" style={{ animationDelay: '0.2s' }} />
-                          <div className="h-2 w-2 bg-[#E66D00] rounded-full animate-bounce-dots" style={{ animationDelay: '0.4s' }} />
+                      <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-80 order-1">جاري التحميل</p>
+                      <div className="flex gap-1.5 order-2 pt-1">
+                          <div className="h-2.5 w-2.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                          <div className="h-2.5 w-2.5 bg-[#FFB000] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                          <div className="h-2.5 w-2.5 bg-[#E66D00] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
                       </div>
-                      <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-90 order-1">جاري التحميل</p>
                   </div>
               </div>
           </div>
