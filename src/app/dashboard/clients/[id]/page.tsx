@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -99,6 +98,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -404,7 +404,7 @@ export default function ClientProfilePage() {
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none bg-white">
-                                            <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">إجراءات العرض</DropdownMenuLabel>
+                                            <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase tracking-widest">إجراءات العرض</DropdownMenuLabel>
                                             <DropdownMenuItem onSelect={() => router.push(`/dashboard/accounting/quotations/${q.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer">
                                                 <Eye className="h-4 w-4 text-primary"/> عرض التفاصيل
                                             </DropdownMenuItem>
