@@ -61,10 +61,12 @@ import {
     Banknote,
     Coins,
     Lock,
-    Ban
+    Ban,
+    ChevronLeft
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 import type { Client, ClientTransaction, TransactionStage, Holiday } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -377,7 +379,6 @@ export default function TransactionDetailPage() {
 
   return (
     <div className='space-y-6 max-w-6xl mx-auto pb-20' dir='rtl'>
-        {/* 🛡️ بنر القفل السيادي 🛡️ */}
         {isLocked && (
             <Alert className={cn(
                 "rounded-[2rem] border-2 shadow-2xl py-6 animate-in slide-in-from-top-4 duration-700",
@@ -401,7 +402,13 @@ export default function TransactionDetailPage() {
                     <div className="text-right space-y-2">
                         <div className="flex items-center gap-3">
                             <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
-                            {!isLocked && <UniversalActionTrigger title={transaction.transactionType} sourceModule="المعاملات" sourceId={transaction.id!} />}
+                            {!isLocked && (
+                                <UniversalActionTrigger 
+                                    title={transaction.transactionType} 
+                                    sourceModule="المعاملات" 
+                                    sourceId={transaction.id!} 
+                                />
+                            )}
                         </div>
                         {transaction.subServiceName && <Badge className="bg-primary text-white font-black px-4 h-7 rounded-full border-none shadow-md">{transaction.subServiceName}</Badge>}
                         <CardDescription className="text-base font-medium">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline font-bold'>{client.nameAr}</Link></CardDescription>
@@ -497,6 +504,15 @@ export default function TransactionDetailPage() {
                                     <div className="flex items-center gap-3 mt-4 sm:mt-0 no-print">
                                         {!isLocked && (
                                             <>
+                                                {/* ✨ محرك الإنتاجية المخصص للمرحلة ✨ */}
+                                                <UniversalActionTrigger 
+                                                    title={transaction.transactionType} 
+                                                    subItemName={stage.name}
+                                                    sourceModule="مراحل العمل" 
+                                                    sourceId={transaction.id!} 
+                                                    sourceSubId={stage.stageId}
+                                                />
+
                                                 {stage.status === 'pending' && isPredecessorCompleted && (
                                                     <Button size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'start')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-8 bg-orange-600 hover:bg-orange-700 text-white shadow-xl shadow-orange-100">
                                                         <Play className="ml-2 h-4 w-4"/> بدء العمل
