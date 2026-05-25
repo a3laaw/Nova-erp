@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -10,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { 
     Zap, Save, Loader2, GitMerge, Settings2, 
     ArrowRightLeft, FileText, Calculator, 
-    AlertTriangle, Sparkles, DatabaseZap, Clock
+    AlertTriangle, Sparkles, DatabaseZap, Clock,
+    PlusCircle, Trash2
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, doc, addDoc, serverTimestamp, orderBy, deleteDoc } from 'firebase/firestore';

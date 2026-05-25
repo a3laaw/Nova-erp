@@ -66,7 +66,6 @@ export function ScreenBuilder() {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* محرّر المواصفات */}
             <Card className="lg:col-span-8 rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white/80 backdrop-blur-xl border border-white/60">
                 <CardHeader className="bg-primary/5 p-8 border-b">
                     <div className="flex items-center gap-4">
@@ -160,7 +159,6 @@ export function ScreenBuilder() {
                 </CardFooter>
             </Card>
 
-            {/* معاينة القائمة */}
             <Card className="lg:col-span-4 rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white/80 backdrop-blur-xl border border-white/60 h-fit sticky top-24">
                 <CardHeader className="bg-indigo-600 text-white p-8">
                     <CardTitle className="text-xl font-black flex items-center gap-2"><Network className="h-5 w-5"/> قائمة الشاشات الديناميكية</CardTitle>

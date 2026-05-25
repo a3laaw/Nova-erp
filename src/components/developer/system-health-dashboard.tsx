@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { 
     Activity, ShieldCheck, Database, Loader2, 
     AlertTriangle, CheckCircle2, Cloud, 
@@ -11,7 +12,6 @@ import {
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 
 /**
  * لوحة صحة النظام (System Health & Integrity):
@@ -26,8 +26,8 @@ export function SystemHealthDashboard() {
         setIsChecking(true);
         setTimeout(() => {
             const posted = journalEntries.filter(e => e.status === 'posted');
-            const totalDebit = posted.reduce((s, e) => s + e.totalDebit, 0);
-            const totalCredit = posted.reduce((s, e) => s + e.totalCredit, 0);
+            const totalDebit = posted.reduce((s, e) => s + (e.totalDebit || 0), 0);
+            const totalCredit = posted.reduce((s, e) => s + (e.totalCredit || 0), 0);
             
             const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
             setHealthStatus(isBalanced ? 'ok' : 'error');
