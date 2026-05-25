@@ -40,21 +40,18 @@ export default function DashboardLayout({
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-        {/* ✨ سديم النوفا المتوهج والنبضي مطابق للصورة تماماً ✨ */}
         <div className="nova-nebula-glow top-1/2 left-1/2" />
         
         <div className="relative flex flex-col items-center justify-center z-10">
-            {/* كلمة NOVA مع التوهج والتباعد الواسع */}
             <div className="nova-text-glow">
                 <span className="text-8xl font-black tracking-[0.4em] select-none">
                   NOVA
                 </span>
             </div>
             
-            {/* النص السفلي مع النقاط الملونة المتحركة */}
             <div className="mt-20 text-center space-y-4">
                 <div className="flex items-center justify-center gap-3">
-                    <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-70">جاري التحميل</p>
+                    <p className="text-[#1e1b4b] font-black text-xl tracking-tight opacity-70">جاري فتح النظام...</p>
                     <div className="flex gap-2 pt-2">
                         <div className="h-2.5 w-2.5 bg-[#FFB000] rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
                         <div className="h-2.5 w-2.5 bg-[#FF7A00] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
@@ -66,7 +63,7 @@ export default function DashboardLayout({
                     <div className="mt-12 animate-in zoom-in-95 duration-500 glass-effect p-6 rounded-[2.5rem] border-2 border-white shadow-2xl max-w-xs mx-auto">
                         <div className="flex gap-3">
                             <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] border-slate-200">تحديث</Button>
-                            <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] text-red-600">خروج آمن</Button>
+                            <Button onClick={handleSafeExit} variant="ghost" size="sm" className="flex-1 h-10 rounded-xl font-black text-[10px] text-red-600">خروج</Button>
                         </div>
                     </div>
                 )}
@@ -82,9 +79,9 @@ export default function DashboardLayout({
         <div className="p-6 bg-red-50/10 rounded-full border-2 border-red-500/20 mb-4">
             <AlertCircle className="h-12 w-12 text-red-400 animate-bounce" />
         </div>
-        <h2 className="text-3xl font-black text-[#1e1b4b]">انتهت جلسة العمل</h2>
-        <p className="text-slate-500 font-bold max-w-xs mx-auto">يرجى تسجيل الدخول مرة أخرى للوصول إلى بياناتك المعزولة.</p>
-        <Button onClick={handleSafeExit} className="bg-[#FF7A00] text-white font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:bg-[#E66D00] active:scale-95 transition-all">بوابة الدخول</Button>
+        <h2 className="text-3xl font-black text-[#1e1b4b]">انتهى وقت الدخول</h2>
+        <p className="text-slate-500 font-bold max-w-xs mx-auto">يرجى إعادة الدخول للوصول لبياناتك.</p>
+        <Button onClick={handleSafeExit} className="bg-[#FF7A00] text-white font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:bg-[#E66D00] active:scale-95 transition-all">دخول</Button>
       </div>
     );
   }

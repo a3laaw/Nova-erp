@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef, Suspense } from 'react';
@@ -59,7 +58,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
-// 🛡️ مخطط التحقق السيادي الموحد (V20.0)
 const contractSchema = z.object({
   clientId: z.string().min(1, 'العميل مطلوب.'),
   transactionId: z.string().min(1, 'المعاملة مطلوبة.'),
@@ -102,19 +100,17 @@ function DirectContractContent() {
             roofExtension: 'none', 
             workNature: 'labor_only',
             financialsType: 'fixed',
-            clauses: [{ id: generateId(), name: 'الدفعة الأولى عند توقيع العقد', condition: 'عند توقيع العقد', amount: 0, percentage: 0 }]
+            clauses: [{ id: generateId(), name: 'الدفعة الأولى', condition: 'عند التوقيع', amount: 0, percentage: 0 }]
         }
     });
 
     const { fields, append, remove, replace: replaceClauses } = useFieldArray({ control, name: 'clauses' });
     
-    // 🛡️ محركات الرصد اللحظي (Real-time Watchers)
     const watchedClauses = useWatch({ control, name: 'clauses' });
     const watchedClientId = useWatch({ control, name: 'clientId' });
     const watchedTransactionId = useWatch({ control, name: 'transactionId' });
     const financialsType = useWatch({ control, name: 'financialsType' });
 
-    // ✨ محرك حساب المجموع الحي المعتمد (V20.0)
     const currentTotalCalculated = useMemo(() => {
         const items = watchedClauses || [];
         if (financialsType === 'fixed') {
@@ -124,7 +120,6 @@ function DirectContractContent() {
         }
     }, [watchedClauses, financialsType]);
 
-    // جلب البيانات المرجعية
     const { data: allClients = [], loading: clientsLoading } = useSubscription<Client>(firestore, tenantId ? 'clients' : null);
     const { data: templates = [], loading: templatesLoading } = useSubscription<ContractTemplate>(firestore, tenantId ? 'contractTemplates' : null, [orderBy('title')]);
     const { data: accounts = [] } = useSubscription<Account>(firestore, tenantId ? 'chartOfAccounts' : null);
@@ -134,7 +129,6 @@ function DirectContractContent() {
     const [txLoading, setTxLoading] = useState(false);
     const [specificWorkStages, setSpecificWorkStages] = useState<{ value: string, label: string }[]>([]);
 
-    // رادار جلب معاملات العميل المختار (فقط غير الموقعة)
     useEffect(() => {
         if (!firestore || !watchedClientId || !tenantId) {
             setClientTransactions([]);
@@ -145,12 +139,11 @@ function DirectContractContent() {
         getDocs(query(collection(firestore, txPath!), where('status', 'in', ['new', 'in-progress']))).then(snap => {
             const availableTxs = snap.docs
                 .map(d => ({ id: d.id, ...d.data() } as ClientTransaction))
-                .filter(tx => !tx.contract); // استبعاد الموقعة
+                .filter(tx => !tx.contract);
             setClientTransactions(availableTxs);
         }).finally(() => setTxLoading(false));
     }, [watchedClientId, firestore, tenantId]);
 
-    // رادار جلب مراحل العمل المعتمدة للربط الميداني
     useEffect(() => {
         if (!watchedTransactionId || !firestore || !tenantId || clientTransactions.length === 0) {
             setSpecificWorkStages([]);
@@ -164,7 +157,7 @@ function DirectContractContent() {
                 const stagesPath = getTenantPath(`transactionTypes/${selectedTx.transactionTypeId}/subServices/${selectedTx.subServiceId}/workStages`, tenantId);
                 const snap = await getDocs(query(collection(firestore, stagesPath!), orderBy('order')));
                 const stages = snap.docs.map(d => ({ value: d.data().name, label: d.data().name }));
-                setSpecificWorkStages([{ value: 'عند توقيع العقد', label: 'عند توقيع العقد' }, ...stages]);
+                setSpecificWorkStages([{ value: 'عند التوقيع', label: 'عند التوقيع' }, ...stages]);
             } catch (e) { console.error(e); }
         };
         fetchStages();
@@ -178,13 +171,12 @@ function DirectContractContent() {
     }, [clientTransactions, watchedTransactionId, transactionTypesData]);
 
     const wbsOptions = useMemo(() => [
-        { value: 'عند توقيع العقد', label: 'عند توقيع العقد' },
+        { value: 'عند التوقيع', label: 'عند التوقيع' },
         ...specificWorkStages
     ], [specificWorkStages]);
 
     const templateOptions = useMemo(() => templates.map(t => ({ value: t.id!, label: t.title })), [templates]);
 
-    // محرك استيراد القالب وتعديله
     const handleTemplateSelect = (templateId: string) => {
         const template = templates.find(t => t.id === templateId);
         if (!template) return;
@@ -204,7 +196,7 @@ function DirectContractContent() {
             }));
             replaceClauses(newClauses);
         }
-        toast({ title: '✅ تم استيراد هيكل العقد وتجهيز الدفعات' });
+        toast({ title: 'تم جلب الدفعات من القالب' });
     };
 
     const clientOptions = useMemo(() => allClients.map(c => ({ value: c.id!, label: c.nameAr })), [allClients]);
@@ -217,7 +209,7 @@ function DirectContractContent() {
         
         const totalToSave = financialsType === 'fixed' ? currentTotalCalculated : (data.totalAmount || 0);
         if (financialsType === 'percentage' && currentTotalCalculated !== 100) {
-            toast({ variant: 'destructive', title: 'خطأ في النسب', description: 'مجموع نسب الدفعات يجب أن يكون 100%.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'مجموع نسب الدفعات يجب أن يكون 100%.' });
             return;
         }
 
@@ -234,11 +226,9 @@ function DirectContractContent() {
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1)));
             const clientAccSnap = await getDocs(query(collection(firestore, coaPath), where('name', '==', selectedClient.nameAr), where('parentCode', '==', '1102'), limit(1)));
 
-            // 🛡️ تنفيذ الجلسة المالية مع ترتيب القراءة قبل الكتابة 🛡️
             await runTransaction(firestore, async (transaction_fs) => {
                 const currentYear = new Date().getFullYear();
                 
-                // 1. القراءات أولاً (ALL READS)
                 const jeCounterRef = doc(firestore, getTenantPath('counters/journalEntries', tenantId)!);
                 const coaSubCounterRef = doc(firestore, getTenantPath('counters/coa_clients', tenantId)!);
                 
@@ -247,7 +237,6 @@ function DirectContractContent() {
                     transaction_fs.get(coaSubCounterRef)
                 ]);
 
-                // 2. معالجة البيانات وبدء الكتابة (ALL WRITES)
                 let clientAccountId = '';
                 if (clientAccSnap.empty) {
                     const nextClientNum = (coaSubCounterDoc.data()?.lastNumber || 0) + 1;
@@ -291,9 +280,9 @@ function DirectContractContent() {
                 const newJeRef = doc(collection(firestore, getTenantPath('journalEntries', tenantId)!));
 
                 transaction_fs.set(newJeRef, cleanFirestoreData({
-                    entryNumber: `JV-PR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
+                    entryNumber: `JV-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
                     date: serverTimestamp(), 
-                    narration: `[إثبات مديونية عقد] ${selectedTx.subServiceName || selectedTx.transactionType} لـ ${selectedClient.nameAr}`,
+                    narration: `عقد: ${selectedTx.subServiceName || selectedTx.transactionType} لـ ${selectedClient.nameAr}`,
                     totalDebit: totalToSave, totalCredit: totalToSave, status: 'draft',
                     lines: [
                         { accountId: clientAccountId, accountName: selectedClient.nameAr, debit: totalToSave, credit: 0, auto_profit_center: data.transactionId },
@@ -306,10 +295,10 @@ function DirectContractContent() {
                 transaction_fs.update(doc(firestore, getTenantPath(`clients/${data.clientId}`, tenantId)!), { status: 'contracted' });
             });
 
-            toast({ title: '✅ تم توقيع العقد بنجاح' });
+            toast({ title: 'تم حفظ العقد بنجاح' });
             router.push(`/dashboard/clients/${data.clientId}`);
         } catch (e: any) {
-            toast({ variant: 'destructive', title: 'فشل التوقيع', description: e.message });
+            toast({ variant: 'destructive', title: 'خطأ', description: e.message });
             setIsSaving(false);
             savingRef.current = false;
         }
@@ -324,8 +313,8 @@ function DirectContractContent() {
                         <div className="flex items-center gap-6">
                             <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl"><FileSignature className="h-10 w-10 text-white" /></div>
                             <div className="text-right">
-                                <CardTitle className="text-3xl font-black text-white tracking-tighter">توقيع العقد المباشر</CardTitle>
-                                <CardDescription className="text-white/90 font-bold text-sm">اعتماد المسار القانوني والمالي للخدمة المختارة آلياً.</CardDescription>
+                                <CardTitle className="text-3xl font-black text-white tracking-tighter">حفظ عقد جديد</CardTitle>
+                                <CardDescription className="text-white/90 font-bold text-sm">تسجيل بيانات العقد والدفعات المالية للعميل.</CardDescription>
                             </div>
                         </div>
                         <Button type="button" onClick={() => router.back()} variant="outline" className="h-12 px-8 rounded-2xl font-black bg-white/10 text-white border-white/40 hover:bg-white/20 no-print"><ArrowRight className="h-5 w-5" /> تراجع</Button>
@@ -333,20 +322,20 @@ function DirectContractContent() {
                 </CardHeader>
             </Card>
 
-            <form onSubmit={handleSubmit(onSubmit, (e) => console.error("Validation Error:", e))}>
+            <form onSubmit={handleSubmit(onSubmit, (e) => console.error(e))}>
                 <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white/95">
                     <CardContent className="p-10 space-y-10">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                             <div className="grid gap-3">
-                                <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 flex items-center gap-2"><User className="h-3 w-3 text-[#FF7A00]"/> المالك / العميل المستهدف *</Label>
+                                <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 flex items-center gap-2"><User className="h-3 w-3 text-[#FF7A00]"/> العميل المستهدف *</Label>
                                 <Controller control={control} name="clientId" render={({ field }) => (
                                     <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن عميل..." className="h-14 rounded-2xl border-2" />
                                 )} />
                             </div>
                             <div className="grid gap-3">
-                                <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 flex items-center gap-2"><LayoutGrid className="h-3 w-3 text-[#FF7A00]"/> الخدمة / المعاملة المطلوبة *</Label>
+                                <Label className="font-black text-[11px] uppercase text-slate-400 tracking-widest pr-2 flex items-center gap-2"><LayoutGrid className="h-3 w-3 text-[#FF7A00]"/> الخدمة المطلوبة *</Label>
                                 <Controller control={control} name="transactionId" render={({ field }) => (
-                                    <InlineSearchList value={field.value} onSelect={field.onChange} options={transactionOptions} placeholder={!watchedClientId ? "اختر عميلاً أولاً" : txLoading ? "جاري التحميل..." : "اختر المعاملة..."} disabled={!watchedClientId || txLoading} className="h-14 rounded-2xl border-2" />
+                                    <InlineSearchList value={field.value} onSelect={field.onChange} options={transactionOptions} placeholder={!watchedClientId ? "اختر عميلاً أولاً" : txLoading ? "جاري التحميل..." : "اختر الخدمة..."} disabled={!watchedClientId || txLoading} className="h-14 rounded-2xl border-2" />
                                 )} />
                             </div>
                         </div>
@@ -355,10 +344,10 @@ function DirectContractContent() {
 
                         <div className="space-y-8">
                             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                                <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4">مواصفات وهيكل العقد</h3>
+                                <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4">بيانات العقد</h3>
                                 <div className="grid gap-3 w-full md:w-80 no-print">
-                                    <Label className="font-black text-[11px] uppercase text-primary tracking-widest pr-2 flex items-center gap-2"><Sparkles className="h-4 w-4 animate-pulse"/> استيراد قالب وعقد جاهز</Label>
-                                    <InlineSearchList value={importedTemplateId} onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر القالب المرجعي..." className="h-11 border-primary/20 bg-primary/5 rounded-2xl" />
+                                    <Label className="font-black text-[11px] uppercase text-primary tracking-widest pr-2 flex items-center gap-2"><Sparkles className="h-4 w-4 animate-pulse"/> استخدام قالب جاهز</Label>
+                                    <InlineSearchList value={importedTemplateId} onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر من القوالب..." className="h-11 border-primary/20 bg-primary/5 rounded-2xl" />
                                 </div>
                             </div>
 
@@ -371,15 +360,15 @@ function DirectContractContent() {
                                         <div className="grid gap-2"><Label className="text-[10px] font-black uppercase text-slate-400 pr-1">توسعة السطح</Label><Controller name="roofExtension" control={control} render={({ field }) => (<Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="h-12 rounded-xl border-2 font-black text-sm"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)} /></div>
                                     </div>
                                     {showWorkNature && (
-                                        <div className="mt-6 pt-6 border-t border-dashed border-indigo-100"><div className="grid gap-2 max-w-md"><Label className="font-black text-[10px] text-indigo-700 uppercase pr-1 flex items-center gap-2"><ShieldCheck className="h-3 w-3"/> طبيعة التعاقد الفني</Label><Controller name="workNature" control={control} render={({field}) => (<Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="h-12 rounded-xl border-2 font-black bg-indigo-50/30 border-indigo-200"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="labor_only">عقد مصنعية فقط</SelectItem><SelectItem value="with_materials">عقد توريد وتنفيذ (مواد)</SelectItem></SelectContent></Select>)}/></div></div>
+                                        <div className="mt-6 pt-6 border-t border-dashed border-indigo-100"><div className="grid gap-2 max-w-md"><Label className="font-black text-[10px] text-indigo-700 uppercase pr-1 flex items-center gap-2"><ShieldCheck className="h-3 w-3"/> طبيعة العمل</Label><Controller name="workNature" control={control} render={({field}) => (<Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="h-12 rounded-xl border-2 font-black bg-indigo-50/30 border-indigo-200"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="labor_only">مصنعية فقط</SelectItem><SelectItem value="with_materials">مع مواد</SelectItem></SelectContent></Select>)}/></div></div>
                                     )}
                                 </div>
 
                                 <div className="p-8 border-b-2 border-dashed border-slate-100 flex justify-between items-center bg-primary/5">
-                                    <div className="flex items-center gap-4"><div className="p-3 bg-white rounded-2xl text-[#FF7A00] shadow-inner"><Calculator className="h-6 w-6"/></div><Label className="text-xl font-black text-[#1e1b4b]">مصفوفة الدفعات المالية المعتمدة</Label></div>
+                                    <div className="flex items-center gap-4"><div className="p-3 bg-white rounded-2xl text-[#FF7A00] shadow-inner"><Calculator className="h-6 w-6"/></div><Label className="text-xl font-black text-[#1e1b4b]">جدول الدفعات</Label></div>
                                     <div className="flex items-center gap-4 no-print">
-                                        <div className="grid gap-1"><Label className="text-[10px] font-black text-slate-400 text-center uppercase">نظام السداد</Label><Controller name="financialsType" control={control} render={({ field }) => (<Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-40 h-10 rounded-xl bg-white font-black text-[#FF7A00] border-2"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="fixed">مبالغ ثابتة</SelectItem><SelectItem value="percentage">نسب مئوية</SelectItem></SelectContent></Select>)}/></div>
-                                        {financialsType === 'percentage' && (<div className="grid gap-1"><Label className="text-[10px] font-black text-slate-400 text-center uppercase">إجمالي العقد</Label><Input type="number" step="any" {...register('totalAmount')} onWheel={(e) => e.currentTarget.blur()} className="w-28 h-10 rounded-xl bg-white font-black text-lg text-center border-2" /></div>)}
+                                        <div className="grid gap-1"><Label className="text-[10px] font-black text-slate-400 text-center uppercase">نظام الدفع</Label><Controller name="financialsType" control={control} render={({ field }) => (<Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-40 h-10 rounded-xl bg-white font-black text-[#FF7A00] border-2"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="fixed">مبالغ ثابتة</SelectItem><SelectItem value="percentage">نسب مئوية</SelectItem></SelectContent></Select>)}/></div>
+                                        {financialsType === 'percentage' && (<div className="grid gap-1"><Label className="text-[10px] font-black text-slate-400 text-center uppercase">قيمة العقد</Label><Input type="number" step="any" {...register('totalAmount')} onWheel={(e) => e.currentTarget.blur()} className="w-28 h-10 rounded-xl bg-white font-black text-lg text-center border-2" /></div>)}
                                     </div>
                                 </div>
 
@@ -387,8 +376,8 @@ function DirectContractContent() {
                                     <TableHeader className="bg-slate-900 h-14">
                                         <TableRow className="border-none">
                                             <TableHead className="w-24 text-center font-black text-white/40 border-l border-white/10">#</TableHead>
-                                            <TableHead className="px-8 font-black text-white text-right">بيان الدفعة وشرط الاستحقاق الميداني</TableHead>
-                                            <TableHead className="text-center font-black text-white w-64">{financialsType === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}</TableHead>
+                                            <TableHead className="px-8 font-black text-white text-right">وصف الدفعة وموعد الاستحقاق</TableHead>
+                                            <TableHead className="text-center font-black text-white w-64">{financialsType === 'percentage' ? 'النسبة (%)' : 'المبلغ'}</TableHead>
                                             <TableHead className="w-16"></TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -398,7 +387,7 @@ function DirectContractContent() {
                                                 <TableCell className="text-center bg-slate-50/50 border-l font-black text-slate-400">{i+1}</TableCell>
                                                 <TableCell className="px-8 space-y-2">
                                                     <Input {...register(`clauses.${i}.name`)} className="border-none shadow-none font-black text-lg bg-transparent focus-visible:ring-0 text-black p-0" placeholder="اسم الدفعة..." />
-                                                    <Controller control={control} name={`clauses.${i}.condition`} render={({ field: condField }) => (<InlineSearchList value={condField.value} onSelect={condField.onChange} options={wbsOptions} placeholder="اربط بمرحلة إنجاز..." allowCustomValue={true} className="h-8 border-dashed border-2 bg-white/50 text-[10px] font-black text-primary" />)} />
+                                                    <Controller control={control} name={`clauses.${i}.condition`} render={({ field: condField }) => (<InlineSearchList value={condField.value} onSelect={condField.onChange} options={wbsOptions} placeholder="موعد الاستحقاق..." allowCustomValue={true} className="h-8 border-dashed border-2 bg-white/50 text-[10px] font-black text-primary" />)} />
                                                 </TableCell>
                                                 <TableCell className="bg-[#FF7A00]/5 border-r">
                                                     <Input type="number" step="any" {...register(financialsType === 'percentage' ? `clauses.${i}.percentage` : `clauses.${i}.amount`)} onWheel={(e) => e.currentTarget.blur()} placeholder="" className="text-center font-black text-3xl text-[#FF7A00] border-none shadow-none focus-visible:ring-0 bg-transparent font-mono h-14" />
@@ -409,22 +398,22 @@ function DirectContractContent() {
                                     </TableBody>
                                     <TableFooter className="bg-[#FF7A00]/5 h-24">
                                         <TableRow className="border-none hover:bg-transparent">
-                                            <TableCell colSpan={2} className="text-right px-10"><p className="text-2xl font-black">إجمالي قيمة التعاقد المباشر:</p></TableCell>
+                                            <TableCell colSpan={2} className="text-right px-10"><p className="text-2xl font-black">إجمالي العقد:</p></TableCell>
                                             <TableCell className="text-center border-r bg-white"><div className={cn("text-4xl font-black font-mono tracking-tighter", financialsType === 'percentage' && currentTotalCalculated !== 100 ? "text-red-600" : "text-[#FF7A00]")}>{financialsType === 'fixed' ? formatCurrency(currentTotalCalculated) : `${currentTotalCalculated}%`}</div></TableCell>
                                             <TableCell />
                                         </TableRow>
                                     </TableFooter>
                                 </Table>
-                                <div className="p-8 flex justify-center bg-muted/5 border-t"><Button type="button" variant="outline" onClick={() => append({ id: generateId(), name: `الدفعة الجديدة`, condition: '', amount: 0, percentage: 0 })} className="h-12 px-12 rounded-xl border-dashed border-2 font-black text-[#FF7A00] gap-2 hover:bg-white shadow-sm"><PlusCircle className="h-5 w-5" /> إضافة دفعة +</Button></div>
+                                <div className="p-8 flex justify-center bg-muted/5 border-t"><Button type="button" variant="outline" onClick={() => append({ id: generateId(), name: `الدفعة الجديدة`, condition: '', amount: 0, percentage: 0 })} className="h-12 px-12 rounded-xl border-dashed border-2 font-black text-[#FF7A00] gap-2 hover:bg-white shadow-sm"><PlusCircle className="h-5 w-5" /> إضافة دفعة</Button></div>
                             </div>
                         </div>
                     </CardContent>
                     <CardFooter className="p-10 border-t bg-muted/10 flex justify-between items-center">
-                        <div className="space-y-1"><p className="text-sm font-black text-[#FF7A00] flex items-center gap-2"><ShieldCheck className="h-5 w-5 animate-pulse"/> الاعتماد يثبت مديونية العميل في شجرة الحسابات</p><p className="text-[10px] text-muted-foreground font-bold pr-7">سيتم إنشاء قيد يومية مسودة آلياً بكامل قيمة العقد.</p></div>
-                        <Button type="submit" disabled={isSaving || !watchedClientId || !watchedTransactionId || fields.length === 0} className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[350px] gap-4 bg-[#FF7A00] text-white border-none transition-all active:scale-95 group">{isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}توقيـع واعتمـاد العقـد</Button>
+                        <div className="space-y-1"><p className="text-sm font-black text-[#FF7A00] flex items-center gap-2"><ShieldCheck className="h-5 w-5 animate-pulse"/> سيتم تسجيل العقد وتسجيل حركات الحساب آلياً</p></div>
+                        <Button type="submit" disabled={isSaving || !watchedClientId || !watchedTransactionId || fields.length === 0} className="h-16 px-20 rounded-[2.2rem] font-black text-2xl shadow-xl shadow-primary/30 min-w-[350px] gap-4 bg-[#FF7A00] text-white border-none transition-all active:scale-95 group">{isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}توقيع العقد</Button>
                     </CardFooter>
                 </Card>
-                {Object.keys(errors).length > 0 && (<Alert variant="destructive" className="mt-6 rounded-3xl border-2"><AlertTriangle className="h-4 w-4" /><AlertTitle className="font-black">بيانات ناقصة</AlertTitle><AlertDescription className="font-bold">يرجى مراجعة كافة الحقول؛ تأكد من ملء "شرط الاستحقاق" لكل بند مالي.</AlertDescription></Alert>)}
+                {Object.keys(errors).length > 0 && (<Alert variant="destructive" className="mt-6 rounded-3xl border-2"><AlertTriangle className="h-4 w-4" /><AlertTitle className="font-black">بيانات ناقصة</AlertTitle><AlertDescription className="font-bold">يرجى مراجعة كافة حقول الدفعات وتأكد من ملء الموعد لكل دفعة.</AlertDescription></Alert>)}
             </form>
         </div>
     );

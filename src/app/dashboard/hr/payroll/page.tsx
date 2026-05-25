@@ -24,8 +24,8 @@ export default function PayrollPage() {
                             <Banknote className="h-8 w-8" />
                         </div>
                         <div>
-                            <CardTitle className="text-3xl font-black">إدارة الرواتب والأجور</CardTitle>
-                            <CardDescription className="text-base font-medium">معالجة حضور الموظفين، التدقيق المالي، واعتماد كشوف الرواتب الشهرية.</CardDescription>
+                            <CardTitle className="text-3xl font-black">الرواتب</CardTitle>
+                            <CardDescription className="text-base font-medium">حساب رواتب الموظفين، التدقيق، واعتماد كشوف الصرف.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -39,20 +39,20 @@ export default function PayrollPage() {
                     )}>
                         <TabsTrigger value="attendance" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
                             <div className="tab-icon-box"><Users2 className="h-6 w-6" /></div>
-                            <h3 className="text-lg font-black">رفع الحضور</h3>
-                            <p className="text-[10px] font-bold text-muted-foreground">استيراد سجلات البصمة ومطابقتها مع التراخيص.</p>
+                            <h3 className="text-lg font-black">رفع البصمة</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground">استيراد ملفات الحضور والانصراف.</p>
                         </TabsTrigger>
                         
                         <TabsTrigger value="payroll" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
                             <div className="tab-icon-box"><ShieldCheck className="h-6 w-6" /></div>
-                            <h3 className="text-lg font-black">معالجة الرواتب</h3>
-                            <p className="text-[10px] font-bold text-muted-foreground">احتساب البدلات والخصومات وإغلاق الفترة مالياً.</p>
+                            <h3 className="text-lg font-black">توليد الرواتب</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground">حساب البدلات والخصومات الشهرية.</p>
                         </TabsTrigger>
 
                         <TabsTrigger value="payslips" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
                             <div className="tab-icon-box"><FileSpreadsheet className="h-6 w-6" /></div>
-                            <h3 className="text-lg font-black">كشوفات الصرف</h3>
-                            <p className="text-[10px] font-bold text-muted-foreground">عرض وتصدير قسائم الرواتب النهائية المعتمدة.</p>
+                            <h3 className="text-lg font-black">كشوف الصرف</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground">عرض قسائم الرواتب النهائية.</p>
                         </TabsTrigger>
                     </TabsList>
                 </div>

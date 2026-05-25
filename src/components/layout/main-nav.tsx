@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -98,12 +97,12 @@ const navItems = {
     },
     { 
       href: '/dashboard/employee-hub', 
-      label: 'الحائط التفاعلي', 
+      label: 'حائط العمل', 
       icon: Sparkles, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] 
     },
     { 
-      label: 'العملاء والمبيعات',
+      label: 'العملاء',
       icon: UsersRound,
       roles: ['Developer', 'Admin', 'Accountant', 'Secretary', 'Engineer'],
       hrefPrefix: '/dashboard/clients',
@@ -111,86 +110,86 @@ const navItems = {
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
         { href: '/dashboard/clients?view=prospective', label: 'المحتملون', icon: Search },
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
-        { href: '/dashboard/contracts', label: 'العقود الرسمية', icon: FileSignature },
+        { href: '/dashboard/contracts', label: 'العقود', icon: FileSignature },
       ]
     },
     { 
-      label: 'الهندسة والمقاولات',
+      label: 'المقاولات',
       icon: PencilRuler,
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
       hrefPrefix: '/dashboard/construction',
       children: [
-        { href: '/dashboard/construction/projects', label: 'المشاريع القائمة', icon: Briefcase },
+        { href: '/dashboard/construction/projects', label: 'المشاريع', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
-        { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
-        { href: '/dashboard/construction/schedules', label: 'الجداول الزمنية', icon: Clock },
+        { href: '/dashboard/construction/boq', label: 'جدول الكميات', icon: ClipboardList },
+        { href: '/dashboard/construction/schedules', label: 'الجدول الزمني', icon: Clock },
       ]
     },
     { 
-      label: 'المحاسبة والمالية', 
+      label: 'المالية', 
       icon: Landmark, 
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
       children: [
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
-        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية', icon: BookOpen },
-        { href: '/dashboard/accounting/claims', label: 'المطالبات والتحصيل', icon: Coins },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'الحسابات', icon: ListTree },
+        { href: '/dashboard/accounting/journal-entries', label: 'حركات الحساب', icon: BookOpen },
+        { href: '/dashboard/accounting/claims', label: 'التحصيل', icon: Coins },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-        { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: RotateCcw },
-        { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: PieChart },
+        { href: '/dashboard/accounting/reconciliation', label: 'مطابقة البنك', icon: RotateCcw },
+        { href: '/dashboard/accounting/reports', label: 'الأرباح', icon: PieChart },
       ]
     },
     { 
-      label: 'المخازن والمشتريات',
+      label: 'المخازن',
       icon: Package,
       roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
       hrefPrefix: '/dashboard/warehouse',
       children: [
-        { href: '/dashboard/warehouse/items', label: 'دليل الأصناف', icon: Package },
-        { href: '/dashboard/warehouse/grns', label: 'أذونات الاستلام', icon: FileCheck },
-        { href: '/dashboard/warehouse/material-issue', label: 'صرف المواد', icon: ArrowUpFromLine },
-        { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية', icon: ArrowLeftRight },
-        { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون', icon: BarChart3 },
+        { href: '/dashboard/warehouse/items', label: 'قائمة الأصناف', icon: Package },
+        { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة', icon: FileCheck },
+        { href: '/dashboard/warehouse/material-issue', label: 'صرف للموقع', icon: ArrowUpFromLine },
+        { href: '/dashboard/warehouse/transfers', label: 'نقل بين مخازن', icon: ArrowLeftRight },
+        { href: '/dashboard/warehouse/reports', label: 'تقارير المخزن', icon: BarChart3 },
       ]
     },
     { 
-      label: 'الموارد البشرية', 
+      label: 'الموظفين', 
       icon: Users, 
       roles: ['Developer', 'Admin', 'HR', 'Accountant', 'Engineer', 'Secretary', 'User'],
       hrefPrefix: '/dashboard/hr',
       children: [
-        { href: '/dashboard/hr/employees', label: 'سجل الموظفين', icon: Users, roles: ['Admin', 'HR', 'Developer'] },
-        { href: '/dashboard/hr/payroll', label: 'مسير الرواتب', icon: Banknote, roles: ['Admin', 'HR', 'Accountant', 'Developer'] },
+        { href: '/dashboard/hr/employees', label: 'بيانات الموظفين', icon: Users, roles: ['Admin', 'HR', 'Developer'] },
+        { href: '/dashboard/hr/payroll', label: 'الرواتب', icon: Banknote, roles: ['Admin', 'HR', 'Accountant', 'Developer'] },
         { href: '/dashboard/hr/leaves', label: 'الإجازات', icon: CalendarCheck },
         { href: '/dashboard/hr/permissions', label: 'الاستئذانات', icon: Clock },
-        { href: '/dashboard/hr/custody-reconciliation', label: 'تسوية العهد', icon: Wallet, roles: ['Admin', 'Accountant', 'Developer', 'Engineer', 'Secretary'] },
-        { href: '/dashboard/hr/reports', label: 'تقارير الموارد', icon: Activity, roles: ['Admin', 'HR', 'Developer'] },
+        { href: '/dashboard/hr/custody-reconciliation', label: 'تصفية سلف', icon: Wallet, roles: ['Admin', 'Accountant', 'Developer', 'Engineer', 'Secretary'] },
+        { href: '/dashboard/hr/reports', label: 'تقارير الموظفين', icon: Activity, roles: ['Admin', 'HR', 'Developer'] },
       ]
     },
     { 
-      label: 'إدارة التقارير',
+      label: 'التقارير',
       icon: BarChart3,
       roles: ['Developer', 'Admin', 'Accountant', 'HR'],
       hrefPrefix: '/dashboard/reports',
       children: [
-        { href: '/dashboard/reports/operational-hub', label: 'رادار الأداء الفني', icon: Activity },
-        { href: '/dashboard/reports/appointments-audit', label: 'سجل تدقيق المواعيد', icon: History },
-        { href: '/dashboard/reports/delayed-stages', label: 'المراحل المتأخرة', icon: Clock },
-        { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: Search },
+        { href: '/dashboard/reports/operational-hub', label: 'متابعة الأداء', icon: Activity },
+        { href: '/dashboard/reports/appointments-audit', label: 'سجل المواعيد', icon: History },
+        { href: '/dashboard/reports/delayed-stages', label: 'مهام متأخرة', icon: Clock },
+        { href: '/dashboard/reports/prospective-clients', label: 'العملاء الجدد', icon: Search },
       ]
     },
     { 
-      label: 'إعدادات النظام', 
+      label: 'الإعدادات', 
       icon: Settings2, 
       roles: ['Developer', 'Admin'],
       hrefPrefix: '/dashboard/settings',
       children: [
-        { href: '/dashboard/settings/branding', label: 'الهوية والشعار', icon: Palette },
-        { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: UserCheck },
+        { href: '/dashboard/settings/branding', label: 'شعار الشركة', icon: Palette },
+        { href: '/dashboard/settings/users', label: 'دخول الموظفين', icon: UserCheck },
         { href: '/dashboard/settings/reference-data', label: 'تجهيز القوائم', icon: Network },
         { href: '/dashboard/settings/contract-templates', label: 'نماذج العقود', icon: FileSignature },
-        { href: '/dashboard/settings/work-hours', label: 'مواعيد العمل', icon: Clock },
+        { href: '/dashboard/settings/work-hours', label: 'أوقات العمل', icon: Clock },
       ]
     },
   ],
@@ -352,7 +351,7 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
         <div className="flex flex-col items-center">
           <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter group-data-[collapsible=icon]:text-xl">Nova</span>
           <div className="flex items-center gap-2 mt-1 group-data-[collapsible=icon]:hidden">
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-primary">ENTERPRISE</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-primary">BUSINESS</span>
           </div>
         </div>
       </SidebarHeader>
@@ -372,7 +371,7 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
 
       <SidebarFooter className="p-6 mt-auto">
         <div className="flex items-center justify-center py-4 opacity-20 hover:opacity-50 transition-opacity">
-            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary">Nova Core v1.5</Badge>
+            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary">Nova v1.5</Badge>
         </div>
       </SidebarFooter>
     </>

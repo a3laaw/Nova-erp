@@ -83,7 +83,6 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
-          {/* ✨ سديم النوفا المتوهج والنبضي مطابق للصورة تماماً ✨ */}
           <div className="nova-nebula-glow top-1/2 left-1/2" />
 
           <div className="relative flex flex-col items-center justify-center">
@@ -117,10 +116,10 @@ export default function LoginPage() {
                 <div className="bg-gradient-to-br from-[#FF7A00] to-[#E66D00] p-6 rounded-[2.2rem] w-fit mx-auto mb-6 shadow-xl border-4 border-white/30 transition-transform hover:scale-105 duration-500">
                     <LogIn className="h-10 w-10 text-white" />
                 </div>
-                <CardTitle className="text-4xl font-black text-[#1e1b4b] tracking-tighter">Nova ERP</CardTitle>
+                <CardTitle className="text-4xl font-black text-[#1e1b4b] tracking-tighter">Nova</CardTitle>
                 <CardDescription className="text-[#FF7A00] font-black mt-2 text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2">
                     <Sparkles className="h-3 w-3 animate-pulse" />
-                    بوابة الموظفين والمديرين
+                    دخول الموظفين
                 </CardDescription>
             </CardHeader>
             <CardContent className="px-10 pb-8 space-y-8">
@@ -134,7 +133,7 @@ export default function LoginPage() {
                 {mode === 'login' ? (
                     <form onSubmit={handleLogin} className="space-y-8" autoComplete="off">
                         <div className="grid gap-3">
-                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم أو البريد المعتمد</Label>
+                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم</Label>
                             <div className="relative group">
                                 <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
                                 <Input 
@@ -163,7 +162,7 @@ export default function LoginPage() {
 
                         <div className="space-y-4">
                             <Button type="submit" className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none transition-all active:scale-95 group">
-                                {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول النظام"}
+                                {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول"}
                                 {!isSubmitting && <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform rotate-180" />}
                             </Button>
                             
@@ -173,11 +172,11 @@ export default function LoginPage() {
                                 <Separator className="w-1/2 opacity-10" />
                                 
                                 <div className="text-center pt-2">
-                                    <p className="text-[10px] font-bold text-slate-400 mb-3">هل تملك مكتباً هندسياً أو شركة مقاولات؟</p>
+                                    <p className="text-[10px] font-bold text-slate-400 mb-3">هل تملك شركة؟</p>
                                     <Button asChild variant="outline" className="h-12 px-10 rounded-2xl border-2 border-orange-200 text-[#FF7A00] font-black text-sm gap-2 hover:bg-orange-50 shadow-sm transition-all">
                                         <Link href="/register">
                                             <Building2 className="h-5 w-5" />
-                                            طلب انضمام منشأة جديدة
+                                            طلب فتح حساب شركة
                                         </Link>
                                     </Button>
                                 </div>
@@ -187,12 +186,12 @@ export default function LoginPage() {
                 ) : (
                     <form onSubmit={handleResetPassword} className="space-y-6">
                         <div className="grid gap-3">
-                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد المربوط بحسابك</Label>
+                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد المسجل</Label>
                             <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg shadow-inner bg-[#F8F9FB]" required placeholder="your@email.com" />
                         </div>
                         <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg gap-3 bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white shadow-xl">
                             {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
-                            إرسال رابط التعيين
+                            إرسال رابط استعادة
                         </Button>
                         <button type="button" onClick={() => setMode('login')} className="w-full text-xs font-black opacity-50 flex items-center justify-center gap-2 hover:opacity-100 transition-opacity">
                             <ArrowRight className="h-4 w-4 rotate-180" /> العودة للدخول

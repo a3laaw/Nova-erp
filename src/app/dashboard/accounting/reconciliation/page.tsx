@@ -24,8 +24,8 @@ export default function ReconciliationPage() {
                             <Scale className="h-8 w-8" />
                         </div>
                         <div>
-                            <CardTitle className="text-3xl font-black">مركز التسويات البنكية</CardTitle>
-                            <CardDescription className="text-base font-medium">مطابقة كشوف الحسابات البنكية مع قيود النظام وسحب عمولات الوسطاء.</CardDescription>
+                            <CardTitle className="text-3xl font-black">مطابقة حساب البنك</CardTitle>
+                            <CardDescription className="text-base font-medium">تأكيد تطابق مبالغ البنك مع حركات النظام وخصم العمولات.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -39,14 +39,14 @@ export default function ReconciliationPage() {
                     )}>
                         <TabsTrigger value="standard" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
                             <div className="tab-icon-box"><Landmark className="h-6 w-6" /></div>
-                            <h3 className="text-lg font-black">التسوية القياسية</h3>
-                            <p className="text-[10px] font-bold text-muted-foreground">مطابقة حركة مقابل حركة لكشوف الحسابات التقليدية.</p>
+                            <h3 className="text-lg font-black">مطابقة كشف البنك</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground">مقارنة حركة البنك مع حركات البرنامج.</p>
                         </TabsTrigger>
                         
                         <TabsTrigger value="intermediary" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
                             <div className="tab-icon-box"><Share2 className="h-6 w-6" /></div>
-                            <h3 className="text-lg font-black">شركات الوساطة</h3>
-                            <p className="text-[10px] font-bold text-muted-foreground">معالجة الدفعات المجمعة من بوابات الدفع (K-Net, Link).</p>
+                            <h3 className="text-lg font-black">شركات الدفع</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground">معالجة دفعات الكي نت والوسطاء (K-Net).</p>
                         </TabsTrigger>
                     </TabsList>
                 </div>
