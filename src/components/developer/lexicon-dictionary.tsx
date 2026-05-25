@@ -18,13 +18,12 @@ import {
     DownloadCloud,
     BookOpen,
     AlertCircle,
-    Zap,
     MousePointer2,
     FileText,
     Pencil
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, orderBy, getDocs, query } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, orderBy, getDocs, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
@@ -39,6 +38,11 @@ const NAMESPACES = [
     { id: 'ui_prose', name: 'النصوص الثابتة (Static UI)', color: 'bg-orange-100 text-orange-700', icon: Languages },
 ];
 
+/**
+ * محرك قاموس المصطلحات الشامل (The Universal Lexicon Engine V45.0):
+ * تم تحديث "الأساسيات" لتشمل جرد كامل لكافة نصوص النظام القياسية.
+ * تم تعديل مظهر الأزرار ليطابق الهوية البصرية المطلوبة.
+ */
 export function LexiconDictionary() {
     const { firestore } = useFirebase();
     const { user } = useAuth();
@@ -61,7 +65,6 @@ export function LexiconDictionary() {
 
     const tenantId = user?.currentCompanyId;
     
-    // جلب القاموس بالكامل
     const { data: lexicon, loading } = useSubscription<any>(
         firestore, 
         tenantId ? `companies/${tenantId}/system_lexicon` : null, 
@@ -109,6 +112,10 @@ export function LexiconDictionary() {
         } finally { setIsSaving(false); }
     };
 
+    /**
+     * محرك استيراد الأساسيات (The Essentials Provisioner):
+     * يقوم بحقن كافة نصوص الواجهات القياسية لضمان عمل النظام فوراً.
+     */
     const handleImportDefaults = async () => {
         if (!firestore || !tenantId) return;
         setIsSaving(true);
@@ -116,21 +123,60 @@ export function LexiconDictionary() {
             const batch = writeBatch(firestore);
             const lexiconPath = `companies/${tenantId}/system_lexicon`;
             
+            // قائمة الأساسيات الشاملة (The Core Genome)
             const defaults = [
+                // 1. الأفعال (Actions)
                 { key: 'btn_save', namespace: 'actions', valueAr: 'حفظ التعديلات', valueEn: 'Save Changes' },
                 { key: 'btn_cancel', namespace: 'actions', valueAr: 'إلغاء', valueEn: 'Cancel' },
-                { key: 'lbl_project_name', namespace: 'fields', valueAr: 'اسم المشروع', valueEn: 'Project Name' },
+                { key: 'btn_add', namespace: 'actions', valueAr: 'إضافة جديد', valueEn: 'Add New' },
+                { key: 'btn_edit', namespace: 'actions', valueAr: 'تعديل', valueEn: 'Edit' },
+                { key: 'btn_delete', namespace: 'actions', valueAr: 'حذف نهائي', valueEn: 'Delete' },
+                { key: 'btn_print', namespace: 'actions', valueAr: 'طباعة المستند', valueEn: 'Print' },
+                { key: 'btn_export', namespace: 'actions', valueAr: 'تصدير البيانات', valueEn: 'Export' },
+                { key: 'btn_search', namespace: 'actions', valueAr: 'بحث', valueEn: 'Search' },
+                { key: 'btn_confirm', namespace: 'actions', valueAr: 'تأكيد الإجراء', valueEn: 'Confirm' },
+                { key: 'btn_back', namespace: 'actions', valueAr: 'عودة', valueEn: 'Back' },
+
+                // 2. الحقول (Fields)
+                { key: 'lbl_name', namespace: 'fields', valueAr: 'الاسم الكامل', valueEn: 'Full Name' },
+                { key: 'lbl_phone', namespace: 'fields', valueAr: 'رقم الهاتف', valueEn: 'Phone Number' },
+                { key: 'lbl_date', namespace: 'fields', valueAr: 'التاريخ', valueEn: 'Date' },
+                { key: 'lbl_amount', namespace: 'fields', valueAr: 'المبلغ', valueEn: 'Amount' },
+                { key: 'lbl_total', namespace: 'fields', valueAr: 'الإجمالي', valueEn: 'Total' },
+                { key: 'lbl_status', namespace: 'fields', valueAr: 'الحالة', valueEn: 'Status' },
+                { key: 'lbl_description', namespace: 'fields', valueAr: 'الوصف / البيان', valueEn: 'Description' },
+                { key: 'lbl_project', namespace: 'fields', valueAr: 'المشروع', valueEn: 'Project' },
+                { key: 'lbl_client', namespace: 'fields', valueAr: 'العميل', valueEn: 'Client' },
+                { key: 'lbl_notes', namespace: 'fields', valueAr: 'ملاحظات إضافية', valueEn: 'Notes' },
+
+                // 3. التنبيهات (Alerts)
                 { key: 'msg_save_success', namespace: 'alerts', valueAr: 'تم حفظ المستند بنجاح', valueEn: 'Document saved successfully' },
+                { key: 'msg_error_generic', namespace: 'alerts', valueAr: 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً', valueEn: 'An unexpected error occurred' },
+                { key: 'msg_access_denied', namespace: 'alerts', valueAr: 'عذراً، غير مصرح لك بدخول هذه الصفحة', valueEn: 'Access Denied' },
+                { key: 'msg_delete_confirm', namespace: 'alerts', valueAr: 'هل أنت متأكد من رغبتك في الحذف؟ لا يمكن التراجع عن هذا الإجراء.', valueEn: 'Are you sure you want to delete?' },
+                { key: 'msg_unsaved_changes', namespace: 'alerts', valueAr: 'يوجد تعديلات غير محفوظة، هل تود المغادرة؟', valueEn: 'Unsaved changes exist, leave?' },
+
+                // 4. النصوص الثابتة (UI Prose)
                 { key: 'ui_loading', namespace: 'ui_prose', valueAr: 'جاري تهيئة النظام...', valueEn: 'Initializing System...' },
+                { key: 'ui_no_data', namespace: 'ui_prose', valueAr: 'لا توجد بيانات لعرضها حالياً', valueEn: 'No data to display' },
+                { key: 'ui_welcome_msg', namespace: 'ui_prose', valueAr: 'أهلاً بك في لوحة التحكم المركزية', valueEn: 'Welcome to Central Dashboard' },
+                { key: 'ui_search_placeholder', namespace: 'ui_prose', valueAr: 'ابحث عن أي شيء هنا...', valueEn: 'Search anything...' },
             ];
 
+            // فحص الموجود حالياً لمنع التكرار
+            const existingKeys = new Set((lexicon || []).map(item => item.key));
+
             for (const item of defaults) {
-                const newRef = doc(collection(firestore, lexiconPath));
-                batch.set(newRef, { ...item, companyId: tenantId, createdAt: serverTimestamp() });
+                if (!existingKeys.has(item.key)) {
+                    const newRef = doc(collection(firestore, lexiconPath));
+                    batch.set(newRef, { ...item, companyId: tenantId, createdAt: serverTimestamp() });
+                }
             }
 
             await batch.commit();
-            toast({ title: '✅ تم استيراد المصطلحات الأساسية' });
+            toast({ title: '✅ تم استيراد الأساسيات', description: 'تم ملء القاموس بكافة النصوص القياسية للنظام.' });
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'فشل الاستيراد' });
         } finally { setIsSaving(false); }
     };
 
@@ -144,15 +190,30 @@ export function LexiconDictionary() {
                                 <BookOpen className="h-8 w-8" />
                             </div>
                             <div className="text-right">
-                                <CardTitle className="text-3xl font-black">قاموس المصطلحات الشامل (Lexicon)</CardTitle>
-                                <CardDescription className="text-slate-500 font-bold">المصدر الوحيد للحقيقة لكافة النصوص والرسائل الظاهرة في النظام.</CardDescription>
+                                <CardTitle className="text-3xl font-black text-[#1e1b4b]">قاموس المصطلحات (Lexicon)</CardTitle>
+                                <CardDescription className="text-slate-500 font-bold">تحكم في كل كلمة ظاهرة في النظام؛ حوّل "نوفا" للغتك الخاصة.</CardDescription>
                             </div>
                         </div>
-                        <div className="flex gap-3 no-print">
-                            <Button variant="outline" onClick={handleImportDefaults} disabled={isSaving} className="h-12 px-6 rounded-2xl font-black gap-2 border-2 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                        <div className="flex gap-4 no-print">
+                            {/* زر الاستيراد - مخطط بحدود زرقاء ونصوص زرقاء */}
+                            <Button 
+                                variant="outline" 
+                                onClick={handleImportDefaults} 
+                                disabled={isSaving} 
+                                className="h-12 px-10 rounded-2xl font-black gap-2 border-2 border-dashed border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-all active:scale-95"
+                            >
                                 <DownloadCloud className="h-5 w-5" /> استيراد الأساسيات
                             </Button>
-                            <Button onClick={() => { setEditingItem(null); setFormData({ key: '', namespace: 'actions', valueAr: '', valueEn: '', description: '', module: 'General' }); setIsFormOpen(true); }} className="h-12 px-8 rounded-2xl font-black gap-2 shadow-xl shadow-primary/20">
+                            
+                            {/* زر الإضافة - برتقالي ملكي بارز */}
+                            <Button 
+                                onClick={() => { 
+                                    setEditingItem(null); 
+                                    setFormData({ key: '', namespace: 'actions', valueAr: '', valueEn: '', description: '', module: 'General' }); 
+                                    setIsFormOpen(true); 
+                                }} 
+                                className="h-12 px-10 rounded-2xl font-black gap-2 shadow-xl bg-gradient-to-r from-[#FFB000] to-[#FF7A00] text-white border-none hover:brightness-110 transition-all active:scale-95"
+                            >
                                 <PlusCircle className="h-5 w-5" /> إضافة مصطلح
                             </Button>
                         </div>
@@ -165,7 +226,7 @@ export function LexiconDictionary() {
                                 <TabsTrigger value="all" className="rounded-xl px-6 font-black text-xs h-full">الكل</TabsTrigger>
                                 {NAMESPACES.map(ns => (
                                     <TabsTrigger key={ns.id} value={ns.id} className="rounded-xl px-6 font-black text-xs h-full gap-2">
-                                        <ns.icon className="h-3 w-3" /> {ns.name}
+                                        <ns.icon className="h-3 w-3" /> {ns.name.split(' (')[0]}
                                     </TabsTrigger>
                                 ))}
                             </TabsList>
@@ -186,8 +247,8 @@ export function LexiconDictionary() {
                         <Table>
                             <TableHeader className="bg-slate-50 border-b">
                                 <TableRow className="h-14">
-                                    <TableHead className="px-8 font-black text-slate-900 border-l">المعرف البرمجي (Key)</TableHead>
-                                    <TableHead className="font-black text-slate-900 border-l">النص العربي</TableHead>
+                                    <TableHead className="px-8 font-black text-slate-900 border-l">المعرف (Key)</TableHead>
+                                    <TableHead className="font-black text-slate-900 border-l">القيمة (عربي)</TableHead>
                                     <TableHead className="font-black text-slate-900 border-l text-left">English Value</TableHead>
                                     <TableHead className="font-black text-slate-900 text-center">التصنيف</TableHead>
                                     <TableHead className="w-20"></TableHead>
@@ -226,7 +287,7 @@ export function LexiconDictionary() {
                     </div>
                 </CardContent>
                 <CardFooter className="bg-muted/10 p-6 flex justify-center border-t border-indigo-50">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Nova ERP — Comprehensive Lexicon Engine v1.0</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Nova ERP — Comprehensive Lexicon Engine v2.0</p>
                 </CardFooter>
             </Card>
 
@@ -286,4 +347,3 @@ export function LexiconDictionary() {
         </div>
     );
 }
-
