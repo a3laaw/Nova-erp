@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { orderBy, where, doc, updateDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { orderBy, where, doc, updateDoc, serverTimestamp, deleteDoc, QueryConstraint } from 'firebase/firestore';
 import type { UserProductivityItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,7 +18,8 @@ import {
     Loader2,
     Target,
     Activity,
-    CalendarDays
+    CalendarDays,
+    X
 } from 'lucide-react';
 import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -34,13 +34,13 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * منصة الإنتاجية الشخصية (Personal Workspace V68):
- * تضم كافة المهام والمفضلات المستخلصة من الـ ERP في واجهة كانبان وقائمة مفضلات.
- * تم فرض اللون الأسود القاتم (#000000) للوضوح المطلق فوق الهوية اللؤلؤية.
+ * منصة الإنتاجية الشخصية (Personal Workspace V69.0):
+ * تم تحصين الاستعلامات لضمان عدم الانهيار عند غياب الـ User ID.
+ * تم فرض اللون الأسود القاتم (#000000) للوضوح المطلق.
  */
 export default function PersonalProductivityPage() {
     const { firestore } = useFirebase();
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const searchParams = useSearchParams();
     
     const [activeTab, setActiveTab] = useState('tasks');
@@ -52,21 +52,30 @@ export default function PersonalProductivityPage() {
     }, [searchParams]);
 
     const tenantId = user?.currentCompanyId;
-    const productivityPath = useMemo(() => tenantId ? getTenantPath('userProductivity', tenantId) : null, [tenantId]);
+    
+    // 🛡️ توجيه الرادار السحابي 🛡️
+    const productivityPath = useMemo(() => 
+        tenantId ? getTenantPath('userProductivity', tenantId) : null
+    , [tenantId]);
 
-    const productivityQuery = useMemo(() => [
-        where('userId', '==', user?.id),
-        orderBy('createdAt', 'desc')
-    ], [user?.id]);
+    const productivityQuery = useMemo<QueryConstraint[] | null>(() => {
+        if (!user?.id) return null;
+        return [
+            where('userId', '==', user.id),
+            orderBy('createdAt', 'desc')
+        ];
+    }, [user?.id]);
 
-    const { data: allItems, loading } = useSubscription<UserProductivityItem>(
+    const { data: allItems, loading: subscriptionLoading } = useSubscription<UserProductivityItem>(
         firestore, 
-        productivityPath, 
-        productivityQuery
+        productivityQuery ? productivityPath : null, 
+        productivityQuery || []
     );
 
     const tasks = useMemo(() => allItems.filter(i => i.entryType === 'task'), [allItems]);
     const bookmarks = useMemo(() => allItems.filter(i => i.entryType === 'bookmark'), [allItems]);
+
+    const globalLoading = authLoading || (productivityQuery && subscriptionLoading);
 
     return (
         <div className="space-y-10" dir="rtl">
@@ -103,13 +112,13 @@ export default function PersonalProductivityPage() {
 
                 <TabsContent value="tasks" className="animate-in fade-in slide-in-from-bottom-4 duration-700 m-0">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {loading ? (
+                        {globalLoading ? (
                             Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-72 w-full rounded-[3rem]" />)
                         ) : tasks.length === 0 ? (
                             <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale border-4 border-dashed rounded-[3rem] bg-white/40">
                                 <ListChecks className="h-24 w-24 mb-4" />
                                 <p className="text-2xl font-black">لا توجد مهام مجدولة حالياً</p>
-                                <p className="text-sm font-bold mt-2">استخدم زر "محرك الإنتاجية" من داخل المعاملات لإضافة مهام هنا.</p>
+                                <p className="text-sm font-bold mt-2 text-center">استخدم زر "محرك الإنتاجية" من داخل المسار الفني لإضافة مهام هنا.</p>
                             </div>
                         ) : (
                             tasks.map(task => <TaskCard key={task.id} task={task} />)
@@ -119,7 +128,7 @@ export default function PersonalProductivityPage() {
 
                 <TabsContent value="bookmarks" className="animate-in fade-in slide-in-from-bottom-4 duration-700 m-0">
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                        {loading ? (
+                        {globalLoading ? (
                             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-3xl" />)
                         ) : bookmarks.length === 0 ? (
                             <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale border-4 border-dashed rounded-[3rem] bg-white/40">
@@ -172,7 +181,7 @@ function TaskCard({ task }: { task: UserProductivityItem }) {
         review: 'مراجعة وتدقيق', 
         decision: 'اتخاذ قرار', 
         design: 'تصميم فني', 
-        redesign: 'تعديل تصميم', 
+        redesign: 'إعادة تصميم / تعديل', 
         meeting: 'اجتماع عمل', 
         general: 'متابعة'
     };
@@ -291,5 +300,3 @@ function BookmarkCard({ bookmark }: { bookmark: UserProductivityItem }) {
         </Link>
     );
 }
-
-import { X } from 'lucide-react';

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -15,20 +14,21 @@ import type { UserProductivityItem, ProductivityAction, ProductivityStatus } fro
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 
 /**
- * @fileOverview محرك الإنتاجية الشخصية السيادي (Productivity Service).
- * مسؤول عن تحويل كيانات الـ ERP إلى مهام ومفضلات بضغطة زر.
+ * @fileOverview محرك الإنتاجية الشخصية السيادي (Productivity Service V2.0).
+ * تم تحصينه بـ "رادار التحقق" لضمان عدم الحفظ في مسارات خاطئة أو ناقصة.
  */
 
 export class ProductivityService {
     private db: Firestore;
-    private tenantId: string;
+    private tenantId: string | null;
 
-    constructor(db: Firestore, tenantId: string) {
+    constructor(db: Firestore, tenantId: string | null) {
         this.db = db;
         this.tenantId = tenantId;
     }
 
     private get collectionPath() {
+        // استخدام getTenantPath لضمان العزل التام
         return getTenantPath('userProductivity', this.tenantId);
     }
 
@@ -36,7 +36,10 @@ export class ProductivityService {
      * إنشاء عنصر إنتاجية جديد (مهمة أو مفضلة)
      */
     async createItem(data: Partial<UserProductivityItem>) {
-        const colRef = collection(this.db, this.collectionPath);
+        const path = this.collectionPath;
+        if (!path) throw new Error("CRITICAL_ERROR: Missing tenant scope for productivity item.");
+
+        const colRef = collection(this.db, path);
         const finalData = {
             ...data,
             viewCounter: 0,
@@ -45,6 +48,7 @@ export class ProductivityService {
             updatedAt: serverTimestamp(),
             companyId: this.tenantId,
         };
+        
         return addDoc(colRef, cleanFirestoreData(finalData));
     }
 
@@ -52,7 +56,10 @@ export class ProductivityService {
      * تحديث حالة المهمة مع طابع زمني تلقائي عند الإنجاز
      */
     async updateTaskStatus(itemId: string, status: ProductivityStatus) {
-        const docRef = doc(this.db, this.collectionPath, itemId);
+        const path = this.collectionPath;
+        if (!path) return;
+
+        const docRef = doc(this.db, path, itemId);
         const updates: any = {
             status,
             updatedAt: serverTimestamp()
@@ -69,7 +76,10 @@ export class ProductivityService {
      * رادار التفاعل: زيادة عداد المشاهدات وتحديث طابع الزيارة
      */
     async trackInteraction(itemId: string) {
-        const docRef = doc(this.db, this.collectionPath, itemId);
+        const path = this.collectionPath;
+        if (!path) return;
+
+        const docRef = doc(this.db, path, itemId);
         return updateDoc(docRef, {
             viewCounter: increment(1),
             lastViewedAt: serverTimestamp()
@@ -77,10 +87,13 @@ export class ProductivityService {
     }
 
     /**
-     * حذف عنصر
+     * حذف عنصر (إخفاء منطقي)
      */
     async deleteItem(itemId: string) {
-        const docRef = doc(this.db, this.collectionPath, itemId);
+        const path = this.collectionPath;
+        if (!path) return;
+
+        const docRef = doc(this.db, path, itemId);
         return updateDoc(docRef, { status: 'cancelled', updatedAt: serverTimestamp() });
     }
 }
