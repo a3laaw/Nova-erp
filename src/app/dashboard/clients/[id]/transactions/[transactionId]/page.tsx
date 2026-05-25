@@ -119,7 +119,7 @@ export default function TransactionDetailPage() {
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
   const tenantId = currentUser?.currentCompanyId;
 
-  const [employeesMap, setEmployeesMap] = setEmployeesMap || useState<Map<string, string>>(new Map());
+  const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [actionDialog, setActionDialog] = useState<{
@@ -160,10 +160,6 @@ export default function TransactionDetailPage() {
       setActionDialog({ isOpen: true, stageId, stageName, actionType: type });
   };
 
-  /**
-   * محرك الاستحقاق والتقادم المالي (Accrual Engine V2600.0)
-   * يتم استدعاؤه عند إنجاز أي مرحلة لمطابقة الدفعات والديون.
-   */
   const calculateFinancialClaim = async (stageName: string) => {
     if (!firestore || !tenantId || !transaction?.contract?.clauses) return null;
 
@@ -214,7 +210,6 @@ export default function TransactionDetailPage() {
 
             let logContent = '';
             let commentContent = '';
-            let financialUpdate: any = null;
 
             if (action === 'start') {
                 stage.status = 'in-progress';
@@ -235,7 +230,6 @@ export default function TransactionDetailPage() {
                 logContent = `تم إنجاز وإغلاق مرحلة: **${stage.name}** بواسطة المهندس ${currentUser.fullName}.`;
                 commentContent = `**[إشعار إنجاز مرحلة]**\nأكد المهندس ${currentUser.fullName} إتمام العمل في مرحلة **${stage.name}**.\n\n**ملاحظات الإغلاق:**\n${note}`;
                 
-                // 🛡️ تفعيل محرك الاستحقاق والتقادم المالي 🛡️
                 const claim = await calculateFinancialClaim(stage.name);
                 if (claim) {
                     let claimMsg = `\n\n**[مطالبة مالية آلية]**\nنظراً لإنجاز مرحلة **${stage.name}**، استحقت دفعة بقيمة **${formatCurrency(claim.currentClauseAmount)}**.`;
@@ -245,9 +239,7 @@ export default function TransactionDetailPage() {
                     claimMsg += `\n**إجمالي المطلوب تحصيله الآن: ${formatCurrency(claim.totalDebt)}**`;
                     
                     commentContent += claimMsg;
-                    financialUpdate = claim;
 
-                    // ✨ التوليد الفوري للمستخلص الرسمي ليظهر في شاشة المطالبات ✨
                     const appCounterPath = getTenantPath('counters/paymentApplications', tenantId);
                     const appCounterDoc = await getDoc(doc(firestore, appCounterPath!));
                     const currentYear = new Date().getFullYear();
@@ -601,8 +593,4 @@ export default function TransactionDetailPage() {
         </Dialog>
     </div>
   );
-}
-
-function setEmployeesMap(arg0: Map<string, string>) {
-    throw new Error('Function not implemented.');
 }

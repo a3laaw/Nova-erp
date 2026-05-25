@@ -185,10 +185,6 @@ export default function ClientProfilePage() {
     } finally { setIsProcessing(false); }
   };
 
-  /**
-   * 🛠️ محرك فسخ العقد والترصيد العكسي (Sovereign Contract Cancellation V21.0)
-   * يقوم بحساب المتبقي وتوليد قيد إغلاق المديونية آلياً لضمان الصحة المالية.
-   */
   const handleConfirmCancelContract = async () => {
     if (!firestore || !tenantId || !transactionToCancel?.id || !id || !currentUser) return;
     setIsProcessing(true);
@@ -196,7 +192,6 @@ export default function ClientProfilePage() {
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             
-            // 1. جلب بيانات السندات المربوطة بالمعاملة لحساب "التحصيل الفعلي"
             const receiptsPath = getTenantPath('cashReceipts', tenantId);
             const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath!), where('projectId', '==', transactionToCancel.id)));
             const totalCollected = receiptsSnap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
@@ -204,7 +199,6 @@ export default function ClientProfilePage() {
             const originalTotal = transactionToCancel.contract?.totalAmount || 0;
             const amountToReverse = Math.max(0, originalTotal - totalCollected);
 
-            // 2. معالجة القيد المحاسبي العكسي (Reversing Entry)
             const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
             const revenueAccSnap = await getDocs(query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1)));
             const clientAccSnap = await getDocs(query(collection(firestore, coaPath), where('name', '==', client?.nameAr), where('parentCode', '==', '1102'), limit(1)));
@@ -219,7 +213,6 @@ export default function ClientProfilePage() {
                 
                 const newJeRef = doc(collection(firestore, getTenantPath('journalEntries', tenantId)!));
 
-                // القيد العكسي (مدين: إيرادات / دائن: عميل) لتقليل المديونية بالمبلغ الذي لن يُدفع
                 transaction_fs.set(newJeRef, {
                     entryNumber: `JV-REV-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
                     date: serverTimestamp(),
@@ -241,7 +234,6 @@ export default function ClientProfilePage() {
                 transaction_fs.update(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum });
             }
 
-            // 3. تحديث حالة المعاملة وحذف كائن العقد الفعال
             const txRef = doc(firestore, getTenantPath(`clients/${id}/transactions/${transactionToCancel.id}`, tenantId)!);
             transaction_fs.update(txRef, {
                 status: 'cancelled',
@@ -250,7 +242,6 @@ export default function ClientProfilePage() {
                 updatedAt: serverTimestamp()
             });
 
-            // 4. توثيق الحدث في السجل التاريخي
             const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
             const historyRef = doc(collection(firestore, historyPath!));
             transaction_fs.set(historyRef, {
