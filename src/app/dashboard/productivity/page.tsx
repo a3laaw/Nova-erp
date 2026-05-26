@@ -24,7 +24,8 @@ import {
     Save,
     PlayCircle,
     MessageSquare,
-    Users
+    Users,
+    MessageCircle
 } from 'lucide-react';
 import { cn, getTenantPath, cleanFirestoreData, formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -44,9 +45,9 @@ import { DateInput } from '@/components/ui/date-input';
 import { MentionTextarea } from '@/components/ui/mention-textarea';
 
 /**
- * منصة الإنتاجية السيادية (Productivity Platform V118.0):
- * - تم تصحيح مسارات الاستيراد (Skeleton, Separator) لضمان نجاح البناء.
- * - تحصين محرك المنشن التفاعلي في فقاعات الإنجاز.
+ * منصة الإنتاجية السيادية (Productivity Platform V123.0):
+ * - تفعيل ميزة "المذكرات البينية": إضافة ملاحظات للسجل الفني دون إغلاق المهمة.
+ * - تحصين محرك المنشن والعزل البصري.
  */
 function ProductivityContent() {
     const { firestore } = useFirebase();
@@ -58,6 +59,8 @@ function ProductivityContent() {
     const [taskToEdit, setTaskToEdit] = useState<UserProductivityItem | null>(null);
     const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
     const [taskToComplete, setTaskToComplete] = useState<UserProductivityItem | null>(null);
+    const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
+    const [taskToComment, setTaskToComment] = useState<UserProductivityItem | null>(null);
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -99,6 +102,11 @@ function ProductivityContent() {
     const openCompleteDialog = (task: UserProductivityItem) => {
         setTaskToComplete(task);
         setIsCompleteDialogOpen(true);
+    };
+
+    const openCommentDialog = (task: UserProductivityItem) => {
+        setTaskToComment(task);
+        setIsCommentDialogOpen(true);
     };
 
     return (
@@ -143,7 +151,7 @@ function ProductivityContent() {
                                 <p className="text-2xl font-black">لا توجد مهام مجدولة حالياً</p>
                             </div>
                         ) : (
-                            tasks.map(task => <TaskCard key={task.id} task={task} onEdit={openEditDialog} onComplete={openCompleteDialog} />)
+                            tasks.map(task => <TaskCard key={task.id} task={task} onEdit={openEditDialog} onComplete={openCompleteDialog} onAddComment={openCommentDialog} />)
                         )}
                     </div>
                 </TabsContent>
@@ -179,11 +187,19 @@ function ProductivityContent() {
                     task={taskToComplete} 
                 />
             )}
+
+            {isCommentDialogOpen && taskToComment && (
+                <TaskProgressNoteDialog
+                    isOpen={isCommentDialogOpen}
+                    onClose={() => setIsCommentDialogOpen(false)}
+                    task={taskToComment}
+                />
+            )}
         </div>
     );
 }
 
-function TaskCard({ task, onEdit, onComplete }: { task: UserProductivityItem, onEdit: (task: UserProductivityItem) => void, onComplete: (task: UserProductivityItem) => void }) {
+function TaskCard({ task, onEdit, onComplete, onAddComment }: { task: UserProductivityItem, onEdit: (task: UserProductivityItem) => void, onComplete: (task: UserProductivityItem) => void, onAddComment: (task: UserProductivityItem) => void }) {
     const { firestore } = useFirebase();
     const { user } = useAuth();
     const { toast } = useToast();
@@ -241,7 +257,7 @@ function TaskCard({ task, onEdit, onComplete }: { task: UserProductivityItem, on
         )}>
             <CardHeader className="p-8 pb-4">
                 <div className="flex justify-between items-start mb-4">
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest border-2", actionColors[task.actionType!] || "bg-slate-50 text-slate-500 border-slate-100")}>
                             {actionLabels[task.actionType!] || 'مهمة عمل'}
                         </Badge>
@@ -253,9 +269,19 @@ function TaskCard({ task, onEdit, onComplete }: { task: UserProductivityItem, on
                     </div>
                     <div className="flex items-center gap-2 no-print">
                          {!isCompleted && (
-                            <Button variant="ghost" size="icon" onClick={() => onEdit(task)} className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary">
-                                <Pencil className="h-4 w-4" />
-                            </Button>
+                            <>
+                                <Button 
+                                    variant="ghost" size="icon" 
+                                    onClick={() => onAddComment(task)} 
+                                    className="h-8 w-8 rounded-full hover:bg-orange-50 text-orange-600"
+                                    title="إضافة ملاحظة للسجل"
+                                >
+                                    <MessageCircle className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => onEdit(task)} className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary">
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                            </>
                          )}
                          <Button variant="ghost" size="icon" onClick={handleDelete} disabled={isDeleting} className="h-8 w-8 rounded-full hover:bg-red-50 text-red-300 hover:text-red-600">
                             {isDeleting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
@@ -314,6 +340,101 @@ function TaskCard({ task, onEdit, onComplete }: { task: UserProductivityItem, on
     );
 }
 
+/**
+ * فقاعة كتابة ملاحظة تقدم (Progress Note Dialog):
+ * تسمح للموظف بكتابة ملاحظات للسجل الفني دون إغلاق المهمة.
+ */
+function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: () => void, task: UserProductivityItem }) {
+    const { firestore } = useFirebase();
+    const { user } = useAuth();
+    const { toast } = useToast();
+    
+    const [note, setNote] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSaveNote = async () => {
+        const tenantId = user?.currentCompanyId;
+        if (!firestore || !tenantId || !note.trim()) return;
+
+        setIsSaving(true);
+        try {
+            const batch = writeBatch(firestore);
+
+            // توثيق الملاحظة في سجل العميل (Timeline) آلياً
+            if (task.clientId && task.sourceId && task.sourceModule) {
+                const txPath = getTenantPath(`clients/${task.clientId}/transactions/${task.sourceId}`, tenantId);
+                const timelineRef = doc(collection(firestore, `${txPath}/timelineEvents`));
+                
+                batch.set(timelineRef, {
+                    type: 'comment',
+                    content: `**[مذكرة متابعة مهمة]**: "${task.title}"\n\n${note}`,
+                    userId: user.id,
+                    userName: user.fullName,
+                    userAvatar: user.avatarUrl,
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
+                });
+
+                // تحديث المهمة نفسها لبيان آخر ملاحظة
+                const taskPath = getTenantPath(`userProductivity/${task.id}`, tenantId);
+                batch.update(doc(firestore, taskPath!), {
+                    updatedAt: serverTimestamp()
+                });
+
+                await batch.commit();
+                toast({ title: '✅ تم حقن الملاحظة في سجل المعاملة' });
+                onClose();
+                setNote('');
+            } else {
+                toast({ variant: 'destructive', title: 'عائق ارتباط', description: 'هذه المهمة غير مرتبطة بمسار فني لعميل.' });
+            }
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
+        } finally { setIsSaving(false); }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+                <DialogHeader className="p-8 bg-orange-600 text-white border-b shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                            <MessageCircle className="h-8 w-8 text-white" />
+                        </div>
+                        <div>
+                            <DialogTitle className="text-xl font-black">إضافة ملاحظة تقدم فني</DialogTitle>
+                            <DialogDescription className="text-orange-50 font-bold">سيتم نشر الملاحظة فوراً في تايم لاين المعاملة.</DialogDescription>
+                        </div>
+                    </div>
+                </DialogHeader>
+
+                <div className="p-8 space-y-6">
+                    <div className="grid gap-3">
+                        <Label className="font-black text-slate-700 flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-primary animate-pulse" /> الملاحظة الفنية الحالية *
+                        </Label>
+                        <MentionTextarea 
+                            autoFocus
+                            value={note} 
+                            onValueChange={setNote} 
+                            placeholder="ماذا تم بخصوص هذه المهمة؟ استخدم @ للمنشن..."
+                            className="rounded-[2rem] border-2 p-6 text-base font-medium min-h-[160px] focus-visible:ring-2 focus-visible:ring-orange-500/20"
+                        />
+                    </div>
+                </div>
+
+                <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
+                    <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                    <Button onClick={handleSaveNote} disabled={isSaving || !note.trim()} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-orange-200 bg-orange-600 hover:bg-orange-700 text-white border-none">
+                        {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
+                        حفظ ونشر الملاحظة
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: () => void, task: UserProductivityItem }) {
     const { firestore } = useFirebase();
     const { user } = useAuth();
@@ -346,24 +467,24 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                 updatedAt: serverTimestamp()
             });
 
-            // 2. إذا كانت تشاركية ومرتبطة بمسار فني ومعرف عميل، حقن التعليق في المعاملة
-            if (isShared && task.sourceId && task.sourceModule && task.clientId) {
+            // 2. إذا كانت مرتبطة بمسار فني ومعرف عميل، حقن التعليق في المعاملة
+            if (task.clientId && task.sourceId && task.sourceModule) {
                 const txPath = getTenantPath(`clients/${task.clientId}/transactions/${task.sourceId}`, tenantId);
                 const timelineRef = doc(collection(firestore, `${txPath}/timelineEvents`));
                 
                 batch.set(timelineRef, {
                     type: 'comment',
-                    content: `**[إتمام مهمة تشاركية]**\nأتم الزميل **${user?.fullName}** المهمة بعنوان: "${task.title}".\n\n**محضر الإنجاز الموثق:**\n${completionNote}`,
-                    userId: user?.id,
-                    userName: user?.fullName,
-                    userAvatar: user?.avatarUrl,
+                    content: `**[إتمام وإغلاق مهمة]**: "${task.title}"\n\n**محضر الإنجاز النهائي:**\n${completionNote || 'تم الإنجاز بنجاح.'}`,
+                    userId: user.id,
+                    userName: user.fullName,
+                    userAvatar: user.avatarUrl,
                     createdAt: serverTimestamp(),
                     companyId: tenantId
                 });
             }
 
             await batch.commit();
-            toast({ title: '✅ تم الإنجاز والتوثيق المزدوج' });
+            toast({ title: '✅ تم الإنجاز والتوثيق النهائي' });
             onClose();
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إغلاق المهمة.' });
@@ -389,7 +510,7 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                     <div className="grid gap-3">
                         <div className="flex justify-between items-center pr-1">
                             <Label className="font-black text-slate-700 flex items-center gap-2">
-                                <MessageSquare className="h-4 w-4 text-primary" /> {isShared ? 'محضر الإنجاز والتسليم (إلزامي) *' : 'ملاحظات الإنجاز (اختياري)'}
+                                <MessageSquare className="h-4 w-4 text-primary" /> {isShared ? 'محضر الإنجاز والتسليم (إلزامي) *' : 'ملاحظات الإنجاز النهائية'}
                             </Label>
                             <Badge className="bg-primary/10 text-primary border-none text-[8px] font-black uppercase flex items-center gap-1">
                                 <Sparkles className="h-2.5 w-2.5 fill-primary" /> جرب استخدام @ للمنشن
@@ -399,24 +520,17 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                             autoFocus
                             value={completionNote} 
                             onValueChange={setCompletionNote} 
-                            placeholder={isShared ? "اشرح ما تم إنجازه للزملاء والعميل... استخدم @ للمنشن" : "أي ملاحظات إضافية..."}
+                            placeholder={isShared ? "اشرح ما تم إنجازه للزملاء والعميل..." : "أي ملاحظات نهائية..."}
                             className="rounded-[2rem] border-2 p-6 text-base font-medium min-h-[140px] focus-visible:ring-2 focus-visible:ring-green-500/20"
                         />
                     </div>
-                    
-                    {isShared && (
-                        <div className="flex items-center gap-3 p-4 bg-blue-50 border-2 border-dashed border-blue-200 rounded-2xl">
-                            <Users className="h-5 w-5 text-blue-600" />
-                            <p className="text-[10px] font-black text-blue-800 leading-tight">سيتم نشر هذا التعليق آلياً في "سجل المعاملة" لضمان اطلاع الطرفين والعميل.</p>
-                        </div>
-                    )}
                 </div>
 
                 <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
                     <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
                     <Button onClick={handleConfirm} disabled={isSaving || (isShared && !completionNote.trim())} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-green-200 bg-green-600 hover:bg-green-700 text-white border-none">
                         {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
-                        تأكيد الإنجاز
+                        تأكيد الإغلاق والتوثيق
                     </Button>
                 </DialogFooter>
             </DialogContent>
