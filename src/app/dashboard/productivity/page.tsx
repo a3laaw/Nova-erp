@@ -283,7 +283,7 @@ function TaskCard({ task, onEdit, onComplete }: { task: UserProductivityItem, on
                             <Clock className="h-3.5 w-3.5 text-primary opacity-40" />
                             <span className="text-[10px] font-black text-slate-400 uppercase">الحالة</span>
                         </div>
-                        <Badge className={cn("font-black text-[9px] border-none px-3", isCompleted ? "bg-green-600 text-white" : isPending ? "bg-amber-500 text-white" : "bg-blue-600 text-white")}>
+                        <Badge className={cn("font-black text-[9px] border-none px-3", isCompleted ? 'bg-green-600' : isPending ? 'bg-amber-500' : 'bg-blue-600')}>
                             {isCompleted ? 'مكتملة' : isPending ? 'بانتظار قبولك' : 'قيد المتابعة'}
                         </Badge>
                     </div>

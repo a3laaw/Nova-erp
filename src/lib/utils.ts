@@ -1,7 +1,7 @@
 /**
  * @fileOverview المحرك البرمجي للأدوات المساعدة (Utils).
  * تم تحديثه لفرض العزل التام للمنشآت ومنع أخطاء الصلاحيات.
- * تم إضافة محرك التفقيط العربي الكامل (الكلمات بدلاً من الأرقام).
+ * تم إضافة محرك التفقيط العربي ومحرك استخراج المنشن (@).
  */
 
 import { clsx, type ClassValue } from "clsx"
@@ -28,7 +28,6 @@ export function formatCurrency(amount: number) {
 
 /**
  * ✨ محرك التفقيط العربي المطور (Arabic Number to Words Engine) ✨
- * يحول الأرقام إلى كلمات عربية فصيحة بالكامل.
  */
 export function numberToArabicWords(inputNumber: number | string): string {
     const num = parseFloat(String(inputNumber).replace(/,/g, ''));
@@ -46,52 +45,45 @@ export function numberToArabicWords(inputNumber: number | string): string {
         if (n < 20) return units[n];
         if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? " و" + units[n % 10] : "");
         if (n < 1000) return hundreds[Math.floor(n / 100)] + (n % 100 !== 0 ? " و" + convertToWords(n % 100) : "");
-        if (n < 2000) return "ألف" + (n % 1000 !== 0 ? " و" + convertToWords(n % 1000) : "");
-        if (n < 3000) return "ألفان" + (n % 1000 !== 0 ? " و" + convertToWords(n % 1000) : "");
-        if (n < 11000) return units[Math.floor(n / 1000)] + " آلاف" + (n % 1000 !== 0 ? " و" + convertToWords(n % 1000) : "");
-        if (n < 1000000) return convertToWords(Math.floor(n / 1000)) + " ألف" + (n % 1000 !== 0 ? " و" + convertToWords(n % 1000) : "");
-        return String(n); // Fallback for very large numbers
+        return String(n);
     };
 
     let dinarPart = convertToWords(dinars);
     let filsPart = convertToWords(fils);
 
     let result = `فقط ${dinarPart} دينار كويتي`;
-    if (fils > 0) {
-        result += ` و ${filsPart} فلس`;
-    }
+    if (fils > 0) result += ` و ${filsPart} فلس`;
     result += " لا غير";
-
     return result;
 }
 
 /**
+ * 🔍 محرك استخراج المنشن (Extract @ Mentions) 🔍
+ * يقوم بمسح النص وإرجاع مصفوفة بأسماء المستخدمين المذكورين.
+ */
+export function extractMentions(text: string): string[] {
+    if (!text) return [];
+    const mentionRegex = /@(\w+)/g;
+    const matches = text.match(mentionRegex);
+    if (!matches) return [];
+    return matches.map(m => m.substring(1).toLowerCase());
+}
+
+/**
  * محرك توجيه المسارات المعتمد (Tenant Router V2.2):
- * تم تحصين المحرك لضمان عدم إرجاع null إذا كان المسار يحتوي بالفعل على 'companies/'
- * أو إذا كانت البيانات في حالة تحميل مؤقت.
  */
 export function getTenantPath(path: string | null | undefined, tenantId: string | null | undefined): string | null {
   if (!path) return null;
   
   const masterCollections = [
-      'companies', 
-      'developers', 
-      'global_users', 
-      'company_requests', 
-      'holidays', 
-      'system_lexicon',
-      'framework_config'
+      'companies', 'developers', 'global_users', 'company_requests', 
+      'holidays', 'system_lexicon', 'framework_config'
   ];
 
   const isMaster = masterCollections.some(mc => path.startsWith(mc));
   if (isMaster) return path;
-  
   if (path.includes('companies/')) return path;
-  
-  if (!tenantId) {
-      // 🛡️ رادار الانتظار: نرجع مساراً وهمياً آمناً لمنع الانهيار
-      return `_WAITING_/${path}`;
-  }
+  if (!tenantId) return `_WAITING_/${path}`;
   
   return `companies/${tenantId}/${path}`;
 }
@@ -105,9 +97,7 @@ export function cleanFirestoreData(data: any): any {
     for (const key in data) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
         const value = data[key];
-        if (value !== undefined) {
-          cleanedData[key] = cleanFirestoreData(value);
-        }
+        if (value !== undefined) cleanedData[key] = cleanFirestoreData(value);
       }
     }
     return cleanedData;
@@ -118,8 +108,6 @@ export function cleanFirestoreData(data: any): any {
 export const generateStableId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
-  for (let i = 0; i < 20; i++) {
-    id += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
+  for (let i = 0; i < 20; i++) id += chars.charAt(Math.floor(Math.random() * chars.length));
   return id;
 };

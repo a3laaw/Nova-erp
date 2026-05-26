@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { useFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'; 
+import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore'; 
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,9 @@ import { Send, Loader2, Lock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { createNotification } from '@/services/notification-service';
 import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
-import { cn, getTenantPath } from '@/lib/utils';
+import { cn, getTenantPath, extractMentions } from '@/lib/utils';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -65,7 +65,6 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     loaderRef 
   } = useInfiniteScroll<TimelineEvent>(relativePath);
 
-  // 🛡️ درع القفل السيادي 🛡️
   const isLocked = useMemo(() => {
     return transaction?.status === 'cancelled' || transaction?.status === 'on-hold';
   }, [transaction?.status]);
@@ -76,10 +75,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     const tenantId = currentUser.currentCompanyId;
     const finalPath = getTenantPath(relativePath, tenantId);
 
-    if (!finalPath) {
-        toast({ variant: 'destructive', title: 'خطأ في الجلسة', description: 'يرجى إعادة تسجيل الدخول لتحديد المنشأة.' });
-        return;
-    }
+    if (!finalPath) return;
 
     setIsPosting(true);
     const tempId = `temp_${Date.now()}`;
@@ -94,11 +90,12 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     };
     
     setEvents(prev => [optimisticComment, ...prev]);
+    const commentText = newComment;
     setNewComment('');
 
     const commentData = {
         type: 'comment' as const,
-        content: optimisticComment.content,
+        content: commentText,
         userId: currentUser.id,
         userName: optimisticComment.userName,
         userAvatar: currentUser.avatarUrl || null,
@@ -108,31 +105,33 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
 
     addDoc(collection(firestore, finalPath), commentData)
         .then(async () => {
-            const clientName = client?.nameAr || 'عميل';
-            const transactionName = transaction?.transactionType || 'معاملة';
-            
-            if (transaction?.assignedEngineerId && transaction.assignedEngineerId !== currentUser.employeeId) {
-                const assigneeUserId = await findUserIdByEmployeeId(firestore, transaction.assignedEngineerId);
-                if (assigneeUserId) {
-                    await createNotification(firestore, {
-                        userId: assigneeUserId,
-                        title: `تعليق جديد من ${currentUser.fullName}`,
-                        body: `أضاف زميلك تعليقاً على معاملة "${transactionName}" للعميل ${clientName}.`,
-                        link: `/dashboard/clients/${clientId}/transactions/${transactionId}`
-                    });
-                }
+            // 🔍 محرك المنشن السيادي 🔍
+            const mentionedUsernames = extractMentions(commentText);
+            if (mentionedUsernames.length > 0) {
+                const usersPath = getTenantPath('users', tenantId);
+                const q = query(collection(firestore, usersPath!), where('username', 'in', mentionedUsernames));
+                const snap = await getDocs(q);
+                
+                snap.forEach(userDoc => {
+                    if (userDoc.id !== currentUser.id) {
+                        createNotification(firestore, {
+                            userId: userDoc.id,
+                            title: '💬 تم ذكرك في تعليق',
+                            body: `ذكرك ${currentUser.fullName} في معاملة ${client?.nameAr || 'العميل'}.`,
+                            link: `/dashboard/clients/${clientId}/transactions/${transactionId}`
+                        }, tenantId);
+                    }
+                });
             }
         })
         .catch(async (serverError) => {
             setEvents(prev => prev.filter(e => e.id !== tempId));
-            setNewComment(optimisticComment.content);
-
-            const permissionError = new FirestorePermissionError({
+            setNewComment(commentText);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: finalPath,
                 operation: 'create',
                 requestResourceData: commentData
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         })
         .finally(() => {
             setIsPosting(false);
@@ -160,7 +159,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
             </Avatar>
             <div className="flex-1 space-y-4">
               <Textarea
-                placeholder="اكتب ملاحظاتك الميدانية أو ردك هنا..."
+                placeholder="اكتب ملاحظاتك... استخدم @ لمنشن الزملاء"
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 rows={4}
@@ -180,12 +179,10 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
           </div>
         )}
 
-        {/* 🔒 بنر القفل للتعليقات 🔒 */}
         {showInput && isLocked && (
             <div className="p-8 bg-muted/20 rounded-[2.5rem] border-4 border-dashed border-muted flex flex-col items-center justify-center text-center gap-3 opacity-60">
                 <Lock className="h-10 w-10 text-muted-foreground" />
                 <p className="font-black text-xl text-slate-500">منطقة التعليقات مقفلة</p>
-                <p className="text-xs font-bold text-slate-400">لا يمكن إضافة ملاحظات جديدة على معاملة ملغاة أو مجمدة.</p>
             </div>
         )}
 
@@ -193,16 +190,13 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
             {loading && Array.from({length: 2}).map((_, i) => (
                 <div key={i} className="flex gap-4 p-4 animate-pulse">
                     <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className='flex-1 space-y-2'>
-                        <Skeleton className="h-4 w-1/4 rounded-lg" />
-                        <Skeleton className="h-16 w-full rounded-2xl" />
-                    </div>
+                    <div className='flex-1 space-y-2'><Skeleton className="h-4 w-1/4 rounded-lg" /><Skeleton className="h-16 w-full rounded-2xl" /></div>
                 </div>
             ))}
             
             {!loading && filteredEvents.length === 0 && (
                 <div className="text-center text-muted-foreground py-20 opacity-30 italic font-black">
-                  <p>{filterType === 'comment' ? 'لا توجد تعليقات بعد. كن أول من يضيف لمسة في مسار العمل.' : 'لا توجد أحداث مسجلة في السجل التاريخي.'}</p>
+                  <p>{filterType === 'comment' ? 'لا توجد تعليقات بعد.' : 'لا يوجد أحداث في السجل.'}</p>
                 </div>
             )}
 
@@ -218,10 +212,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
                     )}>
                         <div className="flex justify-between items-center mb-3">
                             <p className="font-black text-sm text-[#1e1b4b]">{event.userName}</p>
-                            <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                                <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                {formatDate(event.createdAt)}
-                            </p>
+                            <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">{formatDate(event.createdAt)}</p>
                         </div>
                         <p className="text-lg font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{event.content}</p>
                     </div>
