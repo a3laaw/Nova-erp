@@ -17,7 +17,8 @@ import {
     orderBy,
     getDoc,
     runTransaction,
-    limit
+    limit,
+    deleteField
 } from 'firebase/firestore';
 import {
   Card,
@@ -104,24 +105,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-const transactionStatusColors: Record<string, string> = {
-  new: 'bg-blue-100 text-blue-800 border-blue-200',
-  'in-progress': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  completed: 'bg-green-100 text-green-800 border-green-200',
-  submitted: 'bg-purple-100 text-purple-800 border-purple-200',
-  'on-hold': 'bg-gray-100 text-gray-800 border-gray-200',
-  'cancelled': 'bg-red-100 text-red-800 border-red-200',
-};
-
-const statusTranslations: Record<string, string> = {
-  new: 'جديدة',
-  'in-progress': 'قيد التنفيذ',
-  completed: 'مكتملة',
-  submitted: 'تم تسليمها',
-  'on-hold': 'مجمدة إدارياً',
-  'cancelled': 'ملغاة / عقد مفسوخ',
-};
-
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: any }) {
     if (!value) return null;
     return (
@@ -160,21 +143,38 @@ export default function ClientProfilePage() {
     ['Admin', 'Accountant', 'HR', 'Secretary', 'Developer'].includes(currentUser?.role || '')
   , [currentUser?.role]);
 
-  // 🛡️ التعديل الجوهري: استخدام Collection Group للبحث عن المعاملات في كافة المسارات (القديمة والجديدة) 🛡️
-  const txQuery = useMemo(() => {
-    const base = [where('clientId', '==', id), orderBy('createdAt', 'desc')];
+  // 🛡️ رادار استعادة البيانات (The Dual-Path Recovery Sync) 🛡️
+  // نقوم بالاستماع للمسار القديم (تحت العميل) والمسار الجديد (المسطح) ودمجهما
+  const { data: nestedTransactions, loading: nestedLoading } = useSubscription<ClientTransaction>(
+      firestore, 
+      `clients/${id}/transactions`,
+      [] 
+  );
+
+  const flatTxQuery = useMemo(() => {
+    const base = [where('clientId', '==', id)];
     if (!isPrivileged && currentUser?.employeeId) {
         base.push(where('assignedEngineerId', '==', currentUser.employeeId));
     }
     return base;
   }, [id, isPrivileged, currentUser?.employeeId]);
 
-  const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(
+  const { data: flatTransactions, loading: flatLoading } = useSubscription<ClientTransaction>(
       firestore, 
       'transactions', 
-      txQuery,
-      true // استخدام البحث المجمع (Collection Group) لضمان ظهور البيانات القديمة
+      flatTxQuery
   );
+
+  // دمج البيانات ومنع التكرار (Merge & Deduplicate)
+  const transactions = useMemo(() => {
+    const all = [...nestedTransactions, ...flatTransactions];
+    const seen = new Set();
+    return all.filter(tx => {
+        if (seen.has(tx.id)) return false;
+        seen.add(tx.id);
+        return true;
+    }).sort((a, b) => (toFirestoreDate(b.createdAt)?.getTime() || 0) - (toFirestoreDate(a.createdAt)?.getTime() || 0));
+  }, [nestedTransactions, flatTransactions]);
 
   const qQuery = useMemo(() => [where('clientId', '==', id)], [id]);
   const { data: quotations, loading: quotationsLoading } = useSubscription<Quotation>(firestore, 'quotations', qQuery);
@@ -194,22 +194,23 @@ export default function ClientProfilePage() {
     setIsProcessing(true);
     const newStatus = tx.status === 'on-hold' ? 'new' : 'on-hold';
     
-    let finalPath = getTenantPath(`transactions/${tx.id}`, tenantId);
+    // محاولة إيجاد المسار الصحيح للمعاملة (مسطح أو متداخل)
+    let finalPath = getTenantPath(`transactions/${tx.id}`, tenantId)!;
     try {
-        const checkRef = doc(firestore, finalPath!);
+        const checkRef = doc(firestore, finalPath);
         const snap = await getDoc(checkRef);
         if (!snap.exists()) {
-            finalPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId);
+            finalPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId)!;
         }
 
-        await updateDoc(doc(firestore, finalPath!), { 
+        await updateDoc(doc(firestore, finalPath), { 
             status: newStatus,
             updatedAt: serverTimestamp() 
         });
         toast({ title: '✅ تم حفظ المعلومات', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
     } catch (e: any) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: finalPath!,
+            path: finalPath,
             operation: 'update',
             requestResourceData: { status: newStatus }
         }));
