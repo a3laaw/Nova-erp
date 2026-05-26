@@ -24,9 +24,7 @@ import { DateInput } from '@/components/ui/date-input';
 
 /**
  * رادار متابعة العمل والميدان:
- * - تخصيص عتبة الخمول.
- * - تصنيف درجة الخطورة (Critical/Warning/Active).
- * - فلترة متقدمة للتواريخ.
+ * تم تطهير الألوان الداكنة واستبدالها بخلفيات لؤلؤية مع رؤوس جداول برتقالية/لؤلؤية.
  */
 export function UnifiedOperationalRadar() {
   const { transactions, clients, employees, departments, appointments, loading } = useAnalyticalData();
@@ -112,9 +110,9 @@ export function UnifiedOperationalRadar() {
             <Select value={threshold} onValueChange={setThreshold}>
                 <SelectTrigger className="h-10 rounded-xl border-2 font-black text-[#1e1b4b]"><SelectValue /></SelectTrigger>
                 <SelectContent dir="rtl">
-                    <SelectItem value="7">7 أيام (كشف ميداني)</SelectItem>
+                    <SelectItem value="7">7 أيام (ميداني)</SelectItem>
                     <SelectItem value="14">14 يوم (تصميم)</SelectItem>
-                    <SelectItem value="30">30 يوم (متابعة تراخيص)</SelectItem>
+                    <SelectItem value="30">30 يوم (تراخيص)</SelectItem>
                 </SelectContent>
             </Select>
         </div>
@@ -126,9 +124,9 @@ export function UnifiedOperationalRadar() {
             </div>
         </div>
         <div className="lg:col-span-3">
-            <Button onClick={handleGenerate} disabled={isGenerating || loading} className="w-full h-12 rounded-xl font-black text-base gap-2 shadow-xl shadow-primary/20">
+            <Button onClick={handleGenerate} disabled={isGenerating || loading} className="w-full h-12 rounded-xl font-black text-base gap-2 shadow-xl shadow-primary/20 bg-primary text-white">
                 {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Activity className="h-5 w-5" />} 
-                تحديث رادار النبض
+                تحديث الرادار العملياتي
             </Button>
         </div>
       </div>
@@ -136,14 +134,14 @@ export function UnifiedOperationalRadar() {
       {reportData ? (
         <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-2xl bg-white animate-in fade-in zoom-in-95 duration-500">
             <Table>
-                <TableHeader className="bg-slate-900 text-white">
+                <TableHeader className="bg-primary/5 border-b-2">
                     <TableRow className="h-14 border-none">
-                        <TableHead className="px-8 font-black text-white text-right">المشروع والعميل</TableHead>
-                        <TableHead className="font-black text-white">المرحلة الحالية</TableHead>
-                        <TableHead className="font-black text-white text-center">أيام التوقف</TableHead>
-                        <TableHead className="font-black text-white text-center">درجة الخطورة</TableHead>
-                        <TableHead className="font-black text-white">آخر زيارة</TableHead>
-                        <TableHead className="font-black text-white text-left px-8">المسؤول</TableHead>
+                        <TableHead className="px-8 font-black text-primary text-right">المشروع والعميل</TableHead>
+                        <TableHead className="font-black text-primary">المرحلة الحالية</TableHead>
+                        <TableHead className="font-black text-primary text-center">أيام التوقف</TableHead>
+                        <TableHead className="font-black text-primary text-center">درجة الخطورة</TableHead>
+                        <TableHead className="font-black text-primary">آخر زيارة</TableHead>
+                        <TableHead className="font-black text-primary text-left px-8">المسؤول</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -171,11 +169,11 @@ export function UnifiedOperationalRadar() {
                                 </TableCell>
                                 <TableCell className="text-center">
                                     <Badge className={cn(
-                                        "px-4 py-1 rounded-full font-black text-[10px] border-none shadow-sm",
+                                        "px-4 py-1 rounded-full font-black text-[9px] border-none shadow-sm",
                                         item.severity === 'active' ? "bg-green-600 text-white" :
                                         item.severity === 'warning' ? "bg-orange-400 text-white" :
                                         item.severity === 'critical' ? "bg-red-600 text-white animate-pulse" :
-                                        "bg-slate-900 text-white"
+                                        "bg-slate-400 text-white"
                                     )}>{item.severity === 'active' ? 'نشط' : item.severity === 'warning' ? 'تحذير' : item.severity === 'critical' ? 'خامل (حرج)' : 'متوقف'}</Badge>
                                 </TableCell>
                                 <TableCell>
@@ -201,7 +199,7 @@ export function UnifiedOperationalRadar() {
       ) : (
         <div className="h-96 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] opacity-30 grayscale">
             <Activity className="h-20 w-20 text-muted-foreground mb-4" />
-            <p className="text-xl font-black text-slate-800">بانتظار تحديث الرادار العملياتي</p>
+            <p className="text-xl font-bold text-slate-800">بانتظار تحديث الرادار العملياتي</p>
         </div>
       )}
     </div>

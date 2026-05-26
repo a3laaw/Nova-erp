@@ -174,7 +174,7 @@ export default function IncomeStatementPage() {
                     <CardDescription>حلل نتائج الأعمال للفترة المحددة مع رصد منحنى الأرباح السنوي.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">نطاق التحليل</Label>
                             <InlineSearchList 
@@ -281,9 +281,9 @@ export default function IncomeStatementPage() {
                                 </div>
                             </div>
 
-                            <div className="flex justify-between p-8 bg-slate-900 text-white rounded-[2.5rem] shadow-2xl items-center">
+                            <div className="flex justify-between p-8 bg-primary/5 text-primary border-2 border-primary/20 rounded-[2.5rem] shadow-sm items-center">
                                 <span className="text-2xl font-black">مجمل الربح (Gross Profit)</span>
-                                <span className="font-mono text-4xl font-black text-green-400">{formatCurrency(reportData.grossProfit)}</span>
+                                <span className="font-mono text-4xl font-black">{formatCurrency(reportData.grossProfit)}</span>
                             </div>
 
                             <div className="space-y-6">

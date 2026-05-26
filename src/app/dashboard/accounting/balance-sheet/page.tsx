@@ -77,9 +77,9 @@ export default function BalanceSheetPage() {
             const jePath = getTenantPath('journalEntries', tenantId);
 
             const [accountsSnap, entriesSnap] = await Promise.all([
-                getDocs(query(collection(firestore, coaPath))),
+                getDocs(query(collection(firestore, coaPath!))),
                 getDocs(query(
-                    collection(firestore, jePath), 
+                    collection(firestore, jePath!), 
                     where('date', '<=', Timestamp.fromDate(endDate)),
                     where('status', '==', 'posted')
                 ))
@@ -264,7 +264,7 @@ export default function BalanceSheetPage() {
 
                                     <Separator className="my-4" />
 
-                                    <div className="flex justify-between items-center text-xl p-6 font-black bg-slate-900 text-white rounded-3xl shadow-xl">
+                                    <div className="flex justify-between items-center text-xl p-6 font-black bg-indigo-600/10 text-indigo-700 border-2 border-indigo-600/20 rounded-3xl shadow-sm">
                                         <span>إجمالي الالتزامات وحقوق الملكية</span>
                                         <span className="font-mono text-3xl">{formatCurrency(reportData.liabilitiesAndEquity.total)}</span>
                                     </div>

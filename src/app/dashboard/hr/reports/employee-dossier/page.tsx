@@ -126,13 +126,13 @@ export default function EmployeeDossierReport() {
 
             {results && results.map((entry, idx) => (
                 <Card key={idx} className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white print:shadow-none print:m-0 print:rounded-none">
-                    <CardHeader className="bg-slate-900 text-white p-10">
+                    <CardHeader className="bg-primary/5 text-[#1e1b4b] p-10 border-b-2">
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-6">
-                                <Logo className="h-20 w-20 !p-3 border-2 border-white/20" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                <Logo className="h-20 w-20 !p-3 border-2 border-primary/20 shadow-inner" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                                 <div className="space-y-1">
                                     <h2 className="text-3xl font-black tracking-tight">{entry.employee.fullName}</h2>
-                                    <p className="text-indigo-200 font-bold">{entry.employee.jobTitle} - {entry.employee.department}</p>
+                                    <p className="text-primary font-bold">{entry.employee.jobTitle} - {entry.employee.department}</p>
                                 </div>
                             </div>
                             <div className="text-left opacity-40"><p className="text-[10px] font-black uppercase tracking-[0.3em]">Official Dossier Record</p></div>
@@ -140,7 +140,6 @@ export default function EmployeeDossierReport() {
                     </CardHeader>
                     <CardContent className="p-10 space-y-12">
                         
-                        {/* ✨ المخطط الزمني التاريخي ✨ */}
                         <section className="space-y-6">
                             <h3 className="text-xl font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4"><Activity className="text-indigo-600" /> الجدول الزمني للقرارات والمسيرة</h3>
                             <div className="relative pr-8 border-r-4 border-slate-100 space-y-8">
@@ -170,7 +169,7 @@ export default function EmployeeDossierReport() {
                             <h3 className="text-xl font-black flex items-center gap-3 border-r-8 border-primary pr-4"><Clock className="text-primary" /> ملخص الانضباط الميداني</h3>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                                 <div className="p-6 bg-green-50 rounded-3xl border border-green-100 text-center shadow-inner"><Label className="text-[10px] font-black text-green-700 uppercase">الحضور</Label><p className="text-3xl font-black text-green-800">{entry.attendanceSummary.presentDays} يوم</p></div>
-                                <div className="p-6 bg-red-50 rounded-3xl border border-red-100 text-center shadow-inner"><Label className="text-[10px] font-black text-red-700 uppercase">الغياب</Label><p className="text-3xl font-black text-red-800">{entry.attendanceSummary.absentDays} يوم</p></div>
+                                <div className="p-6 bg-red-50 rounded-3xl border border-red-100 text-center shadow-inner"><Label className="text-[10px] font-black text-red-700 uppercase">الغياب الفعلي</Label><p className="text-3xl font-black text-red-800">{entry.attendanceSummary.absentDays} يوم</p></div>
                                 <div className="p-6 bg-orange-50 rounded-3xl border border-orange-100 text-center shadow-inner"><Label className="text-[10px] font-black text-orange-700 uppercase">التأخير</Label><p className="text-3xl font-black text-orange-800">{entry.attendanceSummary.lateMinutes} د</p></div>
                                 <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100 text-center shadow-inner"><Label className="text-[10px] font-black text-blue-700 uppercase">استئذانات</Label><p className="text-3xl font-black text-blue-800">{entry.permissionCount}</p></div>
                             </div>

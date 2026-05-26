@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -70,7 +69,7 @@ export default function ViewJournalEntryPage() {
 
   return (
     <div className="bg-gray-100 p-4 sm:p-8 print:p-0 print:bg-white" dir="rtl">
-        <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-[2.5rem] overflow-hidden print:shadow-none print:border-none">
+        <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-[2.5rem] overflow-hidden print:shadow-none print:border-none border">
             <div id="printable-area" className="p-8 md:p-12">
                 <header className="flex justify-between items-start pb-8 border-b-4 border-primary mb-10">
                     <div className="flex items-center gap-6">
@@ -105,11 +104,11 @@ export default function ViewJournalEntryPage() {
 
                 <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm">
                     <Table>
-                        <TableHeader className="bg-slate-900 h-12">
+                        <TableHeader className="bg-primary/5 h-14 border-b-2">
                             <TableRow className="border-none">
-                                <TableHead className="px-8 font-black text-white text-right">الحساب المالي</TableHead>
-                                <TableHead className="text-left font-black text-white w-32">مدين (+)</TableHead>
-                                <TableHead className="text-left font-black text-white w-32">دائن (-)</TableHead>
+                                <TableHead className="px-8 font-black text-primary text-right">الحساب المالي</TableHead>
+                                <TableHead className="text-left font-black text-primary w-32">مدين (+)</TableHead>
+                                <TableHead className="text-left font-black text-primary w-32">دائن (-)</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -123,9 +122,9 @@ export default function ViewJournalEntryPage() {
                         </TableBody>
                         <TableFooter className="bg-primary/5 h-16">
                             <TableRow className="border-t-4 border-primary/20">
-                                <TableCell className="px-8 font-black">الإجمالي:</TableCell>
-                                <TableCell className="text-left font-mono font-black text-primary">{formatCurrency(entry.totalDebit)}</TableCell>
-                                <TableCell className="text-left font-mono font-black text-primary">{formatCurrency(entry.totalCredit)}</TableCell>
+                                <TableCell className="px-8 font-black text-[#1e1b4b]">الإجمالي:</TableCell>
+                                <TableCell className="text-left font-mono font-black text-primary text-lg">{formatCurrency(entry.totalDebit)}</TableCell>
+                                <TableCell className="text-left font-mono font-black text-primary text-lg">{formatCurrency(entry.totalCredit)}</TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
