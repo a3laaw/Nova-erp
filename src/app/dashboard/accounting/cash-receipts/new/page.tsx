@@ -49,7 +49,7 @@ const getTotalPaidForProject = async (projectId: string, db: any, tenantId: stri
 
 /**
  * مكون محتوى سند القبض (The Receipt Engine Content):
- * تم فصل المحتوى ليتم تغليفه بـ Suspense لضمان استقرار البناء.
+ * تم تحويل دوال الخيارات إلى useMemo لضمان تمرير مصفوفات صحيحة لمكون البحث.
  */
 function NewCashReceiptContent() {
   const router = useRouter();
@@ -85,6 +85,30 @@ function NewCashReceiptContent() {
 
   const [clientProjects, setClientProjects] = useState<ClientTransaction[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
+
+  // ✨ مصفوفات الخيارات المحسنة (Memorized Options) ✨
+  const clientAccountOptions = useMemo(() => 
+    accounts.filter(a => a.code.startsWith('1102')).map(a => ({
+      value: a.id!,
+      label: `السيد/ ${a.name} (${a.code})`,
+      searchKey: a.code
+    }))
+  , [accounts]);
+
+  const projectOptions = useMemo(() => 
+    clientProjects.map(p => ({ 
+        value: p.id!, 
+        label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})`
+    }))
+  , [clientProjects]);
+
+  const debitAccountOptions = useMemo(() => {
+    if (!paymentMethod) return [];
+    const isCash = paymentMethod === 'Cash';
+    return accounts
+        .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes(isCash ? 'صندوق' : 'بنك'))
+        .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+  }, [accounts, paymentMethod]);
 
   useEffect(() => {
     if (!firestore || !tenantId) return;
@@ -427,27 +451,6 @@ function NewCashReceiptContent() {
     </Card>
   );
 }
-
-const clientAccountOptions = (accounts: Account[]) => 
-  accounts.filter(a => a.code.startsWith('1102')).map(a => ({
-    value: a.id!,
-    label: `السيد/ ${a.name} (${a.code})`,
-    searchKey: a.code
-  }));
-
-const projectOptions = (projects: ClientTransaction[]) => 
-  projects.map(p => ({ 
-      value: p.id!, 
-      label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})`
-  }));
-
-const debitAccountOptions = (accounts: Account[], paymentMethod: string) => {
-  if (!paymentMethod) return [];
-  const isCash = paymentMethod === 'Cash';
-  return accounts
-      .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes(isCash ? 'صندوق' : 'بنك'))
-      .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
-};
 
 export default function NewCashReceiptPage() {
     return (

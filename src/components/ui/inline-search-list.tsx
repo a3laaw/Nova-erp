@@ -36,10 +36,9 @@ interface InlineSearchListProps {
 }
 
 /**
- * مكون البحث والاختيار السيادي المطور (Sovereign Clarity Engine V26.1):
- * - تم حل مشكلة ظهور الـ ID بدلاً من الاسم عبر رادار الانتظار الذكي.
+ * مكون البحث والاختيار السيادي المطور (Sovereign Clarity Engine V26.2):
+ * - تم تحصين المكون ضد أخطاء (map is not a function) عبر فرض مصفوفة آمنة.
  * - تحسين تباين النصوص (Solid Black) لضمان الوضوح المطلق.
- * - معالجة التفاعل الخارجي لضمان الإغلاق التلقائي.
  */
 export function InlineSearchList({
   value,
@@ -57,21 +56,29 @@ export function InlineSearchList({
     if (!open) setSearchValue('');
   }, [open]);
 
-  // ✨ محرك الوضوح: البحث عن التسمية الصحيحة ومنع ظهور الـ ID أثناء التحميل
+  // 🛡️ درع الحماية: التأكد من أن options هي دائماً مصفوفة 🛡️
+  const safeOptions = React.useMemo(() => (Array.isArray(options) ? options : []), [options]);
+
   const displayText = React.useMemo(() => {
     if (!value) return placeholder;
-    const option = options.find((opt) => opt.value === value);
+    const option = safeOptions.find((opt) => opt.value === value);
     if (option) return option.label;
-    
-    // 🛡️ درع الحماية: إذا كان هناك قيمة ولكنها غير موجودة في القائمة، فهذا يعني أن البيانات قيد التحميل
-    // لا نظهر الـ ID للمستخدم بل نظهر حالة الانتظار
     return disabled ? "جاري التحميل..." : (allowCustomValue ? value : "جاري استرجاع الاسم..."); 
-  }, [options, value, placeholder, disabled, allowCustomValue]);
+  }, [safeOptions, value, placeholder, disabled, allowCustomValue]);
+
+  const filteredOptions = React.useMemo(() => {
+    if (!searchValue) return safeOptions;
+    const searchLower = searchValue.toLowerCase();
+    return safeOptions.filter(opt => 
+        opt.label.toLowerCase().includes(searchLower) || 
+        opt.searchKey?.toLowerCase().includes(searchLower)
+    );
+  }, [safeOptions, searchValue]);
 
   const showCustomAdd = React.useMemo(() => {
     if (!allowCustomValue || !searchValue.trim()) return false;
-    return !options.some(opt => opt.label.toLowerCase() === searchValue.toLowerCase().trim());
-  }, [allowCustomValue, searchValue, options]);
+    return !safeOptions.some(opt => opt.label.toLowerCase() === searchValue.toLowerCase().trim());
+  }, [allowCustomValue, searchValue, safeOptions]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -82,7 +89,7 @@ export function InlineSearchList({
           aria-expanded={open}
           className={cn(
             "w-full justify-between h-11 rounded-xl border-2 transition-all px-4 text-right shadow-sm",
-            "bg-white border-slate-200 hover:border-primary/40 text-sm font-black text-black", // نصوص سوداء واضحة
+            "bg-white border-slate-200 hover:border-primary/40 text-sm font-black text-black",
             !value && "text-muted-foreground font-medium",
             className
           )}
@@ -96,7 +103,6 @@ export function InlineSearchList({
         className="w-[--radix-popover-trigger-width] p-0 z-[999999999] border-2 border-primary/20 shadow-2xl rounded-2xl overflow-hidden bg-white" 
         align="start"
         dir="rtl"
-        // 🛡️ منع خطف التركيز لضمان استجابة الماوس الفورية V74
         onOpenAutoFocus={(e) => e.preventDefault()}
         style={{ pointerEvents: 'auto' }}
       >
@@ -131,7 +137,7 @@ export function InlineSearchList({
             </CommandEmpty>
             
             <CommandGroup>
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <CommandItem
                   key={option.value}
                   value={option.label + (option.searchKey || '')}
