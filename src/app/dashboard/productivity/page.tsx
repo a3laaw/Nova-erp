@@ -21,7 +21,8 @@ import {
     Pencil,
     CalendarDays,
     X,
-    Save
+    Save,
+    PlayCircle
 } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -39,10 +40,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 
-/**
- * محتوى منصة الإنتاجية (Productivity Hub Content):
- * تم تغليفها بـ Suspense لضمان استقرار الخادم.
- */
 function ProductivityContent() {
     const { firestore } = useFirebase();
     const { user, loading: authLoading } = useAuth();
@@ -62,9 +59,7 @@ function ProductivityContent() {
     
     const productivityQuery = useMemo<QueryConstraint[] | null>(() => {
         if (!user?.id) return null;
-        return [
-            where('userId', '==', user.id)
-        ];
+        return [where('userId', '==', user.id)];
     }, [user?.id]);
 
     const { data: rawItems, loading: subscriptionLoading } = useSubscription<UserProductivityItem>(
@@ -184,7 +179,19 @@ function TaskCard({ task, onEdit }: { task: UserProductivityItem, onEdit: (task:
                 completedAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             });
-            toast({ title: '✅ تم الإنجاز', description: 'تم تحديث المهمة ومنحك نقاط الخبرة.' });
+            toast({ title: '✅ تم الإنجاز', description: 'تم تحديث المهمة بنجاح.' });
+        } finally { setIsUpdating(false); }
+    };
+
+    const handleAccept = async () => {
+        if (!firestore || !taskPath) return;
+        setIsUpdating(true);
+        try {
+            await updateDoc(doc(firestore, taskPath), {
+                status: 'in-progress',
+                updatedAt: serverTimestamp()
+            });
+            toast({ title: '✅ تم قبول المهمة', description: 'المهمة الآن قيد التنفيذ في جدولك.' });
         } finally { setIsUpdating(false); }
     };
 
@@ -214,6 +221,7 @@ function TaskCard({ task, onEdit }: { task: UserProductivityItem, onEdit: (task:
     };
 
     const isCompleted = task.status === 'completed';
+    const isPending = task.status === 'pending';
 
     return (
         <Card className={cn(
@@ -236,7 +244,7 @@ function TaskCard({ task, onEdit }: { task: UserProductivityItem, onEdit: (task:
                         </Button>
                     </div>
                 </div>
-                <CardTitle className="text-xl font-black text-black leading-tight tracking-tight group-hover:text-primary transition-colors">
+                <CardTitle className="text-xl font-black text-[#000000] leading-tight tracking-tight group-hover:text-primary transition-colors">
                     {task.title}
                 </CardTitle>
             </CardHeader>
@@ -258,19 +266,26 @@ function TaskCard({ task, onEdit }: { task: UserProductivityItem, onEdit: (task:
                             <Clock className="h-3.5 w-3.5 text-primary opacity-40" />
                             <span className="text-[10px] font-black text-slate-400 uppercase">الحالة</span>
                         </div>
-                        <Badge className={cn("font-black text-[9px] border-none px-3", isCompleted ? "bg-green-600 text-white" : "bg-blue-600 text-white")}>
-                            {isCompleted ? 'مكتملة' : 'قيد المتابعة'}
+                        <Badge className={cn("font-black text-[9px] border-none px-3", isCompleted ? "bg-green-600 text-white" : isPending ? "bg-amber-500 text-white" : "bg-blue-600 text-white")}>
+                            {isCompleted ? 'مكتملة' : isPending ? 'بانتظار قبولك' : 'قيد المتابعة'}
                         </Badge>
                     </div>
                 </div>
             </CardContent>
 
             <CardFooter className="p-8 bg-muted/10 flex gap-3 rounded-b-[2.8rem]">
-                <Button asChild variant="ghost" className="h-12 px-6 rounded-2xl font-black text-xs gap-2 hover:bg-white transition-all">
+                <Button asChild variant="ghost" className="h-12 px-6 rounded-2xl font-black text-xs gap-2 hover:bg-white transition-all text-[#000000]">
                     <Link href={task.sourceUrl || '#'}><ArrowUpRight className="h-4 w-4"/> فتح المصدر</Link>
                 </Button>
                 
-                {!isCompleted && (
+                {isPending && (
+                    <Button onClick={handleAccept} disabled={isUpdating} className="flex-1 h-12 rounded-2xl bg-primary text-white font-black gap-2 shadow-xl shadow-primary/20">
+                        {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <PlayCircle className="h-4 w-4"/>}
+                        قبول المهمة
+                    </Button>
+                )}
+
+                {task.status === 'in-progress' && (
                     <Button onClick={handleComplete} disabled={isUpdating} className="flex-1 h-12 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black gap-2 shadow-xl shadow-green-100">
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4"/>}
                         إتمام المهمة
@@ -329,7 +344,7 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
                 <div className="p-8 space-y-6">
                     <div className="grid gap-2">
                         <Label className="font-black text-slate-400 text-[10px] uppercase pr-2">عنوان المهمة *</Label>
-                        <Input value={title} onChange={e => setTitle(e.target.value)} className="h-12 rounded-xl border-2 font-bold text-black" />
+                        <Input value={title} onChange={e => setTitle(e.target.value)} className="h-12 rounded-xl border-2 font-black text-black" />
                     </div>
 
                     <div className="grid gap-2">
@@ -396,7 +411,7 @@ function BookmarkCard({ bookmark }: { bookmark: UserProductivityItem }) {
                     <Bookmark className="h-8 w-8 fill-primary/10" />
                 </div>
                 
-                <p className="font-black text-xs text-black line-clamp-2 leading-relaxed tracking-tight px-1">
+                <p className="font-black text-xs text-[#000000] line-clamp-2 leading-relaxed tracking-tight px-1">
                     {bookmark.title}
                 </p>
                 

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse, isValid, isWithinInterval } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -31,8 +31,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer, MousePointer2, Eye, MoreHorizontal } from 'lucide-react';
-import { cn, getTenantPath } from '@/lib/utils';
+import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer, MousePointer2, Eye, MoreHorizontal, Sparkles } from 'lucide-react';
+import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
@@ -45,6 +45,7 @@ import { useAuth } from '@/context/auth-context';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '../ui/badge';
 import { useRouter } from 'next/navigation';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 import {
   DndContext, 
@@ -188,7 +189,6 @@ export default function RoomBookingCalendar() {
     const tenantId = currentUser?.currentCompanyId;
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-    // 🛡️ توحيد منطق التجاوز للمدير والمطور
     const canBypassTime = useMemo(() => 
         ['Admin', 'Developer'].includes(currentUser?.role || '')
     , [currentUser?.role]);
@@ -229,13 +229,13 @@ export default function RoomBookingCalendar() {
 
     useEffect(() => {
         if (!firestore || !tenantId) return;
-        getDocs(query(collection(firestore, getTenantPath('employees', tenantId)), where('status', 'in', ['active', 'on-leave']))).then(snap => {
+        getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!), where('status', 'in', ['active', 'on-leave']))).then(snap => {
             setEngineers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).sort((a,b) => a.fullName.localeCompare(b.fullName, 'ar')));
         });
-        getDocs(query(collection(firestore, getTenantPath('clients', tenantId)), where('isActive', '==', true))).then(snap => {
+        getDocs(query(collection(firestore, getTenantPath('clients', tenantId)!), where('isActive', '==', true))).then(snap => {
             setClients(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
         });
-        getDocs(query(collection(firestore, getTenantPath('leaveRequests', tenantId)), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
+        getDocs(query(collection(firestore, getTenantPath('leaveRequests', tenantId)!), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
             setLeaveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data()} as LeaveRequest)));
         });
     }, [firestore, tenantId]);
@@ -245,7 +245,7 @@ export default function RoomBookingCalendar() {
         setLoading(true);
         try {
             const apptsPath = getTenantPath('appointments', tenantId);
-            const apptSnap = await getDocs(query(collection(firestore, apptsPath), where('appointmentDate', '>=', startOfDay(d)), where('appointmentDate', '<=', endOfDay(d))));
+            const apptSnap = await getDocs(query(collection(firestore, apptsPath!), where('appointmentDate', '>=', startOfDay(d)), where('appointmentDate', '<=', endOfDay(d))));
             setRawAppointments(apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment)).filter(appt => appt.type === 'room'));
         } finally { setLoading(false); }
     }, [firestore, tenantId]);
@@ -262,9 +262,8 @@ export default function RoomBookingCalendar() {
 
         if (targetType === 'room') {
             const [hours, minutes] = targetTime.split(':').map(Number);
-            const newDateTime = setMinutes(setHours(date, hours), minutes);
+            const newDateTime = setHours(setMinutes(date, minutes), hours);
 
-            // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
             if (isPast(newDateTime) && !canBypassTime) {
                 toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن نقل الحجز للماضي.' });
                 return;
@@ -277,7 +276,7 @@ export default function RoomBookingCalendar() {
             }
 
             try {
-                const apptRef = doc(firestore, getTenantPath('appointments', tenantId), apptId);
+                const apptRef = doc(firestore, getTenantPath('appointments', tenantId)!, apptId);
                 await updateDoc(apptRef, {
                     meetingRoom: targetRoomName,
                     appointmentDate: Timestamp.fromDate(newDateTime),
@@ -324,7 +323,7 @@ export default function RoomBookingCalendar() {
         if (!appointmentToDelete || !firestore || !tenantId) return;
         try {
             const apptPath = getTenantPath('appointments', tenantId);
-            await updateDoc(doc(firestore, apptPath, appointmentToDelete.id!), { status: 'cancelled' });
+            await updateDoc(doc(firestore, apptPath!, appointmentToDelete.id!), { status: 'cancelled' });
             toast({ title: 'تم الإلغاء' });
             fetchAppointments(date!);
         } finally { setAppointmentToDelete(null); }
@@ -357,8 +356,7 @@ export default function RoomBookingCalendar() {
                                         onClick={() => {
                                             if (booking) return;
                                             const [h, m] = time.split(':').map(Number);
-                                            const startTime = setMinutes(setHours(date!, h), m);
-                                            // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
+                                            const startTime = setHours(setMinutes(date!, m), h);
                                             if (isPast(startTime) && !canBypassTime) {
                                                 return toast({ title: 'لا يمكن الحجز في الماضي' });
                                             }
@@ -489,21 +487,40 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!tenantId) return;
+        if (!tenantId || !firestore) return;
         setIsSaving(true);
         try {
             const apptsPath = getTenantPath('appointments', tenantId);
             const client = clients.find((c: any) => c.id === selectedClientId);
             
-            // 🛡️ توحيد المنطق: السماح للمدير والمطور بالتجاوز
             if (isPast(dialogData.appointmentDate) && !canBypassTime) {
                 toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن حجز موعد في الماضي.' });
                 setIsSaving(false); return;
             }
 
             const dataToSave = { clientId: selectedClientId, clientName: client?.nameAr || 'عميل محمول', engineerId: selectedEngineerId, title, department, notes, meetingRoom: dialogData.room || dialogData.meetingRoom, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'room' as const, companyId: tenantId };
-            if (isEditing) await updateDoc(doc(firestore, apptsPath, dialogData.id), dataToSave);
-            else await addDoc(collection(firestore, apptsPath), { ...dataToSave, createdAt: serverTimestamp() });
+            
+            let finalApptId = dialogData.id;
+            if (isEditing) {
+                await updateDoc(doc(firestore, apptsPath!, dialogData.id), dataToSave);
+            } else {
+                const docRef = await addDoc(collection(firestore, apptsPath!), { ...dataToSave, createdAt: serverTimestamp() });
+                finalApptId = docRef.id;
+            }
+
+            // 🚀 إرسال إشعار فوري للمهندس 🚀
+            if (selectedEngineerId) {
+                const targetUserId = await findUserIdByEmployeeId(firestore, selectedEngineerId, tenantId);
+                if (targetUserId) {
+                    await createNotification(firestore, {
+                        userId: targetUserId,
+                        title: '📍 حجز قاعة اجتماعات لك',
+                        body: `قام ${currentUser.fullName} بحجز ${dialogData.room || dialogData.meetingRoom} لاجتماع "${title}" مع العميل ${client?.nameAr} بتاريخ ${format(dialogData.appointmentDate, "PPp", { locale: ar })}.`,
+                        link: `/dashboard/appointments/${finalApptId}`
+                    }, tenantId);
+                }
+            }
+
             toast({ title: 'نجاح الحجز' });
             onSaveSuccess(); onClose();
         } finally { setIsSaving(false); }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -32,7 +31,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, MousePointer2, MoreHorizontal, AlertCircle } from 'lucide-react';
+import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, MousePointer2, MoreHorizontal, Sparkles } from 'lucide-react';
 import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
@@ -44,6 +43,7 @@ import { useAuth } from '@/context/auth-context';
 import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 import {
   DndContext, 
@@ -88,7 +88,6 @@ async function reconcileClientAppointments(firestore: any, tenantId: string | un
     if (!identifier.clientId && !identifier.clientMobile) return;
     try {
         const apptsPath = getTenantPath('appointments', tenantId);
-        // 🛡️ التصفية داخل المتصفح (Client-side) لتجنب أخطاء الفهارس
         const apptsQueryConstraints = [where('type', '==', 'architectural')];
         const clientApptsSnap = await getDocs(query(collection(firestore, apptsPath!), ...apptsQueryConstraints));
         
@@ -302,7 +301,7 @@ export function ArchitecturalAppointmentsView() {
 
         if (targetType === 'slot') {
             const [hours, minutes] = targetTime.split(':').map(Number);
-            const newDateTime = setMinutes(setHours(date, hours), minutes);
+            const newDateTime = setHours(setMinutes(date, minutes), hours);
 
             if (isPast(newDateTime) && !canBypassTime) {
                 toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكنك نقل موعد للماضي.' });
@@ -447,7 +446,7 @@ export function ArchitecturalAppointmentsView() {
                                         onClick={() => {
                                             if (isOnLeave || booking) return;
                                             const [h, m] = time.split(':').map(Number);
-                                            const apptDate = setMinutes(setHours(date!, h), m);
+                                            const apptDate = setHours(setMinutes(date!, m), h);
                                             if (isPast(apptDate) && !canBypassTime) {
                                                 return toast({ title: 'عائق زمني', description: 'لا يمكن الحجز في الماضي.' });
                                             }
@@ -620,7 +619,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 const client = clients.find((c: any) => c.id === selectedClientId);
                 if (!client) throw new Error("لم يتم العثور على ملف العميل المختار.");
 
-                // 🛡️ التصفية داخل المتصفح (Client-side) لتجنب أخطاء الفهارس
                 const apptsSnap = await getDocs(query(collection(firestore, apptsPath!), where('type', '==', 'architectural')));
                 const clientAppts = apptsSnap.docs.filter(d => {
                     const data = d.data();
@@ -646,6 +644,18 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
             });
 
             await batch.commit();
+
+            // 🚀 إرسال إشعار فوري للمهندس 🚀
+            const targetUserId = await findUserIdByEmployeeId(firestore, dialogData.engineerId, tenantId);
+            if (targetUserId) {
+                await createNotification(firestore, {
+                    userId: targetUserId,
+                    title: '🗓️ موعد جديد مجدول لك',
+                    body: `قام ${currentUser.fullName} بحجز موعد لـ ${isNewClient ? newClientName : clients.find((c: any) => c.id === selectedClientId)?.nameAr} بتاريخ ${format(apptDate, "PPp", { locale: ar })}.`,
+                    link: `/dashboard/appointments/${newApptRef.id}`
+                }, tenantId);
+            }
+
             toast({ title: 'تم الحجز بنجاح' });
             onSaveSuccess(); 
             onClose();
@@ -674,7 +684,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                     </div>
                     <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
                         <Button type="button" variant="outline" onClick={onClose} className="rounded-xl font-bold h-12 px-8" disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30">
+                        <Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 bg-[#FF7A00] text-white">
                             {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : 'تأكيد الحجز'}
                         </Button>
                     </DialogFooter>
@@ -683,4 +693,3 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         </Dialog>
     );
 }
-
