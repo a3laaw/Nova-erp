@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -183,21 +182,10 @@ export default function TransactionDetailPage() {
                 });
 
                 // 2. تفعيل المراحل التالية
-                const nextIds = stage.nextStageIds || [];
-                if (nextIds.length > 0) {
-                    nextIds.forEach(nid => {
-                        const target = currentStages.find(s => s.stageId === nid);
-                        if (target && target.status === 'pending') {
-                            target.status = 'in-progress';
-                            target.startDate = Timestamp.fromDate(now);
-                        }
-                    });
-                } else {
-                    const nextStage = currentStages.find(s => s.order === stage.order + 1);
-                    if (nextStage && nextStage.status === 'pending') {
-                        nextStage.status = 'in-progress';
-                        nextStage.startDate = Timestamp.fromDate(now);
-                    }
+                const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                if (nextStage && nextStage.status === 'pending') {
+                    nextStage.status = 'in-progress';
+                    nextStage.startDate = Timestamp.fromDate(now);
                 }
             }
 
@@ -214,55 +202,11 @@ export default function TransactionDetailPage() {
                 companyId: tenantId
             });
 
-            // تحديث العقد المالي إذا وجد
-            if (action === 'complete' && transaction.contract) {
-                const contract = transaction.contract;
-                const clauseIndex = contract.clauses?.findIndex((c: any) => c.condition === stage.name);
-                if (clauseIndex !== -1 && contract.clauses?.[clauseIndex].status === 'غير مستحقة') {
-                    const updatedClauses = [...contract.clauses];
-                    updatedClauses[clauseIndex].status = 'مستحقة';
-                    batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
-                    
-                    const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
-                    batch.set(appRef, cleanFirestoreData({
-                        applicationNumber: `APP-AUTO-${now.getTime().toString().substring(7)}`,
-                        date: serverTimestamp(),
-                        projectId: transaction.id,
-                        clientId: transaction.clientId,
-                        clientName: client?.nameAr,
-                        projectName: transaction.transactionType,
-                        totalAmount: updatedClauses[clauseIndex].amount,
-                        status: 'draft',
-                        createdAt: serverTimestamp(),
-                        createdBy: 'system-auto-chain',
-                        companyId: tenantId
-                    }));
-                }
-            }
-
             await batch.commit();
-            toast({ title: '✅ تم حفظ الإجراء وتحديث الـ XP' });
+            toast({ title: '✅ تم حفظ الإجراء ومنح الـ XP' });
             setActionNote('');
             setActiveAction(null);
         } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsProcessing(false); }
-  };
-
-  const handleUndoStage = async (stageId: string) => {
-        if (!firestore || !currentUser || !transaction || !transactionPath || !isAdmin || isLocked) return;
-        setIsProcessing(true);
-        try {
-            const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
-            const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
-            currentStages.forEach((s, idx) => {
-                if (idx >= stageIndex) {
-                    s.status = (idx === stageIndex) ? 'in-progress' : 'pending';
-                    s.endDate = null;
-                    if (idx > stageIndex) { s.startDate = null; s.expectedEndDate = null; }
-                }
-            });
-            await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: '✅ تم التراجع عن الإنجاز' });
-        } finally { setIsProcessing(false); }
   };
 
   if (transactionLoading || clientLoading || !transaction) return <div className="p-8 max-w-5xl mx-auto space-y-6"><Skeleton className="h-48 w-full rounded-[3rem]" /><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
@@ -281,7 +225,7 @@ export default function TransactionDetailPage() {
             <CardHeader className="bg-primary/5 pb-8 px-10 border-b">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="text-right space-y-2">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-4">
                             <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
                             {!isLocked && (
                                 <UniversalActionTrigger 
@@ -348,7 +292,7 @@ export default function TransactionDetailPage() {
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-3">
                                                     <span className="font-black text-2xl text-slate-900">{stage.name}</span>
-                                                    {stage.currentCount! > 0 && <Badge variant="secondary" className="bg-orange-100 text-orange-700 font-black h-5 px-2 text-[9px]">{stage.currentCount} تعديلات</Badge>}
+                                                    {(stage.currentCount || 0) > 0 && <Badge variant="secondary" className="bg-orange-100 text-orange-700 font-black h-5 px-2 text-[9px]">{stage.currentCount} تعديلات</Badge>}
                                                 </div>
                                                 {isCurrent && stage.expectedEndDate && (
                                                     <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 uppercase tracking-widest">
@@ -371,13 +315,10 @@ export default function TransactionDetailPage() {
                                                 </div>
                                             )}
                                             {stage.status === 'pending' && !isActionActive && !isLocked && (
-                                                <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'start' })} className="h-12 px-10 rounded-2xl font-black gap-3 shadow-xl"><Play className="h-4 w-4" /> بدء العمل الميداني</Button>
+                                                <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'start' })} className="h-12 px-10 rounded-2xl font-black gap-3 shadow-xl"><Play className="h-4 w-4" /> بدء العمل</Button>
                                             )}
                                             {isCompleted && (
-                                                <div className="flex items-center gap-4">
-                                                    <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-7 w-7"/></div>
-                                                    {isAdmin && <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="text-orange-300 hover:text-orange-600 transition-colors"><Undo2 className="h-5 w-5"/></Button>}
-                                                </div>
+                                                <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-7 w-7"/></div>
                                             )}
                                             {isActionActive && <Button variant="ghost" size="icon" onClick={() => setActiveAction(null)} className="h-10 w-10 rounded-full text-slate-400 hover:bg-red-50 hover:text-red-500"><X className="h-5 w-5"/></Button>}
                                         </div>
@@ -388,7 +329,7 @@ export default function TransactionDetailPage() {
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-center pr-1">
                                                     <Label className="font-black text-xs text-primary flex items-center gap-2 uppercase tracking-[0.2em]">
-                                                        <MessageSquare className="h-4 w-4" /> محضر التوثيق الميداني (إلزامي) *
+                                                        <MessageSquare className="h-4 w-4" /> محضر الأعمال والتوثيق (إلزامي) *
                                                     </Label>
                                                     <Badge className="bg-primary/10 text-primary border-none text-[9px] font-black uppercase flex items-center gap-1">
                                                         <Zap className="h-2.5 w-2.5 fill-primary" /> {activeAction.type === 'complete' ? '+10 XP Points' : '+2 XP Points'}

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -158,11 +157,11 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="rounded-xl border-primary/20 text-primary gap-2 h-9 font-black shadow-sm group">
-                        <Sparkles className="h-4 w-4 animate-pulse" /> محرك العمل والإنتاجية
+                        <Sparkles className="h-4 w-4 animate-pulse" /> محرك الإنتاجية
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl bg-white border-none">
-                    <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 p-3">إجراءات المسار الفني</DropdownMenuLabel>
+                    <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 p-3">إجراءات الإنتاجية</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => setIsTaskDialogOpen(true)} className="rounded-xl py-3 cursor-pointer gap-3 font-bold text-black hover:bg-primary/5">
                         <PlusCircle className="h-4 w-4 text-green-600" /> جدولة مهمة عمل (تشاركية)
                     </DropdownMenuItem>

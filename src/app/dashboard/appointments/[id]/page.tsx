@@ -50,6 +50,7 @@ import { ClientTransactionForm } from '@/components/clients/client-transaction-f
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Separator } from '@/components/ui/separator';
+import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
 
 const stageStatusColors: Record<string, string> = {
   pending: 'bg-slate-100 text-slate-800 border-slate-200',
@@ -223,7 +224,14 @@ export default function AppointmentDetailsPage() {
                 <CardHeader className="bg-primary/5 pb-8 px-10 border-b">
                     <div className="flex justify-between items-start">
                         <div className="space-y-1">
-                            <CardTitle className="text-2xl font-black">{appointment.clientName}</CardTitle>
+                            <div className="flex items-center gap-3">
+                                <CardTitle className="text-2xl font-black">{appointment.clientName}</CardTitle>
+                                <UniversalActionTrigger 
+                                    title={appointment.clientName}
+                                    sourceModule="المواعيد"
+                                    sourceId={appointment.id!}
+                                />
+                            </div>
                             <CardDescription className="font-bold flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-primary" /> {apptDate ? format(apptDate, 'eeee, dd MMMM HH:mm', { locale: ar }) : '-'}
                             </CardDescription>
@@ -298,7 +306,7 @@ export default function AppointmentDetailsPage() {
                                                         <div className="space-y-1">
                                                             <div className="flex items-center gap-3">
                                                                 <span className="font-black text-2xl text-slate-900">{stage.name}</span>
-                                                                {stage.currentCount! > 0 && <Badge variant="secondary" className="bg-orange-100 text-orange-700 font-black h-5 px-2 text-[9px]">{stage.currentCount} تعديلات</Badge>}
+                                                                {(stage.currentCount || 0) > 0 && <Badge variant="secondary" className="bg-orange-100 text-orange-700 font-black h-5 px-2 text-[9px]">{stage.currentCount} تعديلات</Badge>}
                                                             </div>
                                                             {isCurrent && stage.expectedEndDate && (
                                                                 <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 uppercase tracking-widest">
