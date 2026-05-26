@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -15,9 +16,10 @@ import {
     Timestamp, 
     getDoc,
     updateDoc,
-    increment 
+    increment,
+    limit
 } from 'firebase/firestore';
-import type { Appointment, Client, ClientTransaction, TransactionStage, Holiday } from '@/lib/types';
+import type { Appointment, Client, ClientTransaction, TransactionStage, Holiday, Account } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,7 +34,9 @@ import {
     Edit3,
     X,
     Save,
-    Zap
+    Zap,
+    Coins,
+    FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -134,6 +138,7 @@ export default function AppointmentDetailsPage() {
                 stage.endDate = Timestamp.fromDate(now);
                 logLabel = 'إغلاق المرحلة ميدانياً';
 
+                // 1. تفعيل نظام نقاط XP
                 const userPath = getTenantPath(`users/${currentUser.id}`, tenantId);
                 const ledgerPath = getTenantPath(`points_ledger`, tenantId);
                 batch.update(doc(firestore, userPath!), { totalPoints: increment(10) });
@@ -146,10 +151,66 @@ export default function AppointmentDetailsPage() {
                     companyId: tenantId
                 });
                 
+                // 2. تفعيل المرحلة التالية
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
                     nextStage.startDate = Timestamp.fromDate(now);
+                }
+
+                // 🛡️ المزامنة المالية السيادية (Sovereign Auto-Chain V131.0) 🛡️
+                const contract = transaction.contract;
+                if (contract?.clauses) {
+                    const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
+                    if (clauseIndex !== -1 && contract.clauses[clauseIndex].status === 'غير مستحقة') {
+                        const updatedClauses = [...contract.clauses];
+                        updatedClauses[clauseIndex].status = 'مستحقة';
+                        batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
+
+                        // أ. توليد مسودة مستخلص آلي
+                        const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
+                        const milestoneAmount = updatedClauses[clauseIndex].amount;
+                        batch.set(appRef, cleanFirestoreData({
+                            applicationNumber: `APP-SITE-${now.getTime().toString().substring(7)}`,
+                            date: serverTimestamp(),
+                            projectId: transaction.id,
+                            clientId: transaction.clientId,
+                            clientName: client?.nameAr,
+                            projectName: transaction.transactionType,
+                            totalAmount: milestoneAmount,
+                            status: 'draft',
+                            createdAt: serverTimestamp(),
+                            createdBy: 'system-auto-chain',
+                            companyId: tenantId
+                        }));
+
+                        // ب. توليد القيد المحاسبي المترابط (المديونية)
+                        const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
+                        const revenueAccSnap = await getDocs(query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1)));
+                        const clientAccSnap = await getDocs(query(collection(firestore, coaPath), where('name', '==', client?.nameAr), where('parentCode', '==', '1102'), limit(1)));
+
+                        if (!revenueAccSnap.empty && !clientAccSnap.empty) {
+                            const newJeRef = doc(collection(firestore, getTenantPath('journalEntries', tenantId)!));
+                            batch.set(newJeRef, cleanFirestoreData({
+                                entryNumber: `JE-SITE-${now.getTime().toString().substring(8)}`,
+                                date: serverTimestamp(),
+                                narration: `[استحقاق ميداني] إنجاز مرحلة "${stage.name}" للعميل ${client?.nameAr}`,
+                                status: 'draft',
+                                totalDebit: milestoneAmount,
+                                totalCredit: milestoneAmount,
+                                lines: [
+                                    { accountId: clientAccSnap.docs[0].id, accountName: client?.nameAr, debit: milestoneAmount, credit: 0, auto_profit_center: transaction.id },
+                                    { accountId: revenueAccSnap.docs[0].id, accountName: 'إيرادات عقود', debit: 0, credit: milestoneAmount, auto_profit_center: transaction.id }
+                                ],
+                                clientId: transaction.clientId,
+                                transactionId: transaction.id,
+                                createdAt: serverTimestamp(),
+                                companyId: tenantId
+                            }));
+                        }
+
+                        logLabel += ' (وتم إطلاق المطالبة المالية)';
+                    }
                 }
             }
 
@@ -158,7 +219,7 @@ export default function AppointmentDetailsPage() {
             const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
             batch.set(timelineRef, {
                 type: 'comment',
-                content: `**[محضر زيارة: ${logLabel}]** للمرحلة: ${stage.name}.\nالملاحظات: ${actionNote}`,
+                content: `**[محضر زيارة ميدانية: ${logLabel}]** للمرحلة: ${stage.name}.\nالملاحظات: ${actionNote}`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
@@ -172,38 +233,16 @@ export default function AppointmentDetailsPage() {
                     status: 'confirmed',
                     actualCompletionDate: serverTimestamp() 
                 });
-
-                const contract = transaction.contract;
-                if (contract?.clauses) {
-                    const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
-                    if (clauseIndex !== -1 && contract.clauses[clauseIndex].status === 'غير مستحقة') {
-                        const updatedClauses = [...contract.clauses];
-                        updatedClauses[clauseIndex].status = 'مستحقة';
-                        batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
-
-                        const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
-                        batch.set(appRef, cleanFirestoreData({
-                            applicationNumber: `APP-AUTO-${now.getTime().toString().substring(7)}`,
-                            date: serverTimestamp(),
-                            projectId: transaction.id,
-                            clientId: transaction.clientId,
-                            clientName: client?.nameAr,
-                            projectName: transaction.transactionType,
-                            totalAmount: updatedClauses[clauseIndex].amount,
-                            status: 'draft',
-                            createdAt: serverTimestamp(),
-                            createdBy: 'system-auto-chain',
-                            companyId: tenantId
-                        }));
-                    }
-                }
             }
 
             await batch.commit();
-            toast({ title: '✅ تم توثيق الإنجاز الميداني ومنح الـ XP' });
+            toast({ title: '✅ تم توثيق الإنجاز الميداني والارتباط المالي' });
             setActionNote('');
             setActiveAction(null);
-        } catch (e: any) { console.error(e); } finally { setIsSaving(false); }
+        } catch (e: any) { 
+            console.error(e); 
+            toast({ variant: 'destructive', title: 'عائق رقابي', description: 'فشل إتمام المزامنة المالية.' });
+        } finally { setIsSaving(false); }
     };
 
     const handleUndoStage = async (stageId: string) => {
@@ -337,7 +376,6 @@ export default function AppointmentDetailsPage() {
                                                                         sourceSubId={stage.stageId}
                                                                     />
                                                                 )}
-                                                                {(stage.currentCount || 0) > 0 && <Badge variant="secondary" className="bg-orange-100 text-orange-700 font-black h-5 px-2 text-[9px]">{stage.currentCount} تعديلات</Badge>}
                                                             </div>
                                                             {isCurrent && stage.expectedEndDate && (
                                                                 <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 uppercase tracking-widest">
@@ -360,7 +398,7 @@ export default function AppointmentDetailsPage() {
                                                             </div>
                                                         )}
                                                         {stage.status === 'pending' && !isActionActive && !isLocked && (
-                                                            <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'start' })} className="h-12 px-10 rounded-2xl font-black gap-3 shadow-xl shadow-primary/20"><Play className="h-4 w-4" /> بدء العمل الميداني</Button>
+                                                            <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'start' })} className="h-12 px-10 rounded-2xl font-black gap-3 shadow-xl shadow-primary/20"><Play className="h-4 w-4" /> بدء الزيارة</Button>
                                                         )}
                                                         {isCompleted && (
                                                             <div className="flex items-center gap-2">
@@ -388,7 +426,7 @@ export default function AppointmentDetailsPage() {
                                                                 <Label className="font-black text-xs text-primary flex items-center gap-2 uppercase tracking-[0.2em]">
                                                                     <MessageSquare className="h-4 w-4" /> محضر الأعمال الميدانية (إلزامي) *
                                                                 </Label>
-                                                                <Badge className="bg-primary/10 text-primary border-none text-[9px] font-black uppercase flex items-center gap-1">
+                                                                <Badge className="bg-primary/10 text-primary border-none text-[8px] font-black uppercase flex items-center gap-1">
                                                                     <Zap className="h-2.5 w-2.5 fill-primary" /> {activeAction.type === 'complete' ? '+10 XP Points' : '+2 XP Points'}
                                                                 </Badge>
                                                             </div>
