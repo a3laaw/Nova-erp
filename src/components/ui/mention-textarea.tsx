@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Textarea } from './textarea';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -9,7 +9,7 @@ import type { UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import { ScrollArea } from './scroll-area';
-import { AtSign, User } from 'lucide-react';
+import { AtSign } from 'lucide-react';
 import { Card } from './card';
 import { Badge } from './badge';
 
@@ -18,9 +18,9 @@ interface MentionTextareaProps extends React.ComponentProps<typeof Textarea> {
 }
 
 /**
- * مكون مساحة النص مع المنشن الذكي (Sovereign Mention Engine V119.0):
- * - تم تحويل المحاذاة لجهة اليمين (right-0) لتناسب واجهة RTL وتكون قريبة من حرف @.
- * - تحصين الفلترة ضد القيم غير المعرفة (undefined) لمنع انهيار الواجهة.
+ * مكون مساحة النص مع المنشن الذكي (Sovereign Mention Engine V120.0):
+ * - تم تحصين دالة الاختيار ضد أخطاء Undefined لضمان عدم انهيار الواجهة.
+ * - ضبط المحاذاة لتكون أكثر تلاحماً وقرباً من منطقة الكتابة في RTL.
  */
 export function MentionTextarea({ value, onValueChange, className, ...props }: MentionTextareaProps) {
   const { firestore } = useFirebase();
@@ -29,7 +29,7 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
   const [selectedIndex, setSelectedIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // جلب كافة مستخدمي المنشأة
+  // جلب كافة مستخدمي المنشأة مع ضمان وجود بيانات آمنة
   const { data: users = [] } = useSubscription<UserProfile>(firestore, 'users');
 
   const filteredUsers = useMemo(() => {
@@ -78,6 +78,12 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
   };
 
   const selectUser = (user: UserProfile) => {
+    // 🛡️ درع حماية: التأكد من وجود المستخدم واسم المستخدم قبل المعالجة 🛡️
+    if (!user || !user.username) {
+        setShowMentions(false);
+        return;
+    }
+
     const text = (value as string) || '';
     const cursor = textareaRef.current?.selectionStart || 0;
     const lastAt = text.lastIndexOf('@', cursor - 1);
@@ -89,11 +95,12 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
     onValueChange(newValue);
     setShowMentions(false);
     
-    // إعادة التركيز للمساحة النصية
+    // إعادة التركيز للمساحة النصية وتحديد موقع المؤشر الجديد بأمان
     setTimeout(() => {
         if (textareaRef.current) {
             textareaRef.current.focus();
-            const newPos = before.length + user.username.length + 2;
+            const usernameLen = user.username?.length || 0;
+            const newPos = before.length + usernameLen + 2; // +1 لـ @ و +1 للمسافة
             textareaRef.current.setSelectionRange(newPos, newPos);
         }
     }, 10);
@@ -114,13 +121,13 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
       />
 
       {showMentions && filteredUsers.length > 0 && (
-        <Card className="absolute top-full right-0 mt-2 z-[9999] w-72 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-2 border-primary/20 bg-white/95 backdrop-blur-xl overflow-hidden animate-in slide-in-from-top-2 duration-200">
-          <div className="p-3 bg-primary/5 border-b flex items-center justify-between">
+        <Card className="absolute top-full right-0 mt-2 z-[9999] w-full max-w-[320px] rounded-[2rem] shadow-[0_25px_60px_rgba(0,0,0,0.3)] border-2 border-primary/20 bg-white/95 backdrop-blur-xl overflow-hidden animate-in slide-in-from-top-2 duration-200">
+          <div className="p-4 bg-primary/5 border-b flex items-center justify-between">
              <div className="flex items-center gap-2">
-                <AtSign className="h-3.5 w-3.5 text-primary" />
+                <AtSign className="h-4 w-4 text-primary" />
                 <span className="text-[10px] font-black uppercase text-primary tracking-widest">إشارة إلى زميل</span>
              </div>
-             <Badge variant="secondary" className="text-[8px] font-black bg-white">{filteredUsers.length} نتائج</Badge>
+             <Badge variant="secondary" className="text-[8px] font-black bg-white border shadow-sm">{filteredUsers.length} نتائج</Badge>
           </div>
           <ScrollArea className="max-h-64">
             <div className="p-2 space-y-1">
@@ -131,20 +138,24 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
                   onClick={() => selectUser(user)}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={cn(
-                    "w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right",
+                    "w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-right",
                     idx === selectedIndex ? "bg-primary text-white shadow-lg scale-[1.02]" : "hover:bg-primary/5 text-black"
                   )}
                 >
                   <div className="relative">
-                      <Avatar className="h-8 w-8 border-2 border-white shadow-sm">
+                      <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
                         <AvatarImage src={user.avatarUrl} className="object-cover" />
-                        <AvatarFallback className="bg-primary/10 text-primary font-black text-[10px]">{user.username?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                        <AvatarFallback className="bg-primary/10 text-primary font-black text-xs">{user.username?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
                       </Avatar>
-                      {idx === selectedIndex && <div className="absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 bg-white rounded-full flex items-center justify-center shadow-sm"><div className="h-1.5 w-1.5 bg-primary rounded-full animate-pulse" /></div>}
+                      {idx === selectedIndex && (
+                        <div className="absolute -bottom-1 -left-1 h-3.5 w-3.5 bg-white rounded-full flex items-center justify-center shadow-sm">
+                            <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
+                        </div>
+                      )}
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <p className="font-black text-xs truncate leading-none">{user.fullName || user.username}</p>
-                    <p className={cn("text-[9px] font-bold mt-1", idx === selectedIndex ? "text-white/70" : "text-primary")}>@{user.username}</p>
+                    <p className="font-black text-sm truncate leading-none">{user.fullName || user.username}</p>
+                    <p className={cn("text-[10px] font-bold mt-1.5", idx === selectedIndex ? "text-white/70" : "text-primary")}>@{user.username}</p>
                   </div>
                 </button>
               ))}
