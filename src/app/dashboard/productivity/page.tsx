@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, Suspense } from 'react';
@@ -34,8 +33,8 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Skeleton } from '../ui/skeleton';
-import { Separator } from '../ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -44,6 +43,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateInput } from '@/components/ui/date-input';
 import { Textarea } from '@/components/ui/textarea';
 
+/**
+ * منصة الإنتاجية السيادية (Productivity Platform V114.0):
+ * تم إصلاح أخطاء الاستيراد (Skeleton/Separator) وتحصين المصافحة التشاركية.
+ */
 function ProductivityContent() {
     const { firestore } = useFirebase();
     const { user, loading: authLoading } = useAuth();
@@ -467,7 +470,7 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
                     </div>
 
                     <div className="grid gap-2">
-                        <Label className="font-black text-slate-400 text-[10px] uppercase pr-1">نوع الإجراء</Label>
+                        <Label className="font-black text-slate-700 pr-1">نوع الإجراء</Label>
                         <Select value={actionType} onValueChange={setActionType}>
                             <SelectTrigger className="h-11 rounded-xl border-2 font-bold">
                                 <SelectValue />
