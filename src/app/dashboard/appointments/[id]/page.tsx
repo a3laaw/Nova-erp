@@ -41,7 +41,6 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { formatCurrency, getTenantPath, cleanFirestoreData, cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
@@ -76,7 +75,6 @@ export default function AppointmentDetailsPage() {
     const [actionNote, setActionNote] = useState('');
     const [isTxFormOpen, setIsTxFormOpen] = useState(false);
     
-    // 🛡️ رادار الإجراءات التفاعلية (Active Action State)
     const [activeAction, setActiveAction] = useState<{ stageId: string, type: 'start' | 'modify' | 'complete' } | null>(null);
 
     const apptPath = useMemo(() => id && tenantId ? getTenantPath(`appointments/${id}`, tenantId) : null, [id, tenantId]);

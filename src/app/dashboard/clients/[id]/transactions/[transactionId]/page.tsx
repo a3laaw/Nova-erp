@@ -40,7 +40,9 @@ import {
     Edit3,
     ArrowDownLeft,
     Sparkles,
-    ChevronLeft
+    ChevronLeft,
+    X,
+    Save
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -53,11 +55,9 @@ import { useToast } from '@/hooks/use-toast';
 import { cn, getTenantPath, cleanFirestoreData, formatCurrency } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
-import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 
 const stageStatusColors: Record<string, string> = {
@@ -98,7 +98,6 @@ export default function TransactionDetailPage() {
   const [actionNote, setActionNote] = useState('');
   const [transactionPath, setTransactionPath] = useState<string | null>(null);
   
-  // 🛡️ رادار الإجراءات التفاعلية (Active Action State)
   const [activeAction, setActiveAction] = useState<{ stageId: string, type: 'start' | 'modify' | 'complete' } | null>(null);
 
   useEffect(() => {
