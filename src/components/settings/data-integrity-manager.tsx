@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { 
     collection, 
@@ -189,9 +190,9 @@ function UniversalDataPurgeTool() {
 
             // تصفير كافة العدادات (Counters)
             const countersSnap = await getDocs(query(collection(firestore, getTenantPath('counters', tenantId)!)));
-            countersSnap.forEach(d => clientBatch.delete(d.ref));
-
-            await clientBatch.commit();
+            const counterBatch = writeBatch(firestore);
+            countersSnap.forEach(d => counterBatch.delete(d.ref));
+            await counterBatch.commit();
 
             toast({ title: '✅ تم تطهير البيانات بالكامل', description: 'المنظومة الآن جاهزة لبدء دورة عمل نظيفة وجديدة.' });
             setIsImportConfirmOpen(false);
@@ -329,3 +330,4 @@ export function DataIntegrityManager() {
         </Card>
     );
 }
+
