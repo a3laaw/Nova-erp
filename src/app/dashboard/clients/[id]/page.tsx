@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -71,7 +70,8 @@ import {
     AlertCircle,
     Ban,
     RotateCcw,
-    Send
+    Send,
+    Search
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -102,8 +102,6 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -159,7 +157,6 @@ export default function ClientProfilePage() {
   const clientPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}`, tenantId) : null, [id, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
-  // 🛡️ درع الرؤية السيادي للمجلدات الفرعية (V94.1) 🛡️
   const isPrivileged = useMemo(() => 
     ['Admin', 'Accountant', 'HR', 'Secretary', 'Developer'].includes(currentUser?.role || '')
   , [currentUser?.role]);
@@ -201,7 +198,7 @@ export default function ClientProfilePage() {
             status: newStatus,
             updatedAt: serverTimestamp() 
         });
-        toast({ title: 'تم حفظ المعلومات', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
+        toast({ title: '✅ تم حفظ المعلومات', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
     } catch (e: any) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: docPath!,
@@ -209,6 +206,34 @@ export default function ClientProfilePage() {
             requestResourceData: { status: newStatus }
         }));
     } finally { setIsProcessing(false); }
+  };
+
+  // 🛡️ دالة حذف عرض السعر (The Missing Reference V100) 🛡️
+  const handleConfirmDeleteQuotation = async () => {
+    if (!quotationToDelete || !firestore || !tenantId) return;
+    setIsProcessing(true);
+    try {
+        const qPath = getTenantPath(`quotations/${quotationToDelete.id}`, tenantId);
+        await deleteDoc(doc(firestore, qPath!));
+        
+        const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
+        await addDoc(collection(firestore, historyPath!), {
+            type: 'log',
+            content: `قام ${currentUser?.fullName} بحذف عرض السعر رقم "${quotationToDelete.quotationNumber}" نهائياً.`,
+            createdAt: serverTimestamp(),
+            userId: currentUser?.id,
+            userName: currentUser?.fullName,
+            userAvatar: currentUser?.avatarUrl,
+            companyId: tenantId
+        });
+
+        toast({ title: '✅ تم حذف عرض السعر' });
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+    } finally {
+        setIsProcessing(false);
+        setQuotationToDelete(null);
+    }
   };
 
   const handleConfirmCancelContract = async () => {
@@ -284,7 +309,7 @@ export default function ClientProfilePage() {
             });
         });
 
-        toast({ title: 'تم حفظ المعلومات', description: 'تم توليد القيد العكسي وتصفير مديونية المتبقي بنجاح.' });
+        toast({ title: '✅ تم حفظ المعلومات', description: 'تم توليد القيد العكسي وتصفير مديونية المتبقي بنجاح.' });
     } catch (e: any) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: finalTxPath,
@@ -314,7 +339,7 @@ export default function ClientProfilePage() {
             companyId: tenantId
         });
 
-        toast({ title: 'تم حفظ المعلومات', description: 'تم مسح سجل المعاملة نهائياً.' });
+        toast({ title: '✅ تم حفظ المعلومات', description: 'تم مسح سجل المعاملة نهائياً.' });
     } catch (e: any) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: docPath!,
@@ -484,7 +509,7 @@ export default function ClientProfilePage() {
                                                         <Eye className="h-4 w-4 text-primary"/> فتح المسار الفني
                                                     </DropdownMenuItem>
 
-                                                    {isAdmin && (
+                                                    {isPrivileged && (
                                                         <DropdownMenuItem onSelect={() => setAssignmentTx(tx)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-indigo-600 bg-indigo-50/30">
                                                             <Send className="h-4 w-4" /> تحويل لموظف / مهندس
                                                         </DropdownMenuItem>
@@ -553,7 +578,7 @@ export default function ClientProfilePage() {
             />
         )}
         
-        {/* Cancel Contract Confirmation with Financial Settlement Alert */}
+        {/* Cancel Contract Confirmation */}
         <AlertDialog open={!!transactionToCancel} onOpenChange={() => setTransactionToCancel(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
                 <AlertDialogHeader>
@@ -565,7 +590,7 @@ export default function ClientProfilePage() {
                             <ShieldCheck className="h-5 w-5 text-blue-600" />
                             <AlertTitle className="text-blue-900 font-black">الإجراء المحاسبي الآلي:</AlertTitle>
                             <AlertDescription className="text-blue-800">
-                                سيقوم النظام آلياً بتوليد <strong>قيد عكسي</strong> لإغلاق مديونية العميل المتبقية (قيمة العقد - ما تم تحصيله فعلياً) وإلغاء استحقاق الإيرادات لضمان صحة الميزانية.
+                                سيقوم النظام آلياً بتوليد <strong>قيد عكسي</strong> لإغلاق مديونية العميل المتبقية وإلغاء استحقاق الإيرادات.
                             </AlertDescription>
                         </Alert>
                     </AlertDialogDescription>

@@ -122,14 +122,14 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
             
-            // 🛡️ المزامنة المالية السيادية (V88.0): إثبات القيد بالتاريخ المعتمد والوصف الذكي 🛡️
+            // 🛡️ المزامنة المالية السيادية (V100.0): إثبات القيد بالتاريخ المعتمد والوصف الذكي وحالة الترحيل 🛡️
             transaction_fs.set(doc(collection(firestore, getTenantPath('journalEntries', tenantId)!)), cleanFirestoreData({
                 entryNumber: `JV-PR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
-                date: serverTimestamp(), // تم إضافة التاريخ المفقود
+                date: serverTimestamp(), 
                 narration: `[عقد مالي] إثبات مديونية: ${transaction.transactionType || transaction.subject} لـ ${clientName}`,
                 totalDebit: financials.totalAmount, 
                 totalCredit: financials.totalAmount, 
-                status: 'posted', // ترحيل فوري لمنع تشتيت المستخدم
+                status: 'posted', 
                 lines: [
                     { accountId: clientAccountId, accountName: clientName, debit: financials.totalAmount, credit: 0, auto_profit_center: targetTxId },
                     { accountId: revenueAccSnap.docs[0]?.id, accountName: 'إيرادات عقود', debit: 0, credit: financials.totalAmount, auto_profit_center: targetTxId }
@@ -149,7 +149,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             transaction_fs.set(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum }, { merge: true });
         });
 
-        toast({ title: 'تم توقيع العقد وإنشاء القيد المحاسبي' });
+        toast({ title: '✅ تم توقيع العقد وإنشاء القيد المحاسبي' });
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {

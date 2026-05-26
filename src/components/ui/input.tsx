@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, value, ...props }, ref) => {
-    // 🛡️ درع تصفير الحقول السيادي (Empty-by-Default Matrix V99.0): 
+    // 🛡️ درع تصفير الحقول السيادي (Empty-by-Default Matrix V100.0): 
     // يضمن ظهور الحقل فارغاً تماماً إذا لم يتم إدخال قيمة حقيقية (بما فيها الصفر)، لراحة العين ودقة المطبوعات.
     // استثناء: القيمة "1" تظهر كـ "1" لأنها غالباً ما تكون كمية افتراضية مقصودة.
     const displayValue = (type === "number" && (value === 0 || value === "0" || value === null || value === undefined)) ? "" : value;
