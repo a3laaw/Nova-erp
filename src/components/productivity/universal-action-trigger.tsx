@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -121,7 +120,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl">
                     <DropdownMenuItem onClick={() => setIsTaskDialogOpen(true)} className="rounded-xl py-3 cursor-pointer gap-2 font-bold"><CheckCircle2 className="h-4 w-4 text-green-600" /> جدولة مهمة</DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleAddBookmark} className="rounded-xl py-3 cursor-pointer gap-2 font-bold text-primary"><Bookmark className="h-4 w-4" /> حفظ بالمفضلة</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleAddBookmark} className="rounded-xl py-3 cursor-pointer gap-2 font-bold text-primary"><Bookmark className="h-4 w-4" /> حفظ بالمفضلة</Bookmark></DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
 
