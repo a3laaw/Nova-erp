@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -69,11 +70,13 @@ import {
     FileSignature,
     AlertCircle,
     Ban,
-    RotateCcw
+    RotateCcw,
+    Send
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
+import { TransactionAssignmentDialog } from '@/components/clients/transaction-assignment-dialog';
 import type { Client, ClientTransaction, Employee, Quotation, Account } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
@@ -145,6 +148,7 @@ export default function ClientProfilePage() {
   const tenantId = currentUser?.currentCompanyId;
 
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [assignmentTx, setAssignmentTx] = useState<ClientTransaction | null>(null);
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   
   const [transactionToDelete, setTransactionToDelete] = useState<ClientTransaction | null>(null);
@@ -155,8 +159,24 @@ export default function ClientProfilePage() {
   const clientPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}`, tenantId) : null, [id, tenantId]);
   const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
 
-  const txRelativePath = useMemo(() => id ? `clients/${id}/transactions` : null, [id]);
-  const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(firestore, txRelativePath, [orderBy('createdAt', 'desc')]);
+  // 🛡️ درع الرؤية السيادي للمجلدات الفرعية (V94.1) 🛡️
+  const isPrivileged = useMemo(() => 
+    ['Admin', 'Accountant', 'HR', 'Secretary', 'Developer'].includes(currentUser?.role || '')
+  , [currentUser?.role]);
+
+  const txQuery = useMemo(() => {
+    const base = [orderBy('createdAt', 'desc')];
+    if (!isPrivileged && currentUser?.employeeId) {
+        base.push(where('assignedEngineerId', '==', currentUser.employeeId));
+    }
+    return base;
+  }, [isPrivileged, currentUser?.employeeId]);
+
+  const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(
+      firestore, 
+      id ? `clients/${id}/transactions` : null, 
+      txQuery
+  );
 
   const qQuery = useMemo(() => [where('clientId', '==', id)], [id]);
   const { data: quotations, loading: quotationsLoading } = useSubscription<Quotation>(firestore, 'quotations', qQuery);
@@ -181,7 +201,7 @@ export default function ClientProfilePage() {
             status: newStatus,
             updatedAt: serverTimestamp() 
         });
-        toast({ title: 'نجاح التحديث', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
+        toast({ title: 'تم حفظ المعلومات', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
     } catch (e: any) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: docPath!,
@@ -264,7 +284,7 @@ export default function ClientProfilePage() {
             });
         });
 
-        toast({ title: '✅ تم فسخ العقد', description: 'تم توليد القيد العكسي وتصفير مديونية المتبقي بنجاح.' });
+        toast({ title: 'تم حفظ المعلومات', description: 'تم توليد القيد العكسي وتصفير مديونية المتبقي بنجاح.' });
     } catch (e: any) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: finalTxPath,
@@ -294,7 +314,7 @@ export default function ClientProfilePage() {
             companyId: tenantId
         });
 
-        toast({ title: 'تم الحذف', description: 'تم مسح سجل المعاملة نهائياً.' });
+        toast({ title: 'تم حفظ المعلومات', description: 'تم مسح سجل المعاملة نهائياً.' });
     } catch (e: any) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: docPath!,
@@ -303,36 +323,6 @@ export default function ClientProfilePage() {
     } finally { 
         setIsProcessing(false); 
         setTransactionToDelete(null); 
-    }
-  };
-
-  const handleConfirmDeleteQuotation = async () => {
-    if (!firestore || !tenantId || !quotationToDelete?.id || !id) return;
-    setIsProcessing(true);
-    const qPath = getTenantPath(`quotations/${quotationToDelete.id}`, tenantId);
-    try {
-        await deleteDoc(doc(firestore, qPath!));
-        
-        const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
-        await addDoc(collection(firestore, historyPath!), {
-            type: 'log',
-            content: `قام ${currentUser?.fullName} بحذف عرض السعر رقم "${quotationToDelete.quotationNumber}" نهائياً.`,
-            createdAt: serverTimestamp(),
-            userId: currentUser?.id,
-            userName: currentUser?.fullName,
-            userAvatar: currentUser?.avatarUrl,
-            companyId: tenantId
-        });
-
-        toast({ title: 'تم الحذف', description: 'تم مسح عرض السعر من سجلات العميل.' });
-    } catch (e: any) {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: qPath!,
-            operation: 'delete'
-        }));
-    } finally { 
-        setIsProcessing(false); 
-        setQuotationToDelete(null); 
     }
   };
 
@@ -493,6 +483,12 @@ export default function ClientProfilePage() {
                                                     <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-black">
                                                         <Eye className="h-4 w-4 text-primary"/> فتح المسار الفني
                                                     </DropdownMenuItem>
+
+                                                    {isAdmin && (
+                                                        <DropdownMenuItem onSelect={() => setAssignmentTx(tx)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-indigo-600 bg-indigo-50/30">
+                                                            <Send className="h-4 w-4" /> تحويل لموظف / مهندس
+                                                        </DropdownMenuItem>
+                                                    )}
                                                     
                                                     {hasSignedContract && (
                                                         <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${id}/transactions/${tx.id}/contract`)} className="rounded-lg py-3 font-bold gap-3 cursor-pointer text-indigo-700">
@@ -547,6 +543,15 @@ export default function ClientProfilePage() {
         <ClientHistoryTimeline clientId={id} />
 
         {isFormOpen && <ClientTransactionForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} clientId={id} clientName={client.nameAr} />}
+        
+        {assignmentTx && (
+            <TransactionAssignmentDialog 
+                isOpen={!!assignmentTx} 
+                onClose={() => setAssignmentTx(null)} 
+                transaction={assignmentTx} 
+                clientName={client.nameAr} 
+            />
+        )}
         
         {/* Cancel Contract Confirmation with Financial Settlement Alert */}
         <AlertDialog open={!!transactionToCancel} onOpenChange={() => setTransactionToCancel(null)}>

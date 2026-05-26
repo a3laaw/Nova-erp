@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -24,29 +25,34 @@ service cloud.firestore {
               request.auth.token.currentCompanyId == companyId);
     }
 
+    // 🛡️ رادار الخصوصية للأدوار (Visibility Shield Logic)
+    function isPrivilegedRole() {
+        return request.auth.token.role in ['Admin', 'Accountant', 'HR', 'Secretary', 'Developer'];
+    }
+
     // 🏯 قاعدة الوصول الشاملة للمطور المعتمد (Master Key)
     match /{document=**} {
       allow read, write: if isDeveloper();
     }
 
-    // 🌍 محركات النظام العالمية (Sovereign Global Collections)
-    match /system_lexicon/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isDeveloper();
-    }
-    
-    match /framework_config/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isDeveloper();
-    }
-
     // 🏢 عزل بيانات المنشآت (SaaS Multi-tenancy Protection)
-    // تم تشديد القواعد لضمان أن العضو يرى ويكتب فقط في شركته
     match /companies/{companyId} {
       allow read: if isDeveloper() || isTenantMember(companyId);
       allow write: if isDeveloper() || isTenantMember(companyId);
       
-      // السماح بالوصول لكافة المجموعات الفرعية (القيود، الفواتير، المعاملات...)
+      // 🛡️ حماية المعاملات (Transactions Visibility) 🛡️
+      match /transactions/{txId} {
+        allow read: if isDeveloper() || (isTenantMember(companyId) && (isPrivilegedRole() || resource.data.assignedEngineerId == request.auth.token.employeeId));
+        allow write: if isDeveloper() || (isTenantMember(companyId) && isPrivilegedRole());
+      }
+
+      // حماية المعاملات داخل ملف العميل (Nested Paths)
+      match /clients/{clientId}/transactions/{txId} {
+        allow read: if isDeveloper() || (isTenantMember(companyId) && (isPrivilegedRole() || resource.data.assignedEngineerId == request.auth.token.employeeId));
+        allow write: if isDeveloper() || (isTenantMember(companyId) && isPrivilegedRole());
+      }
+      
+      // السماح بالوصول لكافة المجموعات الفرعية الأخرى
       match /{allSubcollections=**} {
         allow read, write: if isDeveloper() || isTenantMember(companyId);
       }
@@ -56,11 +62,6 @@ service cloud.firestore {
     match /global_users/{uid} {
       allow read: if true; 
       allow write: if isDeveloper() || (isAuthenticated() && request.auth.uid == uid);
-    }
-    
-    match /company_requests/{id} {
-      allow create: if isAuthenticated(); 
-      allow read, write: if isDeveloper();
     }
   }
 }

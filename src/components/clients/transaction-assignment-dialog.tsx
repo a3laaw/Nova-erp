@@ -1,383 +1,158 @@
+
 'use client';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogHeader, 
+    DialogTitle, 
+    DialogDescription, 
+    DialogFooter 
+} from '@/components/ui/dialog';
 import { Button } from '../ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { Checkbox } from '../ui/checkbox';
-import { InlineSearchList } from '../ui/inline-search-list';
-import { useFirebase } from '@/firebase';
-import { useToast } from '@/hooks/use-toast';
-import { collection, getDocs, query, where, writeBatch, serverTimestamp, doc, collectionGroup } from 'firebase/firestore';
-import type { Department, Employee, ClientTransaction, TransactionAssignment, TransactionType } from '@/lib/types';
+import { Label } from '../ui/label';
+import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { Loader2, Save, Shield } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { doc, updateDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { UserCheck, Loader2, Save, Send, ShieldCheck } from 'lucide-react';
+import type { Employee, ClientTransaction } from '@/lib/types';
+import { InlineSearchList } from '../ui/inline-search-list';
+import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { Input } from '../ui/input';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '../ui/alert-dialog';
 
-
-interface AssignmentState {
-  departmentId: string;
-  departmentName: string;
-  selected: boolean;
-  engineerId: string;
-  notes: string;
-  existingAssignmentId?: string;
-  isAvailable: boolean;
-}
-
-interface TransactionAssignmentDialogProps {
+interface Props {
   isOpen: boolean;
   onClose: () => void;
   transaction: ClientTransaction;
   clientName: string;
 }
 
-export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clientName }: TransactionAssignmentDialogProps) {
+/**
+ * محرك تحويل المعاملات السيادي (Transaction Transfer Engine V94.0):
+ * يسمح بتغيير المهندس المسؤول وإرسال تنبيهات فورية وتوثيق الإجراء.
+ */
+export function TransactionAssignmentDialog({ isOpen, onClose, transaction, clientName }: Props) {
     const { firestore } = useFirebase();
-    const { toast } = useToast();
     const { user: currentUser } = useAuth();
-
-    const [assignments, setAssignments] = useState<AssignmentState[]>([]);
-    const [engineers, setEngineers] = useState<Employee[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { toast } = useToast();
+    
+    const [selectedEngineerId, setSelectedEngineerId] = useState(transaction.assignedEngineerId || '');
     const [isSaving, setIsSaving] = useState(false);
+    const tenantId = currentUser?.currentCompanyId;
 
-    const [isBypassConfirmOpen, setIsBypassConfirmOpen] = useState(false);
-    const [assignmentsToCommit, setAssignmentsToCommit] = useState<AssignmentState[]>([]);
+    const { data: engineers, loading: engLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
 
+    const engineerOptions = useMemo(() => 
+        engineers.map(e => ({ value: e.id!, label: e.fullName }))
+    , [engineers]);
 
-    useEffect(() => {
-        if (!firestore || !isOpen) return;
-
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const deptsQuery = query(collection(firestore, 'departments'));
-                const engineersQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-                const existingAssignmentsQuery = query(collection(firestore, 'transaction_assignments'), where('transactionId', '==', transaction.id));
-                const clientTransactionsQuery = query(collection(firestore, `clients/${transaction.clientId}/transactions`));
-                const clientReceiptsQuery = query(collection(firestore, 'cashReceipts'), where('clientId', '==', transaction.clientId));
-                const transactionTypesQuery = query(collectionGroup(firestore, 'transactionTypes'));
-                
-                const [deptsSnap, engsSnap, assignmentsSnap, clientTxnsSnap, clientReceiptsSnap, transTypesSnap] = await Promise.all([
-                    getDocs(deptsQuery),
-                    getDocs(engineersQuery),
-                    getDocs(existingAssignmentsQuery),
-                    getDocs(clientTransactionsQuery),
-                    getDocs(clientReceiptsQuery),
-                    getDocs(transactionTypesQuery),
-                ]);
-
-                const allDepartments = deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
-                const allEngineers = engsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
-                setEngineers(allEngineers);
-                
-                const allClientTransactions = clientTxnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
-                const paidTransactionIds = new Set(clientReceiptsSnap.docs.map(doc => doc.data().projectId));
-                
-                const transactionTypesMap = new Map<string, string>();
-                transTypesSnap.forEach(doc => {
-                    const type = doc.data() as TransactionType;
-                    const deptId = doc.ref.parent.parent?.id;
-                    if (deptId) {
-                        const deptName = allDepartments.find(d => d.id === deptId)?.name;
-                        if (deptName && type.name.includes(deptName)) {
-                            transactionTypesMap.set(deptId, type.name);
-                        }
-                    }
-                });
-
-                const existingAssignmentsMap = new Map(assignmentsSnap.docs.map(doc => {
-                    const data = doc.data();
-                    return [data.departmentId, { id: doc.id, ...data }];
-                }));
-                
-                const initialAssignments = allDepartments.map(dept => {
-                    const existing = existingAssignmentsMap.get(dept.id);
-                    
-                    let isAvailable = false;
-                    const openDepts = ['الإنشائي', 'السكرتارية', 'المحاسبة'];
-                    if (openDepts.includes(dept.name)) {
-                        isAvailable = true;
-                    } else {
-                        const requiredTransactionType = transactionTypesMap.get(dept.id);
-                        if (requiredTransactionType) {
-                            const hasPaidPrerequisite = allClientTransactions.some(tx => 
-                                tx.id !== transaction.id && // Exclude the current transaction
-                                tx.transactionType === requiredTransactionType && 
-                                paidTransactionIds.has(tx.id!)
-                            );
-                            if (hasPaidPrerequisite) {
-                                isAvailable = true;
-                            }
-                        }
-                    }
-
-                    return {
-                        departmentId: dept.id,
-                        departmentName: dept.name,
-                        selected: !!existing,
-                        engineerId: existing?.engineerId || '',
-                        notes: existing?.notes || '',
-                        existingAssignmentId: existing?.id,
-                        isAvailable: isAvailable,
-                    };
-                });
-
-                setAssignments(initialAssignments);
-
-            } catch (error) {
-                console.error(error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل بيانات الإسناد.' });
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [firestore, isOpen, transaction.id, transaction.clientId, toast, currentUser?.role]);
-
-    const handleAssignmentChange = (departmentId: string, field: 'selected' | 'engineerId' | 'notes', value: string | boolean) => {
-        setAssignments(prev => prev.map(a => a.departmentId === departmentId ? { ...a, [field]: value } : a));
-    };
-
-    const getEngineersForDept = (deptName: string) => {
-        return engineers
-            .filter(e => e.department === deptName)
-            .map(e => ({ value: e.id!, label: e.fullName }));
-    };
-
-    const performSave = async (assignmentsToProcess: AssignmentState[]) => {
-        if (!firestore || !currentUser || !transaction.id) return;
+    const handleTransfer = async () => {
+        if (!firestore || !tenantId || !selectedEngineerId) return;
         setIsSaving(true);
-        const batch = writeBatch(firestore);
-        const assignmentsRef = collection(firestore, 'transaction_assignments');
-
-        const timelineCollectionRef = collection(firestore, `clients/${transaction.clientId}/transactions/${transaction.id}/timelineEvents`);
-        const historyCollectionRef = collection(firestore, `clients/${transaction.clientId}/history`);
-    
-        const notificationsToSend: any[] = [];
-        const originalAssignments = assignments; // Capture original state to compare changes
-    
-        for (const assignment of assignmentsToProcess) {
-          const engineer = engineers.find(e => e.id === assignment.engineerId);
-          let logContent = '';
-          
-          if (assignment.selected) {
-            if (!assignment.engineerId) {
-              toast({ variant: 'destructive', title: 'حقل ناقص', description: `الرجاء اختيار موظف لقسم: ${assignment.departmentName}` });
-              setIsSaving(false);
-              return;
-            }
-            const data = {
-              transactionId: transaction.id,
-              clientId: transaction.clientId,
-              departmentId: assignment.departmentId,
-              departmentName: assignment.departmentName,
-              engineerId: assignment.engineerId,
-              notes: assignment.notes,
-              status: 'pending',
-              createdBy: currentUser.id,
-              createdAt: serverTimestamp(),
-            };
-    
-            if (assignment.existingAssignmentId) {
-              const originalAssignment = originalAssignments.find(a => a.existingAssignmentId === assignment.existingAssignmentId);
-              if (originalAssignment?.engineerId !== assignment.engineerId || originalAssignment?.notes !== assignment.notes) {
-                const docRef = doc(assignmentsRef, assignment.existingAssignmentId);
-                batch.update(docRef, { engineerId: data.engineerId, notes: data.notes });
-                logContent = `قام ${currentUser.fullName} بتحديث إسناد قسم "${assignment.departmentName}" إلى الموظف "${engineer?.fullName}".`;
-              }
-            } else {
-              const docRef = doc(assignmentsRef);
-              batch.set(docRef, data);
-              logContent = `قام ${currentUser.fullName} بإسناد المعاملة إلى قسم "${assignment.departmentName}" للموظف "${engineer?.fullName}".`;
-              if (engineer) {
-                notificationsToSend.push({
-                  engineerId: engineer.id,
-                  title: 'تم إسناد معاملة جديدة لك',
-                  body: `قام ${currentUser.fullName} بإسناد معاملة "${transaction.transactionType}" الخاصة بالعميل ${clientName} إليك للمتابعة.`
-                });
-              }
-            }
-          } else if (assignment.existingAssignmentId) {
-            const docRef = doc(assignmentsRef, assignment.existingAssignmentId);
-            batch.delete(docRef);
-            logContent = `قام ${currentUser.fullName} بإلغاء إسناد المعاملة من قسم "${assignment.departmentName}".`;
-          }
-
-          if (logContent) {
-              const logData = {
-                  type: 'log' as const,
-                  content: logContent,
-                  userId: currentUser.id,
-                  userName: currentUser.fullName,
-                  userAvatar: currentUser.avatarUrl,
-                  createdAt: serverTimestamp(),
-              };
-              batch.set(doc(timelineCollectionRef), logData);
-              batch.set(doc(historyCollectionRef), logData);
-          }
-        }
-    
         try {
-          await batch.commit();
-    
-          for (const notif of notificationsToSend) {
-            const targetUserId = await findUserIdByEmployeeId(firestore, notif.engineerId);
+            const txPath = getTenantPath(`clients/${transaction.clientId}/transactions/${transaction.id}`, tenantId);
+            const engineer = engineers.find(e => e.id === selectedEngineerId);
+
+            // 1. تحديث المعاملة
+            await updateDoc(doc(firestore, txPath!), {
+                assignedEngineerId: selectedEngineerId,
+                updatedAt: serverTimestamp()
+            });
+
+            // 2. توثيق السجل التاريخي (History & Timeline)
+            const logContent = `قام ${currentUser?.fullName} بتحويل مسؤولية المعاملة إلى المهندس: ${engineer?.fullName}.`;
+            
+            const timelinePath = getTenantPath(`clients/${transaction.clientId}/transactions/${transaction.id}/timelineEvents`, tenantId);
+            const historyPath = getTenantPath(`clients/${transaction.clientId}/history`, tenantId);
+
+            await addDoc(collection(firestore, timelinePath!), {
+                type: 'log',
+                content: logContent,
+                userId: currentUser?.id,
+                userName: currentUser?.fullName,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
+
+            await addDoc(collection(firestore, historyPath!), {
+                type: 'log',
+                content: `[${transaction.transactionType}] ${logContent}`,
+                userId: currentUser?.id,
+                userName: currentUser?.fullName,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
+
+            // 3. إرسال إشعار فوري للمهندس المستلم
+            const targetUserId = await findUserIdByEmployeeId(firestore, selectedEngineerId, tenantId);
             if (targetUserId) {
-              await createNotification(firestore, {
-                userId: targetUserId,
-                title: notif.title,
-                body: notif.body,
-                link: `/dashboard/clients/${transaction.clientId}/transactions/${transaction.id}`
-              });
+                await createNotification(firestore, {
+                    userId: targetUserId,
+                    title: '📂 تم تحويل معاملة إليك',
+                    body: `حول إليك ${currentUser?.fullName} المعاملة "${transaction.transactionType}" للعميل ${clientName}.`,
+                    link: `/dashboard/clients/${transaction.clientId}/transactions/${transaction.id}`
+                }, tenantId);
             }
-          }
-    
-          toast({ title: 'نجاح', description: 'تم حفظ تحويلات المعاملة بنجاح.' });
-          onClose();
-        } catch (error) {
-          console.error(error);
-          toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التغييرات.' });
+
+            toast({ title: '✅ تم تحويل المسار الفني بنجاح' });
+            onClose();
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إتمام عملية التحويل.' });
         } finally {
-          setIsSaving(false);
+            setIsSaving(false);
         }
     };
-
-    const handleSave = async () => {
-        const bypassedAssignments = assignments.filter(
-            a => a.selected && !a.isAvailable && currentUser?.role === 'Admin'
-        );
-
-        if (bypassedAssignments.length > 0) {
-            setAssignmentsToCommit(assignments);
-            setIsBypassConfirmOpen(true);
-        } else {
-            await performSave(assignments);
-        }
-    };
-    
-    const handleConfirmAndSave = async () => {
-        setIsBypassConfirmOpen(false);
-        await performSave(assignmentsToCommit);
-        setAssignmentsToCommit([]);
-    };
-
 
     return (
-        <React.Fragment>
-            <Dialog open={isOpen} onOpenChange={onClose}>
-                <DialogContent className="max-w-4xl" dir="rtl">
-                    <DialogHeader>
-                        <DialogTitle>تحويل / إسناد المعاملة للأقسام</DialogTitle>
-                        <DialogDescription>
-                            اختر الأقسام التي تريد تحويل المعاملة إليها وأسندها للموظف المسؤول في كل قسم.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                        {loading ? (
-                             <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                        ) : (
-                             <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
-                                <Table>
-                                    <TableHeader className="sticky top-0 bg-muted z-10">
-                                        <TableRow>
-                                            <TableHead className="w-[40px]"></TableHead>
-                                            <TableHead className="w-[180px]">القسم</TableHead>
-                                            <TableHead>الموظف المسؤول</TableHead>
-                                            <TableHead>ملاحظات</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {assignments.map(a => (
-                                            <TableRow key={a.departmentId} className={!a.isAvailable && currentUser?.role !== 'Admin' ? 'bg-muted/30 text-muted-foreground' : ''}>
-                                                <TableCell>
-                                                    <TooltipProvider>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <span tabIndex={0} className="flex items-center gap-2">
-                                                                    <Checkbox
-                                                                        checked={a.selected}
-                                                                        onCheckedChange={(checked) => handleAssignmentChange(a.departmentId, 'selected', !!checked)}
-                                                                        disabled={!a.isAvailable && currentUser?.role !== 'Admin'}
-                                                                    />
-                                                                     {currentUser?.role === 'Admin' && !a.isAvailable && <Shield className="h-4 w-4 text-blue-500" />}
-                                                                </span>
-                                                            </TooltipTrigger>
-                                                            {!a.isAvailable && (
-                                                                <TooltipContent>
-                                                                    <p>{currentUser?.role === 'Admin' ? 'صلاحية المدير تتجاوز هذا الشرط.' : 'يجب وجود معاملة سابقة مدفوعة لهذا القسم.'}</p>
-                                                                </TooltipContent>
-                                                            )}
-                                                        </Tooltip>
-                                                    </TooltipProvider>
-                                                </TableCell>
-                                                <TableCell className="font-semibold">{a.departmentName}</TableCell>
-                                                <TableCell>
-                                                    <InlineSearchList 
-                                                        value={a.engineerId}
-                                                        onSelect={(value) => handleAssignmentChange(a.departmentId, 'engineerId', value)}
-                                                        options={getEngineersForDept(a.departmentName)}
-                                                        placeholder="اختر موظف..."
-                                                        disabled={!a.selected || (!a.isAvailable && currentUser?.role !== 'Admin')}
-                                                    />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Input 
-                                                        value={a.notes}
-                                                        onChange={(e) => handleAssignmentChange(a.departmentId, 'notes', e.target.value)}
-                                                        placeholder="ملاحظات للقسم..."
-                                                        disabled={!a.selected || (!a.isAvailable && currentUser?.role !== 'Admin')}
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        )}
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+                <DialogHeader className="p-8 bg-primary/5 border-b">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
+                            <UserCheck className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <DialogTitle className="text-xl font-black text-[#1e1b4b]">تحويل مسؤولية المعاملة</DialogTitle>
+                            <DialogDescription className="font-bold text-slate-500">سيتم إشعار المهندس المستلم فوراً وتعديل صلاحيات الرؤية.</DialogDescription>
+                        </div>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={onClose} disabled={isSaving}>إغلاق</Button>
-                        <Button onClick={handleSave} disabled={isSaving || loading}>
-                            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-                            حفظ
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-            <AlertDialog open={isBypassConfirmOpen} onOpenChange={setIsBypassConfirmOpen}>
-                <AlertDialogContent dir="rtl">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>تأكيد تجاوز الصلاحية</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            أنت على وشك إسناد هذه المعاملة إلى قسم واحد أو أكثر يتطلب معاملة سابقة مدفوعة.
-                            <br />
-                            باستخدام صلاحياتك كمدير، سيتم تجاوز هذا الشرط. هل تود المتابعة؟
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setAssignmentsToCommit([])} disabled={isSaving}>
-                            تراجع
-                        </AlertDialogCancel>
-                        <AlertDialogAction onClick={handleConfirmAndSave} disabled={isSaving} className="bg-amber-600 hover:bg-amber-700">
-                            {isSaving ? 'جاري الحفظ...' : 'نعم، قم بالإسناد'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </React.Fragment>
+                </DialogHeader>
+
+                <div className="p-8 space-y-6">
+                    <div className="p-5 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                        <Label className="text-[10px] font-black text-slate-400 uppercase pr-1 block mb-1">المعاملة الحالية:</Label>
+                        <p className="font-black text-lg text-primary">{transaction.transactionType}</p>
+                    </div>
+
+                    <div className="grid gap-3">
+                        <Label className="font-black text-slate-700 pr-2">اختر المهندس المستلم *</Label>
+                        <InlineSearchList 
+                            value={selectedEngineerId}
+                            onSelect={setSelectedEngineerId}
+                            options={engineerOptions}
+                            placeholder={engLoading ? "جاري جلب القائمة..." : "ابحث عن مهندس..."}
+                        />
+                    </div>
+
+                    <Alert className="bg-blue-50 border-blue-100 rounded-2xl">
+                        <ShieldCheck className="h-5 w-5 text-blue-600" />
+                        <AlertTitle className="text-blue-900 font-black">أثر التحويل:</AlertTitle>
+                        <AlertDescription className="text-blue-800 text-xs font-bold leading-relaxed">
+                            هذه المعاملة ستختفي من لوحات تحكم المهندسين الآخرين وستظهر حصراً لهذا المهندس (وللأقسام الإدارية والرقابية).
+                        </AlertDescription>
+                    </Alert>
+                </div>
+
+                <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
+                    <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                    <Button onClick={handleTransfer} disabled={isSaving || !selectedEngineerId} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-primary/30 gap-2">
+                        {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Send className="h-4 w-4 rotate-180" />}
+                        تأكيد التحويل
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
