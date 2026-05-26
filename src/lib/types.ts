@@ -12,12 +12,12 @@ export interface BaseEntity {
 
 export interface UserProductivityItem extends BaseEntity {
   userId: string;
-  clientId?: string; // 🛡️ الرابط السيادي بالعميل لضمان التوثيق المتبادل
+  clientId?: string; 
   entryType: 'task' | 'bookmark';
   title: string;
   actionType?: 'review' | 'decision' | 'design' | 'redesign' | 'meeting' | 'general';
   status?: 'pending' | 'in-progress' | 'completed' | 'cancelled';
-  assignedUserIds?: string[]; // قائمة الزملاء المشاركين في المهمة
+  assignedUserIds?: string[]; 
   startDate?: Timestamp | any;
   dueDate?: Timestamp | any;
   completedAt?: Timestamp | any;
@@ -34,7 +34,8 @@ export interface UserProfile extends BaseEntity {
   uid: string;
   username: string;
   email: string;
-  role: 'Developer' | 'Admin' | 'HR' | 'Accountant' | 'Engineer' | 'Secretary' | 'User';
+  // 🛡️ تحديث الأدوار السيادية لتطابق المصفوفة المعتمدة 🛡️
+  role: 'Developer' | 'Admin' | 'CFO' | 'ProjectManager' | 'EngineeringManager' | 'Engineer' | 'Accountant' | 'Secretary' | 'Surveyor' | 'User';
   isActive: boolean;
   employeeId?: string;
   fullName?: string;

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -87,53 +88,48 @@ import { useLanguage } from '@/context/language-context';
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
+// 🛡️ تحديث مصفوفة الأذونات في القائمة بناءً على طلبك 🛡️
 const navItems = {
   ar: [
     { 
       href: '/dashboard', 
       label: 'الرئيسية', 
       icon: LayoutGrid, 
-      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] 
+      roles: ['Developer', 'Admin', 'CFO', 'ProjectManager', 'EngineeringManager', 'Engineer', 'Accountant', 'Secretary', 'Surveyor'] 
     },
     { 
-      href: '/dashboard/employee-hub', 
-      label: 'حائط العمل', 
-      icon: Sparkles, 
-      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] 
-    },
-    { 
-      label: 'العملاء',
+      label: 'العملاء والـ CRM',
       icon: UsersRound,
-      roles: ['Developer', 'Admin', 'Accountant', 'Secretary', 'Engineer'],
+      roles: ['Developer', 'Admin', 'CFO', 'ProjectManager', 'EngineeringManager', 'Engineer', 'Accountant', 'Secretary', 'Surveyor'],
       hrefPrefix: '/dashboard/clients',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
-        { href: '/dashboard/clients?view=prospective', label: 'المحتملون', icon: Search },
+        { href: '/dashboard/clients?view=prospective', label: 'المحتملون (Leads)', icon: Search },
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
-        { href: '/dashboard/contracts', label: 'العقود', icon: FileSignature },
+        { href: '/dashboard/contracts', label: 'العقود والاتفاقيات', icon: FileSignature },
       ]
     },
     { 
-      label: 'المقاولات',
+      label: 'المسار الفني والمقاولات',
       icon: PencilRuler,
-      roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
+      roles: ['Developer', 'Admin', 'ProjectManager', 'EngineeringManager', 'Engineer', 'Surveyor', 'CFO', 'Secretary'],
       hrefPrefix: '/dashboard/construction',
       children: [
-        { href: '/dashboard/construction/projects', label: 'المشاريع', icon: Briefcase },
+        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
-        { href: '/dashboard/construction/boq', label: 'جدول الكميات', icon: ClipboardList },
-        { href: '/dashboard/construction/schedules', label: 'الجدول الزمني', icon: Clock },
+        { href: '/dashboard/construction/boq', label: 'جدول الكميات (BOQ)', icon: ClipboardList },
+        { href: '/dashboard/construction/schedules', label: 'الجدول الزمني (Gantt)', icon: Clock },
+        { href: '/dashboard/construction/payment-applications', label: 'المستخلصات', icon: Coins },
       ]
     },
     { 
-      label: 'المالية', 
+      label: 'المالية والمحاسبة', 
       icon: Landmark, 
-      roles: ['Developer', 'Admin', 'Accountant'],
+      roles: ['Developer', 'Admin', 'CFO', 'Accountant', 'ProjectManager'],
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'دليل الحسابات', icon: ListTree },
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
-        { href: '/dashboard/accounting/claims', label: 'المطالبات والتحصيل', icon: Coins },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
         { href: '/dashboard/accounting/reconciliation', label: 'التسوية البنكية', icon: RotateCcw },
@@ -141,60 +137,31 @@ const navItems = {
       ]
     },
     { 
-      label: 'المخازن',
-      icon: Package,
-      roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
-      hrefPrefix: '/dashboard/warehouse',
-      children: [
-        { href: '/dashboard/warehouse/items', label: 'قائمة الأصناف', icon: Package },
-        { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة', icon: FileCheck },
-        { href: '/dashboard/warehouse/material-issue', label: 'صرف للموقع', icon: ArrowUpFromLine },
-        { href: '/dashboard/warehouse/transfers', label: 'نقل بين مخازن', icon: ArrowLeftRight },
-        { href: '/dashboard/warehouse/reports', label: 'تقارير المخزن', icon: BarChart3 },
-      ]
-    },
-    { 
-      label: 'الموظفين', 
+      label: 'الموارد البشرية (HR)', 
       icon: Users, 
-      roles: ['Developer', 'Admin', 'HR', 'Accountant', 'Engineer', 'Secretary', 'User'],
+      roles: ['Developer', 'Admin', 'HR', 'CFO', 'ProjectManager', 'Secretary'],
       hrefPrefix: '/dashboard/hr',
       children: [
-        { href: '/dashboard/hr/employees', label: 'بيانات الموظفين', icon: Users, roles: ['Admin', 'HR', 'Developer'] },
-        { href: '/dashboard/hr/payroll', label: 'الرواتب', icon: Banknote, roles: ['Admin', 'HR', 'Accountant', 'Developer'] },
-        { href: '/dashboard/hr/leaves', label: 'الإجازات', icon: CalendarCheck },
+        { href: '/dashboard/hr/employees', label: 'بيانات الموظفين', icon: Users },
+        { href: '/dashboard/hr/payroll', label: 'الرواتب والإجازات', icon: Banknote },
         { href: '/dashboard/hr/permissions', label: 'الاستئذانات', icon: Clock },
-        { href: '/dashboard/hr/custody-reconciliation', label: 'تصفية سلف', icon: Wallet, roles: ['Admin', 'Accountant', 'Developer', 'Engineer', 'Secretary'] },
-        { href: '/dashboard/hr/reports', label: 'تقارير الموظفين', icon: Activity, roles: ['Admin', 'HR', 'Developer'] },
+        { href: '/dashboard/hr/reports', label: 'تقارير الموارد', icon: Activity },
       ]
     },
     { 
-      label: 'التقارير',
-      icon: BarChart3,
-      roles: ['Developer', 'Admin', 'Accountant', 'HR'],
-      hrefPrefix: '/dashboard/reports',
-      children: [
-        { href: '/dashboard/reports/operational-hub', label: 'متابعة الأداء', icon: Activity },
-        { href: '/dashboard/reports/appointments-audit', label: 'سجل المواعيد', icon: History },
-        { href: '/dashboard/reports/delayed-stages', label: 'مهام متأخرة', icon: Clock },
-        { href: '/dashboard/reports/prospective-clients', label: 'العملاء الجدد', icon: Search },
-      ]
-    },
-    { 
-      label: 'الإعدادات', 
+      label: 'الإعدادات السيادية', 
       icon: Settings2, 
       roles: ['Developer', 'Admin'],
       hrefPrefix: '/dashboard/settings',
       children: [
-        { href: '/dashboard/settings/branding', label: 'شعار الشركة', icon: Palette },
+        { href: '/dashboard/settings/branding', label: 'الهوية والشعار', icon: Palette },
         { href: '/dashboard/settings/users', label: 'دخول الموظفين', icon: UserCheck },
         { href: '/dashboard/settings/reference-data', label: 'تجهيز القوائم', icon: Network },
-        { href: '/dashboard/settings/contract-templates', label: 'نماذج العقود', icon: FileSignature },
-        { href: '/dashboard/settings/work-hours', label: 'أوقات العمل', icon: Clock },
       ]
     },
   ],
   en: [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'CFO', 'Engineer', 'Accountant'] },
   ]
 };
 

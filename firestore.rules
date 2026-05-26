@@ -4,62 +4,110 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات الموحدة (V133.0 - Sovereign Master Edition)
+    // 🛡️ مصفوفة الصلاحيات الموحدة (V134.0 - Matrix Enforcement Edition)
     
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // ⚡ محرك التعرف على المطور السيادي (Sovereign ID Engine)
     function isDeveloper() {
       return isAuthenticated() && 
              (request.auth.token.role == 'Developer' || 
-              request.auth.token.isSuperAdmin == true ||
               request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
     }
 
-    // 🛡️ محرك التحقق من العضوية والسيادة على المنشأة
     function isTenantMember(companyId) {
       return isAuthenticated() && 
              (request.auth.token.companyId == companyId || 
               request.auth.token.currentCompanyId == companyId);
     }
 
-    // 🛡️ رادار الخصوصية للأدوار (Visibility Shield Logic)
-    function isPrivilegedRole() {
-        return request.auth.token.role in ['Admin', 'Accountant', 'HR', 'Secretary', 'Developer'];
+    // 🛡️ رادار فحص الأدوار (The Role Radar) 🛡️
+    function hasRole(roleName) {
+        return request.auth.token.role == roleName;
     }
 
-    // 🏯 قاعدة الوصول الشاملة للمطور المعتمد (Master Key)
+    // هل يملك صلاحية إدارية عليا؟
+    function isAdminPower() {
+        return hasRole('Admin') || hasRole('Developer');
+    }
+
+    // هل يملك صلاحية مالية؟ (مدير مالي أو محاسب أو مدير مشاريع)
+    function isFinancePrivileged() {
+        return isAdminPower() || hasRole('CFO') || hasRole('Accountant') || hasRole('ProjectManager');
+    }
+
+    // هل يملك صلاحية فنية؟ (مدير مشاريع، مدير هندسي، مهندس، مساح)
+    function isTechnicalPrivileged() {
+        return isAdminPower() || hasRole('ProjectManager') || hasRole('EngineeringManager') || hasRole('Engineer') || hasRole('Surveyor');
+    }
+
     match /{document=**} {
       allow read, write: if isDeveloper();
     }
 
-    // 🏢 عزل بيانات المنشآت (SaaS Multi-tenancy Protection)
     match /companies/{companyId} {
       allow read: if isDeveloper() || isTenantMember(companyId);
       allow write: if isDeveloper() || isTenantMember(companyId);
       
-      // 🛡️ حماية المعاملات (Transactions Visibility V101) 🛡️
-      // السماح بالوصول للمعاملات في المسار المسطح (Flat Collection)
-      match /transactions/{txId} {
-        allow read: if isDeveloper() || (isTenantMember(companyId) && (isPrivilegedRole() || resource.data.assignedEngineerId == request.auth.token.employeeId));
-        allow write: if isDeveloper() || (isTenantMember(companyId) && isPrivilegedRole());
+      // 🏢 إدارة العملاء (CRM) 🏢
+      match /clients/{clientId} {
+        allow read: if isTenantMember(companyId);
+        allow create, update: if isTenantMember(companyId) && (isAdminPower() || hasRole('ProjectManager') || hasRole('Secretary'));
+        allow delete: if isAdminPower();
       }
 
-      // حماية المعاملات داخل ملف العميل (Old Nested Path)
-      match /clients/{clientId}/transactions/{txId} {
-        allow read: if isDeveloper() || (isTenantMember(companyId) && (isPrivilegedRole() || resource.data.assignedEngineerId == request.auth.token.employeeId));
-        allow write: if isDeveloper() || (isTenantMember(companyId) && isPrivilegedRole());
+      // 📂 المعاملات والمسار الفني 📂
+      match /transactions/{txId} {
+        allow read: if isTenantMember(companyId) && (isTechnicalPrivileged() || isFinancePrivileged() || hasRole('Secretary'));
+        allow create, update: if isTenantMember(companyId) && (isAdminPower() || hasRole('ProjectManager') || hasRole('EngineeringManager') || (hasRole('Engineer') && resource.data.assignedEngineerId == request.auth.token.employeeId));
+        allow delete: if isAdminPower();
+      }
+
+      // 🏗️ الزيارات الميدانية 🏗️
+      match /field_visits/{visitId} {
+        allow read: if isTenantMember(companyId) && isTechnicalPrivileged();
+        allow create, update: if isTenantMember(companyId) && (isTechnicalPrivileged() || hasRole('Secretary'));
+        allow delete: if isAdminPower();
+      }
+
+      // 💰 المحاسبة (القيود، السندات، المستخلصات) 💰
+      match /journalEntries/{id} {
+        allow read: if isTenantMember(companyId) && (isFinancePrivileged() || hasRole('CFO'));
+        allow write: if isTenantMember(companyId) && (isAdminPower() || hasRole('CFO') || hasRole('Accountant'));
       }
       
-      // السماح بالوصول لكافة المجموعات الفرعية الأخرى
+      match /cashReceipts/{id} {
+        allow read: if isTenantMember(companyId) && (isFinancePrivileged() || hasRole('CFO'));
+        allow write: if isTenantMember(companyId) && (isAdminPower() || hasRole('CFO') || hasRole('Accountant'));
+      }
+
+      match /payment_applications/{id} {
+        allow read: if isTenantMember(companyId);
+        allow write: if isTenantMember(companyId) && (isFinancePrivileged());
+      }
+
+      // 👥 الموارد البشرية 👥
+      match /employees/{id} {
+        allow read: if isTenantMember(companyId) && (isAdminPower() || hasRole('HR') || hasRole('CFO') || hasRole('ProjectManager') || hasRole('Secretary'));
+        allow write: if isAdminPower() || hasRole('HR');
+      }
+
+      match /payroll/{id} {
+        allow read, write: if isAdminPower() || hasRole('HR') || hasRole('CFO') || hasRole('Accountant');
+      }
+
+      // ⚙️ الإعدادات (Sovereign Settings) ⚙️
+      match /settings/{id} {
+        allow read: if isTenantMember(companyId);
+        allow write: if isAdminPower();
+      }
+      
       match /{allSubcollections=**} {
         allow read, write: if isDeveloper() || isTenantMember(companyId);
       }
     }
 
-    // 🌍 الفهرس العالمي للمستخدمين
     match /global_users/{uid} {
       allow read: if true; 
       allow write: if isDeveloper() || (isAuthenticated() && request.auth.uid == uid);
