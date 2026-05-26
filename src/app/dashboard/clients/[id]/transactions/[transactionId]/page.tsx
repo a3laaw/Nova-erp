@@ -84,8 +84,8 @@ const statusTranslations: Record<string, string> = {
 };
 
 /**
- * تفاصيل المعاملة (Transaction Details V135.0):
- * تم تحديث محرك الاستحقاق الآلي لتوثيق المراحل "المدفوعة مسبقاً" في سجل العميل.
+ * تفاصيل المعاملة (Transaction Details V136.0):
+ * تم إيقاف التوليد التلقائي للقيود المالية، والاكتفاء بالمستخلص والتعليقات الرسمية لضمان سيادة قرار المحاسب.
  */
 export default function TransactionDetailPage() {
   const params = useParams();
@@ -195,7 +195,8 @@ export default function TransactionDetailPage() {
                     }
                 }
 
-                // 🛡️ المزامنة المالية السيادية (Sovereign Auto-Chain V135.0) 🛡️
+                // 🛡️ المزامنة المالية السيادية (Sovereign Auto-Chain V136.0) 🛡️
+                // تم حذف توليد القيود المحاسبية التلقائي؛ نكتفي بالمستخلص والتعليق.
                 const contract = transaction.contract;
                 if (contract?.clauses) {
                     const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
@@ -219,41 +220,28 @@ export default function TransactionDetailPage() {
                                 clientName: client?.nameAr,
                                 projectName: transaction.transactionType,
                                 totalAmount: finalAppAmount,
-                                currentMilestone: stage.name, // ✨ إضافة اسم المرحلة للمستخلص ✨
+                                currentMilestone: stage.name, 
                                 status: 'draft',
                                 createdAt: serverTimestamp(),
                                 createdBy: 'system-auto-chain',
                                 companyId: tenantId
                             }));
 
-                            // ب. توليد مسودة قيد مالي (المديونية)
-                            const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
-                            const revenueAccSnap = await getDocs(query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1)));
-                            const clientAccSnap = await getDocs(query(collection(firestore, coaPath), where('name', '==', client?.nameAr), where('parentCode', '==', '1102'), limit(1)));
+                            // ب. توثيق الاستحقاق المالي في التايم لاين
+                            batch.set(timelineRef, {
+                                type: 'comment',
+                                content: `**[إشعار مالي: استحقاق دفعة]**\nتم إنجاز مرحلة **"${stage.name}"**.\nتم إصدار مسودة مستخلص أعمال بقيمة **${formatCurrency(finalAppAmount)}** بانتظار المراجعة والتحصيل المالي.`,
+                                userId: currentUser.id,
+                                userName: currentUser.fullName,
+                                userAvatar: currentUser.avatarUrl,
+                                createdAt: serverTimestamp(),
+                                companyId: tenantId
+                            });
 
-                            if (!revenueAccSnap.empty && !clientAccSnap.empty) {
-                                const newJeRef = doc(collection(firestore, getTenantPath('journalEntries', tenantId)!));
-                                batch.set(newJeRef, cleanFirestoreData({
-                                    entryNumber: `JE-AUTO-${now.getTime().toString().substring(8)}`,
-                                    date: serverTimestamp(),
-                                    narration: `[استحقاق آلي] إنجاز مرحلة "${stage.name}" - معاملة #${transaction.transactionNumber}`,
-                                    status: 'draft',
-                                    totalDebit: finalAppAmount,
-                                    totalCredit: finalAppAmount,
-                                    lines: [
-                                        { accountId: clientAccSnap.docs[0].id, accountName: client?.nameAr, debit: finalAppAmount, credit: 0, auto_profit_center: transaction.id },
-                                        { accountId: revenueAccSnap.docs[0].id, accountName: 'إيرادات عقود', debit: 0, credit: finalAppAmount, auto_profit_center: transaction.id }
-                                    ],
-                                    clientId: transaction.clientId,
-                                    transactionId: transaction.id,
-                                    createdAt: serverTimestamp(),
-                                    companyId: tenantId
-                                }));
-                            }
                             logLabel += ' (وتم تفعيل المطالبة المالية)';
                         } 
                         else if (targetClause.status === 'مدفوعة') {
-                            // ✨ توثيق مالي للمراحل المدفوعة مسبقاً (The Pre-paid Financial Handshake) ✨
+                            // توثيق مالي للمراحل المدفوعة مسبقاً
                             batch.set(timelineRef, {
                                 type: 'comment',
                                 content: `**[إشعار مالي: استحقاق مدفوع مسبقاً]**\nتم إنجاز مرحلة **"${stage.name}"**.\nتبين في السجلات المالية أن قيمة هذه المرحلة قد تمت تسويتها مسبقاً من واقع التحصيلات السابقة لهذا المشروع.`,
@@ -458,7 +446,7 @@ export default function TransactionDetailPage() {
                                                     value={actionNote} 
                                                     onValueChange={setActionNote} 
                                                     placeholder="اشرح بالتفصيل ما تم إنجازه أو مبررات التعديل الفني... استخدم @ للمنشن" 
-                                                    className="rounded-[2.5rem] border-none bg-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)] p-8 font-medium text-xl leading-relaxed min-h-[160px] focus-visible:ring-2 focus-visible:ring-primary/20"
+                                                    className="rounded-[2.5rem] border-none bg-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)] p-8 font-medium text-xl leading-relaxed min-h-[140px] focus-visible:ring-2 focus-visible:ring-primary/20 text-black font-bold"
                                                 />
                                             </div>
                                             

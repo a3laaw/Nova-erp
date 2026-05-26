@@ -69,8 +69,8 @@ const stageStatusTranslations: Record<string, string> = {
 };
 
 /**
- * مركز تحكم الزيارة (Appointment Center V135.0):
- * تم تحديث محرك المزامنة المالية لتوثيق الاستحقاق "المدفوع مسبقاً" في تايم لاين المعاملة.
+ * مركز تحكم الزيارة (Appointment Center V136.0):
+ * تم إيقاف التوليد التلقائي للقيود المالية، والاكتفاء بالمستخلص والتعليقات الرسمية.
  */
 export default function AppointmentDetailsPage() {
     const params = useParams();
@@ -162,7 +162,8 @@ export default function AppointmentDetailsPage() {
                     nextStage.startDate = Timestamp.fromDate(now);
                 }
 
-                // 🛡️ المزامنة المالية السيادية (Sovereign Auto-Chain V135.0) 🛡️
+                // 🛡️ المزامنة المالية السيادية (Sovereign Auto-Chain V136.0) 🛡️
+                // تم حذف توليد القيود المحاسبية التلقائي بناءً على رغبة المستخدم
                 const contract = transaction.contract;
                 if (contract?.clauses) {
                     const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
@@ -175,7 +176,7 @@ export default function AppointmentDetailsPage() {
                             updatedClauses[clauseIndex].status = 'مستحقة';
                             batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
 
-                            // أ. توليد مسودة مستخلص آلي
+                            // أ. توليد مسودة مستخلص آلي (للمراجعة في قسم المطالبات)
                             const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
                             const milestoneAmount = updatedClauses[clauseIndex].amount;
                             batch.set(appRef, cleanFirestoreData({
@@ -186,41 +187,28 @@ export default function AppointmentDetailsPage() {
                                 clientName: client?.nameAr,
                                 projectName: transaction.transactionType,
                                 totalAmount: milestoneAmount,
-                                currentMilestone: stage.name, // ✨ إضافة اسم المرحلة ✨
+                                currentMilestone: stage.name, 
                                 status: 'draft',
                                 createdAt: serverTimestamp(),
                                 createdBy: 'system-auto-chain',
                                 companyId: tenantId
                             }));
 
-                            // ب. توليد القيد المحاسبي المترابط (المديونية)
-                            const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
-                            const revenueAccSnap = await getDocs(query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1)));
-                            const clientAccSnap = await getDocs(query(collection(firestore, coaPath), where('name', '==', client?.nameAr), where('parentCode', '==', '1102'), limit(1)));
+                            // توثيق الاستحقاق في التايم لاين
+                            batch.set(timelineRef, {
+                                type: 'comment',
+                                content: `**[إشعار مالي: استحقاق دفعة جديدة]**\nتم إنجاز مرحلة **"${stage.name}"** ميدانياً.\nتم إصدار مسودة مستخلص أعمال بقيمة **${formatCurrency(milestoneAmount)}** بانتظار التحصيل المالي.`,
+                                userId: currentUser.id,
+                                userName: currentUser.fullName,
+                                userAvatar: currentUser.avatarUrl,
+                                createdAt: serverTimestamp(),
+                                companyId: tenantId
+                            });
 
-                            if (!revenueAccSnap.empty && !clientAccSnap.empty) {
-                                const newJeRef = doc(collection(firestore, getTenantPath('journalEntries', tenantId)!));
-                                batch.set(newJeRef, cleanFirestoreData({
-                                    entryNumber: `JE-SITE-${now.getTime().toString().substring(8)}`,
-                                    date: serverTimestamp(),
-                                    narration: `[استحقاق ميداني] إنجاز مرحلة "${stage.name}" للعميل ${client?.nameAr}`,
-                                    status: 'draft',
-                                    totalDebit: milestoneAmount,
-                                    totalCredit: milestoneAmount,
-                                    lines: [
-                                        { accountId: clientAccSnap.docs[0].id, accountName: client?.nameAr, debit: milestoneAmount, credit: 0, auto_profit_center: transaction.id },
-                                        { accountId: revenueAccSnap.docs[0].id, accountName: 'إيرادات عقود', debit: 0, credit: milestoneAmount, auto_profit_center: transaction.id }
-                                    ],
-                                    clientId: transaction.clientId,
-                                    transactionId: transaction.id,
-                                    createdAt: serverTimestamp(),
-                                    companyId: tenantId
-                                }));
-                            }
                             logLabel += ' (وتم تفعيل المطالبة المالية)';
                         }
                         else if (targetClause.status === 'مدفوعة') {
-                            // ✨ توثيق مالي للمراحل المدفوعة مسبقاً (Pre-paid Sync) ✨
+                            // توثيق مالي للمراحل المدفوعة مسبقاً (Pre-paid Sync)
                             batch.set(timelineRef, {
                                 type: 'comment',
                                 content: `**[إشعار مالي: استحقاق مدفوع مسبقاً]**\nتم إنجاز مرحلة **"${stage.name}"** ميدانياً.\nتبين في السجلات أن قيمة هذه المرحلة مغطاة مسبقاً من واقع التحصيلات المحققة لهذا المشروع.`,
