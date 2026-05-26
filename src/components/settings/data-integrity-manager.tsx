@@ -14,9 +14,10 @@ import {
     doc, 
     serverTimestamp, 
     collectionGroup,
-    deleteField
+    deleteField,
+    deleteDoc
 } from 'firebase/firestore';
-import type { ClientTransaction, WorkStage, Employee, Client } from '@/lib/types';
+import type { ClientTransaction, WorkStage, Employee, Client, Boq } from '@/lib/types';
 import { 
     Loader2, 
     ShieldAlert, 
@@ -59,8 +60,8 @@ function TechnicalWbsSyncTool() {
             const stagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages'), where('companyId', '==', tenantId)));
             const masterStages = stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage));
 
-            const txsQuery = query(collectionGroup(firestore, 'transactions'), where('companyId', '==', tenantId));
-            const txsSnap = await getDocs(txsQuery);
+            // جلب كافة المعاملات المرتبطة بالشركة
+            const txsSnap = await getDocs(query(collectionGroup(firestore, 'transactions'), where('companyId', '==', tenantId)));
             
             const batch = writeBatch(firestore);
             let updateCount = 0;
@@ -126,8 +127,8 @@ function TechnicalWbsSyncTool() {
 }
 
 /**
- * 🔥 محرك التطهير المالي والعملياتي الشامل (The Sovereign Purge Engine V81) 🔥
- * تم تحويل كافة المسارات لتكون صريحة ومباشرة (Flat) لضمان الصلاحيات.
+ * 🔥 محرك التطهير المالي والعملياتي الشامل (The Sovereign Deep Purge Engine V82.0) 🔥
+ * تم تحصينه لمسح كافة المجلدات الفرعية (المعاملات والـ BOQ) لضمان تصفير المنظومة.
  */
 function UniversalDataPurgeTool() {
     const { firestore } = useFirebase();
@@ -140,13 +141,11 @@ function UniversalDataPurgeTool() {
     const tenantId = user?.currentCompanyId;
 
     const collectionsToPurge = [
-        'transactions', // المعاملات أصبحت فلات تحت المنشأة
         'journalEntries',
         'cashReceipts',
         'paymentVouchers',
         'quotations',
         'payment_applications',
-        'boqs',
         'purchaseOrders',
         'rfqs',
         'grns',
@@ -155,7 +154,10 @@ function UniversalDataPurgeTool() {
         'notifications',
         'userProductivity',
         'hub_posts',
-        'points_ledger'
+        'points_ledger',
+        'letter_of_credits',
+        'recurring_obligations',
+        'custody_reconciliations'
     ];
 
     const handlePurge = async () => {
@@ -163,51 +165,72 @@ function UniversalDataPurgeTool() {
         
         setIsPurging(true);
         try {
-            // 🛡️ تنفيذ التطهير المتسلسل والمحمي 🛡️
+            // 🛡️ 1. مسح القوائم الرئيسية 🛡️
             for (const collName of collectionsToPurge) {
                 const collPath = getTenantPath(collName, tenantId);
                 if (!collPath) continue;
 
                 const snap = await getDocs(collection(firestore, collPath));
-                if (snap.empty) continue;
-
-                // مسح البيانات في حزم (Batches) لضمان استقرار السيرفر
-                const batch = writeBatch(firestore);
-                snap.forEach(d => batch.delete(d.ref));
-                
-                await batch.commit().catch(async (serverError) => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({
-                        path: collPath,
-                        operation: 'delete'
-                    } satisfies SecurityRuleContext));
-                    throw serverError;
-                });
+                if (!snap.empty) {
+                    const batch = writeBatch(firestore);
+                    snap.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                }
             }
 
-            // 🛡️ تصفير حالة العملاء وإعادة ضبط العدادات 🛡️
-            const clientBatch = writeBatch(firestore);
-            const clientsSnap = await getDocs(query(collection(firestore, getTenantPath('clients', tenantId)!)));
-            clientsSnap.forEach(d => {
-                clientBatch.update(d.ref, { 
+            // 🛡️ 2. مسح المعاملات وسجل العميل (Nested Paths) 🛡️
+            const clientsPath = getTenantPath('clients', tenantId);
+            const clientsSnap = await getDocs(collection(firestore, clientsPath!));
+            
+            for (const clientDoc of clientsSnap.docs) {
+                // مسح المعاملات والـ Timeline الخاص بها
+                const txsSnap = await getDocs(collection(firestore, `${clientDoc.ref.path}/transactions`));
+                for (const txDoc of txsSnap.docs) {
+                    const timelineSnap = await getDocs(collection(firestore, `${txDoc.ref.path}/timelineEvents`));
+                    const subBatch = writeBatch(firestore);
+                    timelineSnap.forEach(td => subBatch.delete(td.ref));
+                    subBatch.delete(txDoc.ref);
+                    await subBatch.commit();
+                }
+
+                // مسح سجل الحركات (History)
+                const historySnap = await getDocs(collection(firestore, `${clientDoc.ref.path}/history`));
+                const histBatch = writeBatch(firestore);
+                historySnap.forEach(hd => histBatch.delete(hd.ref));
+                
+                // تصفير حالة العميل والعدادات
+                histBatch.update(clientDoc.ref, { 
                     status: 'new', 
                     transactionCounter: 0,
                     updatedAt: serverTimestamp() 
                 });
-            });
+                await histBatch.commit();
+            }
 
+            // 🛡️ 3. مسح بنود الـ BOQ (Nested Paths) 🛡️
+            const boqsPath = getTenantPath('boqs', tenantId);
+            const boqsSnap = await getDocs(collection(firestore, boqsPath!));
+            for (const boqDoc of boqsSnap.docs) {
+                const itemsSnap = await getDocs(collection(firestore, `${boqDoc.ref.path}/items`));
+                const boqBatch = writeBatch(firestore);
+                itemsSnap.forEach(id => boqBatch.delete(id.ref));
+                boqBatch.delete(boqDoc.ref);
+                await boqBatch.commit();
+            }
+
+            // 🛡️ 4. مسح عدادات الترقيم (Reset Counters) 🛡️
+            const countersPath = getTenantPath('counters', tenantId);
+            const countersSnap = await getDocs(collection(firestore, countersPath!));
             const counterBatch = writeBatch(firestore);
-            const countersSnap = await getDocs(query(collection(firestore, getTenantPath('counters', tenantId)!)));
             countersSnap.forEach(d => counterBatch.delete(d.ref));
-            
-            await clientBatch.commit();
             await counterBatch.commit();
 
-            toast({ title: '✅ تم التطهير الشامل', description: 'تم تصفير كافة العمليات المالية والتقنية للمنشأة.' });
+            toast({ title: '✅ تم التطهير الشامل والمجمدات', description: 'تم تصفير كافة العمليات والمعاملات الميدانية بنجاح.' });
             setIsImportConfirmOpen(false);
             setConfirmText('');
         } catch (e: any) {
-            console.error("Purge Error:", e);
-            toast({ variant: 'destructive', title: 'فشل التطهير', description: 'تأكد من صلاحيات المدير وأعد المحاولة.' });
+            console.error("Purge Failure:", e);
+            toast({ variant: 'destructive', title: 'فشل التطهير العميق', description: 'يرجى مراجعة الصلاحيات أو الاتصال بالمطور.' });
         } finally {
             setIsPurging(false);
         }
@@ -219,12 +242,12 @@ function UniversalDataPurgeTool() {
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-white rounded-2xl shadow-sm text-red-600 border border-red-100"><Ban className="h-6 w-6"/></div>
                     <div>
-                        <h3 className="font-black text-xl text-red-700">تطهير العمليات الحالية (Sovereign Reset)</h3>
-                        <p className="text-xs font-bold text-red-600/70 mt-0.5">مسح كافة القيود، العقود، المعاملات، والمستخلصات (مع الإبقاء على العملاء والموظفين).</p>
+                        <h3 className="font-black text-xl text-red-700">تطهير شامل لكافة العمليات (Sovereign Deep Purge)</h3>
+                        <p className="text-xs font-bold text-red-600/70 mt-0.5">مسح القيود، المعاملات، جداول الكميات، والمستخلصات (مع الإبقاء على العملاء).</p>
                     </div>
                 </div>
                 <Button onClick={() => setIsImportConfirmOpen(true)} variant="destructive" className="rounded-xl font-black gap-2 shadow-xl shadow-red-200 px-8 h-12">
-                    <Trash2 className="h-5 w-5" /> مسح السجلات والعمليات
+                    <Trash2 className="h-5 w-5" /> بدء التطهير العميق
                 </Button>
             </div>
 
@@ -236,7 +259,7 @@ function UniversalDataPurgeTool() {
                         </div>
                         <AlertDialogTitle className="text-2xl font-black text-red-800 tracking-tighter">إجراء سيادي: تصفير المنظومة!</AlertDialogTitle>
                         <AlertDialogDescription className="text-lg font-bold text-slate-600 leading-relaxed mt-2">
-                            سيقوم هذا المحرك بمسح نهائي لكافة العمليات المالية والميدانية لضمان بدء دورة عمل نظيفة.
+                            سيقوم هذا المحرك بمسح نهائي لكافة العمليات المالية والميدانية (بما فيها المعاملات والـ BOQ) لضمان بدء دورة عمل نظيفة.
                             <br /><br />
                             <span className="text-red-900 font-black italic block bg-red-50 p-4 rounded-2xl border-2 border-red-200">
                                 تنبيه: لا يمكن التراجع عن هذا الإجراء أبداً. اكتب كلمة "تطهير" أدناه للتأكيد:
