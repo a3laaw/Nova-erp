@@ -7,7 +7,8 @@ import {
     DropdownMenuContent, 
     DropdownMenuItem, 
     DropdownMenuTrigger,
-    DropdownMenuSeparator
+    DropdownMenuSeparator,
+    DropdownMenuLabel
 } from '@/components/ui/dropdown-menu';
 import { 
     Dialog, 
@@ -40,8 +41,8 @@ interface UniversalActionTriggerProps {
 }
 
 /**
- * محرك الإجراءات الموحد (Universal Action Trigger V91.0):
- * تم تفعيل خاصية "المشاركة الجماعية"؛ حيث يتم إرسال تنبيهات فورية وجدولة المهام للزملاء المشاركين.
+ * محرك الإجراءات الموحد (Universal Action Trigger V107.0):
+ * تم إصلاح خطأ DropdownMenuLabel المفقود وضمان استقرار المزامنة التشاركية.
  */
 export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSubId, subItemName }: UniversalActionTriggerProps) {
     const { user: currentUser } = useAuth();
@@ -57,7 +58,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
 
     const tenantId = currentUser?.currentCompanyId;
 
-    // جلب كافة الموظفين لتمكين المشاركة
+    // جلب الموظفين لتمكين المشاركة
     const { data: allUsers = [], loading: usersLoading } = useSubscription<UserProfile>(
         firestore, 
         tenantId ? 'users' : null
@@ -92,7 +93,6 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
             const service = new ProductivityService(firestore, tenantId);
             const taskTitle = subItemName ? `${title} - ${subItemName}` : title;
             
-            // 1. إنشاء المهمة للمستخدم الحالي
             await service.createItem({
                 userId: currentUser.id,
                 entryType: 'task',
@@ -106,13 +106,11 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                 sourceUrl: window.location.pathname,
             });
 
-            // 2. إرسال التنبيهات وجدولة المهام للزملاء المشاركين
             if (assignedUserIds.length > 0) {
                 const notifPath = getTenantPath('notifications', tenantId);
                 const taskPath = getTenantPath('userProductivity', tenantId);
 
                 for (const targetId of assignedUserIds) {
-                    // أ. إرسال الإشعار الفوري
                     await addDoc(collection(firestore, notifPath!), cleanFirestoreData({
                         userId: targetId,
                         title: 'مهمة عمل تشاركية',
@@ -123,7 +121,6 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                         companyId: tenantId
                     }));
 
-                    // ب. جدولة المهمة في لوحة تحكم الزميل آلياً
                     await addDoc(collection(firestore, taskPath!), cleanFirestoreData({
                         userId: targetId,
                         entryType: 'task',
@@ -182,7 +179,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
 
                     <div className="p-8 space-y-6">
                         <div className="p-5 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 block mb-1">بند العمل المستخلص:</Label>
+                            <Label className="text-[10px] font-black text-slate-400 block mb-1">بند العمل المستخلص:</Label>
                             <p className="font-black text-lg text-primary leading-tight">{subItemName || title}</p>
                         </div>
 
@@ -222,7 +219,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                     </div>
 
                     <DialogFooter className="p-8 bg-muted/10 border-t gap-3">
-                        <Button type="button" variant="ghost" onClick={() => setIsTaskDialogOpen(false)} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                        <Button type="button" variant="outline" onClick={() => setIsTaskDialogOpen(false)} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
                         <Button onClick={handleCreateTask} disabled={isSaving} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-primary/30 gap-2 bg-primary text-white border-none">
                             {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Send className="h-5 w-5 rotate-180" />}
                             اعتماد وجدولة المهمة

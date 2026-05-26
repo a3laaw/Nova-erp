@@ -77,6 +77,10 @@ const statusTranslations: Record<string, string> = {
     cancelled: 'ملغي/مفسوخ',
 };
 
+/**
+ * صفحة تفاصيل المعاملة (Transaction Details V107.0):
+ * تم إصلاح خطأ CalendarIcon وضبط رادار حماية البيانات (Null Guard).
+ */
 export default function TransactionDetailPage() {
   const params = useParams();
   const router = useRouter();

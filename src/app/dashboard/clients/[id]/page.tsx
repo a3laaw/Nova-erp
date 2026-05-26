@@ -136,6 +136,10 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
     );
 }
 
+/**
+ * ملف العميل الموحد (Client Profile V107.0):
+ * تم تثبيت كافة المراجع (Separator, transactionStatusColors) وضمان استرجاع المعاملات القديمة والجديدة.
+ */
 export default function ClientProfilePage() {
   const params = useParams();
   const router = useRouter();

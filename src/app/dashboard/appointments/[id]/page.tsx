@@ -39,6 +39,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { formatCurrency, getTenantPath, cleanFirestoreData, cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
@@ -58,6 +59,10 @@ const stageStatusTranslations: Record<string, string> = {
   completed: 'منجزة',
 };
 
+/**
+ * صفحة تفاصيل الزيارة الميدانية (Visit Center V107.0):
+ * تم إصلاح خطأ cn و updateDoc وتثبيت إلزامية التوثيق الميكانيكي.
+ */
 export default function AppointmentDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -84,7 +89,6 @@ export default function AppointmentDetailsPage() {
     const { data: clientTransactions = [] } = useSubscription<ClientTransaction>(firestore, appointment?.clientId ? `clients/${appointment.clientId}/transactions` : null, [where('status', 'in', ['new', 'in-progress'])]);
     const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
-    // 🛡️ درع القفل والسيادة 🛡️
     const isLocked = useMemo(() => {
         return transaction?.status === 'cancelled' || transaction?.status === 'on-hold';
     }, [transaction?.status]);
@@ -173,22 +177,33 @@ export default function AppointmentDetailsPage() {
                 }
             }
 
-            await batch.commit();
+            await batch.commit().catch(async (err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: transactionPath,
+                    operation: 'write'
+                }));
+                throw err;
+            });
+
             toast({ title: 'تم حفظ المعلومات' });
             setActionNote('');
         } catch (e: any) {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: transactionPath,
-                operation: 'write'
-            }));
+            console.error(e);
         } finally { setIsSaving(false); }
     };
 
     const handleLinkTransaction = async (txId: string) => {
         if (!firestore || !apptPath || !tenantId) return;
         const apptRef = doc(firestore, apptPath);
-        await updateDoc(apptRef, { transactionId: txId });
-        toast({ title: 'تم ربط المسار الفني' });
+        await updateDoc(apptRef, { transactionId: txId }).then(() => {
+            toast({ title: 'تم ربط المسار الفني' });
+        }).catch(async (serverError) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: apptPath,
+                operation: 'update',
+                requestResourceData: { transactionId: txId }
+            }));
+        });
     };
 
     if (apptLoading || clientLoading) return <div className="p-10"><Skeleton className="h-96 w-full rounded-[3rem]" /></div>;
@@ -305,7 +320,7 @@ export default function AppointmentDetailsPage() {
                                                                 variant="outline" 
                                                                 className="flex-1 h-12 rounded-2xl font-black gap-2 border-orange-200 text-orange-700 bg-white"
                                                             >
-                                                                <Pencil className="h-4 w-4" /> تسجيل تعديل
+                                                                <Edit3 className="h-4 w-4" /> تسجيل تعديل
                                                             </Button>
                                                             <Button 
                                                                 onClick={() => handleStageAction(stage.stageId, 'complete')} 
