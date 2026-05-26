@@ -34,7 +34,7 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import { formatCurrency, getTenantPath, cleanFirestoreData } from '@/lib/utils';
+import { formatCurrency, getTenantPath, cleanFirestoreData, cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
@@ -55,12 +55,6 @@ const stageStatusTranslations: Record<string, string> = {
   completed: 'منجزة',
 };
 
-/**
- * صفحة تفاصيل الزيارة الموحدة (Sovereign Visit Control Hub V95.0):
- * - تم إصلاح خطأ الـ updateDoc ReferenceError.
- * - تحصين محرك الربط المالي الآلي وإصدار المستخلصات عند الإنجاز.
- * - تطبيق الهوية اللؤلؤية والبرتقالية الشاملة.
- */
 export default function AppointmentDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -108,7 +102,7 @@ export default function AppointmentDetailsPage() {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 
-                // تفعيل المرحلة التالية تلقائياً (الخطوة التالية في الـ WBS)
+                // تفعيل المرحلة التالية تلقائياً
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
@@ -239,7 +233,7 @@ export default function AppointmentDetailsPage() {
                         <div className="space-y-8">
                              <div className="flex items-center gap-3 bg-primary/5 p-4 rounded-2xl border border-primary/10">
                                 <Target className="h-5 w-5 text-primary" />
-                                <div><p className="text-[10px] font-black text-primary uppercase">المسار الفني المرتبط</p><p className="font-black text-lg text-[#1e1b4b]">{transaction?.transactionType}</p></div>
+                                <div><p className="text-[10px] font-black text-primary uppercase">المسار الفني المرتبط</p><p className="font-black text-lg text-slate-900">{transaction?.transactionType}</p></div>
                              </div>
 
                              <div className="space-y-6">
@@ -250,7 +244,6 @@ export default function AppointmentDetailsPage() {
                                         const isCurrent = stage.status === 'in-progress';
                                         const isLocked = idx > 0 && transaction.stages![idx-1].status !== 'completed';
 
-                                        // 🛡️ الظهور التدريجي: لا تظهر المرحلة إلا إذا كانت الحالية أو القادمة المسموح بها 🛡️
                                         if (isLocked && !isCurrent) return null;
 
                                         return (
@@ -264,7 +257,6 @@ export default function AppointmentDetailsPage() {
                                                         <Badge variant="outline" className={cn("text-[9px] font-black", stageStatusColors[stage.status])}>{stageStatusTranslations[stage.status]}</Badge>
                                                     </div>
                                                     
-                                                    {/* 🛡️ الزر الثلاثي الموحد: بدء - تعديل - إنهاء 🛡️ */}
                                                     <div className="flex gap-2">
                                                         {stage.status === 'pending' && !isLocked && (
                                                             <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isSaving} className="rounded-xl font-black px-6 h-9">بدء</Button>
