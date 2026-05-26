@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -69,8 +70,8 @@ const stageStatusTranslations: Record<string, string> = {
 };
 
 /**
- * مركز تحكم الزيارة (Appointment Center V136.0):
- * تم إيقاف التوليد التلقائي للقيود المالية، والاكتفاء بالمستخلص والتعليقات الرسمية.
+ * مركز تحكم الزيارة (Appointment Center V137.0):
+ * تم تحصين التعليق المالي ليشمل (قيمة المرحلة، الرصيد المسبق، والمطلوب سداده) لشفافية كاملة.
  */
 export default function AppointmentDetailsPage() {
     const params = useParams();
@@ -142,28 +143,16 @@ export default function AppointmentDetailsPage() {
                 stage.endDate = Timestamp.fromDate(now);
                 logLabel = 'إغلاق المرحلة ميدانياً';
 
-                // 1. تفعيل نظام نقاط XP
                 const userPath = getTenantPath(`users/${currentUser.id}`, tenantId);
-                const ledgerPath = getTenantPath(`points_ledger`, tenantId);
                 batch.update(doc(firestore, userPath!), { totalPoints: increment(10) });
-                batch.set(doc(collection(firestore, ledgerPath!)), {
-                    userId: currentUser.id,
-                    points: 10,
-                    source: 'site_visit_completion',
-                    description: `إنجاز مرحلة عبر الموقع: ${stage.name}`,
-                    createdAt: serverTimestamp(),
-                    companyId: tenantId
-                });
                 
-                // 2. تفعيل المرحلة التالية
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
                     nextStage.startDate = Timestamp.fromDate(now);
                 }
 
-                // 🛡️ المزامنة المالية السيادية (Sovereign Auto-Chain V136.0) 🛡️
-                // تم حذف توليد القيود المحاسبية التلقائي بناءً على رغبة المستخدم
+                // 🛡️ المزامنة المالية السيادية والتعليق المفسر (V137.0) 🛡️
                 const contract = transaction.contract;
                 if (contract?.clauses) {
                     const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
@@ -171,14 +160,27 @@ export default function AppointmentDetailsPage() {
                         const targetClause = contract.clauses[clauseIndex];
                         const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
 
+                        // حساب الأرصدة والمدفوعات السابقة لبيان الحالة (Previous Balance Logic)
+                        const receiptsPath = getTenantPath('cashReceipts', tenantId);
+                        const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath!), where('projectId', '==', transaction.id)));
+                        const totalCollected = receiptsSnap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
+                        
+                        const previousMilestonesSum = contract.clauses
+                            .slice(0, clauseIndex)
+                            .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
+                        
+                        const availableCredit = Math.max(0, totalCollected - previousMilestonesSum);
+                        const stageValue = targetClause.amount || 0;
+                        const netDue = Math.max(0, stageValue - availableCredit);
+                        const paidFromPrevious = Math.min(stageValue, availableCredit);
+
                         if (targetClause.status === 'غير مستحقة') {
                             const updatedClauses = [...contract.clauses];
-                            updatedClauses[clauseIndex].status = 'مستحقة';
+                            updatedClauses[clauseIndex].status = netDue === 0 ? 'مدفوعة' : 'مستحقة';
                             batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
 
-                            // أ. توليد مسودة مستخلص آلي (للمراجعة في قسم المطالبات)
+                            // أ. توليد مسودة مستخلص
                             const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
-                            const milestoneAmount = updatedClauses[clauseIndex].amount;
                             batch.set(appRef, cleanFirestoreData({
                                 applicationNumber: `APP-SITE-${now.getTime().toString().substring(7)}`,
                                 date: serverTimestamp(),
@@ -186,7 +188,7 @@ export default function AppointmentDetailsPage() {
                                 clientId: transaction.clientId,
                                 clientName: client?.nameAr,
                                 projectName: transaction.transactionType,
-                                totalAmount: milestoneAmount,
+                                totalAmount: stageValue,
                                 currentMilestone: stage.name, 
                                 status: 'draft',
                                 createdAt: serverTimestamp(),
@@ -194,10 +196,10 @@ export default function AppointmentDetailsPage() {
                                 companyId: tenantId
                             }));
 
-                            // توثيق الاستحقاق في التايم لاين
+                            // ب. التوثيق المالي المفسر (Reconciliation Comment)
                             batch.set(timelineRef, {
                                 type: 'comment',
-                                content: `**[إشعار مالي: استحقاق دفعة جديدة]**\nتم إنجاز مرحلة **"${stage.name}"** ميدانياً.\nتم إصدار مسودة مستخلص أعمال بقيمة **${formatCurrency(milestoneAmount)}** بانتظار التحصيل المالي.`,
+                                content: `**[بيان استحقاق مالي تفصيلي]**\nتم إنجاز مرحلة **"${stage.name}"**.\n\n• قيمة المرحلة: **${formatCurrency(stageValue)}**\n• مسدد سابقاً (رصيد متاح): **${formatCurrency(paidFromPrevious)}**\n• المطلوب سداده حالياً: **${formatCurrency(netDue)}**\n\n*ملاحظة: تم رفع مطالبة مالية لمراجعة المحاسب.*`,
                                 userId: currentUser.id,
                                 userName: currentUser.fullName,
                                 userAvatar: currentUser.avatarUrl,
@@ -205,20 +207,7 @@ export default function AppointmentDetailsPage() {
                                 companyId: tenantId
                             });
 
-                            logLabel += ' (وتم تفعيل المطالبة المالية)';
-                        }
-                        else if (targetClause.status === 'مدفوعة') {
-                            // توثيق مالي للمراحل المدفوعة مسبقاً (Pre-paid Sync)
-                            batch.set(timelineRef, {
-                                type: 'comment',
-                                content: `**[إشعار مالي: استحقاق مدفوع مسبقاً]**\nتم إنجاز مرحلة **"${stage.name}"** ميدانياً.\nتبين في السجلات أن قيمة هذه المرحلة مغطاة مسبقاً من واقع التحصيلات المحققة لهذا المشروع.`,
-                                userId: currentUser.id,
-                                userName: currentUser.fullName,
-                                userAvatar: currentUser.avatarUrl,
-                                createdAt: serverTimestamp(),
-                                companyId: tenantId
-                            });
-                            logLabel += ' (مستحق مدفوع مسبقاً)';
+                            logLabel += netDue === 0 ? ' (تمت التسوية من الرصيد)' : ' (بانتظار التحصيل)';
                         }
                     }
                 }
@@ -246,7 +235,7 @@ export default function AppointmentDetailsPage() {
             }
 
             await batch.commit();
-            toast({ title: '✅ تم توثيق الإنجاز الميداني والارتباط المالي' });
+            toast({ title: '✅ تم توثيق الإنجاز والمزامنة المالية' });
             setActionNote('');
             setActiveAction(null);
         } catch (e: any) { 

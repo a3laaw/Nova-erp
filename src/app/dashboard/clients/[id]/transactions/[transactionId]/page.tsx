@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -84,8 +85,8 @@ const statusTranslations: Record<string, string> = {
 };
 
 /**
- * تفاصيل المعاملة (Transaction Details V136.0):
- * تم إيقاف التوليد التلقائي للقيود المالية، والاكتفاء بالمستخلص والتعليقات الرسمية لضمان سيادة قرار المحاسب.
+ * تفاصيل المعاملة (Transaction Details V137.0):
+ * تم تحصين التعليق المالي ليشمل (قيمة المرحلة، الرصيد المسبق، والمطلوب سداده) لشفافية كاملة.
  */
 export default function TransactionDetailPage() {
   const params = useParams();
@@ -172,31 +173,16 @@ export default function TransactionDetailPage() {
                 stage.endDate = Timestamp.fromDate(now);
                 logLabel = 'إتمام وإنجاز';
                 
-                // 1. نظام النقاط XP
                 const userPath = getTenantPath(`users/${currentUser.id}`, tenantId);
-                const ledgerPath = getTenantPath(`points_ledger`, tenantId);
                 batch.update(doc(firestore, userPath!), { totalPoints: increment(10) });
-                batch.set(doc(collection(firestore, ledgerPath!)), {
-                    userId: currentUser.id,
-                    points: 10,
-                    source: 'wbs_completion',
-                    description: `إنجاز مرحلة: ${stage.name}`,
-                    createdAt: serverTimestamp(),
-                    companyId: tenantId
-                });
 
-                // 2. تفعيل المرحلة التالية آلياً
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
                     nextStage.startDate = Timestamp.fromDate(now);
-                    if (nextStage.expectedDurationDays) {
-                        nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
-                    }
                 }
 
-                // 🛡️ المزامنة المالية السيادية (Sovereign Auto-Chain V136.0) 🛡️
-                // تم حذف توليد القيود المحاسبية التلقائي؛ نكتفي بالمستخلص والتعليق.
+                // 🛡️ المزامنة المالية السيادية والتعليق المفسر (V137.0) 🛡️
                 const contract = transaction.contract;
                 if (contract?.clauses) {
                     const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
@@ -204,14 +190,28 @@ export default function TransactionDetailPage() {
                         const targetClause = contract.clauses[clauseIndex];
                         const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
 
+                        // حساب الأرصدة والمدفوعات السابقة لهذا المشروع
+                        const receiptsPath = getTenantPath('cashReceipts', tenantId);
+                        const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath!), where('projectId', '==', transaction.id)));
+                        const totalCollected = receiptsSnap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
+                        
+                        // حساب ما تم فوترته سابقاً (consumed billing)
+                        const previousMilestonesAmount = contract.clauses
+                            .slice(0, clauseIndex)
+                            .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
+                        
+                        const availableCredit = Math.max(0, totalCollected - previousMilestonesAmount);
+                        const stageAmount = targetClause.amount || 0;
+                        const netDueNow = Math.max(0, stageAmount - availableCredit);
+                        const appliedFromCredit = Math.min(stageAmount, availableCredit);
+
                         if (targetClause.status === 'غير مستحقة') {
                             const updatedClauses = [...contract.clauses];
-                            updatedClauses[clauseIndex].status = 'مستحقة';
+                            updatedClauses[clauseIndex].status = netDueNow === 0 ? 'مدفوعة' : 'مستحقة';
                             batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
 
                             // أ. توليد مسودة مستخلص
                             const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
-                            const finalAppAmount = updatedClauses[clauseIndex].amount;
                             batch.set(appRef, cleanFirestoreData({
                                 applicationNumber: `APP-AUTO-${now.getTime().toString().substring(7)}`,
                                 date: serverTimestamp(),
@@ -219,7 +219,7 @@ export default function TransactionDetailPage() {
                                 clientId: transaction.clientId,
                                 clientName: client?.nameAr,
                                 projectName: transaction.transactionType,
-                                totalAmount: finalAppAmount,
+                                totalAmount: stageAmount,
                                 currentMilestone: stage.name, 
                                 status: 'draft',
                                 createdAt: serverTimestamp(),
@@ -227,10 +227,10 @@ export default function TransactionDetailPage() {
                                 companyId: tenantId
                             }));
 
-                            // ب. توثيق الاستحقاق المالي في التايم لاين
+                            // ب. التعليق المالي المفسر (التحليل الذي طلبه المهندس)
                             batch.set(timelineRef, {
                                 type: 'comment',
-                                content: `**[إشعار مالي: استحقاق دفعة]**\nتم إنجاز مرحلة **"${stage.name}"**.\nتم إصدار مسودة مستخلص أعمال بقيمة **${formatCurrency(finalAppAmount)}** بانتظار المراجعة والتحصيل المالي.`,
+                                content: `**[بيان استحقاق مالي تفصيلي]**\nتم إنجاز مرحلة **"${stage.name}"** ميدانياً.\n\n• قيمة المرحلة: **${formatCurrency(stageAmount)}**\n• مسدد سابقاً (رصيد متاح): **${formatCurrency(appliedFromCredit)}**\n• المطلوب سداده حالياً: **${formatCurrency(netDueNow)}**\n\n*ملاحظة: تم إصدار مسودة مستخلص لمراجعة المحاسب.*`,
                                 userId: currentUser.id,
                                 userName: currentUser.fullName,
                                 userAvatar: currentUser.avatarUrl,
@@ -238,20 +238,7 @@ export default function TransactionDetailPage() {
                                 companyId: tenantId
                             });
 
-                            logLabel += ' (وتم تفعيل المطالبة المالية)';
-                        } 
-                        else if (targetClause.status === 'مدفوعة') {
-                            // توثيق مالي للمراحل المدفوعة مسبقاً
-                            batch.set(timelineRef, {
-                                type: 'comment',
-                                content: `**[إشعار مالي: استحقاق مدفوع مسبقاً]**\nتم إنجاز مرحلة **"${stage.name}"**.\nتبين في السجلات المالية أن قيمة هذه المرحلة قد تمت تسويتها مسبقاً من واقع التحصيلات السابقة لهذا المشروع.`,
-                                userId: currentUser.id,
-                                userName: currentUser.fullName,
-                                userAvatar: currentUser.avatarUrl,
-                                createdAt: serverTimestamp(),
-                                companyId: tenantId
-                            });
-                            logLabel += ' (مستحق مدفوع مسبقاً)';
+                            logLabel += netDueNow === 0 ? ' (تمت التسوية من الرصيد)' : ' (بانتظار التحصيل)';
                         }
                     }
                 }

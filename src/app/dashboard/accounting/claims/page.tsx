@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -41,7 +42,7 @@ import {
 
 /**
  * شاشة المطالبات المالية والتحصيل (Claims & Collection Control Center):
- * - تم توضيح "بند الاستحقاق" لكل مطالبة لضمان الوضوح المطلق للمحاسب.
+ * تم تحديث الواجهة لإبراز "بند الاستحقاق" الميداني لضمان الشفافية المطلقة للمحاسب.
  */
 export default function FinancialClaimsPage() {
     const { firestore } = useFirebase();
@@ -205,7 +206,7 @@ export default function FinancialClaimsPage() {
                                                 "font-mono font-black px-4",
                                                 claim.isCritical ? "bg-red-600 text-white border-none animate-pulse" : 
                                                 claim.isOverdue ? "bg-orange-100 text-orange-700 border-orange-200" : 
-                                                "bg-blue-50 text-blue-700 border-blue-100"
+                                                "bg-green-50 text-green-700 border-green-200"
                                             )}>
                                                 {claim.agingDays} يوم
                                             </Badge>
