@@ -103,6 +103,10 @@ export default function TransactionDetailPage() {
   
   const [activeAction, setActiveAction] = useState<{ stageId: string, type: 'start' | 'modify' | 'complete' } | null>(null);
 
+  const isPrivileged = useMemo(() => 
+    ['Admin', 'Accountant', 'HR', 'Secretary', 'Developer'].includes(currentUser?.role || '')
+  , [currentUser?.role]);
+
   useEffect(() => {
       if (!firestore || !tenantId || !clientId || !transactionId) return;
       const findCorrectPath = async () => {
@@ -209,6 +213,21 @@ export default function TransactionDetailPage() {
         } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsProcessing(false); }
   };
 
+  const handleUndoStage = async (stageId: string) => {
+    if (!firestore || !transaction || !transactionPath || !tenantId || isLocked) return;
+    setIsProcessing(true);
+    try {
+        const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
+        const stage = currentStages.find(s => s.stageId === stageId);
+        if (stage) {
+            stage.status = 'in-progress';
+            stage.endDate = null;
+        }
+        await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
+        toast({ title: '✅ تم التراجع عن إغلاق المرحلة' });
+    } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsProcessing(false); }
+  };
+
   if (transactionLoading || clientLoading || !transaction) return <div className="p-8 max-w-5xl mx-auto space-y-6"><Skeleton className="h-48 w-full rounded-[3rem]" /><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
 
   return (
@@ -293,6 +312,16 @@ export default function TransactionDetailPage() {
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-3">
                                                     <span className="font-black text-2xl text-slate-900">{stage.name}</span>
+                                                    {!isLocked && (
+                                                        <UniversalActionTrigger 
+                                                            title={transaction.transactionType}
+                                                            subItemName={stage.name}
+                                                            clientId={clientId} 
+                                                            sourceModule="مراحل العمل"
+                                                            sourceId={transaction.id!}
+                                                            sourceSubId={stage.stageId}
+                                                        />
+                                                    )}
                                                     {(stage.currentCount || 0) > 0 && <Badge variant="secondary" className="bg-orange-100 text-orange-700 font-black h-5 px-2 text-[9px]">{stage.currentCount} تعديلات</Badge>}
                                                 </div>
                                                 {isCurrent && stage.expectedEndDate && (
@@ -319,7 +348,19 @@ export default function TransactionDetailPage() {
                                                 <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'start' })} className="h-12 px-10 rounded-2xl font-black gap-3 shadow-xl"><Play className="h-4 w-4" /> بدء العمل</Button>
                                             )}
                                             {isCompleted && (
-                                                <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-7 w-7"/></div>
+                                                <div className="flex items-center gap-2">
+                                                    {isPrivileged && (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            onClick={() => handleUndoStage(stage.stageId)}
+                                                            className="h-9 px-4 rounded-xl text-orange-600 hover:bg-orange-50 font-black gap-1.5 border border-orange-100"
+                                                        >
+                                                            <Undo2 className="h-4 w-4" /> تراجع عن الإغلاق
+                                                        </Button>
+                                                    )}
+                                                    <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-7 w-7"/></div>
+                                                </div>
                                             )}
                                             {isActionActive && <Button variant="ghost" size="icon" onClick={() => setActiveAction(null)} className="h-10 w-10 rounded-full text-slate-400 hover:bg-red-50 hover:text-red-500"><X className="h-5 w-5"/></Button>}
                                         </div>
