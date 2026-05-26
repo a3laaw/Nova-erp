@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -20,7 +19,7 @@ import {
     limit,
     getDocs
 } from 'firebase/firestore';
-import type { Appointment, Client, ClientTransaction, TransactionStage, Holiday, Account } from '@/lib/types';
+import type { Appointment, Client, ClientTransaction, TransactionStage, Holiday, Account, PaymentApplication } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -69,10 +68,6 @@ const stageStatusTranslations: Record<string, string> = {
   completed: 'منجزة',
 };
 
-/**
- * مركز تحكم الزيارة (Appointment Center V137.0):
- * تم تحصين التعليق المالي ليشمل (قيمة المرحلة، الرصيد المسبق، والمطلوب سداده) لشفافية كاملة.
- */
 export default function AppointmentDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -152,7 +147,6 @@ export default function AppointmentDetailsPage() {
                     nextStage.startDate = Timestamp.fromDate(now);
                 }
 
-                // 🛡️ المزامنة المالية السيادية والتعليق المفسر (V137.0) 🛡️
                 const contract = transaction.contract;
                 if (contract?.clauses) {
                     const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
@@ -160,7 +154,6 @@ export default function AppointmentDetailsPage() {
                         const targetClause = contract.clauses[clauseIndex];
                         const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
 
-                        // حساب الأرصدة والمدفوعات السابقة لبيان الحالة (Previous Balance Logic)
                         const receiptsPath = getTenantPath('cashReceipts', tenantId);
                         const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath!), where('projectId', '==', transaction.id)));
                         const totalCollected = receiptsSnap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
@@ -179,7 +172,6 @@ export default function AppointmentDetailsPage() {
                             updatedClauses[clauseIndex].status = netDue === 0 ? 'مدفوعة' : 'مستحقة';
                             batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
 
-                            // أ. توليد مسودة مستخلص
                             const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
                             batch.set(appRef, cleanFirestoreData({
                                 applicationNumber: `APP-SITE-${now.getTime().toString().substring(7)}`,
@@ -192,11 +184,10 @@ export default function AppointmentDetailsPage() {
                                 currentMilestone: stage.name, 
                                 status: 'draft',
                                 createdAt: serverTimestamp(),
-                                createdBy: 'system-auto-chain',
+                                createdBy: currentUser.id,
                                 companyId: tenantId
                             }));
 
-                            // ب. التوثيق المالي المفسر (Reconciliation Comment)
                             batch.set(timelineRef, {
                                 type: 'comment',
                                 content: `**[بيان استحقاق مالي تفصيلي]**\nتم إنجاز مرحلة **"${stage.name}"**.\n\n• قيمة المرحلة: **${formatCurrency(stageValue)}**\n• مسدد سابقاً (رصيد متاح): **${formatCurrency(paidFromPrevious)}**\n• المطلوب سداده حالياً: **${formatCurrency(netDue)}**\n\n*ملاحظة: تم رفع مطالبة مالية لمراجعة المحاسب.*`,
@@ -244,19 +235,80 @@ export default function AppointmentDetailsPage() {
         } finally { setIsSaving(false); }
     };
 
+    /**
+     * محرك التراجع السيادي (Dual Rollback V138.0):
+     * يقوم بسحب المستخلصات المعلقة وتصفير حالة الدفع في العقد وتوثيق ذلك.
+     */
     const handleUndoStage = async (stageId: string) => {
         if (!firestore || !transaction || !transactionPath || !tenantId || isLocked) return;
         setIsSaving(true);
         try {
+            const batch = writeBatch(firestore);
             const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
-            const stage = currentStages.find(s => s.stageId === stageId);
+            const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
+            const stage = currentStages[stageIndex];
+            
             if (stage) {
                 stage.status = 'in-progress';
                 stage.endDate = null;
             }
-            await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: '✅ تم التراجع عن إغلاق المرحلة' });
-        } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsSaving(false); }
+
+            // 🛡️ التراجع المالي والرقابي (Financial Reversal) 🛡️
+            // 1. البحث عن المستخلصات المرتبطة وإلغاؤها
+            const appsPath = getTenantPath('payment_applications', tenantId);
+            const appsQuery = query(
+                collection(firestore, appsPath!), 
+                where('projectId', '==', transaction.id),
+                where('currentMilestone', '==', stage.name),
+                where('status', '==', 'draft') 
+            );
+            const appsSnap = await getDocs(appsQuery);
+            appsSnap.forEach(d => {
+                batch.update(d.ref, { 
+                    status: 'cancelled', 
+                    notes: `تم الإلغاء آلياً بسبب التراجع عن إغلاق المرحلة الميدانية بواسطة ${currentUser?.fullName}` 
+                });
+            });
+
+            // 2. تصفير حالة الدفعة في العقد
+            const contract = transaction.contract;
+            if (contract?.clauses) {
+                const updatedClauses = contract.clauses.map((c: any) => {
+                    if (c.condition === stage.name) return { ...c, status: 'غير مستحقة' };
+                    return c;
+                });
+                batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
+            }
+
+            // 3. تحديث مسار المعاملة
+            batch.update(doc(firestore, transactionPath), { 
+                stages: currentStages, 
+                updatedAt: serverTimestamp() 
+            });
+
+            // 4. إعادة فتح الموعد إذا كان مرتبطاً
+            if (appointment && appointment.workStageUpdated) {
+                batch.update(doc(firestore, apptPath!), { workStageUpdated: false, status: 'scheduled' });
+            }
+
+            // 5. توثيق التراجع في التايم لاين
+            const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
+            batch.set(timelineRef, {
+                type: 'comment',
+                content: `**[تراجع تقني ومالي]**\nتم التراجع عن إغلاق مرحلة **"${stage.name}"**.\n\n• تمت إعادة المرحلة لحالة قيد التنفيذ.\n• تم إلغاء مسودة المطالبة المالية المرتبطة.\n• تم تصفير استحقاق الدفعة في العقد.`,
+                userId: currentUser?.id,
+                userName: currentUser?.fullName,
+                userAvatar: currentUser?.avatarUrl,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
+
+            await batch.commit();
+            toast({ title: '✅ تم التراجع التقني والمالي بنجاح' });
+        } catch (e) { 
+            console.error(e);
+            toast({ variant: 'destructive', title: 'خطأ في التراجع' }); 
+        } finally { setIsSaving(false); }
     };
 
     const handleLinkTransaction = async (txId: string) => {
@@ -441,7 +493,7 @@ export default function AppointmentDetailsPage() {
                                                         <div className="flex justify-end">
                                                             <Button 
                                                                 onClick={handleStageAction} 
-                                                                disabled={isProcessing || !actionNote.trim()} 
+                                                                disabled={isSaving || !actionNote.trim()} 
                                                                 className={cn(
                                                                     "h-14 px-20 rounded-[2rem] font-black text-xl shadow-2xl gap-4 min-w-[300px]",
                                                                     activeAction.type === 'complete' ? "bg-green-600 hover:bg-green-700 shadow-green-200" : 

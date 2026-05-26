@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -48,7 +47,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import type { Client, ClientTransaction, TransactionStage, Holiday, Account } from '@/lib/types';
+import type { Client, ClientTransaction, TransactionStage, Holiday, Account, PaymentApplication } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
@@ -84,10 +83,6 @@ const statusTranslations: Record<string, string> = {
     cancelled: 'ملغي/مفسوخ',
 };
 
-/**
- * تفاصيل المعاملة (Transaction Details V137.0):
- * تم تحصين التعليق المالي ليشمل (قيمة المرحلة، الرصيد المسبق، والمطلوب سداده) لشفافية كاملة.
- */
 export default function TransactionDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -182,7 +177,6 @@ export default function TransactionDetailPage() {
                     nextStage.startDate = Timestamp.fromDate(now);
                 }
 
-                // 🛡️ المزامنة المالية السيادية والتعليق المفسر (V137.0) 🛡️
                 const contract = transaction.contract;
                 if (contract?.clauses) {
                     const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
@@ -190,12 +184,10 @@ export default function TransactionDetailPage() {
                         const targetClause = contract.clauses[clauseIndex];
                         const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
 
-                        // حساب الأرصدة والمدفوعات السابقة لهذا المشروع
                         const receiptsPath = getTenantPath('cashReceipts', tenantId);
                         const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath!), where('projectId', '==', transaction.id)));
                         const totalCollected = receiptsSnap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
                         
-                        // حساب ما تم فوترته سابقاً (consumed billing)
                         const previousMilestonesAmount = contract.clauses
                             .slice(0, clauseIndex)
                             .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
@@ -210,7 +202,6 @@ export default function TransactionDetailPage() {
                             updatedClauses[clauseIndex].status = netDueNow === 0 ? 'مدفوعة' : 'مستحقة';
                             batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
 
-                            // أ. توليد مسودة مستخلص
                             const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
                             batch.set(appRef, cleanFirestoreData({
                                 applicationNumber: `APP-AUTO-${now.getTime().toString().substring(7)}`,
@@ -223,11 +214,10 @@ export default function TransactionDetailPage() {
                                 currentMilestone: stage.name, 
                                 status: 'draft',
                                 createdAt: serverTimestamp(),
-                                createdBy: 'system-auto-chain',
+                                createdBy: currentUser.id,
                                 companyId: tenantId
                             }));
 
-                            // ب. التعليق المالي المفسر (التحليل الذي طلبه المهندس)
                             batch.set(timelineRef, {
                                 type: 'comment',
                                 content: `**[بيان استحقاق مالي تفصيلي]**\nتم إنجاز مرحلة **"${stage.name}"** ميدانياً.\n\n• قيمة المرحلة: **${formatCurrency(stageAmount)}**\n• مسدد سابقاً (رصيد متاح): **${formatCurrency(appliedFromCredit)}**\n• المطلوب سداده حالياً: **${formatCurrency(netDueNow)}**\n\n*ملاحظة: تم إصدار مسودة مستخلص لمراجعة المحاسب.*`,
@@ -264,19 +254,75 @@ export default function TransactionDetailPage() {
         } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الربط المالي' }); } finally { setIsProcessing(false); }
   };
 
+  /**
+   * محرك التراجع السيادي (Dual Rollback V138.0):
+   * يقوم بسحب المستخلصات المعلقة وتصفير حالة الدفع في العقد وتوثيق ذلك.
+   */
   const handleUndoStage = async (stageId: string) => {
     if (!firestore || !transaction || !transactionPath || !tenantId || isLocked) return;
     setIsProcessing(true);
     try {
+        const batch = writeBatch(firestore);
         const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
-        const stage = currentStages.find(s => s.stageId === stageId);
+        const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
+        const stage = currentStages[stageIndex];
+        
         if (stage) {
             stage.status = 'in-progress';
             stage.endDate = null;
         }
-        await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-        toast({ title: '✅ تم التراجع عن إغلاق المرحلة' });
-    } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsProcessing(false); }
+
+        // 🛡️ التراجع المالي والرقابي (Financial Reversal) 🛡️
+        // 1. البحث عن المستخلصات المرتبطة وإلغاؤها
+        const appsPath = getTenantPath('payment_applications', tenantId);
+        const appsQuery = query(
+            collection(firestore, appsPath!), 
+            where('projectId', '==', transaction.id),
+            where('currentMilestone', '==', stage.name),
+            where('status', '==', 'draft') 
+        );
+        const appsSnap = await getDocs(appsQuery);
+        appsSnap.forEach(d => {
+            batch.update(d.ref, { 
+                status: 'cancelled', 
+                notes: `تم الإلغاء آلياً بسبب التراجع عن إغلاق المرحلة الميدانية بواسطة ${currentUser?.fullName}` 
+            });
+        });
+
+        // 2. تصفير حالة الدفعة في العقد
+        const contract = transaction.contract;
+        if (contract?.clauses) {
+            const updatedClauses = contract.clauses.map((c: any) => {
+                if (c.condition === stage.name) return { ...c, status: 'غير مستحقة' };
+                return c;
+            });
+            batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
+        }
+
+        // 3. تحديث مسار المعاملة
+        batch.update(doc(firestore, transactionPath), { 
+            stages: currentStages, 
+            updatedAt: serverTimestamp() 
+        });
+
+        // 4. توثيق التراجع في التايم لاين
+        const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
+        batch.set(timelineRef, {
+            type: 'comment',
+            content: `**[تراجع تقني ومالي]**\nتم التراجع عن إغلاق مرحلة **"${stage.name}"**.\n\n• تمت إعادة المرحلة لحالة قيد التنفيذ.\n• تم إلغاء مسودة المطالبة المالية المرتبطة.\n• تم تصفير استحقاق الدفعة في العقد.`,
+            userId: currentUser?.id,
+            userName: currentUser?.fullName,
+            userAvatar: currentUser?.avatarUrl,
+            createdAt: serverTimestamp(),
+            companyId: tenantId
+        });
+
+        await batch.commit();
+        toast({ title: '✅ تم التراجع التقني والمالي بنجاح' });
+    } catch (e) { 
+        console.error(e);
+        toast({ variant: 'destructive', title: 'خطأ في التراجع' }); 
+    } finally { setIsProcessing(false); }
   };
 
   if (transactionLoading || clientLoading || !transaction) return <div className="p-8 max-w-5xl mx-auto space-y-6"><Skeleton className="h-48 w-full rounded-[3rem]" /><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
@@ -461,7 +507,7 @@ export default function TransactionDetailPage() {
             </TabsContent>
 
             <TabsContent value="comments"><TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="comment" showInput={!isLocked} title="الملاحظات الفنية" icon={<MessageSquare className='text-primary h-6 w-6'/>} client={client} transaction={transaction} /></TabsContent>
-            <TabsContent value="boq"><Card className="rounded-[3rem] p-10">{transaction.boqId ? <LinkedBoqView boqId={transaction.boqId} /> : <p className="text-center opacity-30 italic font-black">لا يوجد جدول كميات مرتبط.</p>}</Card></TabsContent>
+            <TabsContent value="boq"><Card className="rounded-[3rem] p-10">{transaction.boqId ? <LinkedBoqView boqId={transaction.boqId} /> : <p className="text-center opacity-30 italic font-black">لا توجد مقايسة مرتبطة.</p>}</Card></TabsContent>
             <TabsContent value="history"><TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="log" showInput={false} title="سجل الأحداث" icon={<History className='text-primary h-6 w-6'/>} client={client} transaction={transaction} /></TabsContent>
         </Tabs>
     </div>
