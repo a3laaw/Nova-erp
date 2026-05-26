@@ -298,6 +298,15 @@ export default function TransactionDetailPage() {
                             target.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, tDays, branding?.work_hours?.holidays || [], publicHolidays));
                         }
                     });
+                } else {
+                    const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                    if (nextStage && nextStage.status === 'pending') {
+                        nextStage.status = 'in-progress';
+                        nextStage.startDate = Timestamp.fromDate(now);
+                        if (nextStage.expectedDurationDays) {
+                            nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
+                        }
+                    }
                 }
             }
 
@@ -347,30 +356,60 @@ export default function TransactionDetailPage() {
         } finally { setIsProcessing(false); }
   };
 
+  /**
+   * 🛡️ محرك التراجع العكسي (Sovereign Undo Logic V75) 🛡️
+   * يقوم بإعادة المرحلة الحالية "قيد التنفيذ" وإرجاع كافة المراحل اللاحقة إلى "معلقة" لضمان سلامة التسلسل.
+   */
   const handleUndoStage = async (stageId: string) => {
         if (!firestore || !currentUser || !transaction || !transactionPath || !isAdmin || !tenantId || isLocked) return;
         setIsProcessing(true);
         try {
+            const batch = writeBatch(firestore);
             const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
             const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
             if (stageIndex === -1) throw new Error("Stage not found");
             
             const stage = currentStages[stageIndex];
+            
+            // 1. إعادة المرحلة المختارة إلى "قيد التنفيذ"
             stage.status = 'in-progress';
             stage.endDate = null;
+
+            // 2. محرك التطهير المتسلسل: إرجاع كافة المراحل اللاحقة لـ "معلقة" (Pending)
+            // لضمان عدم وجود مراحل نشطة تسبقها مرحلة تم التراجع عنها.
+            const resetFollowingStages = (sId: string) => {
+                const dependencies = currentStages.filter(s => 
+                    s.nextStageIds?.includes(sId) || 
+                    (s.order > currentStages.find(x => x.stageId === sId)?.order!)
+                );
+                
+                currentStages.forEach((s, idx) => {
+                    if (idx > stageIndex) {
+                        s.status = 'pending';
+                        s.startDate = null;
+                        s.endDate = null;
+                        s.expectedEndDate = null;
+                    }
+                });
+            };
             
-            await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
+            resetFollowingStages(stageId);
+
+            batch.update(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
             
-            await addDoc(collection(firestore, `${transactionPath}/timelineEvents`), {
+            batch.set(doc(collection(firestore, `${transactionPath}/timelineEvents`)), {
                 type: 'log',
-                content: `قام ${currentUser.fullName} بالتراجع عن إغلاق مرحلة: **${stage.name}**. عادت المرحلة قيد التنفيذ.`,
+                content: `قام ${currentUser.fullName} بالتراجع عن إغلاق مرحلة: **${stage.name}**. عادت المرحلة قيد التنفيذ، وتم إرجاع المراحل اللاحقة لوضع الانتظار لضمان سلامة التسلسل.`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 createdAt: serverTimestamp(),
                 companyId: tenantId
             });
 
-            toast({ title: 'تم التراجع', description: 'عادت المرحلة لوضع التنفيذ لضمان سلامة السجل.' });
+            await batch.commit();
+            toast({ title: 'تم التراجع وتطهير المسار', description: 'عادت المرحلة لوضع التنفيذ وأُغلق المسار اللاحق مؤقتاً.' });
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ في التراجع' });
         } finally { setIsProcessing(false); }
   };
 
@@ -459,25 +498,27 @@ export default function TransactionDetailPage() {
                             const expectedDate = toFirestoreDate(stage.expectedEndDate);
                             const isDelayed = stage.status === 'in-progress' && expectedDate && expectedDate < new Date();
                             
+                            // 🛡️ منطق التحقق من التسلسل الصارم (Strict Sequence Shield) 🛡️
+                            // المرحلة تكون متاحة فقط إذا كانت الأولى أو إذا كانت المرحلة التي تسبقها "مكتملة" فعلياً.
                             const isPredecessorCompleted = idx === 0 || 
-                                transaction.stages?.some(s => s.status === 'completed' && s.nextStageIds?.includes(stage.stageId)) || 
-                                (idx > 0 && transaction.stages![idx-1].status === 'completed');
+                                (transaction.stages![idx-1].status === 'completed');
                             
-                            const isBlocked = !isPredecessorCompleted && stage.status === 'pending';
+                            // المرحلة تكون مقفلة (Blocked) إذا لم تكتمل سابقتها أو إذا كانت تتبع مسار تشعبي لم ينتهي بعد.
+                            const isBlocked = !isPredecessorCompleted;
 
                             return (
                                 <div key={stage.stageId} className={cn(
                                     "flex flex-col sm:flex-row items-center justify-between p-6 border-2 border-transparent rounded-[2.5rem] transition-all relative overflow-hidden group",
                                     stage.status === 'in-progress' ? "bg-blue-50/40 border-blue-200 ring-2 ring-primary/5 shadow-lg" : "bg-muted/20 hover:bg-white hover:border-primary/20",
                                     stage.status === 'completed' && "bg-green-50/20 opacity-80",
-                                    isBlocked && "opacity-40 grayscale pointer-events-none"
+                                    isBlocked && stage.status === 'pending' && "opacity-40 grayscale pointer-events-none"
                                 )}>
                                     <div className="flex items-center gap-6">
                                         <Badge variant="outline" className={cn(
                                             "w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2 shadow-sm", 
                                             stageStatusColors[stage.status]
                                         )}>
-                                            {isBlocked ? 'بانتظار سابقتها' : stageStatusTranslations[stage.status]}
+                                            {isBlocked && stage.status === 'pending' ? 'بانتظار سابقتها' : stageStatusTranslations[stage.status]}
                                         </Badge>
                                         
                                         <div className="space-y-1">
@@ -513,13 +554,13 @@ export default function TransactionDetailPage() {
                                                     sourceSubId={stage.stageId}
                                                 />
 
-                                                {stage.status === 'pending' && isPredecessorCompleted && (
+                                                {stage.status === 'pending' && !isBlocked && (
                                                     <Button size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'start')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-8 bg-orange-600 hover:bg-orange-700 text-white shadow-xl shadow-orange-100">
                                                         <Play className="ml-2 h-4 w-4"/> بدء العمل
                                                     </Button>
                                                 )}
                                                 
-                                                {stage.status === 'in-progress' && (
+                                                {stage.status === 'in-progress' && !isBlocked && (
                                                     <>
                                                         {(stage.trackingType === 'occurrence' || stage.trackingType === 'hybrid') && (
                                                             <Button variant="outline" size="sm" onClick={() => openActionDialog(stage.stageId, stage.name, 'modify')} disabled={isProcessing} className="rounded-2xl font-black text-xs h-11 px-6 border-orange-200 text-orange-700 hover:bg-orange-50 gap-2">
@@ -531,6 +572,14 @@ export default function TransactionDetailPage() {
                                                         </Button>
                                                     </>
                                                 )}
+
+                                                {/* 🛡️ تنبيه القفل بسبب انكسار التسلسل 🛡️ */}
+                                                {stage.status === 'in-progress' && isBlocked && (
+                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 font-black gap-1 h-11 px-4 rounded-xl">
+                                                        <Lock className="h-4 w-4" /> تراجع عن السابقة أولاً
+                                                    </Badge>
+                                                )}
+
                                                 {stage.status === 'completed' && isAdmin && (
                                                     <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="h-9 w-9 rounded-xl text-orange-400 hover:text-orange-600" title="تراجع">
                                                         <Undo2 className="h-5 w-5" />
@@ -565,7 +614,7 @@ export default function TransactionDetailPage() {
                         <div className="p-20 text-center border-4 border-dashed rounded-[3.5rem] bg-muted/5 space-y-6">
                             <Package className="h-16 w-16 mx-auto opacity-30" />
                             <p className="text-xl font-black text-slate-400">لا يوجد جدول كميات مرتبط.</p>
-                            {!isLocked && <Button asChild className="rounded-2xl font-black px-12 h-12 shadow-xl shadow-primary/20"><Link href={`/dashboard/construction/boq/new?projectId=${transaction.id}&clientId=${clientId}`}>إنشاء مقايسة جديدة +</Link></Button>}
+                            {!isLocked && <Button asChild className="rounded-2xl font-black px-12 h-12 shadow-xl shadow-primary/20"><Link href={`/dashboard/construction/boq/new?projectId={transaction.id}&clientId=${clientId}`}>إنشاء مقايسة جديدة +</Link></Button>}
                         </div>
                     )}
                 </Card>
