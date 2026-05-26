@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -42,8 +43,6 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { 
     Pencil, 
     User, 
@@ -161,18 +160,20 @@ export default function ClientProfilePage() {
     ['Admin', 'Accountant', 'HR', 'Secretary', 'Developer'].includes(currentUser?.role || '')
   , [currentUser?.role]);
 
+  // 🛡️ التعديل الجوهري: استخدام Collection Group للبحث عن المعاملات في كافة المسارات (القديمة والجديدة) 🛡️
   const txQuery = useMemo(() => {
-    const base = [orderBy('createdAt', 'desc')];
+    const base = [where('clientId', '==', id), orderBy('createdAt', 'desc')];
     if (!isPrivileged && currentUser?.employeeId) {
         base.push(where('assignedEngineerId', '==', currentUser.employeeId));
     }
     return base;
-  }, [isPrivileged, currentUser?.employeeId]);
+  }, [id, isPrivileged, currentUser?.employeeId]);
 
   const { data: transactions, loading: transactionsLoading } = useSubscription<ClientTransaction>(
       firestore, 
-      id ? `clients/${id}/transactions` : null, 
-      txQuery
+      'transactions', 
+      txQuery,
+      true // استخدام البحث المجمع (Collection Group) لضمان ظهور البيانات القديمة
   );
 
   const qQuery = useMemo(() => [where('clientId', '==', id)], [id]);
@@ -192,23 +193,30 @@ export default function ClientProfilePage() {
     if (!firestore || !tenantId || !tx.id || !id) return;
     setIsProcessing(true);
     const newStatus = tx.status === 'on-hold' ? 'new' : 'on-hold';
-    const docPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId);
+    
+    // محاولة تحديد المسار الصحيح للمستند (دعم المسارين)
+    let finalPath = getTenantPath(`transactions/${tx.id}`, tenantId);
     try {
-        await updateDoc(doc(firestore, docPath!), { 
+        const checkRef = doc(firestore, finalPath!);
+        const snap = await getDoc(checkRef);
+        if (!snap.exists()) {
+            finalPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId);
+        }
+
+        await updateDoc(doc(firestore, finalPath!), { 
             status: newStatus,
             updatedAt: serverTimestamp() 
         });
         toast({ title: '✅ تم حفظ المعلومات', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
     } catch (e: any) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: docPath!,
+            path: finalPath!,
             operation: 'update',
             requestResourceData: { status: newStatus }
         }));
     } finally { setIsProcessing(false); }
   };
 
-  // 🛡️ دالة حذف عرض السعر (The Missing Reference V100) 🛡️
   const handleConfirmDeleteQuotation = async () => {
     if (!quotationToDelete || !firestore || !tenantId) return;
     setIsProcessing(true);
@@ -240,9 +248,16 @@ export default function ClientProfilePage() {
     if (!firestore || !tenantId || !transactionToCancel?.id || !id || !currentUser) return;
     setIsProcessing(true);
     
-    const finalTxPath = getTenantPath(`clients/${id}/transactions/${transactionToCancel.id}`, tenantId)!;
+    // محاولة العثور على المسار الصحيح
+    let finalTxPath = getTenantPath(`transactions/${transactionToCancel.id}`, tenantId)!;
 
     try {
+        const checkRef = doc(firestore, finalTxPath);
+        const snap = await getDoc(checkRef);
+        if (!snap.exists()) {
+            finalTxPath = getTenantPath(`clients/${id}/transactions/${transactionToCancel.id}`, tenantId)!;
+        }
+
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             
@@ -324,8 +339,14 @@ export default function ClientProfilePage() {
   const handleConfirmDeleteTransaction = async () => {
     if (!firestore || !tenantId || !transactionToDelete?.id || !id) return;
     setIsProcessing(true);
-    const docPath = getTenantPath(`clients/${id}/transactions/${transactionToDelete.id}`, tenantId);
+    let docPath = getTenantPath(`transactions/${transactionToDelete.id}`, tenantId);
     try {
+        const checkRef = doc(firestore, docPath!);
+        const snap = await getDoc(checkRef);
+        if (!snap.exists()) {
+            docPath = getTenantPath(`clients/${id}/transactions/${transactionToDelete.id}`, tenantId);
+        }
+
         await deleteDoc(doc(firestore, docPath!));
         
         const historyPath = getTenantPath(`clients/${id}/history`, tenantId);
@@ -339,7 +360,7 @@ export default function ClientProfilePage() {
             companyId: tenantId
         });
 
-        toast({ title: '✅ تم حفظ المعلومات', description: 'تم مسح سجل المعاملة نهائياً.' });
+        toast({ title: '✅ تم حذف المعاملة' });
     } catch (e: any) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: docPath!,

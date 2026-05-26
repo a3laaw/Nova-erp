@@ -4,7 +4,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات الموحدة (V132.0 - Sovereign Master Edition)
+    // 🛡️ مصفوفة الصلاحيات الموحدة (V133.0 - Sovereign Master Edition)
     
     function isAuthenticated() {
       return request.auth != null;
@@ -40,13 +40,14 @@ service cloud.firestore {
       allow read: if isDeveloper() || isTenantMember(companyId);
       allow write: if isDeveloper() || isTenantMember(companyId);
       
-      // 🛡️ حماية المعاملات (Transactions Visibility) 🛡️
+      // 🛡️ حماية المعاملات (Transactions Visibility V101) 🛡️
+      // السماح بالوصول للمعاملات في المسار المسطح (Flat Collection)
       match /transactions/{txId} {
         allow read: if isDeveloper() || (isTenantMember(companyId) && (isPrivilegedRole() || resource.data.assignedEngineerId == request.auth.token.employeeId));
         allow write: if isDeveloper() || (isTenantMember(companyId) && isPrivilegedRole());
       }
 
-      // حماية المعاملات داخل ملف العميل (Nested Paths)
+      // حماية المعاملات داخل ملف العميل (Old Nested Path)
       match /clients/{clientId}/transactions/{txId} {
         allow read: if isDeveloper() || (isTenantMember(companyId) && (isPrivilegedRole() || resource.data.assignedEngineerId == request.auth.token.employeeId));
         allow write: if isDeveloper() || (isTenantMember(companyId) && isPrivilegedRole());

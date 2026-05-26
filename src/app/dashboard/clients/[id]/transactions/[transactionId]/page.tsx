@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -84,7 +85,25 @@ export default function TransactionDetailPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionNote, setActionNote] = useState('');
 
-  const transactionPath = useMemo(() => (firestore && clientId && transactionId && tenantId ? getTenantPath(`clients/${clientId}/transactions/${transactionId}`, tenantId) : null), [firestore, clientId, transactionId, tenantId]);
+  // 🛡️ التعديل الجوهري V101: البحث عن المعاملة في المسار المسطح (الرئيسي) والمسار القديم 🛡️
+  const [transactionPath, setTransactionPath] = useState<string | null>(null);
+  
+  useEffect(() => {
+      if (!firestore || !tenantId || !clientId || !transactionId) return;
+      const findCorrectPath = async () => {
+          const flatPath = getTenantPath(`transactions/${transactionId}`, tenantId)!;
+          const nestedPath = getTenantPath(`clients/${clientId}/transactions/${transactionId}`, tenantId)!;
+          
+          const flatSnap = await getDoc(doc(firestore, flatPath));
+          if (flatSnap.exists()) {
+              setTransactionPath(flatPath);
+          } else {
+              setTransactionPath(nestedPath);
+          }
+      };
+      findCorrectPath();
+  }, [firestore, tenantId, clientId, transactionId]);
+
   const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(firestore, transactionPath);
   
   const clientPath = useMemo(() => (firestore && clientId && tenantId ? getTenantPath(`clients/${clientId}`, tenantId) : null), [firestore, clientId, tenantId]);
@@ -183,7 +202,7 @@ export default function TransactionDetailPage() {
             }
 
             await batch.commit();
-            toast({ title: 'تم حفظ المعلومات' });
+            toast({ title: '✅ تم حفظ المعلومات' });
             setActionNote('');
         } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsProcessing(false); }
   };
@@ -206,7 +225,7 @@ export default function TransactionDetailPage() {
             });
 
             await updateDoc(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
-            toast({ title: 'تم التراجع عن الإنجاز' });
+            toast({ title: '✅ تم التراجع عن الإنجاز' });
         } finally { setIsProcessing(false); }
   };
 
@@ -229,7 +248,7 @@ export default function TransactionDetailPage() {
                         <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
                         <CardDescription className="text-base font-medium">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline font-bold'>{client?.nameAr || '...'}</Link></CardDescription>
                     </div>
-                    <Badge variant="outline" className="px-6 py-1.5 rounded-full font-black text-sm border-2">{transaction.status}</Badge>
+                    <Badge variant="outline" className="px-6 py-1.5 rounded-full font-black text-sm border-2">{statusTranslations[transaction.status]}</Badge>
                 </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10 bg-white">

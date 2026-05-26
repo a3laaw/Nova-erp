@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -118,9 +119,9 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const selectedSub = subServices.find(s => s.id === selectedSubServiceId);
 
-            // 🛡️ محرك التسمية المتسلسلة (Unique Index Engine V88.0): منع تكرار الأسماء المتشابهة 🛡️
-            const txsPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
-            const existingSnap = await getDocs(query(collection(firestore, txsPath!), where('transactionType', '>=', transactionTypeName), where('transactionType', '<=', transactionTypeName + '\uf8ff')));
+            // 🛡️ التعديل السيادي (V101.0): استخدام الـ Flat Collection لضمان الرؤية المركزية 🛡️
+            const txsPath = getTenantPath(`transactions`, tenantId);
+            const existingSnap = await getDocs(query(collection(firestore, txsPath!), where('clientId', '==', clientId), where('transactionType', '>=', transactionTypeName), where('transactionType', '<=', transactionTypeName + '\uf8ff')));
             const sameTypeCount = existingSnap.docs.filter(d => d.data().transactionType.startsWith(transactionTypeName)).length;
             
             const finalTypeName = sameTypeCount > 0 
@@ -171,6 +172,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 companyId: tenantId
             }));
 
+            // 🛡️ المزامنة اللغوية السيادية V101 🛡️
             const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
                 type: 'log', 
@@ -182,7 +184,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             });
 
             await batch.commit();
-            toast({ title: 'تم فتح المسار الفني' });
+            toast({ title: '✅ تم فتح المسار الفني' });
             onClose();
             router.refresh();
 
@@ -243,7 +245,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                         </div>
                         <div className="grid gap-2">
                             <Label className="font-black">ملاحظات إضافية</Label>
-                            <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="أدخل أي تفاصيل..." rows={2} />
+                            <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="أدخل أي تفاصيل..." rows={2} className="rounded-2xl" />
                         </div>
                     </div>
                     <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
