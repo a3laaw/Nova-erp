@@ -46,10 +46,10 @@ import { MentionTextarea } from '@/components/ui/mention-textarea';
 import { createNotification } from '@/services/notification-service';
 
 /**
- * منصة الإنتاجية السيادية (Productivity Platform V127.0):
+ * منصة الإنتاجية السيادية (Productivity Platform V128.0):
  * - تم تفعيل نظام التنبيهات للمنشن في المذكرات البينية.
  * - محرك المنشن يعمل الآن بتقنية الـ Portal لمنع الاختفاء داخل النوافذ.
- * - تحصين النوافذ لمنع التداخل مع القائمة العائمة للمنشن.
+ * - تحصين النوافذ لمنع التداخل مع القائمة العائمة للمنشن عبر onInteractOutside.
  */
 function ProductivityContent() {
     const { firestore } = useFirebase();
@@ -623,7 +623,16 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+            <DialogContent 
+                dir="rtl" 
+                className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white"
+                onInteractOutside={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[data-inline-search-list-options]')) {
+                        e.preventDefault();
+                    }
+                }}
+            >
                 <DialogHeader className="p-8 bg-primary/5 border-b">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">

@@ -19,9 +19,9 @@ interface MentionTextareaProps extends React.ComponentProps<typeof Textarea> {
 }
 
 /**
- * محرك المنشن السيادي العابر للطبقات (Sovereign Portal Mention Engine V127.0):
- * - تم تفعيل نظام الـ Portal للظهور فوق كافة النوافذ المنبثقة.
- * - تحصين عملية الاختيار عبر onPointerDown لمنع إغلاق القائمة قبل حقن البيانات.
+ * محرك المنشن السيادي العابر للطبقات (Sovereign Portal Mention Engine V128.0):
+ * - تم فرض pointer-events: auto لضمان الاستجابة المطلقة داخل النوافذ المنبثقة.
+ * - استخدام onMouseDown لمنع فقدان التركيز (Blur) قبل اكتمال عملية الحقن.
  */
 export function MentionTextarea({ value, onValueChange, className, ...props }: MentionTextareaProps) {
   const { firestore } = useFirebase();
@@ -133,7 +133,7 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
     onValueChange(newValue);
     setShowMentions(false);
     
-    // إعادة التركيز وتحديد موقع القلم بعد الحقن
+    // إعادة التركيز وتحديد موقع القلم بعد الحقن لضمان استمرارية الكتابة
     setTimeout(() => {
         if (textareaRef.current) {
             textareaRef.current.focus();
@@ -155,9 +155,11 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
             bottom: menuPosition.openUpwards ? `${window.innerHeight - menuPosition.top}px` : 'auto',
             left: `${menuPosition.left}px`,
             width: `${menuPosition.width}px`,
-            zIndex: 999999999, // سيادة مطلقة فوق أي نافذة منبثقة
+            zIndex: 999999999, // سيادة بصرية مطلقة
+            pointerEvents: 'auto' // 🛡️ ضمان استجابة الماوس حتى داخل الـ Modals 🛡️
         }}
         dir="rtl"
+        data-radix-popover-content="" // لتفعيل القواعد العامة في globals.css
         data-inline-search-list-options="true"
     >
       <div className="p-4 bg-primary/5 border-b flex items-center justify-between">
@@ -175,8 +177,8 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
             <button
               key={user.id}
               type="button"
-              // 🛡️ استخدام onPointerDown مع preventDefault هو "المفتاح" لمنع إغلاق القائمة قبل الاختيار 🛡️
-              onPointerDown={(e) => { 
+              // 🛡️ استخدام onMouseDown مع منع Blur لضمان الحقن قبل إغلاق القائمة 🛡️
+              onMouseDown={(e) => { 
                 e.preventDefault(); 
                 e.stopPropagation();
                 selectUser(user); 
