@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, Suspense } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { where, doc, updateDoc, serverTimestamp, deleteDoc, type QueryConstraint, Timestamp, collection, addDoc } from 'firebase/firestore';
+import { where, doc, updateDoc, serverTimestamp, deleteDoc, type QueryConstraint, Timestamp, collection, addDoc, writeBatch } from 'firebase/firestore';
 import type { UserProductivityItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,8 +34,8 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '../ui/skeleton';
+import { Separator } from '../ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -309,10 +310,6 @@ function TaskCard({ task, onEdit, onComplete }: { task: UserProductivityItem, on
     );
 }
 
-/**
- * 🛠️ نافذة إتمام المهمة (Shared Task Completion Dialog V112.0) 🛠️
- * تفرض التوثيق الإلزامي للمهام التشاركية لضمان ظهور تعليقات الطرفين في سجل المعاملة.
- */
 function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: () => void, task: UserProductivityItem }) {
     const { firestore } = useFirebase();
     const { user } = useAuth();
@@ -345,15 +342,14 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                 updatedAt: serverTimestamp()
             });
 
-            // 2. إذا كانت تشاركية ومرتبطة بمسار فني، حقن التعليق في المعاملة
-            if (isShared && task.sourceId && task.sourceModule) {
-                // محاولة استنتاج مسار المعاملة (بفرض أنها معاملة عميل)
+            // 2. إذا كانت تشاركية ومرتبطة بمسار فني ومعرف عميل، حقن التعليق في المعاملة
+            if (isShared && task.sourceId && task.sourceModule && task.clientId) {
                 const txPath = getTenantPath(`clients/${task.clientId}/transactions/${task.sourceId}`, tenantId);
                 const timelineRef = doc(collection(firestore, `${txPath}/timelineEvents`));
                 
                 batch.set(timelineRef, {
                     type: 'comment',
-                    content: `**[إتمام مهمة تشاركية]**\nأتم الزميل **${user?.fullName}** المهمة بعنوان: "${task.title}".\n\n**محضر الإنجاز:**\n${completionNote}`,
+                    content: `**[إتمام مهمة تشاركية]**\nأتم الزميل **${user?.fullName}** المهمة بعنوان: "${task.title}".\n\n**محضر الإنجاز الموثق:**\n${completionNote}`,
                     userId: user?.id,
                     userName: user?.fullName,
                     userAvatar: user?.avatarUrl,
@@ -466,12 +462,12 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
 
                 <div className="p-8 space-y-6">
                     <div className="grid gap-2">
-                        <Label className="font-black text-slate-400 text-[10px] uppercase pr-2">عنوان المهمة *</Label>
+                        <Label className="font-black text-slate-400 text-[10px] uppercase pr-1">عنوان المهمة *</Label>
                         <Input value={title} onChange={e => setTitle(e.target.value)} className="h-12 rounded-xl border-2 font-black text-black" />
                     </div>
 
                     <div className="grid gap-2">
-                        <Label className="font-black text-slate-400 text-[10px] uppercase pr-2">نوع الإجراء</Label>
+                        <Label className="font-black text-slate-400 text-[10px] uppercase pr-1">نوع الإجراء</Label>
                         <Select value={actionType} onValueChange={setActionType}>
                             <SelectTrigger className="h-11 rounded-xl border-2 font-bold">
                                 <SelectValue />
@@ -488,7 +484,7 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
                     </div>
 
                     <div className="grid gap-2">
-                        <Label className="font-black text-slate-400 text-[10px] uppercase pr-2">الموعد النهائي المحدث</Label>
+                        <Label className="font-black text-slate-400 text-[10px] uppercase pr-1">الموعد النهائي المحدث</Label>
                         <DateInput value={dueDate} onChange={setDueDate} className="h-11 rounded-xl border-2" />
                     </div>
                 </div>

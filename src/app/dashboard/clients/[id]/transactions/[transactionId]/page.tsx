@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -122,7 +123,6 @@ export default function TransactionDetailPage() {
   const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
   const isLocked = transaction?.status === 'cancelled' || transaction?.status === 'on-hold';
-  const isAdmin = ['Admin', 'HR', 'Developer', 'Accountant'].includes(currentUser?.role || '');
 
   useEffect(() => {
     if (!firestore || !tenantId) return;
@@ -166,7 +166,6 @@ export default function TransactionDetailPage() {
                 stage.endDate = Timestamp.fromDate(now);
                 logLabel = 'إتمام وإنجاز';
                 
-                // 1. منح نقاط XP للموظف عند الإنجاز
                 const userPath = getTenantPath(`users/${currentUser.id}`, tenantId);
                 const ledgerPath = getTenantPath(`points_ledger`, tenantId);
                 const userRef = doc(firestore, userPath!);
@@ -181,11 +180,13 @@ export default function TransactionDetailPage() {
                     companyId: tenantId
                 });
 
-                // 2. تفعيل المراحل التالية
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
                     nextStage.startDate = Timestamp.fromDate(now);
+                    if (nextStage.expectedDurationDays) {
+                        nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
+                    }
                 }
             }
 
@@ -230,6 +231,7 @@ export default function TransactionDetailPage() {
                             {!isLocked && (
                                 <UniversalActionTrigger 
                                     title={transaction.transactionType}
+                                    clientId={clientId} // 🛡️ تمرير معرف العميل
                                     sourceModule="المعاملات"
                                     sourceId={transaction.id!}
                                 />

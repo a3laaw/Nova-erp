@@ -12,6 +12,7 @@ export interface BaseEntity {
 
 export interface UserProductivityItem extends BaseEntity {
   userId: string;
+  clientId?: string; // 🛡️ الرابط السيادي بالعميل لضمان التوثيق المتبادل
   entryType: 'task' | 'bookmark';
   title: string;
   actionType?: 'review' | 'decision' | 'design' | 'redesign' | 'meeting' | 'general';
@@ -20,6 +21,7 @@ export interface UserProductivityItem extends BaseEntity {
   startDate?: Timestamp | any;
   dueDate?: Timestamp | any;
   completedAt?: Timestamp | any;
+  completionNote?: string;
   sourceModule: string;
   sourceId: string;
   sourceSubId?: string;

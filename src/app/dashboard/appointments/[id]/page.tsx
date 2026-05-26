@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -130,7 +131,6 @@ export default function AppointmentDetailsPage() {
                 stage.endDate = Timestamp.fromDate(now);
                 logLabel = 'إغلاق المرحلة ميدانياً';
 
-                // 1. منح نقاط XP للموظف عند الإنجاز من الزيارة
                 const userPath = getTenantPath(`users/${currentUser.id}`, tenantId);
                 const ledgerPath = getTenantPath(`points_ledger`, tenantId);
                 batch.update(doc(firestore, userPath!), { totalPoints: increment(10) });
@@ -226,11 +226,14 @@ export default function AppointmentDetailsPage() {
                         <div className="space-y-1">
                             <div className="flex items-center gap-3">
                                 <CardTitle className="text-2xl font-black">{appointment.clientName}</CardTitle>
-                                <UniversalActionTrigger 
-                                    title={appointment.clientName}
-                                    sourceModule="المواعيد"
-                                    sourceId={appointment.id!}
-                                />
+                                {appointment.clientId && (
+                                    <UniversalActionTrigger 
+                                        title={appointment.clientName}
+                                        clientId={appointment.clientId} // 🛡️ تمرير المعرف
+                                        sourceModule="المواعيد"
+                                        sourceId={appointment.id!}
+                                    />
+                                )}
                             </div>
                             <CardDescription className="font-bold flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-primary" /> {apptDate ? format(apptDate, 'eeee, dd MMMM HH:mm', { locale: ar }) : '-'}

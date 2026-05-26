@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -34,19 +35,14 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface UniversalActionTriggerProps {
     title: string;
+    clientId: string; // 🛡️ فرض معرف العميل بشكل إلزامي لضمان التوثيق المتبادل
     sourceModule: string;
     sourceId: string;
     sourceSubId?: string;
     subItemName?: string;
 }
 
-/**
- * محرك الإجراءات الموحد (Universal Action Trigger V111.0):
- * - تفعيل نظام "المشاركة مع زميل" لجدولة المهام المتبادلة.
- * - إرسال تنبيهات تشاركية فورية.
- * - ربط "المسار الفني" تلقائياً بالجدول الشخصي.
- */
-export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSubId, subItemName }: UniversalActionTriggerProps) {
+export function UniversalActionTrigger({ title, clientId, sourceModule, sourceId, sourceSubId, subItemName }: UniversalActionTriggerProps) {
     const { user: currentUser } = useAuth();
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -60,7 +56,6 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
 
     const tenantId = currentUser?.currentCompanyId;
 
-    // جلب الموظفين لتمكين المشاركة التشاركية
     const { data: allUsers = [], loading: usersLoading } = useSubscription<UserProfile>(
         firestore, 
         tenantId ? 'users' : null
@@ -77,6 +72,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
             const service = new ProductivityService(firestore, tenantId);
             await service.createItem({
                 userId: currentUser!.id,
+                clientId: clientId, // 🛡️ ربط العميل
                 entryType: 'bookmark',
                 title: subItemName ? `${title} - ${subItemName}` : title,
                 sourceModule,
@@ -98,6 +94,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
             // 1. إنشاء المهمة لنفسي
             await service.createItem({
                 userId: currentUser.id,
+                clientId: clientId, // 🛡️ حقن معرف العميل للتوثيق اللاحق
                 entryType: 'task',
                 title: taskTitle,
                 actionType: actionType as any,
@@ -115,7 +112,6 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                 const taskPath = getTenantPath('userProductivity', tenantId);
 
                 for (const targetId of assignedUserIds) {
-                    // إرسال تنبيه
                     await addDoc(collection(firestore, notifPath!), cleanFirestoreData({
                         userId: targetId,
                         title: '📍 مهمة عمل تشاركية',
@@ -126,9 +122,9 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                         companyId: tenantId
                     }));
 
-                    // إنشاء المهمة في جدول الزميل
                     await addDoc(collection(firestore, taskPath!), cleanFirestoreData({
                         userId: targetId,
+                        clientId: clientId, // 🛡️ حقن معرف العميل للزميل أيضاً
                         entryType: 'task',
                         title: taskTitle,
                         actionType: actionType as any,
@@ -191,7 +187,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
 
                         <div className="grid grid-cols-2 gap-6">
                             <div className="grid gap-2">
-                                <Label className="font-black text-gray-700 pr-1">نوع الإجراء المطلوبة</Label>
+                                <Label className="font-black text-gray-700 pr-1">نوع الإجراء المطلوب</Label>
                                 <Select value={actionType} onValueChange={setActionType}>
                                     <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger>
                                     <SelectContent dir="rtl">
