@@ -256,17 +256,15 @@ export default function TransactionDetailPage() {
   };
 
   /**
-   * 🛡️ محرك التراجع السيادي المتسلسل (Sovereign Sequential Rollback V139.0) 🛡️
-   * - يمنع التراجع إلا عن آخر مرحلة مكتملة لضمان سلامة المسار.
-   * - يقوم بتصفير كافة المراحل اللاحقة (Reset Subsequent to Pending).
-   * - يسحب المطالبات المالية المرتبطة بالعقد.
+   * 🛡️ محرك التراجع السيادي المتسلسل (Sovereign Sequential Rollback V141.0) 🛡️
+   * - تم تحصينه ليقوم بالتصفير القسري لكافة المراحل اللاحقة (Forced Cascade Reset).
+   * - لا يسمح بوجود أكثر من مرحلة نشطة في آن واحد.
    */
   const handleUndoStage = async (stageId: string) => {
     if (!firestore || !transaction || !transactionPath || !tenantId || isLocked) return;
     
     const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
     const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
-    const stage = currentStages[stageIndex];
     
     // 🛡️ درع التحقق من التسلسل العكسي 🛡️
     const hasLaterCompletedStage = currentStages.some((s, idx) => idx > stageIndex && s.status === 'completed');
@@ -283,17 +281,18 @@ export default function TransactionDetailPage() {
     try {
         const batch = writeBatch(firestore);
         
-        // 1. إعادة المرحلة الحالية لـ قيد التنفيذ
-        stage.status = 'in-progress';
-        stage.endDate = null;
-
-        // 2. 🛡️ تصفير كافة المراحل اللاحقة (Cascade Reset) لضمان مسار واحد نشط 🛡️
-        for (let i = stageIndex + 1; i < currentStages.length; i++) {
-            currentStages[i].status = 'pending';
-            currentStages[i].startDate = null;
+        // 🛡️ التصفير القسري للمستقبل (The Cascade Eraser) 🛡️
+        // نقوم بإعادة المرحلة الحالية لـ "قيد التنفيذ" وكافة اللاحق لـ "بانتظار البدء"
+        for (let i = stageIndex; i < currentStages.length; i++) {
+            currentStages[i].status = i === stageIndex ? 'in-progress' : 'pending';
             currentStages[i].endDate = null;
-            currentStages[i].expectedEndDate = null;
+            if (i > stageIndex) {
+                currentStages[i].startDate = null;
+                currentStages[i].expectedEndDate = null;
+            }
         }
+
+        const stage = currentStages[stageIndex];
 
         // 3. التراجع المالي والرقابي
         const appsPath = getTenantPath('payment_applications', tenantId);
@@ -331,7 +330,7 @@ export default function TransactionDetailPage() {
         const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
         batch.set(timelineRef, {
             type: 'comment',
-            content: `**[تراجع تقني ومالي متسلسل]**\nتم التراجع عن إغلاق مرحلة **"${stage.name}"**.\n\n• تمت إعادة المرحلة لحالة قيد التنفيذ.\n• تم تصفير كافة المراحل اللاحقة لضمان سلامة المسار.\n• تم إلغاء المطالبة المالية المرتبطة وتصفير استحقاق العقد.`,
+            content: `**[تراجع تقني ومالي متسلسل وقسري]**\nتم التراجع عن إغلاق مرحلة **"${stage.name}"**.\n\n• تمت إعادة المرحلة لحالة قيد التنفيذ.\n• تم تصفير كافة المراحل اللاحقة قسرياً لضمان سلامة المسار.\n• تم إلغاء المطالبة المالية المرتبطة وتصفير استحقاق العقد.`,
             userId: currentUser?.id,
             userName: currentUser?.fullName,
             userAvatar: currentUser?.avatarUrl,
@@ -340,7 +339,7 @@ export default function TransactionDetailPage() {
         });
 
         await batch.commit();
-        toast({ title: '✅ تم التراجع التقني والمالي المتسلسل' });
+        toast({ title: '✅ تم التراجع والتصفير المتسلسل' });
     } catch (e) { 
         console.error(e);
         toast({ variant: 'destructive', title: 'خطأ في التراجع' }); 
@@ -410,13 +409,16 @@ export default function TransactionDetailPage() {
                         {(transaction.stages || []).map((stage, idx) => {
                             const isCompleted = stage.status === 'completed';
                             const isCurrent = stage.status === 'in-progress';
+                            const isPending = stage.status === 'pending';
+                            
+                            // 🛡️ قانون التتابع الميداني الصارم 🛡️
+                            // المرحلة تكون متاحة للفعل فقط إذا كانت الأولى أو السابقة لها مكتملة
                             const isLockedRow = idx > 0 && transaction.stages![idx-1].status !== 'completed';
+                            
                             const isActionActive = activeAction?.stageId === stage.stageId;
 
                             // 🛡️ درع التراجع السيادي: لا يسمح بالتراجع إلا عن آخر مرحلة مكتملة 🛡️
                             const isLastCompleted = isCompleted && !transaction.stages!.some((s, sIdx) => s.status === 'completed' && sIdx > idx);
-
-                            if (isLockedRow && !isCurrent) return null;
 
                             return (
                                 <div key={stage.stageId} className={cn(
@@ -466,7 +468,7 @@ export default function TransactionDetailPage() {
                                                     <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'complete' })} className="h-12 px-8 rounded-2xl font-black text-xs gap-2 bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-100"><CheckCircle2 className="h-4 w-4" /> إنهاء المرحلة</Button>
                                                 </div>
                                             )}
-                                            {stage.status === 'pending' && !isActionActive && !isLocked && (
+                                            {isPending && !isLockedRow && !isActionActive && !isLocked && (
                                                 <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'start' })} className="h-12 px-10 rounded-2xl font-black gap-3 shadow-xl"><Play className="h-4 w-4" /> بدء العمل</Button>
                                             )}
                                             {isCompleted && (
