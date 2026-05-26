@@ -40,7 +40,7 @@ interface UniversalActionTriggerProps {
 }
 
 /**
- * محرك الإجراءات الموحد (Universal Action Trigger V89.0):
+ * محرك الإجراءات الموحد (Universal Action Trigger V91.0):
  * تم تفعيل خاصية "المشاركة الجماعية"؛ حيث يتم إرسال تنبيهات فورية وجدولة المهام للزملاء المشاركين.
  */
 export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSubId, subItemName }: UniversalActionTriggerProps) {
@@ -81,7 +81,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                 sourceSubId,
                 sourceUrl: window.location.pathname,
             });
-            toast({ title: 'تم حفظ المعلومات في المفضلة' });
+            toast({ title: '✅ تم الحفظ في المفضلة' });
         } finally { setIsSaving(false); }
     };
 
@@ -141,7 +141,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                 }
             }
 
-            toast({ title: 'تمت جدولة المهمة وإخطار الزملاء' });
+            toast({ title: '✅ تمت جدولة المهمة وإخطار الزملاء' });
             setIsTaskDialogOpen(false);
             setAssignedUserIds([]);
         } catch (e) {
@@ -174,7 +174,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><CheckCircle2 className="h-6 w-6"/></div>
                             <div>
-                                <DialogTitle className="text-2xl font-black text-[#1e1b4b]">جدولة مهمة تشاركية</DialogTitle>
+                                <DialogTitle className="text-xl font-black text-[#1e1b4b]">جدولة مهمة تشاركية</DialogTitle>
                                 <DialogDescription className="font-bold text-slate-500">سيتم إرسال تنبيه فوري للزملاء المشاركين وجدولة المهمة لديهم.</DialogDescription>
                             </div>
                         </div>

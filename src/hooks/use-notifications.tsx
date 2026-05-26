@@ -9,7 +9,7 @@ import type { Notification } from '@/lib/types';
 import { toFirestoreDate } from '@/services/date-converter';
 
 /**
- * خطاف جلب التنبيهات (Sovereign Alerts Hook V89.0): 
+ * خطاف جلب التنبيهات (Sovereign Alerts Hook V91.0): 
  * تم تحصين الفرز الزمني لضمان ظهور التنبيهات الجديدة في القمة آلياً.
  */
 export function useNotifications() {
@@ -21,7 +21,7 @@ export function useNotifications() {
         if (authLoading || !user?.id) return null;
         return [
             where('userId', '==', user.id),
-            orderBy('createdAt', 'desc') // جلب الأحدث أولاً من المصدر
+            orderBy('createdAt', 'desc') 
         ];
     }, [user?.id, authLoading]);
     
@@ -31,16 +31,13 @@ export function useNotifications() {
         queryConstraints || []
     );
     
-    // 🛡️ حماية إضافية للفرز في المتصفح لضمان دقة العرض 🛡️
+    // 🛡️ فرز إضافي لضمان ظهور غير المقروء أولاً ثم الأحدث 🛡️
     const sortedNotifications = useMemo(() => {
         if (!notifications) return [];
         return [...notifications].sort((a, b) => {
-            // غير المقروء أولاً
             if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
-            
             const timeA = toFirestoreDate(a.createdAt)?.getTime() || 0;
             const timeB = toFirestoreDate(b.createdAt)?.getTime() || 0;
-            
             return timeB - timeA;
         });
     }, [notifications]);

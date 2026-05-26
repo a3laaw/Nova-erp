@@ -32,8 +32,8 @@ const formatDate = (dateValue: any) => {
 };
 
 /**
- * مكون التنبيهات السيادي (Sovereign Notification Hub):
- * تم تفعيله ليدعم القراءة الفورية والتوجيه المباشر للمعاملات والمهام.
+ * رادار الجرس المركزي (Sovereign Header Pulse V91.0):
+ * تفعيل التوجيه الفوري والتحديث اللحظي لحالة القراءة.
  */
 export function Notifications() {
   const { notifications, loading } = useNotifications();
@@ -67,7 +67,7 @@ export function Notifications() {
         <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full text-foreground hover:bg-primary/10 hover:text-primary transition-all group">
           <Bell className="h-5 w-5 group-hover:animate-swing" />
           {unreadCount > 0 && (
-            <Badge className="absolute top-0.5 right-0.5 h-4.5 w-4.5 justify-center p-0 bg-red-600 text-white border-2 border-white text-[8px] font-black animate-pulse">
+            <Badge className="absolute top-0.5 right-0.5 h-4 w-4 justify-center p-0 bg-red-600 text-white border-2 border-white text-[8px] font-black animate-pulse">
                 {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>
           )}
@@ -77,7 +77,7 @@ export function Notifications() {
       <DropdownMenuContent align="end" className="w-80 rounded-[2.2rem] p-2 shadow-2xl bg-white border-none mt-2" dir="rtl">
         <DropdownMenuLabel className="font-black text-[#1e1b4b] p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-[#FF7A00]" />
+              <Sparkles className="h-4 w-4 text-primary" />
               <span>نبض التنبيهات</span>
           </div>
           <Link href="/dashboard/notifications" className="text-[10px] font-bold text-primary hover:underline bg-primary/5 px-3 py-1 rounded-full">
@@ -88,7 +88,7 @@ export function Notifications() {
         <div className="max-h-[400px] overflow-y-auto scrollbar-none p-1">
             {loading && <div className="p-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></div>}
             {!loading && notifications.length === 0 && (
-            <div className="p-10 text-center text-xs font-bold text-muted-foreground italic opacity-40">صندوق الوارد نظيف.. لا توجد إشعارات.</div>
+            <div className="p-10 text-center text-xs font-bold text-muted-foreground italic opacity-40">الصندوق نظيف.. لا توجد إشعارات.</div>
             )}
             {!loading && notifications.slice(0, 15).map(notif => (
             <DropdownMenuItem 
