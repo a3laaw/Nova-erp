@@ -44,9 +44,9 @@ import { DateInput } from '@/components/ui/date-input';
 import { MentionTextarea } from '@/components/ui/mention-textarea';
 
 /**
- * منصة الإنتاجية السيادية (Productivity Platform V117.0):
- * - تفعيل محرك المنشن التفاعلي في فقاعة الإنجاز.
- * - تحصين الروابط السيادية لضمان التوثيق المتبادل.
+ * منصة الإنتاجية السيادية (Productivity Platform V118.0):
+ * - تم تصحيح مسارات الاستيراد (Skeleton, Separator) لضمان نجاح البناء.
+ * - تحصين محرك المنشن التفاعلي في فقاعات الإنجاز.
  */
 function ProductivityContent() {
     const { firestore } = useFirebase();
@@ -395,7 +395,6 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                                 <Sparkles className="h-2.5 w-2.5 fill-primary" /> جرب استخدام @ للمنشن
                             </Badge>
                         </div>
-                        {/* ✨ استخدام محرك المنشن الجديد هنا ✨ */}
                         <MentionTextarea 
                             autoFocus
                             value={completionNote} 

@@ -3,21 +3,23 @@
 import * as React from 'react';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Textarea } from './textarea';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
+import { useSubscription } from '@/hooks/use-subscription';
 import type { UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import { ScrollArea } from './scroll-area';
 import { AtSign, User } from 'lucide-react';
 import { Card } from './card';
+import { Badge } from './badge';
 
 interface MentionTextareaProps extends React.ComponentProps<typeof Textarea> {
   onValueChange: (value: string) => void;
 }
 
 /**
- * مكون مساحة النص مع المنشن الذكي (Sovereign Mention Engine V117.0):
- * - يظهر قائمة مستخدمين عائمة عند كتابة @.
+ * مكون مساحة النص مع المنشن الذكي (Sovereign Mention Engine V118.0):
+ * - تم تحصين الفلترة ضد القيم غير المعرفة (undefined) لمنع انهيار الواجهة.
  * - تباين عالٍ (أسود قاتم) للوضوح المطلق.
  */
 export function MentionTextarea({ value, onValueChange, className, ...props }: MentionTextareaProps) {
@@ -31,9 +33,12 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
   const { data: users = [] } = useSubscription<UserProfile>(firestore, 'users');
 
   const filteredUsers = useMemo(() => {
-    const queryStr = mentionQuery.toLowerCase();
-    return users
-      .filter(u => u.username.toLowerCase().includes(queryStr) || u.fullName?.toLowerCase().includes(queryStr))
+    const queryStr = (mentionQuery || '').toLowerCase();
+    return (users || [])
+      .filter(u => 
+        (u?.username?.toLowerCase() || '').includes(queryStr) || 
+        (u?.fullName?.toLowerCase() || '').includes(queryStr)
+      )
       .slice(0, 8);
   }, [users, mentionQuery]);
 
@@ -133,7 +138,7 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
                   <div className="relative">
                       <Avatar className="h-8 w-8 border-2 border-white shadow-sm">
                         <AvatarImage src={user.avatarUrl} className="object-cover" />
-                        <AvatarFallback className="bg-primary/10 text-primary font-black text-[10px]">{user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback className="bg-primary/10 text-primary font-black text-[10px]">{user.username?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
                       </Avatar>
                       {idx === selectedIndex && <div className="absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 bg-white rounded-full flex items-center justify-center shadow-sm"><div className="h-1.5 w-1.5 bg-primary rounded-full animate-pulse" /></div>}
                   </div>
@@ -150,5 +155,3 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
     </div>
   );
 }
-
-import { Badge } from './badge';
