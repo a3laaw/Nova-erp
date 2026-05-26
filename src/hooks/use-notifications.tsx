@@ -3,21 +3,26 @@
 import { useMemo } from 'react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { where, QueryConstraint } from 'firebase/firestore'; 
+import { where, QueryConstraint, orderBy } from 'firebase/firestore'; 
 import { useSubscription } from '@/hooks/use-subscription';
 import type { Notification } from '@/lib/types';
+import { toFirestoreDate } from '@/services/date-converter';
 
 /**
- * خطاف جلب التنبيهات: 
- * تم إصلاح خطأ التوقيت في الفرز لضمان ظهور الأحدث أولاً.
+ * خطاف جلب التنبيهات (Sovereign Alerts Hook V89.0): 
+ * تم تحصين الفرز الزمني لضمان ظهور التنبيهات الجديدة في القمة آلياً.
  */
 export function useNotifications() {
     const { firestore } = useFirebase();
     const { user, loading: authLoading } = useAuth();
 
+    // 🛡️ تصفية التنبيهات حسب معرّف المستخدم الحالي فقط 🛡️
     const queryConstraints = useMemo<QueryConstraint[] | null>(() => {
         if (authLoading || !user?.id) return null;
-        return [where('userId', '==', user.id)];
+        return [
+            where('userId', '==', user.id),
+            orderBy('createdAt', 'desc') // جلب الأحدث أولاً من المصدر
+        ];
     }, [user?.id, authLoading]);
     
     const { data: notifications, loading: notificationsLoading, error } = useSubscription<Notification>(
@@ -26,14 +31,15 @@ export function useNotifications() {
         queryConstraints || []
     );
     
+    // 🛡️ حماية إضافية للفرز في المتصفح لضمان دقة العرض 🛡️
     const sortedNotifications = useMemo(() => {
         if (!notifications) return [];
         return [...notifications].sort((a, b) => {
+            // غير المقروء أولاً
             if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
             
-            // 🛡️ التطهير: استخدام مراجع توقيت صحيحة لكل طرف
-            const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
-            const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
+            const timeA = toFirestoreDate(a.createdAt)?.getTime() || 0;
+            const timeB = toFirestoreDate(b.createdAt)?.getTime() || 0;
             
             return timeB - timeA;
         });
@@ -41,5 +47,9 @@ export function useNotifications() {
     
     const loading = authLoading || (queryConstraints !== null && notificationsLoading);
     
-    return { notifications: sortedNotifications, loading, error };
+    return { 
+        notifications: sortedNotifications, 
+        loading, 
+        error 
+    };
 }
