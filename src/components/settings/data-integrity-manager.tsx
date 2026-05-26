@@ -1,9 +1,8 @@
-
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button } from '../ui/button';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -21,11 +20,9 @@ import type { ClientTransaction, WorkStage, Employee, Client } from '@/lib/types
 import { 
     Loader2, 
     ShieldAlert, 
-    Sparkles, 
     RotateCcw, 
     UserX, 
     Trash2, 
-    AlertTriangle, 
     DatabaseZap,
     RefreshCw,
     Ban
@@ -40,6 +37,8 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 /**
  * 🛠️ محرك مزامنة المسارات الفنية (WBS Sync Engine)
@@ -55,6 +54,7 @@ function TechnicalWbsSyncTool() {
     const handleSyncWbsStructure = async () => {
         if (!firestore || !tenantId) return;
         setIsProcessing(true);
+        
         try {
             const stagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages'), where('companyId', '==', tenantId)));
             const masterStages = stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage));
@@ -96,14 +96,23 @@ function TechnicalWbsSyncTool() {
             });
 
             if (updateCount > 0) {
-                await batch.commit();
-                toast({ title: 'نجاح المزامنة العميقة', description: `تم تحديث ذكاء الـ WBS لـ ${updateCount} معاملة قديمة بنجاح.` });
+                batch.commit()
+                    .then(() => {
+                        toast({ title: 'نجاح المزامنة العميقة', description: `تم تحديث ذكاء الـ WBS لـ ${updateCount} معاملة قديمة بنجاح.` });
+                    })
+                    .catch(async (serverError) => {
+                        errorEmitter.emit('permission-error', new FirestorePermissionError({
+                            path: '[WBS_BATCH_SYNC]',
+                            operation: 'write'
+                        }));
+                    })
+                    .finally(() => setIsProcessing(false));
             } else {
                 toast({ title: 'البيانات محدثة', description: 'كافة المعاملات تتبع القواعد الحالية للقوائم المرجعية.' });
+                setIsProcessing(false);
             }
         } catch (e: any) {
             toast({ variant: 'destructive', title: 'فشل المزامنة', description: e.message });
-        } finally {
             setIsProcessing(false);
         }
     };
@@ -165,17 +174,32 @@ function UniversalDataPurgeTool() {
             // 1. مسح المجموعات المسطحة (Collections)
             for (const collName of collectionsToPurge) {
                 const collPath = getTenantPath(collName, tenantId);
-                const snap = await getDocs(collection(firestore, collPath!));
+                if (!collPath) continue;
+
+                const snap = await getDocs(collection(firestore, collPath));
                 const batch = writeBatch(firestore);
                 snap.forEach(d => batch.delete(d.ref));
-                await batch.commit();
+                
+                batch.commit()
+                    .catch(async (serverError) => {
+                        errorEmitter.emit('permission-error', new FirestorePermissionError({
+                            path: collPath,
+                            operation: 'delete'
+                        } satisfies SecurityRuleContext));
+                    });
             }
 
             // 2. مسح المعاملات (Nested Subcollections) عبر الـ Collection Group
             const txsSnap = await getDocs(query(collectionGroup(firestore, 'transactions'), where('companyId', '==', tenantId)));
             const txBatch = writeBatch(firestore);
             txsSnap.forEach(d => txBatch.delete(d.ref));
-            await txBatch.commit();
+            txBatch.commit()
+                .catch(async (serverError) => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: '[TRANSACTIONS_GROUP_PURGE]',
+                        operation: 'delete'
+                    } satisfies SecurityRuleContext));
+                });
 
             // 3. تصفير حالة العملاء وإعادة ضبط عدادات الترقيم
             const clientsSnap = await getDocs(query(collection(firestore, getTenantPath('clients', tenantId)!)));
@@ -192,7 +216,9 @@ function UniversalDataPurgeTool() {
             const countersSnap = await getDocs(query(collection(firestore, getTenantPath('counters', tenantId)!)));
             const counterBatch = writeBatch(firestore);
             countersSnap.forEach(d => counterBatch.delete(d.ref));
-            await counterBatch.commit();
+            
+            clientBatch.commit();
+            counterBatch.commit();
 
             toast({ title: '✅ تم تطهير البيانات بالكامل', description: 'المنظومة الآن جاهزة لبدء دورة عمل نظيفة وجديدة.' });
             setIsImportConfirmOpen(false);
@@ -266,18 +292,31 @@ function UniversalDataPurgeTool() {
 
 function TerminatedEmployeesManager() {
   const { firestore } = useFirebase();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
 
+  const tenantId = user?.currentCompanyId;
+  const employeesPath = getTenantPath('employees', tenantId);
+
   const terminatedEmployeesQuery = useMemo(() => [where('status', '==', 'terminated')], []);
-  const { data: terminatedEmployees, loading } = useSubscription<Employee>(firestore, 'employees', terminatedEmployeesQuery);
+  const { data: terminatedEmployees, loading } = useSubscription<Employee>(firestore, employeesPath, terminatedEmployeesQuery);
 
   const handleConfirmDelete = async () => {
-    if (!firestore || !employeeToDelete) return;
-    try {
-        await deleteDoc(doc(firestore, 'employees', employeeToDelete.id!));
-        toast({ title: 'نجاح', description: `تم حذف الموظف نهائياً.` });
-    } finally { setEmployeeToDelete(null); }
+    if (!firestore || !employeeToDelete || !employeesPath) return;
+    
+    const docPath = `${employeesPath}/${employeeToDelete.id}`;
+    deleteDoc(doc(firestore, docPath))
+        .then(() => {
+            toast({ title: 'نجاح', description: `تم حذف الموظف نهائياً.` });
+        })
+        .catch(async (serverError) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: docPath,
+                operation: 'delete'
+            }));
+        })
+        .finally(() => setEmployeeToDelete(null));
   };
 
   return (
@@ -330,4 +369,3 @@ export function DataIntegrityManager() {
         </Card>
     );
 }
-
