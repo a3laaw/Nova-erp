@@ -70,7 +70,7 @@
   /* ✨ النبض الدراماتيكي المحدث (The Dramatic Expansion V67) ✨ */
   @keyframes pulse-ring {
     0%, 100% { transform: scale(1); opacity: 0.95; }
-    50% { transform: scale(1.5); opacity: 1; } /* تم التكبير لـ 1.5x بطلب المهندس */
+    50% { transform: scale(1.5); opacity: 1; }
   }
 
   @keyframes dot-bounce {
@@ -89,7 +89,7 @@
     pointer-events: none;
   }
 
-  /* قناع مدمج لمنع حواف الصورة الحادة - تم توسيع النطاق للتمدد الجديد */
+  /* قناع مدمج لمنع حواف الصورة الحادة */
   .nova-image-container {
     mask-image: radial-gradient(circle, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 85%);
     -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 85%);
@@ -108,20 +108,32 @@
   .dot-loader span:nth-child(1) { animation-delay: -0.32s; }
   .dot-loader span:nth-child(2) { animation-delay: -0.16s; }
 
-  /* نصوص الجداول - أسود داكن 100% للوضوح الملكي */
+  /* 🛡️ درع حماية استجابة الماوس السيادي V74.0 🛡️ */
+  [data-radix-popper-content-wrapper] {
+    z-index: 999999999 !important;
+    pointer-events: auto !important;
+  }
+
   [role="listbox"], 
   [role="menu"], 
   [data-radix-select-content], 
-  [data-radix-popover-content],
-  .table-body td {
+  [data-radix-popover-content] {
     color: #000000 !important;
     font-weight: 700 !important;
+    pointer-events: auto !important;
+    z-index: 999999999 !important;
   }
 
   [role="option"], 
   [role="menuitem"], 
   [cmdk-item] {
     cursor: pointer !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
+    pointer-events: auto !important;
+  }
+
+  .table-body td {
     color: #000000 !important;
     font-weight: 700 !important;
   }

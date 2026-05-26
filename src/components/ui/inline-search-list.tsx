@@ -96,8 +96,9 @@ export function InlineSearchList({
         className="w-[--radix-popover-trigger-width] p-0 z-[999999999] border-2 border-primary/20 shadow-2xl rounded-2xl overflow-hidden bg-white" 
         align="start"
         dir="rtl"
-        // 🛡️ ضمان عدم اعتراض الأحداث لتمكين الإغلاق التلقائي
+        // 🛡️ منع خطف التركيز لضمان استجابة الماوس الفورية V74
         onOpenAutoFocus={(e) => e.preventDefault()}
+        style={{ pointerEvents: 'auto' }}
       >
         <Command className="bg-white">
           <div className="flex items-center border-b px-3 bg-slate-50/80">
