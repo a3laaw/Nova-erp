@@ -18,7 +18,7 @@ interface MentionTextareaProps extends React.ComponentProps<typeof Textarea> {
 }
 
 /**
- * محرك المنشن الذكي المتكيف (Sovereign Adaptive Mention Engine V124.0):
+ * محرك المنشن الذكي المتكيف (Sovereign Adaptive Mention Engine V125.0):
  * - محرك "التفكير المكاني": يحدد اتجاه الفتح (أعلى/أسفل) بناءً على المساحة المتاحة.
  * - عزل بصري مطلق بـ z-index سيادي لمنع أي تداخل مع رؤوس النوافذ أو التبويبات.
  * - تباين أسود (#000000) للوضوح المطلق في الواجهة العربية اللؤلؤية.
@@ -28,11 +28,10 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
   const [showMentions, setShowMentions] = useState(false);
   const [mentionQuery, setMentionSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [openUpwards, setOpenUpwards] = useState(false); // ذكاء التموضع
+  const [openUpwards, setOpenUpwards] = useState(false); 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // جلب كافة مستخدمي المنشأة
   const { data: users = [] } = useSubscription<UserProfile>(firestore, 'users');
 
   const filteredUsers = useMemo(() => {
@@ -47,12 +46,10 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
       .slice(0, 8);
   }, [users, mentionQuery]);
 
-  // محرك الذكاء المكاني: فحص المساحة المتاحة عند ظهور المؤشر
   useEffect(() => {
     if (showMentions && textareaRef.current) {
         const rect = textareaRef.current.getBoundingClientRect();
         const spaceBelow = window.innerHeight - rect.bottom;
-        // إذا كانت المساحة تحت النص أقل من 250px، نفتح للأعلى
         setOpenUpwards(spaceBelow < 250);
     }
   }, [showMentions]);
@@ -136,9 +133,9 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
       {showMentions && filteredUsers.length > 0 && (
         <Card className={cn(
             "absolute w-full max-w-[340px] rounded-[2.5rem] border-2 border-primary/30 bg-white overflow-hidden animate-in zoom-in-95 duration-300",
-            openUpwards ? "bottom-full mb-3" : "top-full mt-3", // ذكاء الاتجاه
-            "right-2", // محاذاة RTL الصحيحة
-            "z-[999999999] shadow-[0_45px_100px_-20px_rgba(0,0,0,0.5)]" // سيادة مطلقة وظل سينمائي
+            openUpwards ? "bottom-full mb-3" : "top-full mt-3",
+            "right-2", 
+            "z-[999999999] shadow-[0_45px_100px_-20px_rgba(0,0,0,0.5)]" 
         )}>
           <div className="p-5 bg-primary/5 border-b flex items-center justify-between">
              <div className="flex items-center gap-3">

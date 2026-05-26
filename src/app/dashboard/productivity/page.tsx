@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, Suspense } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { where, doc, updateDoc, serverTimestamp, deleteDoc, type QueryConstraint, Timestamp, collection, addDoc, writeBatch } from 'firebase/firestore';
+import { where, doc, updateDoc, serverTimestamp, deleteDoc, type QueryConstraint, Timestamp, collection, addDoc, writeBatch, getDocs, query } from 'firebase/firestore';
 import type { UserProductivityItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -27,7 +27,7 @@ import {
     Users,
     MessageCircle
 } from 'lucide-react';
-import { cn, getTenantPath, cleanFirestoreData, formatCurrency } from '@/lib/utils';
+import { cn, getTenantPath, cleanFirestoreData, formatCurrency, extractMentions } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -43,11 +43,12 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 import { MentionTextarea } from '@/components/ui/mention-textarea';
+import { createNotification } from '@/services/notification-service';
 
 /**
- * منصة الإنتاجية السيادية (Productivity Platform V124.0):
- * - تم تصحيح مسارات استيراد Skeleton و Separator لضمان ثبات البناء.
- * - دعم محرك المذكرات البينية والتوثيق المزدوج.
+ * منصة الإنتاجية السيادية (Productivity Platform V125.0):
+ * - تم تفعيل نظام التنبيهات للمنشن في المذكرات البينية.
+ * - تصحيح استيرادات Skeleton و Separator لضمان استقرار البناء.
  */
 function ProductivityContent() {
     const { firestore } = useFirebase();
@@ -122,7 +123,7 @@ function ProductivityContent() {
                             <CardTitle className="text-3xl font-black text-white tracking-tighter">منصة الإنجاز والإنتاجية</CardTitle>
                             <div className="flex items-center gap-2 mt-1">
                                 <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
-                                <CardDescription className="text-white/90 font-bold text-sm">مساحتك الخاصة لمتابعة المهام المستخلصة من المشاريع.</CardDescription>
+                                <CardDescription className="text-white/90 font-bold text-sm">مساحتك الخاصة لمتابعة المهام المستخلص من المشاريع.</CardDescription>
                             </div>
                         </div>
                     </div>
@@ -288,7 +289,7 @@ function TaskCard({ task, onEdit, onComplete, onAddComment }: { task: UserProduc
                         </Button>
                     </div>
                 </div>
-                <CardTitle className="text-xl font-black text-[#000000] leading-tight tracking-tight group-hover:text-primary transition-colors">
+                <CardTitle className="text-xl font-black text-black leading-tight tracking-tight group-hover:text-primary transition-colors">
                     {task.title}
                 </CardTitle>
             </CardHeader>
@@ -300,7 +301,7 @@ function TaskCard({ task, onEdit, onComplete, onAddComment }: { task: UserProduc
                             <CalendarDays className="h-3.5 w-3.5 text-primary opacity-40" />
                             <span className="text-[10px] font-black text-slate-400 uppercase">الموعد النهائي</span>
                         </div>
-                        <span className="font-mono font-black text-[#000000] text-sm">
+                        <span className="font-mono font-black text-black text-sm">
                             {toFirestoreDate(task.dueDate) ? format(toFirestoreDate(task.dueDate)!, 'dd MMMM', { locale: ar }) : '-'}
                         </span>
                     </div>
@@ -318,7 +319,7 @@ function TaskCard({ task, onEdit, onComplete, onAddComment }: { task: UserProduc
             </CardContent>
 
             <CardFooter className="p-8 bg-muted/10 flex gap-3 rounded-b-[2.8rem]">
-                <Button asChild variant="ghost" className="h-12 px-6 rounded-2xl font-black text-xs gap-2 hover:bg-white transition-all text-[#000000]">
+                <Button asChild variant="ghost" className="h-12 px-6 rounded-2xl font-black text-xs gap-2 hover:bg-white transition-all text-black">
                     <Link href={task.sourceUrl || '#'}><ArrowUpRight className="h-4 w-4"/> فتح المصدر</Link>
                 </Button>
                 
@@ -355,6 +356,7 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
+            const noteText = note;
 
             if (task.clientId && task.sourceId && task.sourceModule) {
                 const txPath = getTenantPath(`clients/${task.clientId}/transactions/${task.sourceId}`, tenantId);
@@ -362,7 +364,7 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
                 
                 batch.set(timelineRef, {
                     type: 'comment',
-                    content: `**[مذكرة متابعة مهمة]**: "${task.title}"\n\n${note}`,
+                    content: `**[مذكرة متابعة مهمة]**: "${task.title}"\n\n${noteText}`,
                     userId: user.id,
                     userName: user.fullName,
                     userAvatar: user.avatarUrl,
@@ -376,7 +378,27 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
                 });
 
                 await batch.commit();
-                toast({ title: '✅ تم حقن الملاحظة في سجل المعاملة' });
+
+                // 🚀 رادار المنشن: إرسال تنبيهات فورية إذا وُجدت منشنات في المذكرة
+                const mentionedUsernames = extractMentions(noteText);
+                if (mentionedUsernames.length > 0) {
+                    const usersPath = getTenantPath('users', tenantId);
+                    const qUsers = query(collection(firestore, usersPath!), where('username', 'in', mentionedUsernames));
+                    const usersSnap = await getDocs(qUsers);
+                    
+                    usersSnap.forEach(userDoc => {
+                        if (userDoc.id !== user.id) {
+                            createNotification(firestore, {
+                                userId: userDoc.id,
+                                title: '💬 تم ذكرك في مذكرة متابعة',
+                                body: `ذكرك ${user.fullName} في ملاحظة بخصوص مهمة "${task.title}".`,
+                                link: `/dashboard/clients/${task.clientId}/transactions/${task.sourceId}`
+                            }, tenantId);
+                        }
+                    });
+                }
+
+                toast({ title: '✅ تم حقن الملاحظة ونشر التنبيهات' });
                 onClose();
                 setNote('');
             } else {
@@ -452,10 +474,11 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
         try {
             const batch = writeBatch(firestore);
             const taskPath = getTenantPath(`userProductivity/${task.id}`, tenantId);
+            const noteText = completionNote;
             
             batch.update(doc(firestore, taskPath!), {
                 status: 'completed',
-                completionNote: completionNote || null,
+                completionNote: noteText || null,
                 completedAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             });
@@ -466,7 +489,7 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                 
                 batch.set(timelineRef, {
                     type: 'comment',
-                    content: `**[إتمام وإغلاق مهمة]**: "${task.title}"\n\n**محضر الإنجاز النهائي:**\n${completionNote || 'تم الإنجاز بنجاح.'}`,
+                    content: `**[إتمام وإغلاق مهمة]**: "${task.title}"\n\n**محضر الإنجاز النهائي:**\n${noteText || 'تم الإنجاز بنجاح.'}`,
                     userId: user.id,
                     userName: user.fullName,
                     userAvatar: user.avatarUrl,
@@ -476,6 +499,26 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
             }
 
             await batch.commit();
+
+            // 🚀 رادار التنبيهات للمنشنات في ملاحظة الإغلاق
+            const mentionedUsernames = extractMentions(noteText);
+            if (mentionedUsernames.length > 0) {
+                const usersPath = getTenantPath('users', tenantId);
+                const qUsers = query(collection(firestore, usersPath!), where('username', 'in', mentionedUsernames));
+                const usersSnap = await getDocs(qUsers);
+                
+                usersSnap.forEach(userDoc => {
+                    if (userDoc.id !== user.id) {
+                        createNotification(firestore, {
+                            userId: userDoc.id,
+                            title: '✅ تم إتمام مهمة (ذكرك الزميل)',
+                            body: `أنجز ${user.fullName} المهمة "${task.title}" وذكرك في محضر الإغلاق.`,
+                            link: `/dashboard/clients/${task.clientId}/transactions/${task.sourceId}`
+                        }, tenantId);
+                    }
+                });
+            }
+
             toast({ title: '✅ تم الإنجاز والتوثيق النهائي' });
             onClose();
         } catch (e) {
@@ -556,7 +599,7 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
             toast({ title: '✅ تم تحديث المهمة' });
             onClose();
         } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
+            toast({ variant: 'destructive', title: 'خطأ in Save' });
         } finally { setIsSaving(false); }
     };
 
@@ -645,7 +688,7 @@ function BookmarkCard({ bookmark }: { bookmark: UserProductivityItem }) {
                     <Bookmark className="h-8 w-8 fill-primary/10" />
                 </div>
                 
-                <p className="font-black text-xs text-[#000000] line-clamp-2 leading-relaxed tracking-tight px-1">
+                <p className="font-black text-xs text-black line-clamp-2 leading-relaxed tracking-tight px-1">
                     {bookmark.title}
                 </p>
                 

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { useFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore'; 
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc } from 'firebase/firestore'; 
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,10 @@ const formatDate = (dateValue: any): string => {
     return formatDistanceToNow(date, { addSuffix: true, locale: ar });
 }
 
+/**
+ * حائط التعليقات والأحداث (Transaction Timeline V125.0):
+ * - تفعيل رادار المنشن (@) الموثوق مع إرسال إشعارات فورية.
+ */
 export function TransactionTimeline({ clientId, transactionId, filterType, showInput = false, title, icon, client, transaction }: TransactionTimelineProps) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -78,11 +82,14 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     if (!finalPath) return;
 
     setIsPosting(true);
+    const commentText = newComment;
     const tempId = `temp_${Date.now()}`;
+    
+    // التحديث المتفائل للواجهة (Optimistic UI)
     const optimisticComment: TimelineEvent = {
         id: tempId,
         type: 'comment',
-        content: newComment,
+        content: commentText,
         userId: currentUser.id,
         userName: currentUser.fullName || currentUser.username,
         userAvatar: currentUser.avatarUrl,
@@ -90,7 +97,6 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
     };
     
     setEvents(prev => [optimisticComment, ...prev]);
-    const commentText = newComment;
     setNewComment('');
 
     const commentData = {
@@ -105,13 +111,14 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
 
     addDoc(collection(firestore, finalPath), commentData)
         .then(async () => {
+            // 🚀 رادار المنشن: البحث عن @username في النص 🚀
             const mentionedUsernames = extractMentions(commentText);
             if (mentionedUsernames.length > 0) {
                 const usersPath = getTenantPath('users', tenantId);
-                const q = query(collection(firestore, usersPath!), where('username', 'in', mentionedUsernames));
-                const snap = await getDocs(q);
+                const qUsers = query(collection(firestore, usersPath!), where('username', 'in', mentionedUsernames));
+                const usersSnap = await getDocs(qUsers);
                 
-                snap.forEach(userDoc => {
+                usersSnap.forEach(userDoc => {
                     if (userDoc.id !== currentUser.id) {
                         createNotification(firestore, {
                             userId: userDoc.id,
@@ -124,6 +131,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
             }
         })
         .catch(async (serverError) => {
+            // التراجع في حال الفشل
             setEvents(prev => prev.filter(e => e.id !== tempId));
             setNewComment(commentText);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -178,13 +186,6 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
           </div>
         )}
 
-        {showInput && isLocked && (
-            <div className="p-8 bg-muted/20 rounded-[2.5rem] border-4 border-dashed border-muted flex flex-col items-center justify-center text-center gap-3 opacity-60">
-                <Lock className="h-10 w-10 text-muted-foreground" />
-                <p className="font-black text-xl text-slate-500">منطقة التعليقات مقفلة</p>
-            </div>
-        )}
-
         <div className="space-y-6">
             {loading && Array.from({length: 2}).map((_, i) => (
                 <div key={i} className="flex gap-4 p-4 animate-pulse">
@@ -213,7 +214,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
                             <p className="font-black text-sm text-[#1e1b4b]">{event.userName}</p>
                             <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">{formatDate(event.createdAt)}</p>
                         </div>
-                        <p className="text-lg font-bold text-[#000000] leading-relaxed whitespace-pre-wrap">{event.content}</p>
+                        <p className="text-lg font-bold text-black leading-relaxed whitespace-pre-wrap">{event.content}</p>
                     </div>
                 </div>
             ))}
