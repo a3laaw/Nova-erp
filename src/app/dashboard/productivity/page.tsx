@@ -1,13 +1,13 @@
-
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, Suspense } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { where, doc, updateDoc, serverTimestamp, deleteDoc, type QueryConstraint } from 'firebase/firestore';
-import type { UserProductivityItem, ProductivityAction, ProductivityStatus } from '@/lib/types';
+import { where, doc, updateDoc, serverTimestamp, deleteDoc, type QueryConstraint, Timestamp } from 'firebase/firestore';
+import type { UserProductivityItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
     ListChecks, 
     Bookmark, 
@@ -18,14 +18,12 @@ import {
     Trash2,
     Loader2,
     Target,
-    Activity,
+    Pencil,
     CalendarDays,
     X,
-    Pencil,
-    Save,
-    Calendar
+    Save
 } from 'lucide-react';
-import { cn, formatCurrency, getTenantPath, cleanFirestoreData } from '@/lib/utils';
+import { cn, getTenantPath } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -34,7 +32,6 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -43,11 +40,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateInput } from '@/components/ui/date-input';
 
 /**
- * منصة الإنتاجية الشخصية (Personal Workspace V71.0):
- * - تم إضافة نظام التعديل والحذف المرن للمهام.
- * - دعم تغيير التواريخ ونوع الإجراء يدوياً.
+ * محتوى منصة الإنتاجية (Productivity Hub Content):
+ * تم تغليفها بـ Suspense لضمان استقرار الخادم.
  */
-export default function PersonalProductivityPage() {
+function ProductivityContent() {
     const { firestore } = useFirebase();
     const { user, loading: authLoading } = useAuth();
     const searchParams = useSearchParams();
@@ -108,7 +104,7 @@ export default function PersonalProductivityPage() {
                             <CardTitle className="text-3xl font-black text-white tracking-tighter">منصة الإنجاز والإنتاجية</CardTitle>
                             <div className="flex items-center gap-2 mt-1">
                                 <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
-                                <CardDescription className="text-white/90 font-bold text-sm">مساحتك الخاصة لمتابعة المهام المستخلصة من المشاريع والوصول السريع للمفضلات.</CardDescription>
+                                <CardDescription className="text-white/90 font-bold text-sm">مساحتك الخاصة لمتابعة المهام المستخلصة من المشاريع.</CardDescription>
                             </div>
                         </div>
                     </div>
@@ -135,7 +131,6 @@ export default function PersonalProductivityPage() {
                             <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale border-4 border-dashed rounded-[3rem] bg-white/40">
                                 <ListChecks className="h-24 w-24 mb-4" />
                                 <p className="text-2xl font-black">لا توجد مهام مجدولة حالياً</p>
-                                <p className="text-sm font-bold mt-2 text-center px-6">استخدم زر "محرك الإنتاجية" من داخل المسار الفني أو ملف العميل لإضافة مهام للمتابعة.</p>
                             </div>
                         ) : (
                             tasks.map(task => <TaskCard key={task.id} task={task} onEdit={openEditDialog} />)
@@ -151,7 +146,6 @@ export default function PersonalProductivityPage() {
                             <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale border-4 border-dashed rounded-[3rem] bg-white/40">
                                 <Bookmark className="h-24 w-24 mb-4" />
                                 <p className="text-2xl font-black">المفضلة فارغة</p>
-                                <p className="text-sm font-bold mt-2 text-center px-6">أضف الصفحات المهمة للمفضلة من زر "محرك الإنتاجية" للوصول السريع.</p>
                             </div>
                         ) : (
                             bookmarks.map(bm => <BookmarkCard key={bm.id} bookmark={bm} />)
@@ -416,3 +410,10 @@ function BookmarkCard({ bookmark }: { bookmark: UserProductivityItem }) {
     );
 }
 
+export default function PersonalProductivityPage() {
+    return (
+        <Suspense fallback={<div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>}>
+            <ProductivityContent />
+        </Suspense>
+    );
+}

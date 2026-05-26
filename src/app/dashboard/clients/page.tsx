@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Card,
@@ -11,12 +11,15 @@ import {
 } from '@/components/ui/card';
 import { RegisteredClientsList } from '@/components/clients/registered-clients-list';
 import { ProspectiveClientsList } from '@/components/clients/prospective-clients-list';
-import { Button } from '@/components/ui/button';
 import { Users, UserSearch, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export default function ClientsPage() {
+/**
+ * محتوى صفحة العملاء (The Clients Radar Content):
+ * تم عزله لضمان استقرار التحصيل عبر useSearchParams.
+ */
+function ClientsContent() {
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState('registered');
 
@@ -38,7 +41,7 @@ export default function ClientsPage() {
                                 <CardTitle className="text-3xl font-black text-white tracking-tighter">إدارة ملفات العملاء (CRM)</CardTitle>
                                 <div className="flex items-center gap-2 mt-1">
                                     <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
-                                    <CardDescription className="text-white/90 font-bold text-sm">مركز التحكم في بيانات العملاء المتعاقدين وتتبع زوار المكتب الجدد.</CardDescription>
+                                    <CardDescription className="text-white/90 font-bold text-sm">مركز التحكم في بيانات العملاء وتتبع زوار المكتب الجدد.</CardDescription>
                                 </div>
                             </div>
                             <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
@@ -79,3 +82,12 @@ export default function ClientsPage() {
         </div>
     );
 }
+
+export default function ClientsPage() {
+    return (
+        <Suspense fallback={<div className="p-20 text-center"><Loader2 className="animate-spin h-10 w-10 mx-auto text-primary" /></div>}>
+            <ClientsContent />
+        </Suspense>
+    );
+}
+import { Loader2 } from 'lucide-react';

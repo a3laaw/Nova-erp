@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
@@ -16,12 +16,14 @@ import { useAuth } from '@/context/auth-context';
 import type { Client } from '@/lib/types';
 import { ClientForm } from '@/components/clients/client-form';
 import { getTenantPath, cleanFirestoreData } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * صفحة إضافة عميل جديد:
- * تم إصلاح محرك المزامنة لضمان تسجيل رقم الجوال والاسم القادمين من الميدان بشكل آلي.
+ * محتوى صفحة إضافة عميل جديد (The New Client Engine):
+ * تم تغليفها بـ Suspense لضمان استقرار الخادم عند قراءة روابط الميدان.
  */
-export default function NewClientPage() {
+function NewClientContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { firestore } = useFirebase();
@@ -37,7 +39,6 @@ export default function NewClientPage() {
         assignedEngineer: searchParams.get('engineerId') || '',
     }), [searchParams]);
     
-    const fromAppointmentId = searchParams.get('fromAppointmentId');
     const tenantId = currentUser?.currentCompanyId;
 
     const handleSave = useCallback(async (newClientData: Partial<Client>) => {
@@ -47,7 +48,7 @@ export default function NewClientPage() {
         const clientsCollectionPath = getTenantPath('clients', tenantId);
 
         try {
-            const mobileQuery = query(collection(firestore, clientsCollectionPath), where('mobile', '==', newClientData.mobile));
+            const mobileQuery = query(collection(firestore, clientsCollectionPath!), where('mobile', '==', newClientData.mobile));
             const mobileSnapshot = await getDocs(mobileQuery);
             if (!mobileSnapshot.empty) {
                 throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر في هذه المنشأة الموحدة.');
@@ -56,7 +57,7 @@ export default function NewClientPage() {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = String(new Date().getFullYear());
                 const counterPath = getTenantPath('counters/clientFiles', tenantId);
-                const clientFileCounterRef = doc(firestore, counterPath);
+                const clientFileCounterRef = doc(firestore, counterPath!);
                 const clientFileCounterDoc = await transaction.get(clientFileCounterRef);
                 
                 let nextFileNumber = 1;
@@ -80,13 +81,13 @@ export default function NewClientPage() {
                   companyId: tenantId
                 };
 
-                const newClientRef = doc(collection(firestore, clientsCollectionPath));
+                const newClientRef = doc(collection(firestore, clientsCollectionPath!));
                 const newClientId = newClientRef.id;
                 transaction.set(newClientRef, cleanFirestoreData(finalClientData));
 
                 // الربط التلقائي للمواعيد السابقة والحالية بالملف الرسمي الجديد
                 const apptsPath = getTenantPath('appointments', tenantId);
-                const apptsQuery = query(collection(firestore, apptsPath), where('clientMobile', '==', newClientData.mobile));
+                const apptsQuery = query(collection(firestore, apptsPath!), where('clientMobile', '==', newClientData.mobile));
                 const apptsSnapshot = await getDocs(apptsQuery);
 
                 apptsSnapshot.forEach(apptDoc => {
@@ -126,4 +127,10 @@ export default function NewClientPage() {
     );
 }
 
-import { useMemo } from 'react';
+export default function NewClientPage() {
+    return (
+        <Suspense fallback={<div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>}>
+            <NewClientContent />
+        </Suspense>
+    );
+}
