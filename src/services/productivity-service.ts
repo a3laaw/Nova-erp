@@ -8,14 +8,15 @@ import {
     serverTimestamp, 
     increment, 
     Timestamp,
+    writeBatch,
     type Firestore 
 } from 'firebase/firestore';
-import type { UserProductivityItem, ProductivityAction, ProductivityStatus } from '@/lib/types';
+import type { UserProductivityItem, ProductivityStatus } from '@/lib/types';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 
 /**
- * @fileOverview محرك الإنتاجية الشخصية السيادي (Productivity Service V2.0).
- * تم تحصينه بـ "رادار التحقق" لضمان عدم الحفظ في مسارات خاطئة أو ناقصة.
+ * @fileOverview محرك الإنتاجية الشخصية والتشاركية السيادي (Productivity Service V112.0).
+ * تفعيل نظام "المصافحة التشاركية" عند إتمام المهام المشتركة لضمان توثيق الطرفين.
  */
 
 export class ProductivityService {
@@ -28,16 +29,15 @@ export class ProductivityService {
     }
 
     private get collectionPath() {
-        // استخدام getTenantPath لضمان العزل التام
         return getTenantPath('userProductivity', this.tenantId);
     }
 
     /**
-     * إنشاء عنصر إنتاجية جديد (مهمة أو مفضلة)
+     * إنشاء عنصر إنتاجية جديد (مهمة فردية أو تشاركية)
      */
     async createItem(data: Partial<UserProductivityItem>) {
         const path = this.collectionPath;
-        if (!path) throw new Error("CRITICAL_ERROR: Missing tenant scope for productivity item.");
+        if (!path) throw new Error("CRITICAL_ERROR: Missing tenant scope.");
 
         const colRef = collection(this.db, path);
         const finalData = {
@@ -53,27 +53,45 @@ export class ProductivityService {
     }
 
     /**
-     * تحديث حالة المهمة مع طابع زمني تلقائي عند الإنجاز
+     * إغلاق المهمة مع التوثيق المتبادل (The Shared Handshake)
      */
-    async updateTaskStatus(itemId: string, status: ProductivityStatus) {
+    async completeTaskWithNote(itemId: string, status: ProductivityStatus, note: string, taskData: UserProductivityItem) {
         const path = this.collectionPath;
-        if (!path) return;
+        if (!path || !this.tenantId) return;
 
-        const docRef = doc(this.db, path, itemId);
-        const updates: any = {
+        const batch = writeBatch(this.db);
+        const taskRef = doc(this.db, path, itemId);
+
+        // 1. تحديث المهمة
+        batch.update(taskRef, {
             status,
+            completionNote: note,
+            completedAt: serverTimestamp(),
             updatedAt: serverTimestamp()
-        };
+        });
 
-        if (status === 'completed') {
-            updates.completedAt = serverTimestamp();
+        // 2. إذا كانت تشاركية ولها مصدر فني، التوثيق في المعاملة
+        const isShared = taskData.assignedUserIds && taskData.assignedUserIds.length > 0;
+        if (isShared && taskData.sourceId && taskData.sourceModule) {
+            const txPath = getTenantPath(`clients/${taskData.clientId}/transactions/${taskData.sourceId}`, this.tenantId);
+            if (txPath) {
+                const timelineRef = doc(collection(this.db, `${txPath}/timelineEvents`));
+                batch.set(timelineRef, {
+                    type: 'comment',
+                    content: `**[إتمام مهمة عمل تشاركية]**\nأنجز الموظف المسؤول هذه المهمة.\n\n**محضر الإنجاز الموثق:**\n${note}`,
+                    userId: taskData.userId,
+                    userName: 'المسؤول عن الإنجاز',
+                    createdAt: serverTimestamp(),
+                    companyId: this.tenantId
+                });
+            }
         }
 
-        return updateDoc(docRef, updates);
+        return batch.commit();
     }
 
     /**
-     * رادار التفاعل: زيادة عداد المشاهدات وتحديث طابع الزيارة
+     * رادار التفاعل: زيادة عداد المشاهدات
      */
     async trackInteraction(itemId: string) {
         const path = this.collectionPath;
@@ -87,13 +105,11 @@ export class ProductivityService {
     }
 
     /**
-     * حذف عنصر (إخفاء منطقي)
+     * حذف عنصر
      */
     async deleteItem(itemId: string) {
         const path = this.collectionPath;
         if (!path) return;
-
-        const docRef = doc(this.db, path, itemId);
-        return updateDoc(docRef, { status: 'cancelled', updatedAt: serverTimestamp() });
+        return deleteDoc(doc(this.db, path, itemId));
     }
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, Suspense } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { where, doc, updateDoc, serverTimestamp, deleteDoc, type QueryConstraint, Timestamp } from 'firebase/firestore';
+import { where, doc, updateDoc, serverTimestamp, deleteDoc, type QueryConstraint, Timestamp, collection, addDoc } from 'firebase/firestore';
 import type { UserProductivityItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,9 +22,11 @@ import {
     CalendarDays,
     X,
     Save,
-    PlayCircle
+    PlayCircle,
+    MessageSquare,
+    Users
 } from 'lucide-react';
-import { cn, getTenantPath } from '@/lib/utils';
+import { cn, getTenantPath, cleanFirestoreData, formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -39,6 +41,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
+import { Textarea } from '@/components/ui/textarea';
 
 function ProductivityContent() {
     const { firestore } = useFirebase();
@@ -48,6 +51,8 @@ function ProductivityContent() {
     const [activeTab, setActiveTab] = useState('tasks');
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [taskToEdit, setTaskToEdit] = useState<UserProductivityItem | null>(null);
+    const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+    const [taskToComplete, setTaskToComplete] = useState<UserProductivityItem | null>(null);
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -84,6 +89,11 @@ function ProductivityContent() {
     const openEditDialog = (task: UserProductivityItem) => {
         setTaskToEdit(task);
         setIsEditDialogOpen(true);
+    };
+
+    const openCompleteDialog = (task: UserProductivityItem) => {
+        setTaskToComplete(task);
+        setIsCompleteDialogOpen(true);
     };
 
     return (
@@ -128,7 +138,7 @@ function ProductivityContent() {
                                 <p className="text-2xl font-black">لا توجد مهام مجدولة حالياً</p>
                             </div>
                         ) : (
-                            tasks.map(task => <TaskCard key={task.id} task={task} onEdit={openEditDialog} />)
+                            tasks.map(task => <TaskCard key={task.id} task={task} onEdit={openEditDialog} onComplete={openCompleteDialog} />)
                         )}
                     </div>
                 </TabsContent>
@@ -156,11 +166,19 @@ function ProductivityContent() {
                     task={taskToEdit} 
                 />
             )}
+
+            {isCompleteDialogOpen && taskToComplete && (
+                <CompleteTaskDialog 
+                    isOpen={isCompleteDialogOpen} 
+                    onClose={() => setIsCompleteDialogOpen(false)} 
+                    task={taskToComplete} 
+                />
+            )}
         </div>
     );
 }
 
-function TaskCard({ task, onEdit }: { task: UserProductivityItem, onEdit: (task: UserProductivityItem) => void }) {
+function TaskCard({ task, onEdit, onComplete }: { task: UserProductivityItem, onEdit: (task: UserProductivityItem) => void, onComplete: (task: UserProductivityItem) => void }) {
     const { firestore } = useFirebase();
     const { user } = useAuth();
     const { toast } = useToast();
@@ -169,19 +187,6 @@ function TaskCard({ task, onEdit }: { task: UserProductivityItem, onEdit: (task:
 
     const tenantId = user?.currentCompanyId;
     const taskPath = getTenantPath(`userProductivity/${task.id}`, tenantId);
-
-    const handleComplete = async () => {
-        if (!firestore || !taskPath) return;
-        setIsUpdating(true);
-        try {
-            await updateDoc(doc(firestore, taskPath), {
-                status: 'completed',
-                completedAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
-            toast({ title: '✅ تم الإنجاز', description: 'تم تحديث المهمة بنجاح.' });
-        } finally { setIsUpdating(false); }
-    };
 
     const handleAccept = async () => {
         if (!firestore || !taskPath) return;
@@ -222,6 +227,7 @@ function TaskCard({ task, onEdit }: { task: UserProductivityItem, onEdit: (task:
 
     const isCompleted = task.status === 'completed';
     const isPending = task.status === 'pending';
+    const isShared = task.assignedUserIds && task.assignedUserIds.length > 0;
 
     return (
         <Card className={cn(
@@ -230,9 +236,16 @@ function TaskCard({ task, onEdit }: { task: UserProductivityItem, onEdit: (task:
         )}>
             <CardHeader className="p-8 pb-4">
                 <div className="flex justify-between items-start mb-4">
-                    <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest border-2", actionColors[task.actionType!] || "bg-slate-50 text-slate-500 border-slate-100")}>
-                        {actionLabels[task.actionType!] || 'مهمة عمل'}
-                    </Badge>
+                    <div className="flex gap-2">
+                        <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest border-2", actionColors[task.actionType!] || "bg-slate-50 text-slate-500 border-slate-100")}>
+                            {actionLabels[task.actionType!] || 'مهمة عمل'}
+                        </Badge>
+                        {isShared && (
+                            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 rounded-full font-black text-[9px] uppercase px-3 flex items-center gap-1">
+                                <Users className="h-2.5 w-2.5" /> تشاركية
+                            </Badge>
+                        )}
+                    </div>
                     <div className="flex items-center gap-2 no-print">
                          {!isCompleted && (
                             <Button variant="ghost" size="icon" onClick={() => onEdit(task)} className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary">
@@ -286,13 +299,123 @@ function TaskCard({ task, onEdit }: { task: UserProductivityItem, onEdit: (task:
                 )}
 
                 {task.status === 'in-progress' && (
-                    <Button onClick={handleComplete} disabled={isUpdating} className="flex-1 h-12 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black gap-2 shadow-xl shadow-green-100">
+                    <Button onClick={() => onComplete(task)} disabled={isUpdating} className="flex-1 h-12 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black gap-2 shadow-xl shadow-green-100">
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4"/>}
                         إتمام المهمة
                     </Button>
                 )}
             </CardFooter>
         </Card>
+    );
+}
+
+/**
+ * 🛠️ نافذة إتمام المهمة (Shared Task Completion Dialog V112.0) 🛠️
+ * تفرض التوثيق الإلزامي للمهام التشاركية لضمان ظهور تعليقات الطرفين في سجل المعاملة.
+ */
+function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: () => void, task: UserProductivityItem }) {
+    const { firestore } = useFirebase();
+    const { user } = useAuth();
+    const { toast } = useToast();
+    
+    const [completionNote, setCompletionNote] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const isShared = task.assignedUserIds && task.assignedUserIds.length > 0;
+
+    const handleConfirm = async () => {
+        const tenantId = user?.currentCompanyId;
+        if (!firestore || !tenantId) return;
+
+        if (isShared && !completionNote.trim()) {
+            toast({ variant: 'destructive', title: 'توثيق مطلوب', description: 'يجب كتابة محضر الإنجاز للمهام التشاركية لضمان التوثيق.' });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const batch = writeBatch(firestore);
+            const taskPath = getTenantPath(`userProductivity/${task.id}`, tenantId);
+            
+            // 1. تحديث حالة المهمة
+            batch.update(doc(firestore, taskPath!), {
+                status: 'completed',
+                completionNote: completionNote || null,
+                completedAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+
+            // 2. إذا كانت تشاركية ومرتبطة بمسار فني، حقن التعليق في المعاملة
+            if (isShared && task.sourceId && task.sourceModule) {
+                // محاولة استنتاج مسار المعاملة (بفرض أنها معاملة عميل)
+                const txPath = getTenantPath(`clients/${task.clientId}/transactions/${task.sourceId}`, tenantId);
+                const timelineRef = doc(collection(firestore, `${txPath}/timelineEvents`));
+                
+                batch.set(timelineRef, {
+                    type: 'comment',
+                    content: `**[إتمام مهمة تشاركية]**\nأتم الزميل **${user?.fullName}** المهمة بعنوان: "${task.title}".\n\n**محضر الإنجاز:**\n${completionNote}`,
+                    userId: user?.id,
+                    userName: user?.fullName,
+                    userAvatar: user?.avatarUrl,
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
+                });
+            }
+
+            await batch.commit();
+            toast({ title: '✅ تم الإنجاز والتوثيق المزدوج' });
+            onClose();
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إغلاق المهمة.' });
+        } finally { setIsSaving(false); }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+                <DialogHeader className="p-8 bg-green-600 text-white border-b shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                            <CheckCircle2 className="h-8 w-8 text-white" />
+                        </div>
+                        <div>
+                            <DialogTitle className="text-xl font-black">تأكيد إتمام المهمة</DialogTitle>
+                            <DialogDescription className="text-green-50 font-bold">{isShared ? 'يرجى كتابة محضر الإنجاز للتوثيق التشاركي.' : 'إغلاق المهمة الشخصية بنجاح.'}</DialogDescription>
+                        </div>
+                    </div>
+                </DialogHeader>
+
+                <div className="p-8 space-y-6">
+                    <div className="grid gap-3">
+                        <Label className="font-black text-slate-700 flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4 text-primary" /> {isShared ? 'محضر الإنجاز والتسليم (إلزامي) *' : 'ملاحظات الإنجاز (اختياري)'}
+                        </Label>
+                        <Textarea 
+                            autoFocus
+                            value={completionNote} 
+                            onChange={e => setCompletionNote(e.target.value)} 
+                            placeholder={isShared ? "اشرح ما تم إنجازه للزملاء والعميل..." : "أي ملاحظات إضافية..."}
+                            className="rounded-[2rem] border-2 p-6 text-base font-medium min-h-[140px] focus-visible:ring-2 focus-visible:ring-green-500/20"
+                        />
+                    </div>
+                    
+                    {isShared && (
+                        <div className="flex items-center gap-3 p-4 bg-blue-50 border-2 border-dashed border-blue-200 rounded-2xl">
+                            <Users className="h-5 w-5 text-blue-600" />
+                            <p className="text-[10px] font-black text-blue-800 leading-tight">سيتم نشر هذا التعليق آلياً في "سجل المعاملة" لضمان اطلاع الطرفين والعميل.</p>
+                        </div>
+                    )}
+                </div>
+
+                <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
+                    <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                    <Button onClick={handleConfirm} disabled={isSaving || (isShared && !completionNote.trim())} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-green-200 bg-green-600 hover:bg-green-700 text-white border-none">
+                        {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
+                        تأكيد الإنجاز
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -355,7 +478,7 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
                             </SelectTrigger>
                             <SelectContent dir="rtl">
                                 <SelectItem value="review">مراجعة وتدقيق</SelectItem>
-                                <SelectItem value="decision">اتخاذ قرار</SelectItem>
+                                <SelectItem value="decision">اتخاذ قرار نهائي</SelectItem>
                                 <SelectItem value="design">تصميم فني</SelectItem>
                                 <SelectItem value="redesign">إعادة تصميم / تعديل</SelectItem>
                                 <SelectItem value="meeting">اجتماع عمل</SelectItem>
