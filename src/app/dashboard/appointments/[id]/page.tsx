@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -37,7 +38,7 @@ import {
     Zap,
     Coins,
     FileText
-} from 'lucide-react';
+} from 'lucide-center';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -85,7 +86,7 @@ export default function AppointmentDetailsPage() {
     const [activeAction, setActiveAction] = useState<{ stageId: string, type: 'start' | 'modify' | 'complete' } | null>(null);
 
     const isPrivileged = useMemo(() => 
-        ['Admin', 'Accountant', 'HR', 'Secretary', 'Developer'].includes(currentUser?.role || '')
+        ['Admin', 'HR', 'Secretary', 'Developer'].includes(currentUser?.role || '')
     , [currentUser?.role]);
 
     const apptPath = useMemo(() => id && tenantId ? getTenantPath(`appointments/${id}`, tenantId) : null, [id, tenantId]);
@@ -236,25 +237,46 @@ export default function AppointmentDetailsPage() {
     };
 
     /**
-     * محرك التراجع السيادي (Dual Rollback V138.0):
-     * يقوم بسحب المستخلصات المعلقة وتصفير حالة الدفع في العقد وتوثيق ذلك.
+     * 🛡️ محرك التراجع السيادي المتسلسل (Sovereign Sequential Rollback V139.0) 🛡️
+     * - يمنع التراجع إلا عن آخر مرحلة مكتملة لضمان سلامة المسار.
+     * - يقوم بتصفير كافة المراحل اللاحقة (Reset Subsequent to Pending).
+     * - يسحب المطالبات المالية المرتبطة بالعقد.
      */
     const handleUndoStage = async (stageId: string) => {
         if (!firestore || !transaction || !transactionPath || !tenantId || isLocked) return;
+        
+        const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
+        const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
+        const stage = currentStages[stageIndex];
+        
+        // 🛡️ درع التحقق من التسلسل العكسي 🛡️
+        const hasLaterCompletedStage = currentStages.some((s, idx) => idx > stageIndex && s.status === 'completed');
+        if (hasLaterCompletedStage) {
+            toast({ 
+                variant: 'destructive', 
+                title: 'خرق قانون التتابع', 
+                description: 'لا يمكن التراجع عن هذه المرحلة لوجود مراحل لاحقة مكتملة. يجب التراجع خطوة بخطوة من الأحدث للأقدم.' 
+            });
+            return;
+        }
+
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
-            const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
-            const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
-            const stage = currentStages[stageIndex];
             
-            if (stage) {
-                stage.status = 'in-progress';
-                stage.endDate = null;
+            // 1. إعادة المرحلة الحالية لـ قيد التنفيذ
+            stage.status = 'in-progress';
+            stage.endDate = null;
+
+            // 2. 🛡️ تصفير كافة المراحل اللاحقة (Cascade Reset) لضمان مسار واحد نشط 🛡️
+            for (let i = stageIndex + 1; i < currentStages.length; i++) {
+                currentStages[i].status = 'pending';
+                currentStages[i].startDate = null;
+                currentStages[i].endDate = null;
+                currentStages[i].expectedEndDate = null;
             }
 
-            // 🛡️ التراجع المالي والرقابي (Financial Reversal) 🛡️
-            // 1. البحث عن المستخلصات المرتبطة وإلغاؤها
+            // 3. التراجع المالي والرقابي
             const appsPath = getTenantPath('payment_applications', tenantId);
             const appsQuery = query(
                 collection(firestore, appsPath!), 
@@ -270,7 +292,7 @@ export default function AppointmentDetailsPage() {
                 });
             });
 
-            // 2. تصفير حالة الدفعة في العقد
+            // 4. تصفير حالة الدفعة في العقد
             const contract = transaction.contract;
             if (contract?.clauses) {
                 const updatedClauses = contract.clauses.map((c: any) => {
@@ -280,22 +302,22 @@ export default function AppointmentDetailsPage() {
                 batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
             }
 
-            // 3. تحديث مسار المعاملة
+            // 5. تحديث مستند المعاملة النهائي
             batch.update(doc(firestore, transactionPath), { 
                 stages: currentStages, 
                 updatedAt: serverTimestamp() 
             });
 
-            // 4. إعادة فتح الموعد إذا كان مرتبطاً
+            // 6. إعادة فتح الموعد إذا كان مرتبطاً
             if (appointment && appointment.workStageUpdated) {
                 batch.update(doc(firestore, apptPath!), { workStageUpdated: false, status: 'scheduled' });
             }
 
-            // 5. توثيق التراجع في التايم لاين
+            // 7. توثيق التراجع في التايم لاين
             const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
             batch.set(timelineRef, {
                 type: 'comment',
-                content: `**[تراجع تقني ومالي]**\nتم التراجع عن إغلاق مرحلة **"${stage.name}"**.\n\n• تمت إعادة المرحلة لحالة قيد التنفيذ.\n• تم إلغاء مسودة المطالبة المالية المرتبطة.\n• تم تصفير استحقاق الدفعة في العقد.`,
+                content: `**[تراجع تقني ومالي متسلسل]**\nتم التراجع عن إغلاق مرحلة **"${stage.name}"**.\n\n• تمت إعادة المرحلة لحالة قيد التنفيذ.\n• تم تصفير كافة المراحل اللاحقة لضمان سلامة المسار.\n• تم إلغاء المطالبة المالية المرتبطة وتصفير استحقاق العقد.`,
                 userId: currentUser?.id,
                 userName: currentUser?.fullName,
                 userAvatar: currentUser?.avatarUrl,
@@ -304,7 +326,7 @@ export default function AppointmentDetailsPage() {
             });
 
             await batch.commit();
-            toast({ title: '✅ تم التراجع التقني والمالي بنجاح' });
+            toast({ title: '✅ تم التراجع التقني والمالي المتسلسل' });
         } catch (e) { 
             console.error(e);
             toast({ variant: 'destructive', title: 'خطأ في التراجع' }); 
@@ -399,6 +421,9 @@ export default function AppointmentDetailsPage() {
                                         const isLockedRow = idx > 0 && transaction.stages![idx-1].status !== 'completed';
                                         const isActionActive = activeAction?.stageId === stage.stageId;
 
+                                        // 🛡️ درع التراجع السيادي: لا يسمح بالتراجع إلا عن آخر مرحلة مكتملة 🛡️
+                                        const isLastCompleted = isCompleted && !transaction.stages!.some((s, sIdx) => s.status === 'completed' && sIdx > idx);
+
                                         if (isLockedRow && !isCurrent) return null;
 
                                         return (
@@ -453,14 +478,14 @@ export default function AppointmentDetailsPage() {
                                                         )}
                                                         {isCompleted && (
                                                             <div className="flex items-center gap-2">
-                                                                {isPrivileged && (
+                                                                {isPrivileged && isLastCompleted && (
                                                                     <Button 
                                                                         variant="ghost" 
                                                                         size="sm" 
                                                                         onClick={() => handleUndoStage(stage.stageId)}
                                                                         className="h-9 px-4 rounded-xl text-orange-600 hover:bg-orange-50 font-black gap-1.5 border border-orange-100"
                                                                     >
-                                                                        <Undo2 className="h-4 w-4" /> تراجع
+                                                                        <Undo2 className="h-4 w-4" /> تراجع متسلسل
                                                                     </Button>
                                                                 )}
                                                                 <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-7 w-7"/></div>
