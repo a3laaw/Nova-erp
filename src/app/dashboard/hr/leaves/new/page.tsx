@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef, Suspense } from 'react';
@@ -21,7 +22,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
-import { calculateWorkingDays } from '@/services/leave-calculator';
+import { calculateWorkingDays, calculateSickLeaveTiers } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -60,7 +61,8 @@ function LeaveRequestFormContent() {
     
     const [overlapError, setOverlapError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const savingRef = useRef(false);
+    const [loadingQuota, setLoadingQuota] = useState(false);
+    const [usedSickDays, setUsedSickDays] = useState(0);
 
     // تعريف صلاحية الإدارة للتحكم في القوائم
     const isAdmin = useMemo(() => 
@@ -91,7 +93,8 @@ function LeaveRequestFormContent() {
     useEffect(() => {
         if (!firestore || !selectedEmployeeId || !startDate || !endDate || !tenantId) return;
 
-        const checkOverlaps = async () => {
+        const checkContext = async () => {
+            setLoadingQuota(true);
             try {
                 const leavePath = getTenantPath('leaveRequests', tenantId);
                 const q = query(
@@ -100,20 +103,30 @@ function LeaveRequestFormContent() {
                 );
                 const snap = await getDocs(q);
                 
-                const hasOverlap = snap.docs.some(docSnap => {
-                    const existing = docSnap.data() as LeaveRequest;
-                    if (!['pending', 'approved', 'on-leave'].includes(existing.status)) return false;
-                    const exStart = toFirestoreDate(existing.startDate);
-                    const exEnd = toFirestoreDate(existing.endDate);
-                    return (exStart && exEnd && startOfDay(startDate) <= endOfDay(exEnd) && endOfDay(endDate) >= startOfDay(exStart));
+                let totalSick = 0;
+                snap.forEach(docSnap => {
+                    const data = docSnap.data() as LeaveRequest;
+                    if (data.leaveType === 'Sick' && ['approved', 'on-leave', 'returned'].includes(data.status)) {
+                        totalSick += data.workingDays || 0;
+                    }
                 });
+                setUsedSickDays(totalSick);
 
-                if (hasOverlap) setOverlapError("عذراً، يوجد إجازة أخرى مسجلة للموظف في نفس هذا التوقيت.");
-                else setOverlapError(null);
-            } catch (e) { console.error(e); }
+                if (startDate && endDate) {
+                    const hasOverlap = snap.docs.some(docSnap => {
+                        const existing = docSnap.data() as LeaveRequest;
+                        if (!['pending', 'approved', 'on-leave'].includes(existing.status)) return false;
+                        const exStart = toFirestoreDate(existing.startDate);
+                        const exEnd = toFirestoreDate(existing.endDate);
+                        return (exStart && exEnd && startOfDay(startDate) <= endOfDay(exEnd) && endOfDay(endDate) >= startOfDay(exStart));
+                    });
+                    if (hasOverlap) setOverlapError("عذراً، يوجد إجازة أخرى مسجلة للموظف في نفس هذا التوقيت.");
+                    else setOverlapError(null);
+                }
+            } finally { setLoadingQuota(false); }
         };
-        checkOverlaps();
-    }, [selectedEmployeeId, startDate, endDate, firestore, tenantId]);
+        checkContext();
+    }, [isOpen, selectedEmployeeId, startDate, endDate, firestore, tenantId]);
 
     const loading = employeesLoading || holidaysLoading || brandingLoading;
 
@@ -123,6 +136,11 @@ function LeaveRequestFormContent() {
         }
         return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
     }, [startDate, endDate, branding, publicHolidays]);
+
+    const sickTiers = useMemo(() => {
+        if (leaveType !== 'Sick' || leaveDuration.workingDays <= 0) return [];
+        return calculateSickLeaveTiers(usedSickDays, leaveDuration.workingDays);
+    }, [leaveType, leaveDuration.workingDays, usedSickDays]);
 
     const employeeOptions = useMemo(() => (employees || []).map(e => ({ value: e.id!, label: e.fullName })), [employees]);
 
@@ -158,6 +176,7 @@ function LeaveRequestFormContent() {
 
             const newDocRef = await addDoc(collection(firestore, leavePath), cleanFirestoreData(dataToSave));
             
+            // 🚀 إرسال إشعارات فورية للإدارة والـ HR 🚀
             const usersPath = getTenantPath('users', tenantId);
             const adminHRUsersQuery = query(collection(firestore, usersPath), where('role', 'in', ['Admin', 'HR']));
             const adminsSnap = await getDocs(adminHRUsersQuery);
@@ -166,10 +185,10 @@ function LeaveRequestFormContent() {
                 if (adminDoc.id !== currentUser.id) {
                     createNotification(firestore, {
                         userId: adminDoc.id,
-                        title: 'طلب إجازة جديد',
+                        title: '📅 طلب إجازة جديد للمراجعة',
                         body: `قدم الموظف ${(selectedEmployee as any).fullName} طلب إجازة ${leaveTypeTranslations[leaveType]}.`,
-                        link: `/dashboard/hr/leaves/${newDocRef.id}`
-                    });
+                        link: `/dashboard/hr/leaves`
+                    }, tenantId);
                 }
             });
 
@@ -229,18 +248,18 @@ function LeaveRequestFormContent() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label className="font-black text-gray-700 pr-1">نوع الإجازة *</Label>
-                                <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
+                                <Select value={leaveType} onValueChange={(v: any) => setLeaveType(v)} disabled={isSaving}>
                                     <SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
                                     <SelectContent dir="rtl">
                                         <SelectItem value="Annual">سنوية</SelectItem>
-                                        <SelectItem value="Sick">مرضية</SelectItem>
+                                        <SelectItem value="Sick">مرضية (طبيات)</SelectItem>
                                         <SelectItem value="Emergency">طارئة</SelectItem>
                                         <SelectItem value="Unpaid">بدون أجر</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="grid gap-2 text-center">
-                                <Label className="font-bold text-xs opacity-50">أيام العمل المحتسبة</Label>
+                                <Label className="font-bold text-xs opacity-50">أيام العمل</Label>
                                 <div className="h-12 rounded-xl bg-primary/5 border-2 border-dashed border-primary/20 flex items-center justify-center font-black text-primary text-xl">
                                     {leaveDuration.workingDays} يوم
                                 </div>

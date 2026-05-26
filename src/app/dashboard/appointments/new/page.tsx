@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -59,7 +60,6 @@ export default function NewArchitecturalAppointmentPage() {
     
     const tenantId = currentUser?.currentCompanyId;
 
-    // Pre-fill from URL
     useEffect(() => {
         const nameFromUrl = searchParams.get('nameAr');
         const mobileFromUrl = searchParams.get('mobile');
@@ -80,7 +80,6 @@ export default function NewArchitecturalAppointmentPage() {
         }
     }, [searchParams]);
 
-
     useEffect(() => {
         if (!firestore || !tenantId) return;
         const fetchData = async () => {
@@ -89,8 +88,8 @@ export default function NewArchitecturalAppointmentPage() {
                 const clientPath = getTenantPath('clients', tenantId);
                 const empPath = getTenantPath('employees', tenantId);
 
-                const clientQuery = query(collection(firestore, clientPath), where('isActive', '==', true));
-                const engQuery = query(collection(firestore, empPath), where('status', '==', 'active'));
+                const clientQuery = query(collection(firestore, clientPath!), where('isActive', '==', true));
+                const engQuery = query(collection(firestore, empPath!), where('status', '==', 'active'));
 
                 const [clientSnap, engSnap] = await Promise.all([
                     getDocs(clientQuery),
@@ -112,13 +111,12 @@ export default function NewArchitecturalAppointmentPage() {
 
             } catch (error) {
                 console.error("Error fetching data: ", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب بيانات العملاء والمهندسين.' });
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, [firestore, tenantId, toast]);
+    }, [firestore, tenantId]);
     
     const filteredClients = useMemo(() => {
         if (!engineerId) {
@@ -148,14 +146,12 @@ export default function NewArchitecturalAppointmentPage() {
             
             try {
                 const apptsPath = getTenantPath('appointments', tenantId);
-                const appointmentDate = date;
-
-                const dayStart = new Date(appointmentDate);
+                const dayStart = new Date(date);
                 dayStart.setHours(0, 0, 0, 0);
-                const dayEnd = new Date(appointmentDate);
+                const dayEnd = new Date(date);
                 dayEnd.setHours(23, 59, 59, 999);
 
-                const appointmentsRef = collection(firestore, apptsPath);
+                const appointmentsRef = collection(firestore, apptsPath!);
                 const q = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
                 const querySnapshot = await getDocs(q);
 
@@ -164,7 +160,6 @@ export default function NewArchitecturalAppointmentPage() {
                 const bookedSlots: { time: string; title: string; type: 'client' | 'engineer' }[] = [];
                 const processedApptIds = new Set<string>();
 
-                // Filter for engineer
                 if (engineerId) {
                     dailyAppointments.forEach(appt => {
                         if (appt.engineerId === engineerId) {
@@ -178,7 +173,6 @@ export default function NewArchitecturalAppointmentPage() {
                     });
                 }
 
-                // Filter for client
                 if (checkClientId) {
                     dailyAppointments.forEach(appt => {
                         if (appt.clientId === checkClientId && !processedApptIds.has(appt.id)) {
@@ -193,8 +187,6 @@ export default function NewArchitecturalAppointmentPage() {
 
                 bookedSlots.sort((a, b) => a.time.localeCompare(b.time));
                 setDailySchedule(bookedSlots);
-            } catch (err) {
-                console.error("Error fetching daily schedule:", err);
             } finally {
                 setIsLoadingSchedule(false);
             }
@@ -211,16 +203,6 @@ export default function NewArchitecturalAppointmentPage() {
             return;
         }
 
-        if (isNewClient && (!newClientName || !newClientMobile)) {
-             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة اسم وجوال العميل الجديد.' });
-            return;
-        }
-        
-        if (!isNewClient && !clientId) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار عميل مسجل.' });
-            return;
-        }
-
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
@@ -228,51 +210,13 @@ export default function NewArchitecturalAppointmentPage() {
             const [hours, minutes] = time.split(':').map(Number);
             const appointmentDateTime = new Date(date);
             appointmentDateTime.setHours(hours, minutes, 0, 0);
-
-            if (isNewClient) {
-                if (!newClientName || !newClientMobile) {
-                    throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
-                }
-                 // Check if prospective client already exists
-                const prospectiveApptsRef = collection(firestore, apptsPath);
-                const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), where('status', '==', 'scheduled'), limit(1));
-                const prospectiveSnapshot = await getDocs(prospectiveQuery);
-                
-                if (!prospectiveSnapshot.empty) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'عميل محتمل موجود',
-                        description: `هذا العميل المحتمل موجود بالفعل في النظام. يمكنك إعادة متابعته من قائمة "العملاء المحتملون".`,
-                    });
-                    setIsSaving(false);
-                    return;
-                }
-            }
-            
-            // --- Conflict Validation ---
-            const appointmentsRef = collection(firestore, apptsPath);
-            const dayStart = new Date(appointmentDateTime); dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(appointmentDateTime); dayEnd.setHours(23, 59, 59, 999);
-            const dayAppointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
-            const dayAppointmentsSnap = await getDocs(dayAppointmentsQuery);
-            const dayAppointments = dayAppointmentsSnap.docs.map(d => d.data());
-            const windowStart = new Date(appointmentDateTime.getTime() - 59 * 60 * 1000);
-            const windowEnd = new Date(appointmentDateTime.getTime() + 59 * 60 * 1000);
-
-            const engineerHasConflict = dayAppointments.some(appt => appt.engineerId === engineerId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd);
-            if (engineerHasConflict) throw new Error('المهندس لديه موعد آخر في نفس الوقت.');
-
-            if (!isNewClient && clientId) {
-                 const clientHasConflict = dayAppointments.some(appt => appt.clientId === clientId && appt.appointmentDate.toDate() >= windowStart && appt.appointmentDate.toDate() <= windowEnd);
-                 if (clientHasConflict) throw new Error('العميل لديه موعد آخر في نفس الوقت.');
-            }
             
             const newAppointmentData: any = {
                 engineerId: engineerId,
                 title, notes,
                 appointmentDate: Timestamp.fromDate(appointmentDateTime),
                 createdAt: serverTimestamp(),
-                createdBy: currentUser.id, // 🛡️ تعقب المنشئ
+                createdBy: currentUser.id,
                 type: 'architectural',
                 status: 'scheduled',
                 companyId: tenantId
@@ -285,173 +229,104 @@ export default function NewArchitecturalAppointmentPage() {
                 newAppointmentData.clientId = clientId;
             }
 
-            const newApptRef = doc(collection(firestore, apptsPath));
+            const newApptRef = doc(collection(firestore, apptsPath!));
             batch.set(newApptRef, cleanFirestoreData(newAppointmentData));
             
-            // 🛡️ توثيق الحجز في سجل التدقيق
-            const auditRef = doc(collection(newApptRef, 'auditLogs'));
-            batch.set(auditRef, {
-                action: 'created',
-                details: `تم إنشاء الموعد بواسطة ${currentUser.fullName}.`,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp(),
-                companyId: tenantId
-            });
-
-            const fromAppointmentId = searchParams.get('fromAppointmentId');
-            if (fromAppointmentId && !isNewClient) {
-                const appointmentRef = doc(firestore, apptsPath, fromAppointmentId);
-                batch.update(appointmentRef, { clientId: clientId, clientName: deleteField(), clientMobile: deleteField() });
-            }
-
-            if (!isNewClient && clientId) {
-                const historyPath = getTenantPath(`clients/${clientId}/history`, tenantId);
-                const logContent = `قام ${currentUser.fullName} بحجز موعد جديد بعنوان "${title}" بتاريخ ${format(appointmentDateTime, "PPp", { locale: ar })}`;
-                const logData = {
-                    type: 'log' as const,
-                    content: logContent,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
-                    createdAt: serverTimestamp(),
-                    companyId: tenantId
-                };
-                batch.set(doc(collection(firestore, historyPath)), logData);
-            }
-
             await batch.commit();
-            toast({ title: 'نجاح', description: 'تم إنشاء الموعد بنجاح.' });
-            
-            const client = clients.find(c => c.id === clientId);
-            const engineer = engineers.find(e => e.id === engineerId);
 
-            if (engineerId && engineer) {
-                const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
-                if (targetUserId) {
-                     await createNotification(firestore, {
-                        userId: targetUserId,
-                        title: `موعد جديد: ${title}`,
-                        body: `تم تحديد موعد لك مع العميل ${isNewClient ? newClientName : client?.nameAr} يوم ${date ? format(date, 'PPP', { locale: ar }) : ''} الساعة ${time}.`,
-                        link: `/dashboard/appointments/${newApptRef.id}`
-                    });
-                }
+            // 🚀 إرسال إشعار فوري للمهندس 🚀
+            const targetUserId = await findUserIdByEmployeeId(firestore, engineerId, tenantId);
+            if (targetUserId) {
+                await createNotification(firestore, {
+                    userId: targetUserId,
+                    title: '🗓️ موعد جديد مجدول لك',
+                    body: `تم تحديد موعد لك مع العميل ${isNewClient ? newClientName : clients.find(c => c.id === clientId)?.nameAr} يوم ${format(date, 'PPP', { locale: ar })} الساعة ${time}.`,
+                    link: `/dashboard/appointments/${newApptRef.id}`
+                }, tenantId);
             }
-            
+
+            toast({ title: 'نجاح', description: 'تم حجز الموعد وإخطار المهندس المعني.' });
             router.push('/dashboard/appointments');
 
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'فشل حفظ الموعد.';
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: message });
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
         } finally {
             setIsSaving(false);
         }
     };
 
-
     return (
-        <Card className="max-w-2xl mx-auto" dir="rtl">
+        <Card className="max-w-2xl mx-auto rounded-[2.5rem] border-none shadow-2xl" dir="rtl">
             <form onSubmit={handleSubmit}>
-                <CardHeader>
-                    <CardTitle>إنشاء موعد جديد (القسم المعماري)</CardTitle>
-                    <CardDescription>
-                        جدولة موعد جديد مع عميل لأحد مهندسي القسم المعماري.
-                    </CardDescription>
+                <CardHeader className="bg-primary/5 pb-8 border-b">
+                    <CardTitle className="text-2xl font-black">حجز موعد معماري جديد</CardTitle>
+                    <CardDescription>جدولة زيارة المالك للمكتب مع المهندس المختص.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="p-8 space-y-6">
                     <div className="grid gap-2">
-                        <Label htmlFor="title">عنوان الموعد <span className="text-destructive">*</span></Label>
-                        <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: اجتماع مناقشة المخططات الأولية" required />
+                        <Label htmlFor="title" className="font-black">عنوان الموعد / الغرض *</Label>
+                        <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: مناقشة مخططات القسيمة..." required className="h-12 rounded-xl" />
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="engineerId">المهندس المسؤول <span className="text-destructive">*</span></Label>
+                            <Label htmlFor="engineerId" className="font-black">المهندس المسؤول *</Label>
                              <InlineSearchList
                                 value={engineerId}
                                 onSelect={setEngineerId}
                                 options={engineerOptions}
-                                placeholder={loading ? "تحميل..." : "اختر المهندس..."}
-                                disabled={loading}
+                                placeholder="اختر المهندس..."
                              />
                         </div>
                         <div className="flex items-center space-x-2 self-end mb-2">
                             <Checkbox id="isNewClient" checked={isNewClient} onCheckedChange={(checked) => setIsNewClient(checked as boolean)} />
-                            <Label htmlFor="isNewClient">عميل جديد (غير مسجل)</Label>
+                            <Label htmlFor="isNewClient" className="font-bold cursor-pointer">عميل جديد (غير مسجل)</Label>
                         </div>
                     </div>
                     
                     {isNewClient ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4 animate-in fade-in">
                             <div className="grid gap-2">
-                                <Label htmlFor="new-client-name">اسم العميل <span className="text-destructive">*</span></Label>
-                                <Input id="new-client-name" value={newClientName} onChange={e => setNewClientName(e.target.value)} required />
+                                <Label className="font-bold text-xs">اسم العميل *</Label>
+                                <Input value={newClientName} onChange={e => setNewClientName(e.target.value)} required className="h-11" />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="new-client-mobile">رقم الجوال <span className="text-destructive">*</span></Label>
-                                <Input id="new-client-mobile" value={newClientMobile} onChange={e => setNewClientMobile(e.target.value)} dir="ltr" required />
+                                <Label className="font-bold text-xs">رقم الجوال *</Label>
+                                <Input value={newClientMobile} onChange={e => setNewClientMobile(e.target.value)} dir="ltr" required className="h-11" />
                             </div>
                         </div>
                     ) : (
-                        <div className="grid gap-2">
-                            <Label htmlFor="clientId">العميل <span className="text-destructive">*</span></Label>
+                        <div className="grid gap-2 animate-in fade-in">
+                            <Label className="font-black">العميل المسجل *</Label>
                             <InlineSearchList
                                 value={clientId}
                                 onSelect={setClientId}
                                 options={clientOptions}
-                                placeholder={loading ? "تحميل..." : !engineerId ? "اختر مهندسًا أولاً" : "اختر العميل..."}
-                                disabled={loading || !engineerId}
+                                placeholder={!engineerId ? "اختر مهندسًا أولاً" : "اختر العميل..."}
+                                disabled={!engineerId}
                             />
                         </div>
                     )}
 
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                            <DateInput id="date" value={date} onChange={setDate} required />
+                            <Label className="font-black">التاريخ *</Label>
+                            <DateInput value={date} onChange={setDate} required />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="time">الوقت <span className="text-destructive">*</span></Label>
-                            <Input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
+                            <Label className="font-black">الوقت *</Label>
+                            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} required className="h-11 rounded-xl" />
                         </div>
                     </div>
-                    {(isLoadingSchedule || dailySchedule.length > 0) && (
-                        <div className="space-y-2">
-                            <Label>جدول المواعيد في اليوم المحدد</Label>
-                            {isLoadingSchedule ? (
-                                <div className="space-y-2 rounded-md border p-3">
-                                    <Skeleton className="h-5 w-3/4" />
-                                    <Skeleton className="h-5 w-1/2" />
-                                </div>
-                            ) : (
-                                <div className="space-y-2 rounded-md border p-3 text-sm">
-                                    {dailySchedule.map((slot, index) => (
-                                        <div key={index} className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-mono text-muted-foreground">{slot.time}</span>
-                                                <span>-</span>
-                                                <span>{slot.title}</span>
-                                            </div>
-                                            <Badge variant="secondary">{slot.type === 'engineer' ? 'للمهندس' : 'للعميل'}</Badge>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                     <div className="grid gap-2">
-                        <Label htmlFor="notes">ملاحظات إضافية</Label>
-                        <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="تفاصيل إضافية حول الموعد، جدول الأعمال، إلخ." />
+
+                    <div className="grid gap-2">
+                        <Label className="font-bold">ملاحظات إضافية</Label>
+                        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="rounded-2xl" />
                     </div>
                 </CardContent>
-                <CardFooter className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => router.back()}>
-                        <X className="ml-2 h-4 w-4" />
-                        إلغاء
-                    </Button>
-                    <Button type="submit" disabled={isSaving || loading}>
-                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                        {isSaving ? 'جاري الحفظ...' : 'حفظ الموعد'}
+                <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">
+                    <Button type="button" variant="outline" onClick={() => router.back()} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                    <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/30">
+                        {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : 'تأكيد الحجز'}
                     </Button>
                 </CardFooter>
             </form>

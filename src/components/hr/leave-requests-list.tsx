@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
-import { useFirebase } from '@/firebase/provider'; // 🛡️ Fix: Use provider
+import { useFirebase } from '@/firebase/provider';
 import { 
   collection, 
   query, 
@@ -107,7 +108,7 @@ export function LeaveRequestsList() {
     setIsDeleting(true);
     try {
         const finalPath = getTenantPath(`leaveRequests/${requestToDelete.id}`, tenantId);
-        await deleteDoc(doc(firestore, finalPath));
+        await deleteDoc(doc(firestore, finalPath!));
         toast({ title: '✅ تم الحذف' });
     } finally {
         setIsDeleting(false);
@@ -128,19 +129,20 @@ export function LeaveRequestsList() {
             adminComment: adminComment 
         };
         
-        await updateDoc(doc(firestore, finalPath), requestData);
+        await updateDoc(doc(firestore, finalPath!), requestData);
         
-        const targetUserId = await findUserIdByEmployeeId(firestore, requestToProcess.req.employeeId);
+        // 🚀 إشعار الموظف بالنتيجة 🚀
+        const targetUserId = await findUserIdByEmployeeId(firestore, requestToProcess.req.employeeId, tenantId);
         if (targetUserId) {
-            createNotification(firestore, {
+            await createNotification(firestore, {
                 userId: targetUserId,
-                title: requestToProcess.action === 'approved' ? '✅ موافقة على الإجازة' : '❌ رفض طلب الإجازة',
-                body: `تم ${requestToProcess.action === 'approved' ? 'قبول' : 'رفض'} طلب إجازتك. ملاحظة: ${adminComment || 'لا توجد ملاحظات.'}`,
+                title: requestToProcess.action === 'approved' ? '✅ تمت الموافقة على إجازتك' : '❌ عذراً، تم رفض طلب الإجازة',
+                body: `تم الرد على طلبك من قبل الإدارة. ملاحظة: ${adminComment || 'نتمنى لك التوفيق.'}`,
                 link: `/dashboard/hr/leaves/${requestToProcess.req.id}`
-            });
+            }, tenantId);
         }
         
-        toast({ title: 'تم التنفيذ' });
+        toast({ title: 'تم التنفيذ', description: 'تم إخطار الموظف بالقرار فوراً.' });
         setRequestToProcess(null);
         setAdminComment('');
     } finally { 
@@ -204,7 +206,7 @@ export function LeaveRequestsList() {
                   <TableCell className="text-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" dir="rtl" className="rounded-xl shadow-2xl p-2 border-none">
+                        <DropdownMenuContent dir="rtl" className="rounded-xl shadow-2xl p-2 border-none">
                             <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">خيارات المتابعة</DropdownMenuLabel>
                             
                             <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-2 cursor-pointer">
@@ -246,7 +248,7 @@ export function LeaveRequestsList() {
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-8 gap-3">
-                <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2 text-black">تراجع</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-lg shadow-red-200">
                     {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
                 </AlertDialogAction>
@@ -283,10 +285,10 @@ export function LeaveRequestsList() {
                 </div>
             </div>
             <AlertDialogFooter className="p-8 bg-muted/10 border-t gap-3 flex flex-row-reverse">
-                <Button onClick={handleConfirmDecision} disabled={isProcessingAction || !adminComment.trim()} className={cn("flex-1 h-14 rounded-2xl font-black text-lg", requestToProcess?.action === 'approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}>
-                    {isProcessingAction ? <Loader2 className="animate-spin h-6 w-6"/> : 'تأكيد القرار'}
+                <Button onClick={handleConfirmDecision} disabled={isProcessingAction || !adminComment.trim()} className={cn("flex-1 h-14 rounded-2xl font-black text-lg shadow-xl", requestToProcess?.action === 'approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}>
+                    {isProcessingAction ? <Loader2 className="animate-spin h-6 w-6"/> : 'تأكيد القرار وإرسال الإشعار'}
                 </Button>
-                <AlertDialogCancel className="rounded-2xl font-bold h-14 px-8 border-2">إلغاء</AlertDialogCancel>
+                <AlertDialogCancel className="rounded-2xl font-bold h-14 px-8 border-2 text-black">إلغاء</AlertDialogCancel>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

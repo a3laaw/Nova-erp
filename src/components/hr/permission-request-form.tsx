@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -19,6 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toFirestoreDate } from '@/services/date-converter';
 import { cn, getTenantPath } from '@/lib/utils';
 import { Input } from '../ui/input';
+import { createNotification } from '@/services/notification-service';
 
 interface PermissionRequestFormProps {
   isOpen: boolean;
@@ -28,6 +30,11 @@ interface PermissionRequestFormProps {
   employees: Employee[];
   loadingRefs: boolean;
 }
+
+const typeTranslations: Record<string, string> = {
+    late_arrival: 'تأخير صباحي',
+    early_departure: 'خروج مبكر',
+};
 
 export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissionToEdit, employees, loadingRefs }: PermissionRequestFormProps) {
   const { firestore } = useFirebase();
@@ -48,7 +55,6 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
   
   const isAdmin = ['Admin', 'HR', 'Developer'].includes(currentUser?.role || '');
 
-  // 🛡️ تصفير الحالة (State Reset Matrix) لضمان عدم تعليق التحذيرات القديمة
   useEffect(() => {
     if (isOpen) {
         setIsSaving(false);
@@ -69,9 +75,8 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     }
   }, [isOpen, permissionToEdit, currentUser, isAdmin]);
 
-  // 🛡️ فحص الرصيد والتحقق من التداخل عند تغيير البيانات - مع تصفير الخطأ فوراً
   useEffect(() => {
-    setOverlapError(null); // تصفير الخطأ فوراً عند أي تغيير لتجنب "التعليق"
+    setOverlapError(null);
     if (!isOpen || !firestore || !selectedEmployeeId || !date || !tenantId) {
         setMonthlyTotalHours(0);
         return;
@@ -85,7 +90,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             const permissionsPath = getTenantPath('permissionRequests', tenantId);
             
             const q = query(
-                collection(firestore, permissionsPath),
+                collection(firestore, permissionsPath!),
                 where('employeeId', '==', selectedEmployeeId)
             );
             
@@ -102,10 +107,9 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             });
             setMonthlyTotalHours(totalHours);
 
-            // فحص التداخل مع الإجازات
             const leavesPath = getTenantPath('leaveRequests', tenantId);
             const checkDateStart = startOfDay(date);
-            const leavesSnap = await getDocs(query(collection(firestore, leavesPath), where('employeeId', '==', selectedEmployeeId)));
+            const leavesSnap = await getDocs(query(collection(firestore, leavesPath!), where('employeeId', '==', selectedEmployeeId)));
             const hasLeave = leavesSnap.docs.some(d => {
                 const l = d.data() as LeaveRequest;
                 if (!['approved', 'on-leave', 'returned'].includes(l.status)) return false;
@@ -145,17 +149,38 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     setIsSaving(true);
     try {
       const permissionsPath = getTenantPath('permissionRequests', tenantId);
+      const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
+      
       const dataToSave = {
         employeeId: selectedEmployeeId,
-        employeeName: employees.find(e => e.id === selectedEmployeeId)?.fullName || currentUser.fullName,
+        employeeName: selectedEmployee?.fullName || currentUser.fullName,
         type: permissionType,
         date: date,
         durationHours: duration,
         reason: reason,
       };
       
-      if (permissionToEdit?.id) await updateDoc(doc(firestore, permissionsPath, permissionToEdit.id), dataToSave);
-      else await addDoc(collection(firestore, permissionsPath), { ...dataToSave, status: 'pending', createdAt: serverTimestamp(), companyId: tenantId });
+      if (permissionToEdit?.id) {
+          await updateDoc(doc(firestore, permissionsPath!, permissionToEdit.id), dataToSave);
+      } else {
+          await addDoc(collection(firestore, permissionsPath!), { ...dataToSave, status: 'pending', createdAt: serverTimestamp(), companyId: tenantId });
+          
+          // 🚀 إخطار الإدارة والـ HR بالطلب الجديد 🚀
+          const usersPath = getTenantPath('users', tenantId);
+          const adminHRUsersQuery = query(collection(firestore, usersPath!), where('role', 'in', ['Admin', 'HR']));
+          const adminsSnap = await getDocs(adminHRUsersQuery);
+          
+          adminsSnap.forEach(adminDoc => {
+              if (adminDoc.id !== currentUser.id) {
+                  createNotification(firestore, {
+                      userId: adminDoc.id,
+                      title: '🕒 طلب استئذان جديد',
+                      body: `قدم الموظف ${selectedEmployee?.fullName || currentUser.fullName} طلب ${typeTranslations[permissionType]}.`,
+                      link: `/dashboard/hr/permissions`
+                  }, tenantId);
+              }
+          });
+      }
       
       onSaveSuccess(); onClose();
       toast({ title: 'تم تقديم الطلب بنجاح' });

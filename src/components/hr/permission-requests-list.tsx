@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -30,6 +31,7 @@ import { useSearchParams } from 'next/navigation';
 import { cn, getTenantPath } from '@/lib/utils';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -118,7 +120,7 @@ export function PermissionRequestsList() {
     setIsDeleting(true);
     try {
         const finalPath = getTenantPath(`permissionRequests/${requestToDelete.id}`, tenantId);
-        await deleteDoc(doc(firestore, finalPath));
+        await deleteDoc(doc(firestore, finalPath!));
         toast({ title: 'نجاح الحذف', description: 'تم حذف طلب الاستئذان بنجاح.' });
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الطلب.' });
@@ -134,7 +136,7 @@ export function PermissionRequestsList() {
     setIsProcessingAction(true);
     try {
         const finalPath = getTenantPath(`permissionRequests/${requestToAction.request.id}`, tenantId);
-        const reqRef = doc(firestore, finalPath);
+        const reqRef = doc(firestore, finalPath!);
         const newStatus = requestToAction.action === 'approve' ? 'approved' : 'rejected';
         
         await updateDoc(reqRef, {
@@ -143,8 +145,19 @@ export function PermissionRequestsList() {
             approvedAt: serverTimestamp(),
             adminComment: adminComment
         });
+
+        // 🚀 إخطار الموظف بالنتيجة 🚀
+        const targetUserId = await findUserIdByEmployeeId(firestore, requestToAction.request.employeeId, tenantId);
+        if (targetUserId) {
+            await createNotification(firestore, {
+                userId: targetUserId,
+                title: newStatus === 'approved' ? '✅ تمت الموافقة على الاستئذان' : '❌ عذراً، تم رفض طلب الاستئذان',
+                body: `تم الرد على طلبك من قبل الإدارة. ملاحظة: ${adminComment || 'نتمنى لك يوماً سعيداً.'}`,
+                link: `/dashboard/hr/permissions`
+            }, tenantId);
+        }
         
-        toast({ title: 'تم التنفيذ', description: `تم ${newStatus === 'approved' ? 'الموافقة على' : 'رفض'} الطلب.` });
+        toast({ title: 'تم التنفيذ', description: `تم ${newStatus === 'approved' ? 'الموافقة على' : 'رفض'} الطلب وإخطار الموظف.` });
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الطلب.' });
     } finally {
@@ -205,7 +218,7 @@ export function PermissionRequestsList() {
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4"/></Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent dir="rtl" className="rounded-xl shadow-2xl p-2 border-none">
+                        <DropdownMenuContent dir="rtl" className="rounded-xl shadow-2xl p-2 border-none bg-white">
                             <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">خيارات الطلب</DropdownMenuLabel>
                              {isAdmin && req.status === 'pending' && (
                                 <>
@@ -219,7 +232,7 @@ export function PermissionRequestsList() {
                                 </>
                             )}
                             {req.status === 'pending' && (
-                                <DropdownMenuItem onClick={() => handleEditClick(req)} className="gap-2 py-3 rounded-lg font-bold">
+                                <DropdownMenuItem onClick={() => handleEditClick(req)} className="gap-2 py-3 rounded-lg font-bold text-black">
                                     <Pencil className="h-4 w-4 text-primary" /> تعديل البيانات
                                 </DropdownMenuItem>
                             )}
@@ -250,15 +263,15 @@ export function PermissionRequestsList() {
       />
       
       <AlertDialog open={!!requestToDelete} onOpenChange={() => setRequestToDelete(null)}>
-        <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl">
+        <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
             <AlertDialogHeader>
                 <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><Trash2 className="h-8 w-8"/></div>
                 <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
-                <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2">سيتم مسح طلب الاستئذان نهائياً من سجلات الموظف. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
+                <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">سيتم مسح طلب الاستئذان نهائياً من سجلات الموظف. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-8 gap-3">
-                <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12 shadow-lg shadow-red-200">
+                <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2 text-black">تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-lg shadow-red-200">
                     {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف الطلب'}
                 </AlertDialogAction>
             </AlertDialogFooter>
@@ -306,7 +319,7 @@ export function PermissionRequestsList() {
                 >
                     {isProcessingAction ? <Loader2 className="animate-spin h-6 w-6"/> : 'تأكيد وحفظ القرار'}
                 </Button>
-                <AlertDialogCancel className="rounded-2xl font-bold h-14 px-8 border-2">إلغاء</AlertDialogCancel>
+                <AlertDialogCancel className="rounded-2xl font-bold h-14 px-8 border-2 text-black">إلغاء</AlertDialogCancel>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
