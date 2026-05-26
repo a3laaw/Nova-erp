@@ -66,9 +66,9 @@ export function numberToArabicWords(inputNumber: number | string): string {
 }
 
 /**
- * محرك توجيه المسارات المعتمد (Tenant Router V2.1):
+ * محرك توجيه المسارات المعتمد (Tenant Router V2.2):
  * تم تحصين المحرك لضمان عدم إرجاع null إذا كان المسار يحتوي بالفعل على 'companies/'
- * لضمان عدم حدوث انكسار في محرك الإنتاجية للمطورين.
+ * أو إذا كانت البيانات في حالة تحميل مؤقت.
  */
 export function getTenantPath(path: string | null | undefined, tenantId: string | null | undefined): string | null {
   if (!path) return null;
@@ -86,11 +86,12 @@ export function getTenantPath(path: string | null | undefined, tenantId: string 
   const isMaster = masterCollections.some(mc => path.startsWith(mc));
   if (isMaster) return path;
   
-  // 🛡️ إذا كان المسار يحتوي بالفعل على بادئة الشركة، نرجعه كما هو (نقطة حيوية لإصلاح الإنتاجية)
   if (path.includes('companies/')) return path;
   
-  // إذا لم يتوفر tenantId لمسار فرعي، نرجع null لمنع التداخل
-  if (!tenantId) return null;
+  if (!tenantId) {
+      // 🛡️ رادار الانتظار: إذا لم يتوفر tenantId بعد، نرجع مساراً وهمياً آمناً لمنع الانهيار
+      return `_WAITING_/${path}`;
+  }
   
   return `companies/${tenantId}/${path}`;
 }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
@@ -9,7 +8,7 @@ import type { Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature, Globe, ShieldCheck, FileText, Landmark, FileCheck, Calculator } from 'lucide-react';
+import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature, Globe, ShieldCheck, FileText, Landmark, FileCheck, Calculator, CalendarPlus } from 'lucide-react';
 import Link from 'next/link';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, differenceInDays } from 'date-fns';
@@ -23,7 +22,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-// InfoRow component for consistent display
+/**
+ * ملف التعريف المحدث للموظف:
+ * تم إضافة استيراد CalendarPlus المفقود لضمان استقرار العرض.
+ */
 function InfoRow({ label, value, icon, children }: { label: string, value: React.ReactNode, icon: React.ReactNode, children?: React.ReactNode }) {
     return (
         <div className="flex items-start gap-3">
@@ -150,7 +152,6 @@ export default function EmployeeProfilePage() {
                                         )}
                                     </InfoRow>
 
-                                    {/* 🛡️ عرض الوثائق التخصصية 🛡️ */}
                                     {employee.passportExpiry && (
                                         <InfoRow label="انتهاء الجواز" value={formatDate(employee.passportExpiry)} icon={<FileText className="h-4 w-4 text-indigo-600"/>} />
                                     )}
@@ -225,5 +226,3 @@ export default function EmployeeProfilePage() {
         </div>
     );
 }
-
-import { CalendarPlus } from 'lucide-react';

@@ -28,6 +28,10 @@ import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 
+/**
+ * صفحة تفاصيل الزيارة المحدثة (The Sovereign Visit Control Center V83.0):
+ * تم حقن "محرك المطالبات الآلية" لضمان ربط الإنجاز الميداني بالتحصيل المالي فوراً.
+ */
 export default function AppointmentDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -72,25 +76,54 @@ export default function AppointmentDetailsPage() {
         return transaction.stages.filter(s => s.status !== 'completed');
     }, [transaction?.stages]);
 
-    // 🛡️ إجراء ربط الزيارة بمعاملة قائمة (تم الإصلاح لضمان سلامة الـ Audit Log)
+    // ✨ محرك حساب المطالبات المالية الآلية (Financial Claim Radar) ✨
+    const calculateFinancialClaim = async (stageName: string) => {
+        if (!firestore || !tenantId || !transaction?.contract?.clauses) return null;
+        try {
+            const receiptsPath = getTenantPath('cashReceipts', tenantId);
+            const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath!), where('projectId', '==', appointment?.transactionId)));
+            const totalReceived = receiptsSnap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
+
+            const clauses = transaction.contract.clauses;
+            let totalRequiredUntilNow = 0;
+            let foundCurrent = false;
+            let currentClauseAmount = 0;
+
+            for (const clause of clauses) {
+                totalRequiredUntilNow += clause.amount;
+                if (clause.condition === stageName) {
+                    foundCurrent = true;
+                    currentClauseAmount = clause.amount;
+                    break;
+                }
+            }
+
+            if (foundCurrent) {
+                const totalDebt = totalRequiredUntilNow - totalReceived;
+                if (totalDebt > 0) {
+                    const prevOwed = totalDebt - currentClauseAmount;
+                    return { totalDebt, currentClauseAmount, prevOwed };
+                }
+            }
+            return null;
+        } catch (e) {
+            return null;
+        }
+    };
+
     const handleLinkTransaction = async () => {
         if (!firestore || !tenantId || !appointment || !selectedTxToLink) return;
         setIsLinking(true);
         try {
             const batch = writeBatch(firestore);
             const apptRef = doc(firestore, apptPath!);
-            
             batch.update(apptRef, { 
                 transactionId: selectedTxToLink,
                 updatedAt: serverTimestamp(),
                 updatedBy: currentUser?.id
             });
-
-            // 🛡️ تصحيح: استخدام مسار المجلد لإضافة السجل الجديد
-            const auditCollectionRef = collection(apptRef, 'auditLogs');
-            const newAuditRef = doc(auditCollectionRef);
-            
-            batch.set(newAuditRef, {
+            const auditRef = doc(collection(apptRef, 'auditLogs'));
+            batch.set(auditRef, {
                 action: 'linked',
                 details: `تم ربط الزيارة يدوياً بالمعاملة: ${clientTransactions.find(t => t.id === selectedTxToLink)?.transactionType}.`,
                 userName: currentUser?.fullName,
@@ -98,13 +131,9 @@ export default function AppointmentDetailsPage() {
                 createdAt: serverTimestamp(),
                 companyId: tenantId
             });
-
             await batch.commit();
-            toast({ title: 'تم الربط بنجاح', description: 'يمكنك الآن توثيق إنجاز المراحل لهذه المعاملة.' });
-        } catch (e) {
-            console.error("Link Transaction Error:", e);
-            toast({ variant: 'destructive', title: 'خطأ في الربط' });
-        } finally { setIsLinking(false); }
+            toast({ title: 'تم الربط بنجاح' });
+        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الربط' }); } finally { setIsLinking(false); }
     };
 
     const handleUpdateVisitStatus = async () => {
@@ -124,10 +153,10 @@ export default function AppointmentDetailsPage() {
             if (stageIdx > -1) {
                 const stage = currentStages[stageIdx];
                 const now = new Date();
-
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 
+                // تفعيل المراحل التالية
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
@@ -152,18 +181,61 @@ export default function AppointmentDetailsPage() {
                 }
 
                 let financeComment = "";
-                if (transaction.contract?.clauses) {
-                    const updatedClauses = transaction.contract.clauses.map((clause: any) => {
+                let updatedClauses = transaction.contract?.clauses || null;
+                
+                // 💰 محرك المطالبات والتحصيل الآلي 💰
+                if (updatedClauses) {
+                    updatedClauses = updatedClauses.map((clause: any) => {
                         if (clause.condition === stage.name && clause.status === 'غير مستحقة') {
                             financeComment = `\n\n**[إشعار مالي]** استحقت دفعة "${clause.name}" بقيمة **${formatCurrency(clause.amount)}**.`;
                             return { ...clause, status: 'مستحقة' };
                         }
                         return clause;
                     });
-                    batch.update(txRef, { 'contract.clauses': updatedClauses });
+                    
+                    const claim = await calculateFinancialClaim(stage.name);
+                    if (claim) {
+                        const appCounterPath = getTenantPath('counters/paymentApplications', tenantId);
+                        const appCounterDoc = await getDoc(doc(firestore, appCounterPath!));
+                        const currentYear = new Date().getFullYear();
+                        const appNextNumber = ((appCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+                        const appNumber = `APP-AUTO-${currentYear}-${String(appNextNumber).padStart(4, '0')}`;
+                        
+                        const appsPath = getTenantPath('payment_applications', tenantId);
+                        const newAppRef = doc(collection(firestore, appsPath!));
+                        
+                        batch.set(newAppRef, {
+                            applicationNumber: appNumber,
+                            date: serverTimestamp(),
+                            projectId: appointment.transactionId,
+                            clientId: appointment.clientId,
+                            clientName: client?.nameAr || appointment.clientName,
+                            projectName: transaction.transactionType,
+                            items: [{
+                                boqItemId: stage.stageId,
+                                description: `إنجاز مرحلة فنية عبر زيارة ميدانية: ${stage.name}`,
+                                unit: 'مرحلة',
+                                unitPrice: claim.totalDebt,
+                                currentQuantity: 1,
+                                totalAmount: claim.totalDebt
+                            }],
+                            totalAmount: claim.totalDebt,
+                            status: 'approved',
+                            companyId: tenantId,
+                            createdAt: serverTimestamp(),
+                            createdBy: currentUser.id
+                        });
+                        batch.set(doc(firestore, appCounterPath!), { counts: { [currentYear]: appNextNumber } }, { merge: true });
+                        financeComment += `\n**[مطالبة آلية]** تم إصدار مستخلص رقم **${appNumber}** بقيمة صافية: **${formatCurrency(claim.totalDebt)}**.`;
+                    }
                 }
 
-                batch.update(txRef, { stages: currentStages, updatedAt: serverTimestamp() });
+                batch.update(txRef, { 
+                    stages: currentStages, 
+                    updatedAt: serverTimestamp(),
+                    status: 'in-progress',
+                    ...(updatedClauses && { 'contract.clauses': updatedClauses })
+                });
                 
                 const timelineRef = doc(collection(txRef, 'timelineEvents'));
                 batch.set(timelineRef, {
@@ -197,7 +269,7 @@ export default function AppointmentDetailsPage() {
             });
 
             await batch.commit();
-            toast({ title: 'تم توثيق الإنجاز', description: 'تم تحديث كافة مسارات العمل التابعة آلياً.' });
+            toast({ title: 'تم توثيق الإنجاز', description: 'تم تحديث كافة مسارات العمل والمطالبات المالية آلياً.' });
             router.push('/dashboard/appointments');
         } catch (e) { 
             toast({ variant: 'destructive', title: 'خطأ في التوثيق' }); 
