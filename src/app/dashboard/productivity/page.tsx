@@ -46,10 +46,10 @@ import { MentionTextarea } from '@/components/ui/mention-textarea';
 import { createNotification } from '@/services/notification-service';
 
 /**
- * منصة الإنتاجية السيادية (Productivity Platform V126.0):
+ * منصة الإنتاجية السيادية (Productivity Platform V127.0):
  * - تم تفعيل نظام التنبيهات للمنشن في المذكرات البينية.
- * - تم تصحيح مسارات استيراد المكونات لضمان ثبات البناء.
  * - محرك المنشن يعمل الآن بتقنية الـ Portal لمنع الاختفاء داخل النوافذ.
+ * - تحصين النوافذ لمنع التداخل مع القائمة العائمة للمنشن.
  */
 function ProductivityContent() {
     const { firestore } = useFirebase();
@@ -124,7 +124,7 @@ function ProductivityContent() {
                             <CardTitle className="text-3xl font-black text-white tracking-tighter">منصة الإنجاز والإنتاجية</CardTitle>
                             <div className="flex items-center gap-2 mt-1">
                                 <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
-                                <CardDescription className="text-white/90 font-bold text-sm">مساحتك الخاصة لمتابعة المهام المستخلص من المشاريع.</CardDescription>
+                                <CardDescription className="text-white/90 font-bold text-sm">مساحتك الخاصة لمتابعة المهام المستخلصة من المشاريع.</CardDescription>
                             </div>
                         </div>
                     </div>
@@ -410,7 +410,17 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+            <DialogContent 
+                dir="rtl" 
+                className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white"
+                onInteractOutside={(e) => {
+                    // 🛡️ درع حماية: منع إغلاق النافذة عند النقر على قائمة المنشن المفتوحة في الـ Portal 🛡️
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[data-inline-search-list-options]')) {
+                        e.preventDefault();
+                    }
+                }}
+            >
                 <DialogHeader className="p-8 bg-orange-600 text-white border-b shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
@@ -526,7 +536,17 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+            <DialogContent 
+                dir="rtl" 
+                className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white"
+                onInteractOutside={(e) => {
+                    // 🛡️ درع حماية: منع إغلاق النافذة عند النقر على قائمة المنشن المفتوحة في الـ Portal 🛡️
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[data-inline-search-list-options]')) {
+                        e.preventDefault();
+                    }
+                }}
+            >
                 <DialogHeader className="p-8 bg-green-600 text-white border-b shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">

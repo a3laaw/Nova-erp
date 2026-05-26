@@ -19,10 +19,9 @@ interface MentionTextareaProps extends React.ComponentProps<typeof Textarea> {
 }
 
 /**
- * محرك المنشن السيادي العابر للطبقات (Sovereign Portal Mention Engine V126.0):
- * - يستخدم React Portal للظهور فوق كافة النوافذ المنبثقة (Modals) دون أن يُقص.
- * - محرك حساب إحداثيات (Fixed Positioning) يضمن تلاحم القائمة مع منطقة الكتابة.
- * - ذكاء مكاني كامل (Auto-Flip) للظهور بالأعلى أو الأسفل حسب المساحة المتاحة في الشاشة.
+ * محرك المنشن السيادي العابر للطبقات (Sovereign Portal Mention Engine V127.0):
+ * - تم تفعيل نظام الـ Portal للظهور فوق كافة النوافذ المنبثقة.
+ * - تحصين عملية الاختيار عبر onPointerDown لمنع إغلاق القائمة قبل حقن البيانات.
  */
 export function MentionTextarea({ value, onValueChange, className, ...props }: MentionTextareaProps) {
   const { firestore } = useFirebase();
@@ -53,7 +52,6 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
       .slice(0, 8);
   }, [users, mentionQuery]);
 
-  // محرك حساب الموقع العائم
   const updateMenuPosition = () => {
     if (textareaRef.current) {
         const rect = textareaRef.current.getBoundingClientRect();
@@ -126,6 +124,8 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
     const cursor = textareaRef.current?.selectionStart || 0;
     const lastAt = text.lastIndexOf('@', cursor - 1);
     
+    if (lastAt === -1) return;
+
     const before = text.slice(0, lastAt);
     const after = text.slice(cursor);
     const newValue = `${before}@${user.username} ${after}`;
@@ -133,6 +133,7 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
     onValueChange(newValue);
     setShowMentions(false);
     
+    // إعادة التركيز وتحديد موقع القلم بعد الحقن
     setTimeout(() => {
         if (textareaRef.current) {
             textareaRef.current.focus();
@@ -140,7 +141,7 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
             const newPos = before.length + usernameLen + 2; 
             textareaRef.current.setSelectionRange(newPos, newPos);
         }
-    }, 10);
+    }, 50);
   };
 
   const mentionList = showMentions && filteredUsers.length > 0 && mounted ? (
@@ -157,6 +158,7 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
             zIndex: 999999999, // سيادة مطلقة فوق أي نافذة منبثقة
         }}
         dir="rtl"
+        data-inline-search-list-options="true"
     >
       <div className="p-4 bg-primary/5 border-b flex items-center justify-between">
          <div className="flex items-center gap-3">
@@ -173,7 +175,12 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
             <button
               key={user.id}
               type="button"
-              onMouseDown={(e) => { e.preventDefault(); selectUser(user); }} // Use onMouseDown to prevent focus loss
+              // 🛡️ استخدام onPointerDown مع preventDefault هو "المفتاح" لمنع إغلاق القائمة قبل الاختيار 🛡️
+              onPointerDown={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation();
+                selectUser(user); 
+              }}
               onMouseEnter={() => setSelectedIndex(idx)}
               className={cn(
                 "w-full flex items-center gap-4 p-3 rounded-2xl transition-all text-right",
