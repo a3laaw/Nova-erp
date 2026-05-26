@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -19,55 +20,21 @@ import {
   TableRow,
   TableFooter
 } from '@/components/ui/table';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Loader2, 
-  Save, 
-  PlusCircle, 
-  Trash2, 
-  FileSignature, 
-  Calculator, 
-  Layers, 
-  CheckCircle2, 
-  Target,
-  ShieldCheck,
-  Ruler,
-  Building2,
-  Workflow
-} from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, FileSignature, Calculator, ShieldCheck } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { 
-  doc, 
-  collection, 
-  serverTimestamp, 
-  getDocs, 
-  query, 
-  runTransaction, 
-  limit, 
-  where, 
-  orderBy, 
-  getDoc,
-  Timestamp 
-} from 'firebase/firestore';
+import { doc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, orderBy, getDoc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
-import { Separator } from '../ui/separator';
 import { InlineSearchList } from '../ui/inline-search-list';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
-const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة', 'الحادية عشرة', 'الثانية عشرة'];
+const arabicOrdinals = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
 export function ContractClausesForm({ isOpen, onClose, transaction, clientId, clientName, quotationIdToUpdate }: any) {
   const { firestore } = useFirebase();
@@ -79,88 +46,49 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
   
-  const [specs, setSpecs] = useState<any>({
-      totalArea: 0, floorsCount: 1, basementType: 'none', roofExtension: 'none', workNature: 'labor_only'
-  });
-
-  const [financials, setFinancials] = useState<any>({ 
-      type: 'fixed', totalAmount: 0, milestones: [] 
-  });
-  
+  const [specs, setSpecs] = useState<any>({ totalArea: 0, floorsCount: 1, basementType: 'none', roofExtension: 'none', workNature: 'labor_only' });
+  const [financials, setFinancials] = useState<any>({ type: 'fixed', totalAmount: 0, milestones: [] });
   const [fetchedStages, setFetchedStages] = useState<{ value: string, label: string }[]>([]);
-  const syncedRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen && transaction && !syncedRef.current) {
+    if (isOpen && transaction) {
         const q = transaction as any;
-        
         setSpecs({
-            totalArea: Number(q.totalArea || q.contract?.specs?.totalArea || 0),
-            floorsCount: Number(q.floorsCount || q.contract?.specs?.floorsCount || 1),
-            basementType: q.basementType || q.contract?.specs?.basementType || 'none',
-            roofExtension: q.roofExtension || q.contract?.specs?.roofExtension || 'none',
-            workNature: q.workNature || q.contract?.specs?.workNature || 'labor_only'
+            totalArea: Number(q.totalArea || 0),
+            floorsCount: Number(q.floorsCount || 1),
+            basementType: q.basementType || 'none',
+            roofExtension: q.roofExtension || 'none',
+            workNature: q.workNature || 'labor_only'
         });
-
-        const type = q.financialsType || q.contract?.financialsType || 'fixed';
-        const rawItems = q.items || q.contract?.clauses || [];
-        
+        const type = q.financialsType || 'fixed';
+        const rawItems = q.items || [];
         setFinancials({
             type: type,
-            totalAmount: Number(q.totalAmount || q.contract?.totalAmount || 0),
+            totalAmount: Number(q.totalAmount || 0),
             milestones: rawItems.map((item: any, idx: number) => ({
                 id: item.id || generateId(),
-                name: item.description || item.name || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
-                condition: item.triggerCondition || item.condition || (idx === 0 ? 'عند توقيع العقد' : ''), 
-                value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice || item.amount) || 0)
+                name: item.description || `الدفعة ${arabicOrdinals[idx] || (idx + 1)}`,
+                condition: item.triggerCondition || (idx === 0 ? 'عند توقيع العقد' : ''), 
+                value: type === 'percentage' ? (Number(item.percentage) || 0) : (Number(item.unitPrice) || 0)
             }))
         });
-        
-        syncedRef.current = true;
     }
   }, [isOpen, transaction]);
 
   useEffect(() => {
     if (!isOpen || !firestore || !tenantId) return;
-    const fetchRefData = async () => {
-      try {
-        const stagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages'), where('companyId', '==', tenantId)));
-        const stages = Array.from(new Map(stagesSnap.docs.map(doc => {
-            const name = doc.data().name;
-            return [name, { value: name, label: name }];
-        })).values());
-        
-        setFetchedStages([
-            { value: 'عند توقيع العقد', label: 'عند توقيع العقد' },
-            ...stages
-        ]);
-      } catch (e) { console.error(e); }
-    };
-    fetchRefData();
+    getDocs(query(collectionGroup(firestore, 'workStages'), where('companyId', '==', tenantId))).then(snap => {
+        const stages = Array.from(new Map(snap.docs.map(doc => [doc.data().name, { value: doc.data().name, label: doc.data().name }])).values());
+        setFetchedStages([{ value: 'عند توقيع العقد', label: 'عند توقيع العقد' }, ...stages]);
+    });
   }, [isOpen, firestore, tenantId]);
 
-  const wbsOptions = useMemo(() => {
-      const currentValues = (financials.milestones || []).map((m: any) => m.condition).filter(Boolean);
-      const existingValues = new Set(fetchedStages.map(s => s.value));
-      const fallbacks = currentValues.filter(v => !existingValues.has(v)).map(v => ({ value: v, label: v }));
-      return [...fetchedStages, ...fallbacks];
-  }, [fetchedStages, financials.milestones]);
-
-  const currentTotalInput = useMemo(() => 
-    (financials.milestones || []).reduce((sum: number, m: any) => sum + (Number(m.value) || 0), 0)
-  , [financials.milestones]);
-
   const handleSubmit = async () => {
-    if (!firestore || !currentUser || !clientId || isSaving || !tenantId || savingRef.current) return;
-    
-    const targetTxId = transaction.transactionId || transaction.id;
-    if (!targetTxId) {
-        toast({ variant: 'destructive', title: 'فشل الربط', description: 'عذراً، لم يتم العثور على المعاملة الأصلية للربط.' });
-        return;
-    }
-
+    if (!firestore || !currentUser || !clientId || isSaving || savingRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
+
+    const targetTxId = transaction.transactionId || transaction.id;
 
     try {
         const coaPath = getTenantPath('chartOfAccounts', tenantId);
@@ -169,253 +97,97 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
         
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
-            const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
-            const coaSubCounterPath = getTenantPath('counters/coa_clients', tenantId);
+            const jeCounterRef = doc(firestore, getTenantPath('counters/journalEntries', tenantId)!);
+            const coaSubCounterRef = doc(firestore, getTenantPath('counters/coa_clients', tenantId)!);
             
-            const jeCounterRef = doc(firestore, jeCounterPath!);
-            const coaSubCounterRef = doc(firestore, coaSubCounterPath!);
-            
-            const [jeCounterDoc, coaSubCounterDoc] = await Promise.all([
-                transaction_fs.get(jeCounterRef),
-                transaction_fs.get(coaSubCounterRef)
-            ]);
+            const [jeCounterDoc, coaSubCounterDoc] = await Promise.all([transaction_fs.get(jeCounterRef), transaction_fs.get(coaSubCounterRef)]);
 
-            let clientAccountId = '';
-            if (clientAccSnap.empty) {
+            let clientAccountId = clientAccSnap.docs[0]?.id;
+            if (!clientAccountId) {
                 const nextClientNum = (coaSubCounterDoc.data()?.lastNumber || 0) + 1;
-                const clientCode = `1102C${String(nextClientNum).padStart(4, '0')}`;
                 const newAccRef = doc(collection(firestore, coaPath!));
                 clientAccountId = newAccRef.id;
-                transaction_fs.set(newAccRef, {
-                    code: clientCode, name: clientName, type: 'asset', level: 3,
-                    parentCode: '1102', isPayable: true, statement: 'Balance Sheet', balanceType: 'Debit',
-                    companyId: tenantId, createdAt: serverTimestamp()
-                });
+                transaction_fs.set(newAccRef, { code: `1102C${String(nextClientNum).padStart(4, '0')}`, name: clientName, type: 'asset', level: 3, parentCode: '1102', isPayable: true, companyId: tenantId, createdAt: serverTimestamp() });
                 transaction_fs.set(coaSubCounterRef, { lastNumber: nextClientNum }, { merge: true });
-            } else {
-                clientAccountId = clientAccSnap.docs[0].id;
             }
 
             const txPath = getTenantPath(`clients/${clientId}/transactions/${targetTxId}`, tenantId);
-            const txRef = doc(firestore, txPath!);
-            
-            const finalClauses = financials.milestones.map((m: any) => {
-                const amount = financials.type === 'percentage' ? (m.value / 100) * financials.totalAmount : m.value;
-                return { id: m.id, name: m.name, condition: m.condition, amount, status: 'غير مستحقة', percentage: m.value };
-            });
+            const finalClauses = financials.milestones.map((m: any) => ({ ...m, amount: financials.type === 'percentage' ? (m.value / 100) * financials.totalAmount : m.value, status: 'غير مستحقة' }));
 
-            const totalAmount = financials.type === 'fixed' ? currentTotalInput : financials.totalAmount;
-            
-            transaction_fs.update(txRef, {
+            transaction_fs.update(doc(firestore, txPath!), {
                 status: 'in-progress',
-                contract: cleanFirestoreData({ clauses: finalClauses, totalAmount, financialsType: financials.type, specs }),
+                contract: cleanFirestoreData({ clauses: finalClauses, totalAmount: financials.totalAmount, financialsType: financials.type, specs }),
                 updatedAt: serverTimestamp()
             });
 
             const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-            const jePath = getTenantPath('journalEntries', tenantId);
-            const newJeRef = doc(collection(firestore, jePath!));
-
-            transaction_fs.set(newJeRef, cleanFirestoreData({
+            transaction_fs.set(doc(collection(firestore, getTenantPath('journalEntries', tenantId)!)), cleanFirestoreData({
                 entryNumber: `JV-PR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
                 date: serverTimestamp(), 
-                narration: `[قيد إثبات مديونية] عقد: ${transaction.transactionType || transaction.subject} لـ ${clientName} - بانتظار المراجعة`,
-                totalDebit: totalAmount, totalCredit: totalAmount, 
-                status: 'draft',
+                narration: `تم إنشاء القيد المحاسبي للعقد: ${transaction.transactionType || transaction.subject}`,
+                totalDebit: financials.totalAmount, totalCredit: financials.totalAmount, status: 'posted',
                 lines: [
-                    { accountId: clientAccountId, accountName: clientName, debit: totalAmount, credit: 0, auto_profit_center: targetTxId },
-                    { accountId: revenueAccSnap.docs[0]?.id || '4101', accountName: revenueAccSnap.docs[0]?.data()?.name || 'إيرادات عقود', debit: 0, credit: totalAmount, auto_profit_center: targetTxId }
+                    { accountId: clientAccountId, accountName: clientName, debit: financials.totalAmount, credit: 0, auto_profit_center: targetTxId },
+                    { accountId: revenueAccSnap.docs[0]?.id, accountName: 'إيرادات عقود', debit: 0, credit: financials.totalAmount, auto_profit_center: targetTxId }
                 ],
                 clientId, transactionId: targetTxId, createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
             }));
 
-            // ✨ التوثيق الآلي (Automated Comment) ✨
-            const timelineRef = doc(collection(txRef, 'timelineEvents'));
-            transaction_fs.set(timelineRef, {
-                type: 'comment',
-                content: `**[إشعار قانوني]**\nتم توقيع واعتماد العقد المالي للمعاملة بقيمة إجمالية **${formatCurrency(totalAmount)}**.\nتم تأسيس مصفوفة دفعات مكونة من **${finalClauses.length}** مراحل استحقاق.`,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp(),
-                companyId: tenantId
-            });
+            if (quotationIdToUpdate) {
+                transaction_fs.update(doc(firestore, getTenantPath(`quotations/${quotationIdToUpdate}`, tenantId)!), { status: 'accepted' });
+            }
 
             transaction_fs.set(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum }, { merge: true });
-            transaction_fs.update(doc(firestore, getTenantPath(`clients/${clientId}`, tenantId)!), { status: 'contracted' });
         });
 
-        toast({ title: '✅ تم توقيع العقد بنجاح' });
+        toast({ title: 'تم تفعيل العقد المالي' });
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'خطأ تقني', description: e.message });
+        toast({ variant: 'destructive', title: 'خطأ', description: e.message });
     } finally { setIsSaving(false); savingRef.current = false; }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0 overflow-hidden rounded-[3rem] border-none shadow-2xl bg-white" dir="rtl">
-        <DialogHeader className="p-8 bg-[#FF7A00]/5 border-b shrink-0">
+      <DialogContent className="max-w-4xl rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white" dir="rtl">
+        <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-4">
-                <div className="p-4 bg-gradient-to-br from-[#FFB000] to-[#FF7A00] rounded-3xl text-white shadow-xl">
-                    <FileSignature className="h-8 w-8"/>
-                </div>
-                <div className="text-right">
-                    <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">الاعتماد النهائي للعقد</DialogTitle>
-                    <DialogDescription className="font-bold text-slate-500">مراجعة المواصفات والربط المالي الصارم بالمسار الفني.</DialogDescription>
-                </div>
+                <div className="p-3 bg-primary rounded-2xl text-white shadow-xl"><FileSignature className="h-6 w-6"/></div>
+                <DialogTitle className="text-2xl font-black text-[#1e1b4b]">تفعيل العقد المالي</DialogTitle>
             </div>
         </DialogHeader>
-
-        <ScrollArea className="flex-1">
-            <div className="p-10 space-y-12 pb-20">
-                <section className="space-y-6">
-                    <h3 className="text-xl font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4">
-                        <Target className="h-7 w-7 text-indigo-600" /> مراجعة المواصفات الفنية المعتمدة
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 p-10 border-4 border-slate-50 rounded-[3.5rem] bg-white shadow-xl relative">
-                        <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500/10" />
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1 flex items-center gap-1"><Ruler className="h-3 w-3" /> المساحة (م²)</Label>
-                            <Input type="number" value={specs.totalArea} onChange={e => setSpecs({...specs, totalArea: Number(e.target.value)})} className="h-14 font-black text-3xl text-indigo-600 rounded-2xl bg-indigo-50/20 border-indigo-100 shadow-inner" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1 flex items-center gap-1"><Building2 className="h-3 w-3" /> عدد الأدوار</Label>
-                            <Input type="number" value={specs.floorsCount} onChange={e => setSpecs({...specs, floorsCount: Number(e.target.value)})} className="h-14 font-black text-3xl rounded-2xl shadow-inner" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1">السرداب</Label>
-                            <Select value={specs.basementType} onValueChange={v => setSpecs({...specs, basementType: v})}>
-                                <SelectTrigger className="h-14 rounded-2xl border-2 font-black text-lg"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    <SelectItem value="none">بدون سرداب</SelectItem>
-                                    <SelectItem value="full">كامل</SelectItem>
-                                    <SelectItem value="half">نصف</SelectItem>
-                                    <SelectItem value="vault">قبو</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-slate-400 pr-1">توسعة السطح</Label>
-                            <Select value={specs.roofExtension} onValueChange={v => setSpecs({...specs, roofExtension: v})}>
-                                <SelectTrigger className="h-14 rounded-2xl border-2 font-black text-lg"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    <SelectItem value="none">لا يوجد</SelectItem>
-                                    <SelectItem value="quarter">ربع دور</SelectItem>
-                                    <SelectItem value="half">نصف دور</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                </section>
-
-                <section className="space-y-8">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-6 pr-4 border-r-8 border-[#FF7A00]">
-                        <h3 className="text-xl font-black flex items-center gap-3 text-[#1e1b4b]">
-                            <Calculator className="h-7 w-7 text-[#FF7A00]"/> مصفوفة الدفعات المالية المعتمدة
-                        </h3>
-                        <div className="flex items-center gap-4 bg-muted/20 p-3 rounded-2xl border no-print">
-                            <Label className="text-[10px] font-black text-slate-400 uppercase">نظام التسعير المعتمد:</Label>
-                            <Select value={financials.type} onValueChange={(v: any) => setFinancials({...financials, type: v, milestones: []})}>
-                                <SelectTrigger className="w-48 h-10 rounded-xl border-none bg-white font-black text-[#FF7A00] shadow-md"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    <SelectItem value="fixed">مبالغ ثابتة (KD)</SelectItem>
-                                    <SelectItem value="percentage">نسب مئوية (%)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div className="border-4 border-slate-50 rounded-[3.5rem] overflow-hidden shadow-2xl bg-white/95">
-                        <Table>
-                            <TableHeader className="bg-slate-900 h-16">
-                                <TableRow className="border-none">
-                                    <TableHead className="w-24 text-center font-black text-white/40 border-l border-white/10">#</TableHead>
-                                    <TableHead className="px-10 font-black text-white text-right text-lg">مرحلة الربط الميداني (WBS LINK)</TableHead>
-                                    <TableHead className="text-center w-64 font-black text-white text-lg">
-                                        {financials.type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}
-                                    </TableHead>
-                                    <TableHead className="w-16"></TableHead>
+        <ScrollArea className="flex-1 p-8">
+            <div className="space-y-8">
+                <div className="grid grid-cols-4 gap-4 p-6 bg-slate-50 rounded-3xl border-2 border-dashed">
+                    <div className="grid gap-1"><Label className="text-[10px] font-black text-slate-400">المساحة</Label><Input type="number" value={specs.totalArea} onChange={e => setSpecs({...specs, totalArea: e.target.value})} className="h-10 rounded-xl" /></div>
+                    <div className="grid gap-1"><Label className="text-[10px] font-black text-slate-400">الأدوار</Label><Input type="number" value={specs.floorsCount} onChange={e => setSpecs({...specs, floorsCount: e.target.value})} className="h-10 rounded-xl" /></div>
+                    <div className="grid gap-1"><Label className="text-[10px] font-black text-slate-400">نظام الدفع</Label><Badge className="bg-primary h-10 rounded-xl justify-center font-black">{financials.type === 'fixed' ? 'مبالغ ثابتة' : 'نسب مئوية'}</Badge></div>
+                    <div className="grid gap-1"><Label className="text-[10px] font-black text-slate-400">إجمالي العقد</Label><div className="h-10 rounded-xl bg-white border-2 flex items-center justify-center font-black text-primary font-mono">{formatCurrency(financials.totalAmount)}</div></div>
+                </div>
+                <div className="border-2 rounded-[2rem] overflow-hidden">
+                    <Table>
+                        <TableHeader className="bg-slate-900 h-12">
+                            <TableRow><TableHead className="w-16 text-center text-white border-l border-white/10 font-black">#</TableHead><TableHead className="px-6 font-black text-white text-right">شرط الاستحقاق (الربط الميداني)</TableHead><TableHead className="text-center w-48 font-black text-white">المبلغ / النسبة</TableHead></TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {financials.milestones.map((m: any, i: number) => (
+                                <TableRow key={m.id} className="h-16 border-b last:border-0 hover:bg-primary/[0.02]">
+                                    <TableCell className="text-center font-black text-slate-400 border-l">{i+1}</TableCell>
+                                    <TableCell className="px-6"><InlineSearchList value={m.condition} onSelect={v => { const newM = [...financials.milestones]; newM[i].condition = v; setFinancials({...financials, milestones: newM}); }} options={fetchedStages} placeholder="اربط بمرحلة..." allowCustomValue className="h-10" /></TableCell>
+                                    <TableCell className="text-center font-black font-mono text-primary text-xl bg-primary/5">{financials.type === 'percentage' ? `${m.value}%` : formatCurrency(m.value)}</TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {(financials.milestones || []).map((m: any, i: number) => (
-                                    <TableRow key={m.id} className="h-24 border-b last:border-0 hover:bg-primary/[0.02] group transition-all">
-                                        <TableCell className="text-center bg-slate-50/50 border-l">
-                                            <Badge variant="secondary" className="font-black text-sm px-4 h-8 rounded-full border bg-white text-slate-900 shadow-sm">{i+1}</Badge>
-                                        </TableCell>
-                                        <TableCell className="px-10">
-                                            <InlineSearchList 
-                                                value={m.condition} 
-                                                onSelect={v => { const newM = [...financials.milestones]; newM[i].condition = v; setFinancials({...financials, milestones: newM}); }} 
-                                                options={wbsOptions} 
-                                                placeholder="اربط بمرحلة أو اكتب شرطاً مخصصاً..." 
-                                                allowCustomValue={true}
-                                                className="h-12 text-sm border-dashed border-2 border-primary/20 bg-primary/[0.02] font-black text-primary rounded-2xl shadow-inner" 
-                                            />
-                                        </TableCell>
-                                        <TableCell className="bg-primary/[0.01] border-r border-slate-50">
-                                            <Input 
-                                                type="number" step="any" 
-                                                value={m.value} 
-                                                onChange={e => { const newM = [...financials.milestones]; newM[i].value = parseFloat(e.target.value) || 0; setFinancials({...financials, milestones: newM}); }} 
-                                                className="text-center font-black text-4xl text-[#FF7A00] border-none shadow-none focus-visible:ring-0 bg-transparent font-mono h-16" 
-                                            />
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <Button type="button" variant="ghost" size="icon" onClick={() => setFinancials({...financials, milestones: financials.milestones.filter((x: any) => x.id !== m.id)})} className="text-red-300 hover:text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="h-5 w-5"/></Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableFooter className="bg-[#FF7A00]/5 h-28">
-                                <TableRow className="border-none hover:bg-transparent">
-                                    <TableCell colSpan={2} className="text-right px-12">
-                                        <p className="text-3xl font-black tracking-tight text-[#1e1b4b]">إجمالي قيمة العقد النهائي:</p>
-                                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">Total Agreed Contract Sum</p>
-                                    </TableCell>
-                                    <TableCell className="text-center border-r border-white/50 bg-white">
-                                        <div className="text-5xl font-black font-mono tracking-tighter text-[#FF7A00]">
-                                            {financials.type === 'fixed' ? formatCurrency(currentTotalInput) : `${currentTotalInput}%`}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell />
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-                        <div className="p-8 flex justify-center bg-muted/5 border-t border-dashed no-print">
-                            <Button 
-                                variant="outline" 
-                                onClick={() => setFinancials({...financials, milestones: [...financials.milestones, {id: generateId(), name: `الدفعة الجديدة`, value: 0, condition: ''}]})} 
-                                className="h-16 px-16 rounded-[1.8rem] border-dashed border-2 font-black text-[#FF7A00] gap-3 hover:bg-white shadow-xl hover:scale-105 transition-all active:scale-95"
-                            >
-                                <PlusCircle className="h-6 w-6 text-[#FF7A00]" /> إضافة دفعة استحقاق يدوية +
-                            </Button>
-                        </div>
-                    </div>
-                </section>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
             </div>
         </ScrollArea>
-
-        <DialogFooter className="p-10 border-t bg-slate-50 flex flex-col md:flex-row justify-between items-center gap-8 shrink-0 no-print">
-            <div className="text-right space-y-1">
-                <p className="text-base font-black text-primary flex items-center gap-2">
-                    <ShieldCheck className="h-6 w-6 animate-pulse"/> سيتم تحديث مسار المعاملة وتوليد قيد مديونية مسودة
-                </p>
-                <p className="text-[11px] text-muted-foreground font-bold pr-9">الاعتماد النهائي يثبت مديونية العميل في شجرة الحسابات (كقيد غير مرحل).</p>
-            </div>
-            <div className="flex gap-4">
-                <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-2xl font-bold h-14 px-10 text-slate-400">إلغاء</Button>
-                <Button 
-                    onClick={handleSubmit} 
-                    disabled={isSaving || financials.milestones.length === 0} 
-                    className="h-20 px-24 rounded-[2.2rem] font-black text-3xl shadow-2xl shadow-primary/40 gap-4 bg-[#7209B7] text-white border-none transition-all active:scale-[1.02]"
-                >
-                    {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <CheckCircle2 className="h-8 w-8" />}
-                    توقيـع واعتمـاد العقـد
-                </Button>
-            </div>
+        <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
+            <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">تراجع</Button>
+            <Button onClick={handleSubmit} disabled={isSaving} className="rounded-xl font-black h-12 px-12 shadow-xl shadow-primary/30 gap-2">
+                {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />} تفعيل العقد والقيود
+            </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

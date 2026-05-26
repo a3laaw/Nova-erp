@@ -1,3 +1,4 @@
+
 import { Timestamp } from 'firebase/firestore';
 
 export interface BaseEntity {
@@ -9,56 +10,23 @@ export interface BaseEntity {
   updatedBy?: string;           
 }
 
-// 🛡️ هيكل المواصفات العالمية للنظام (Metadata Schema)
-export interface SystemConfig extends BaseEntity {
-    localization: Record<string, string>;
-    hrRules: {
-        annualLeaveQuota: number;
-        indemnityDivisor: number; // 26 or 30
-        probationPeriodDays: number;
-        experienceLetterTemplate: string;
-    };
-    financeConfig: {
-        decimalPrecision: number;
-        currencyCode: string;
-        prefixes: {
-            journalEntry: string;
-            paymentVoucher: string;
-            cashReceipt: string;
-            purchaseOrder: string;
-            rfq: string;
-            grn: string;
-        }
-    };
-    featureFlags: {
-        enableWarehouse: boolean;
-        enableProcurement: boolean;
-        enableHR: boolean;
-        budgetThresholdAlert: number; 
-        residencyExpiryNoticeDays: number;
-    };
-}
-
-// 🛡️ هيكل قاموس المصطلحات الشامل (Lexicon Metadata)
-export interface LexiconEntry extends BaseEntity {
-    key: string; // المعرف الفريد للنص في الكود
-    namespace: 'actions' | 'fields' | 'alerts' | 'ui_prose';
-    valueAr: string;
-    valueEn: string;
-    description?: string;
-    module?: 'Accounting' | 'Construction' | 'HR' | 'Warehouse' | 'General';
-}
-
-// 🛡️ هيكل الشاشات الديناميكية (Dynamic UI Metadata)
-export interface DynamicField extends BaseEntity {
-    screenKey: string;
-    module: 'Accounting' | 'Construction' | 'HR' | 'Warehouse';
-    fieldNameAr: string;
-    fieldNameEn: string;
-    dataType: 'text' | 'number' | 'date' | 'attachment' | 'relation';
-    lookupCollection?: string; // e.g., 'projects' or 'employees'
-    isRequired: boolean;
-    order: number;
+export interface UserProductivityItem extends BaseEntity {
+  userId: string;
+  entryType: 'task' | 'bookmark';
+  title: string;
+  actionType?: 'review' | 'decision' | 'design' | 'redesign' | 'meeting' | 'general';
+  status?: 'pending' | 'in-progress' | 'completed' | 'cancelled';
+  inviteStatus?: Record<string, 'pending' | 'accepted' | 'rejected'>; // لتعقب دعوات الزملاء
+  assignedUserIds?: string[]; // قائمة الزملاء المشاركين
+  startDate?: Timestamp | any;
+  dueDate?: Timestamp | any;
+  completedAt?: Timestamp | any;
+  sourceModule: string;
+  sourceId: string;
+  sourceSubId?: string;
+  sourceUrl?: string;
+  viewCounter?: number;
+  lastViewedAt?: Timestamp | any;
 }
 
 export interface UserProfile extends BaseEntity {
@@ -81,6 +49,21 @@ export interface UserProfile extends BaseEntity {
   companyName?: string;
 }
 
+export interface TransactionStage {
+  stageId: string;
+  name: string;
+  status: 'pending' | 'in-progress' | 'completed';
+  order: number;
+  trackingType: 'duration' | 'occurrence' | 'hybrid' | 'none';
+  expectedDurationDays?: number | null;
+  maxOccurrences?: number | null;
+  currentCount?: number;
+  startDate?: Timestamp | any;
+  endDate?: Timestamp | any;
+  expectedEndDate?: Timestamp | any;
+  nextStageIds?: string[];
+}
+
 export interface ClientTransaction extends BaseEntity {
     id?: string;
     transactionNumber: string;
@@ -91,8 +74,10 @@ export interface ClientTransaction extends BaseEntity {
     status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold' | 'cancelled';
     assignedEngineerId?: string | null;
     transactionTypeId?: string | null;
-    stages?: any[];
+    stages?: TransactionStage[];
     contract?: any;
+    projectId?: string;
+    clientName?: string;
 }
 
 export interface Company extends BaseEntity {
@@ -104,32 +89,6 @@ export interface Company extends BaseEntity {
     maxUsersLimit: number;
     trialEndDate?: Timestamp | any;
     firebaseConfig?: any;
-}
-
-export interface CompanyRequest extends BaseEntity {
-    companyName: string;
-    contactName: string;
-    email: string;
-    username: string;
-    phone: string;
-    activity: string;
-    status: 'pending' | 'activated' | 'rejected';
-}
-
-export interface AuditLog extends BaseEntity {
-    userId: string;
-    userName: string;
-    action: 'CREATE' | 'UPDATE' | 'DELETE';
-    module: string;
-    entityId: string;
-    oldValue: any;
-    newValue: any;
-    ipAddress?: string;
-}
-
-export interface WorkTeam extends BaseEntity {
-    name: string;
-    members: string[];
 }
 
 export interface Employee extends BaseEntity {
@@ -156,6 +115,8 @@ export interface Account extends BaseEntity {
     parentCode: string | null;
     level: number;
     isPayable: boolean;
+    balanceType?: 'Debit' | 'Credit';
+    statement?: 'Balance Sheet' | 'Income Statement';
 }
 
 export interface Appointment extends BaseEntity {
@@ -164,12 +125,18 @@ export interface Appointment extends BaseEntity {
     clientName: string;
     clientMobile?: string;
     engineerId: string;
+    engineerName?: string;
     appointmentDate: Timestamp | any;
     type: string;
     status: string;
     workStageUpdated?: boolean;
     visitCount?: number;
     color?: string;
+    title: string;
+    notes?: string;
+    transactionId?: string;
+    meetingRoom?: string;
+    department?: string;
 }
 
 export interface Holiday extends BaseEntity {
@@ -183,4 +150,18 @@ export interface Notification extends BaseEntity {
     body: string;
     isRead: boolean;
     link?: string;
+}
+
+export interface Quotation extends BaseEntity {
+  quotationNumber: string;
+  clientId: string;
+  clientName: string;
+  subject: string;
+  date: Timestamp | any;
+  validUntil: Timestamp | any;
+  totalAmount: number;
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+  items: any[];
+  financialsType: 'fixed' | 'percentage';
+  transactionId?: string;
 }

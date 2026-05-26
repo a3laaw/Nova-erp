@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -13,13 +14,12 @@ import {
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, X, Workflow, UserCheck, Layers } from 'lucide-react';
+import { Loader2, Save, X, Workflow, Layers } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, orderBy, collectionGroup } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, Department, SubService, TransactionStage } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, SubService, TransactionStage } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
-import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { InlineSearchList } from '../ui/inline-search-list';
 
@@ -50,9 +50,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
     const [description, setDescription] = useState('');
     const [assignedEngineerId, setAssignedEngineerId] = useState('');
-    
     const [isSaving, setIsSaving] = useState(false);
-    const savingRef = useRef(false);
 
     const tenantId = currentUser?.currentCompanyId;
 
@@ -112,38 +110,23 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         fetchSubServices();
     }, [transactionTypeName, transactionTypes, firestore, tenantId]);
 
-    const transactionTypeOptions = useMemo(() => 
-        transactionTypes.map(t => ({ 
-            value: t.name, 
-            label: t.name,
-            searchKey: t.activityType === 'consulting' ? 'استشارات' : t.activityType === 'construction' ? 'مقاولات' : 'مبيعات'
-        })), 
-    [transactionTypes]);
-
-    const subServiceOptions = useMemo(() => 
-        subServices.map(s => ({ value: s.id!, label: s.name })),
-    [subServices]);
-
-    const engineerOptions = useMemo(() => 
-        engineers.map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber })), 
-    [engineers]);
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!firestore || !currentUser || !transactionTypeName || !tenantId) return;
 
-        if (subServices.length > 0 && !selectedSubServiceId) {
-            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار نوع الخدمة التفصيلي.' });
-            return;
-        }
-
-        if (savingRef.current) return;
-        savingRef.current = true;
         setIsSaving(true);
-
         try {
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const selectedSub = subServices.find(s => s.id === selectedSubServiceId);
+
+            // 🛡️ محرك التسمية المتسلسلة: منع تكرار الأسماء المتشابهة 🛡️
+            const txsPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
+            const existingSnap = await getDocs(query(collection(firestore, txsPath!), where('transactionType', '==', transactionTypeName)));
+            const sameTypeCount = existingSnap.size;
+            
+            const finalTypeName = sameTypeCount > 0 
+                ? `${transactionTypeName} - ${String(sameTypeCount + 1).padStart(3, '0')}`
+                : transactionTypeName;
 
             let initialStages: any[] = [];
             const stagesPath = getTenantPath(`transactionTypes/${selectedType?.id}/subServices/${selectedSubServiceId}/workStages`, tenantId);
@@ -171,18 +154,14 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             
             const newCounter = (client?.transactionCounter || 0) + 1;
             const transactionNumber = `CL${client?.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
-            
-            // 🛡️ استعادة التخزين في المسار القديم المجلد تحت العميل لضمان ظهور البيانات 🛡️
-            const transactionsPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
-            const newTransactionRef = doc(collection(firestore, transactionsPath!));
+            const newTransactionRef = doc(collection(firestore, txsPath!));
             
             batch.update(clientRef, { transactionCounter: newCounter });
 
-            const newTransactionData = {
+            batch.set(newTransactionRef, cleanFirestoreData({
                 transactionNumber, 
                 clientId, 
-                transactionType: transactionTypeName,
-                subServiceId: selectedSubServiceId || null,
+                transactionType: finalTypeName,
                 subServiceName: selectedSub?.name || null,
                 description, 
                 status: 'new', 
@@ -190,16 +169,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 updatedAt: serverTimestamp(), 
                 stages: initialStages,
                 assignedEngineerId: assignedEngineerId || client?.assignedEngineer || null,
-                transactionTypeId: selectedType?.id || null,
                 companyId: tenantId
-            };
-            
-            batch.set(newTransactionRef, cleanFirestoreData(newTransactionData));
+            }));
 
             const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
                 type: 'log', 
-                content: `تم فتح مسار معاملة: "${transactionTypeName}${selectedSub ? ` - ${selectedSub.name}` : ''}". تم حقن ${initialStages.length} مرحلة إنجاز مبرمجة آلياً.`,
+                content: `تم فتح المسار الفني للمنشأة: "${finalTypeName}".`,
                 userId: currentUser.id, 
                 userName: currentUser.fullName, 
                 createdAt: serverTimestamp(),
@@ -207,87 +183,66 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             });
 
             await batch.commit();
-            
-            toast({ title: 'نجاح التأسيس الفني', description: `تم إعداد هيكل المعاملة بنجاح.` });
+            toast({ title: 'تم فتح المسار الفني' });
             onClose();
             router.refresh();
 
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'فشل التأسيس', description: error.message });
+            toast({ variant: 'destructive', title: 'خطأ', description: error.message });
             setIsSaving(false);
-            savingRef.current = false;
         }
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) { onClose(); } }}>
-            <DialogContent dir="rtl" className="max-w-lg rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0 bg-white">
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
+            <DialogContent dir="rtl" className="max-w-lg rounded-[2.5rem] border-none shadow-2xl p-0 bg-white">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader className="p-8 bg-primary/5 border-b">
-                        <div className="flex items-center gap-4 text-right">
-                            <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Workflow className="h-6 w-6" /></div>
-                            <div>
-                                <DialogTitle className="text-xl font-black text-[#1e1b4b]">تأسيس معاملة تقنية</DialogTitle>
-                                <DialogDescription className="font-bold text-slate-500">سيتم حقن مراحل العمل (WBS) آلياً بناءً على نوع الخدمة.</DialogDescription>
-                            </div>
-                        </div>
+                        <DialogTitle className="text-xl font-black">فتح مسار معاملة جديدة</DialogTitle>
+                        <DialogDescription className="font-bold text-slate-500">سيتم تحديد رقم تسلسلي آلياً في حال وجود معاملات مشابهة.</DialogDescription>
                     </DialogHeader>
-                    
                     <div className="p-8 space-y-6">
                         <div className="grid gap-2">
-                            <Label className="font-black text-gray-700 pr-1">الخدمة الرئيسية المستهدفة *</Label>
+                            <Label className="font-black">نوع الخدمة الرئيسية *</Label>
                             <InlineSearchList 
                                 value={transactionTypeName} 
                                 onSelect={setTransactionTypeName} 
-                                options={transactionTypeOptions} 
-                                placeholder={typesLoading ? 'جاري التحميل...' : 'اختر الخدمة الرئيسية...'} 
+                                options={transactionTypes.map(t => ({ value: t.name, label: t.name }))} 
+                                placeholder="اختر الخدمة..." 
                                 disabled={typesLoading || isSaving} 
                             />
                         </div>
-
                         {subServices.length > 0 && (
                             <div className="grid gap-2 animate-in slide-in-from-top-2">
-                                <Label className="font-black text-primary pr-1 flex items-center gap-2">
-                                    <Layers className="h-4 w-4" /> نوع الخدمة التفصيلي *
-                                </Label>
+                                <Label className="font-black text-primary flex items-center gap-2"><Layers className="h-4 w-4" /> الخدمة التفصيلية *</Label>
                                 <InlineSearchList 
                                     value={selectedSubServiceId} 
                                     onSelect={setSelectedSubServiceId} 
-                                    options={subServiceOptions} 
-                                    placeholder={subServicesLoading ? 'جاري جلب الخيارات...' : 'اختر التصنيف الميداني المعتمد...'} 
+                                    options={subServices.map(s => ({ value: s.id!, label: s.name }))} 
+                                    placeholder="حدد النوع..." 
                                     disabled={subServicesLoading || isSaving} 
-                                    className="border-primary/20 bg-primary/[0.02]"
                                 />
                             </div>
                         )}
-
                         <div className="grid gap-2">
-                            <Label className="font-black text-gray-700 pr-1">إسناد المهندس المختص</Label>
+                            <Label className="font-black">المهندس المسؤول</Label>
                             <InlineSearchList 
                                 value={assignedEngineerId} 
                                 onSelect={setAssignedEngineerId} 
-                                options={engineerOptions} 
-                                placeholder={engineersLoading ? 'جاري التحميل...' : 'اختر المهندس المسؤول...'} 
+                                options={engineers.map(e => ({ value: e.id!, label: e.fullName }))} 
+                                placeholder="اختر المهندس..." 
                                 disabled={engineersLoading || isSaving} 
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label className="font-black text-gray-700 pr-1">ملاحظات إضافية</Label>
-                            <Textarea 
-                                value={description} 
-                                onChange={e => setDescription(e.target.value)} 
-                                placeholder="أي تفاصيل فنية خاصة..." 
-                                disabled={isSaving}
-                                className="rounded-2xl border-2 p-4 min-h-[100px] shadow-inner"
-                            />
+                            <Label className="font-black">ملاحظات إضافية</Label>
+                            <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="أدخل أي تفاصيل..." rows={2} />
                         </div>
                     </div>
-
                     <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
-                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || !transactionTypeName} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2 bg-[#7209B7] text-white">
-                            {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="ml-2 h-4 w-4" />}
-                            بدء مسار المعاملة
+                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+                        <Button type="submit" disabled={isSaving || !transactionTypeName} className="font-black px-10 rounded-xl">
+                            {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : 'بدء المسار'}
                         </Button>
                     </DialogFooter>
                 </form>
