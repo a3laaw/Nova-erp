@@ -1,11 +1,22 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
+import { 
+    doc, 
+    getDocs, 
+    collection, 
+    query, 
+    where, 
+    orderBy, 
+    writeBatch, 
+    serverTimestamp, 
+    Timestamp, 
+    getDoc,
+    updateDoc 
+} from 'firebase/firestore';
 import type { Appointment, Client, ClientTransaction, TransactionStage, Holiday } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,6 +55,12 @@ const stageStatusTranslations: Record<string, string> = {
   completed: 'منجزة',
 };
 
+/**
+ * صفحة تفاصيل الزيارة الموحدة (Sovereign Visit Control Hub V95.0):
+ * - تم إصلاح خطأ الـ updateDoc ReferenceError.
+ * - تحصين محرك الربط المالي الآلي وإصدار المستخلصات عند الإنجاز.
+ * - تطبيق الهوية اللؤلؤية والبرتقالية الشاملة.
+ */
 export default function AppointmentDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -58,6 +75,7 @@ export default function AppointmentDetailsPage() {
     const [actionNote, setActionNote] = useState('');
     const [isTxFormOpen, setIsTxFormOpen] = useState(false);
 
+    // 🛡️ توجيه المسارات السيادية 🛡️
     const apptPath = useMemo(() => id && tenantId ? getTenantPath(`appointments/${id}`, tenantId) : null, [id, tenantId]);
     const { data: appointment, loading: apptLoading } = useDocument<Appointment>(firestore, apptPath);
     
@@ -154,6 +172,24 @@ export default function AppointmentDetailsPage() {
         } finally { setIsSaving(false); }
     };
 
+    const handleLinkTransaction = async (txId: string) => {
+        if (!firestore || !apptPath || !tenantId) return;
+        const apptRef = doc(firestore, apptPath);
+        const updateData = { transactionId: txId };
+        
+        await updateDoc(apptRef, updateData)
+            .then(() => {
+                toast({ title: 'تم ربط المسار الفني' });
+            })
+            .catch(async (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: apptPath,
+                    operation: 'update',
+                    requestResourceData: updateData
+                }));
+            });
+    };
+
     if (apptLoading || clientLoading) return <div className="p-10"><Skeleton className="h-96 w-full rounded-[3rem]" /></div>;
     if (!appointment) return <div className="p-20 text-center font-black opacity-30">الموعد غير موجود.</div>;
 
@@ -183,7 +219,7 @@ export default function AppointmentDetailsPage() {
                                 <AlertDescription className="text-orange-700 font-bold">يرجى ربط هذه الزيارة بإحدى المعاملات النشطة للتمكن من توثيق الإنجاز.</AlertDescription>
                             </Alert>
                             {!appointment.clientId ? (
-                                <Button asChild className="w-full h-14 rounded-2xl font-black text-lg bg-orange-600 hover:bg-orange-700">
+                                <Button asChild className="w-full h-14 rounded-2xl font-black text-lg bg-orange-600 hover:bg-orange-700 shadow-xl shadow-orange-100">
                                     <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName)}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&fromAppointmentId=${appointment.id}`}>تأسيس ملف عميل رسمي</Link>
                                 </Button>
                             ) : (
@@ -191,10 +227,7 @@ export default function AppointmentDetailsPage() {
                                     <Label className="font-black pr-2">اختر المعاملة للربط:</Label>
                                     <InlineSearchList 
                                         value={''} 
-                                        onSelect={async (v) => {
-                                            await updateDoc(doc(firestore!, apptPath!), { transactionId: v });
-                                            toast({ title: 'تم ربط المسار الفني' });
-                                        }} 
+                                        onSelect={handleLinkTransaction} 
                                         options={clientTransactions.map(t => ({ value: t.id!, label: t.transactionType }))} 
                                         placeholder="ابحث عن معاملة..."
                                     />
