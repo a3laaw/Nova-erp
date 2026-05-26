@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { Textarea } from './textarea';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -9,7 +9,7 @@ import type { UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import { ScrollArea } from './scroll-area';
-import { AtSign, Sparkles } from 'lucide-react';
+import { AtSign, Sparkles, Command } from 'lucide-react';
 import { Card } from './card';
 import { Badge } from './badge';
 
@@ -18,17 +18,19 @@ interface MentionTextareaProps extends React.ComponentProps<typeof Textarea> {
 }
 
 /**
- * محرك المنشن المتكيف السيادي (Sovereign Mention Engine V122.0):
- * - تم رفع الـ z-index لسيادة مطلقة فوق كافة عناصر الواجهة.
- * - استخدام خلفية بيضاء مصمتة 100% لمنع تداخل النصوص الخلفية.
- * - ضبط المحاذاة والظلال لضمان وضوح فائق الجودة في الواجهة العربية.
+ * محرك المنشن الذكي المتكيف (Sovereign Adaptive Mention Engine V124.0):
+ * - محرك "التفكير المكاني": يحدد اتجاه الفتح (أعلى/أسفل) بناءً على المساحة المتاحة.
+ * - عزل بصري مطلق بـ z-index سيادي لمنع أي تداخل مع رؤوس النوافذ أو التبويبات.
+ * - تباين أسود (#000000) للوضوح المطلق في الواجهة العربية اللؤلؤية.
  */
 export function MentionTextarea({ value, onValueChange, className, ...props }: MentionTextareaProps) {
   const { firestore } = useFirebase();
   const [showMentions, setShowMentions] = useState(false);
   const [mentionQuery, setMentionSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [openUpwards, setOpenUpwards] = useState(false); // ذكاء التموضع
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // جلب كافة مستخدمي المنشأة
   const { data: users = [] } = useSubscription<UserProfile>(firestore, 'users');
@@ -44,6 +46,16 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
       )
       .slice(0, 8);
   }, [users, mentionQuery]);
+
+  // محرك الذكاء المكاني: فحص المساحة المتاحة عند ظهور المؤشر
+  useEffect(() => {
+    if (showMentions && textareaRef.current) {
+        const rect = textareaRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        // إذا كانت المساحة تحت النص أقل من 250px، نفتح للأعلى
+        setOpenUpwards(spaceBelow < 250);
+    }
+  }, [showMentions]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showMentions && filteredUsers.length > 0) {
@@ -108,7 +120,7 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
   };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" ref={containerRef}>
       <Textarea
         {...props}
         ref={textareaRef}
@@ -116,16 +128,17 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
         onChange={handleInput}
         onKeyDown={handleKeyDown}
         className={cn(
-          "rounded-[2.5rem] p-8 text-xl font-bold leading-relaxed border-2 focus-visible:ring-primary/20 text-black placeholder:text-slate-300 shadow-sm min-h-[140px]",
+          "rounded-[2.5rem] p-8 text-xl font-bold leading-relaxed border-2 focus-visible:ring-primary/20 text-black placeholder:text-slate-300 shadow-sm min-h-[140px] bg-white",
           className
         )}
       />
 
       {showMentions && filteredUsers.length > 0 && (
         <Card className={cn(
-            "absolute w-full max-w-[340px] rounded-[2.5rem] border-2 border-primary/30 bg-white overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-300",
-            "bottom-full mb-2 right-2", // تطفو للأعلى بمحاذاة اليمين
-            "z-[99999999] shadow-[0_35px_80px_-15px_rgba(0,0,0,0.4)]" // سيادة مطلقة وظل عميق
+            "absolute w-full max-w-[340px] rounded-[2.5rem] border-2 border-primary/30 bg-white overflow-hidden animate-in zoom-in-95 duration-300",
+            openUpwards ? "bottom-full mb-3" : "top-full mt-3", // ذكاء الاتجاه
+            "right-2", // محاذاة RTL الصحيحة
+            "z-[999999999] shadow-[0_45px_100px_-20px_rgba(0,0,0,0.5)]" // سيادة مطلقة وظل سينمائي
         )}>
           <div className="p-5 bg-primary/5 border-b flex items-center justify-between">
              <div className="flex items-center gap-3">
@@ -158,16 +171,20 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
                       </Avatar>
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <p className={cn("font-black text-base truncate leading-none mb-1.5", idx === selectedIndex ? "text-white" : "text-[#000000]")}>{user.fullName || user.username}</p>
-                    <p className={cn("text-[10px] font-bold font-mono tracking-wider", idx === selectedIndex ? "text-white/70" : "text-primary")}>@{user.username}</p>
+                    <p className={cn("font-black text-base truncate leading-none mb-1.5", idx === selectedIndex ? "text-white" : "text-[#000000]")}>
+                        {user.fullName || user.username}
+                    </p>
+                    <p className={cn("text-[10px] font-bold font-mono tracking-wider", idx === selectedIndex ? "text-white/70" : "text-primary")}>
+                        @{user.username}
+                    </p>
                   </div>
                 </button>
               ))}
             </div>
           </ScrollArea>
           <div className="p-3 bg-slate-50 border-t flex justify-center">
-             <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                <Sparkles className="h-2 w-2" /> استخدم الأسهم للتنقل و Enter للاختيار
+             <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <Command className="h-3 w-3" /> استخدم الأسهم للتنقل و Enter للاختيار
              </p>
           </div>
         </Card>

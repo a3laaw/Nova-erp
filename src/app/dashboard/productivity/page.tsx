@@ -45,9 +45,9 @@ import { DateInput } from '@/components/ui/date-input';
 import { MentionTextarea } from '@/components/ui/mention-textarea';
 
 /**
- * منصة الإنتاجية السيادية (Productivity Platform V123.0):
- * - تفعيل ميزة "المذكرات البينية": إضافة ملاحظات للسجل الفني دون إغلاق المهمة.
- * - تحصين محرك المنشن والعزل البصري.
+ * منصة الإنتاجية السيادية (Productivity Platform V124.0):
+ * - تم تصحيح مسارات استيراد Skeleton و Separator لضمان ثبات البناء.
+ * - دعم محرك المذكرات البينية والتوثيق المزدوج.
  */
 function ProductivityContent() {
     const { firestore } = useFirebase();
@@ -340,10 +340,6 @@ function TaskCard({ task, onEdit, onComplete, onAddComment }: { task: UserProduc
     );
 }
 
-/**
- * فقاعة كتابة ملاحظة تقدم (Progress Note Dialog):
- * تسمح للموظف بكتابة ملاحظات للسجل الفني دون إغلاق المهمة.
- */
 function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: () => void, task: UserProductivityItem }) {
     const { firestore } = useFirebase();
     const { user } = useAuth();
@@ -360,7 +356,6 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
         try {
             const batch = writeBatch(firestore);
 
-            // توثيق الملاحظة في سجل العميل (Timeline) آلياً
             if (task.clientId && task.sourceId && task.sourceModule) {
                 const txPath = getTenantPath(`clients/${task.clientId}/transactions/${task.sourceId}`, tenantId);
                 const timelineRef = doc(collection(firestore, `${txPath}/timelineEvents`));
@@ -375,7 +370,6 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
                     companyId: tenantId
                 });
 
-                // تحديث المهمة نفسها لبيان آخر ملاحظة
                 const taskPath = getTenantPath(`userProductivity/${task.id}`, tenantId);
                 batch.update(doc(firestore, taskPath!), {
                     updatedAt: serverTimestamp()
@@ -459,7 +453,6 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
             const batch = writeBatch(firestore);
             const taskPath = getTenantPath(`userProductivity/${task.id}`, tenantId);
             
-            // 1. تحديث حالة المهمة
             batch.update(doc(firestore, taskPath!), {
                 status: 'completed',
                 completionNote: completionNote || null,
@@ -467,7 +460,6 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                 updatedAt: serverTimestamp()
             });
 
-            // 2. إذا كانت مرتبطة بمسار فني ومعرف عميل، حقن التعليق في المعاملة
             if (task.clientId && task.sourceId && task.sourceModule) {
                 const txPath = getTenantPath(`clients/${task.clientId}/transactions/${task.sourceId}`, tenantId);
                 const timelineRef = doc(collection(firestore, `${txPath}/timelineEvents`));
