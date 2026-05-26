@@ -25,7 +25,8 @@ import {
     PlayCircle,
     MessageSquare,
     Users,
-    MessageCircle
+    MessageCircle,
+    History
 } from 'lucide-react';
 import { cn, getTenantPath, cleanFirestoreData, formatCurrency, extractMentions } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -46,10 +47,9 @@ import { MentionTextarea } from '@/components/ui/mention-textarea';
 import { createNotification } from '@/services/notification-service';
 
 /**
- * منصة الإنتاجية السيادية (Productivity Platform V128.0):
- * - تم تفعيل نظام التنبيهات للمنشن في المذكرات البينية.
- * - محرك المنشن يعمل الآن بتقنية الـ Portal لمنع الاختفاء داخل النوافذ.
- * - تحصين النوافذ لمنع التداخل مع القائمة العائمة للمنشن عبر onInteractOutside.
+ * منصة الإنتاجية السيادية (Productivity Platform V129.0):
+ * - تم تفعيل نظام المذكرات البينية (Interim Notes) مع المزامنة الذكية لسجل العميل.
+ * - حل مشكلة التداخل في النوافذ المنبثقة وصراع الاختيار للمنشن.
  */
 function ProductivityContent() {
     const { firestore } = useFirebase();
@@ -148,7 +148,7 @@ function ProductivityContent() {
                         {globalLoading ? (
                             Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-72 w-full rounded-[3rem]" />)
                         ) : tasks.length === 0 ? (
-                            <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale border-4 border-dashed rounded-[3rem] bg-white/40">
+                            <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale border-4 border-dashed rounded-[3rem] bg-white/40 shadow-inner">
                                 <ListChecks className="h-24 w-24 mb-4" />
                                 <p className="text-2xl font-black">لا توجد مهام مجدولة حالياً</p>
                             </div>
@@ -254,7 +254,7 @@ function TaskCard({ task, onEdit, onComplete, onAddComment }: { task: UserProduc
 
     return (
         <Card className={cn(
-            "rounded-[2.8rem] border-2 transition-all duration-500 hover:shadow-2xl group flex flex-col h-full",
+            "rounded-[2.8rem] border-2 transition-all duration-500 hover:shadow-2xl group flex flex-col h-full shadow-sm",
             isCompleted ? "bg-green-50/20 border-green-100 grayscale opacity-60" : "bg-white hover:border-[#FF7A00]/20"
         )}>
             <CardHeader className="p-8 pb-4">
@@ -274,12 +274,12 @@ function TaskCard({ task, onEdit, onComplete, onAddComment }: { task: UserProduc
                             <>
                                 <button 
                                     onClick={() => onAddComment(task)} 
-                                    className="h-8 w-8 rounded-full hover:bg-orange-50 text-orange-600 flex items-center justify-center transition-all"
-                                    title="إضافة ملاحظة للسجل"
+                                    className="h-8 w-8 rounded-full hover:bg-orange-50 text-orange-600 flex items-center justify-center transition-all shadow-sm"
+                                    title="إضافة ملاحظة تقدم"
                                 >
                                     <MessageCircle className="h-4 w-4" />
                                 </button>
-                                <button onClick={() => onEdit(task)} className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary flex items-center justify-center transition-all">
+                                <button onClick={() => onEdit(task)} className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary flex items-center justify-center transition-all shadow-sm">
                                     <Pencil className="h-4 w-4" />
                                 </button>
                             </>
@@ -319,19 +319,19 @@ function TaskCard({ task, onEdit, onComplete, onAddComment }: { task: UserProduc
             </CardContent>
 
             <CardFooter className="p-8 bg-muted/10 flex gap-3 rounded-b-[2.8rem]">
-                <Button asChild variant="ghost" className="h-12 px-6 rounded-2xl font-black text-xs gap-2 hover:bg-white transition-all text-black">
+                <Button asChild variant="ghost" className="h-12 px-6 rounded-2xl font-black text-xs gap-2 hover:bg-white transition-all text-black border-none">
                     <Link href={task.sourceUrl || '#'}><ArrowUpRight className="h-4 w-4"/> فتح المصدر</Link>
                 </Button>
                 
                 {isPending && (
-                    <Button onClick={handleAccept} disabled={isUpdating} className="flex-1 h-12 rounded-2xl bg-primary text-white font-black gap-2 shadow-xl shadow-primary/20">
+                    <Button onClick={handleAccept} disabled={isUpdating} className="flex-1 h-12 rounded-2xl bg-primary text-white font-black gap-2 shadow-xl shadow-primary/20 transition-all active:scale-95">
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <PlayCircle className="h-4 w-4"/>}
                         قبول المهمة
                     </Button>
                 )}
 
                 {task.status === 'in-progress' && (
-                    <Button onClick={() => onComplete(task)} disabled={isUpdating} className="flex-1 h-12 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black gap-2 shadow-xl shadow-green-100">
+                    <Button onClick={() => onComplete(task)} disabled={isUpdating} className="flex-1 h-12 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black gap-2 shadow-xl shadow-green-100 transition-all active:scale-95">
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4"/>}
                         إتمام المهمة
                     </Button>
@@ -349,6 +349,11 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
     const [note, setNote] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
+    /**
+     * محرك حفظ الملاحظات الذكي (Smart Mirroring V129.0):
+     * - يقوم بحفظ الملاحظة داخل سجل المهمة نفسها (Notes History).
+     * - إذا كانت المهمة مرتبطة بعميل، يقوم بنسخ الملاحظة آلياً لتايم لاين المعاملة.
+     */
     const handleSaveNote = async () => {
         const tenantId = user?.currentCompanyId;
         if (!firestore || !tenantId || !note.trim()) return;
@@ -357,8 +362,25 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
         try {
             const batch = writeBatch(firestore);
             const noteText = note;
+            
+            // 1. التوثيق داخل سجل المهمة (حتى لو كانت شخصية بحتة)
+            const taskNotesPath = getTenantPath(`userProductivity/${task.id}/notes`, tenantId);
+            const newTaskNoteRef = doc(collection(firestore, taskNotesPath!));
+            batch.set(newTaskNoteRef, {
+                content: noteText,
+                userId: user.id,
+                userName: user.fullName,
+                userAvatar: user.avatarUrl,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
 
-            if (task.clientId && task.sourceId && task.sourceModule) {
+            batch.update(doc(firestore, getTenantPath(`userProductivity/${task.id}`, tenantId)!), {
+                updatedAt: serverTimestamp()
+            });
+
+            // 2. المزامنة الذكية مع سجل العميل (Mirroring) - فقط إذا وجد ارتباط
+            if (task.clientId && task.sourceId) {
                 const txPath = getTenantPath(`clients/${task.clientId}/transactions/${task.sourceId}`, tenantId);
                 const timelineRef = doc(collection(firestore, `${txPath}/timelineEvents`));
                 
@@ -371,38 +393,32 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
                     createdAt: serverTimestamp(),
                     companyId: tenantId
                 });
-
-                const taskPath = getTenantPath(`userProductivity/${task.id}`, tenantId);
-                batch.update(doc(firestore, taskPath!), {
-                    updatedAt: serverTimestamp()
-                });
-
-                await batch.commit();
-
-                const mentionedUsernames = extractMentions(noteText);
-                if (mentionedUsernames.length > 0) {
-                    const usersPath = getTenantPath('users', tenantId);
-                    const qUsers = query(collection(firestore, usersPath!), where('username', 'in', mentionedUsernames));
-                    const usersSnap = await getDocs(qUsers);
-                    
-                    usersSnap.forEach(userDoc => {
-                        if (userDoc.id !== user.id) {
-                            createNotification(firestore, {
-                                userId: userDoc.id,
-                                title: '💬 تم ذكرك في مذكرة متابعة',
-                                body: `ذكرك ${user.fullName} في ملاحظة بخصوص مهمة "${task.title}".`,
-                                link: `/dashboard/clients/${task.clientId}/transactions/${task.sourceId}`
-                            }, tenantId);
-                        }
-                    });
-                }
-
-                toast({ title: '✅ تم حقن الملاحظة ونشر التنبيهات' });
-                onClose();
-                setNote('');
-            } else {
-                toast({ variant: 'destructive', title: 'عائق ارتباط', description: 'هذه المهمة غير مرتبطة بمسار فني لعميل.' });
             }
+
+            await batch.commit();
+
+            // 3. رادار المنشن (@) وإرسال التنبيهات
+            const mentionedUsernames = extractMentions(noteText);
+            if (mentionedUsernames.length > 0) {
+                const usersPath = getTenantPath('users', tenantId);
+                const qUsers = query(collection(firestore, usersPath!), where('username', 'in', mentionedUsernames));
+                const usersSnap = await getDocs(qUsers);
+                
+                usersSnap.forEach(userDoc => {
+                    if (userDoc.id !== user.id) {
+                        createNotification(firestore, {
+                            userId: userDoc.id,
+                            title: '💬 تم ذكرك في مذكرة متابعة',
+                            body: `ذكرك ${user.fullName} في ملاحظة بخصوص مهمة "${task.title}".`,
+                            link: `/dashboard/productivity?tab=tasks`
+                        }, tenantId);
+                    }
+                });
+            }
+
+            toast({ title: '✅ تم حفظ الملاحظة والمزامنة' });
+            onClose();
+            setNote('');
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
         } finally { setIsSaving(false); }
@@ -414,7 +430,6 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
                 dir="rtl" 
                 className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white"
                 onInteractOutside={(e) => {
-                    // 🛡️ درع حماية: منع إغلاق النافذة عند النقر على قائمة المنشن المفتوحة في الـ Portal 🛡️
                     const target = e.target as HTMLElement;
                     if (target.closest('[data-inline-search-list-options]')) {
                         e.preventDefault();
@@ -422,37 +437,37 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
                 }}
             >
                 <DialogHeader className="p-8 bg-orange-600 text-white border-b shrink-0">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                    <div className="flex items-center gap-4 text-right">
+                        <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/20">
                             <MessageCircle className="h-8 w-8 text-white" />
                         </div>
                         <div>
-                            <DialogTitle className="text-xl font-black">إضافة ملاحظة تقدم فني</DialogTitle>
-                            <DialogDescription className="text-orange-50 font-bold">سيتم نشر الملاحظة فوراً في تايم لاين المعاملة.</DialogDescription>
+                            <DialogTitle className="text-xl font-black">مذكرة متابعة العمل</DialogTitle>
+                            <DialogDescription className="text-orange-50 font-bold">سيتم توثيق الملاحظة في سجل المهمة والمسار الفني.</DialogDescription>
                         </div>
                     </div>
                 </DialogHeader>
 
                 <div className="p-8 space-y-6">
                     <div className="grid gap-3">
-                        <Label className="font-black text-slate-700 flex items-center gap-2">
-                            <Sparkles className="h-4 w-4 text-primary animate-pulse" /> الملاحظة الفنية الحالية *
+                        <Label className="font-black text-slate-700 flex items-center gap-2 pr-1">
+                            <Sparkles className="h-4 w-4 text-[#FF7A00] animate-pulse" /> التحديث الفني الحالي *
                         </Label>
                         <MentionTextarea 
                             autoFocus
                             value={note} 
                             onValueChange={setNote} 
                             placeholder="ماذا تم بخصوص هذه المهمة؟ استخدم @ للمنشن..."
-                            className="rounded-[2rem] border-2 p-6 text-base font-medium min-h-[160px] focus-visible:ring-2 focus-visible:ring-orange-500/20"
+                            className="rounded-[2rem] border-2 p-6 text-lg font-bold min-h-[160px] focus-visible:ring-2 focus-visible:ring-orange-500/20 shadow-inner"
                         />
                     </div>
                 </div>
 
                 <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
                     <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                    <Button onClick={handleSaveNote} disabled={isSaving || !note.trim()} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-orange-200 bg-orange-600 hover:bg-orange-700 text-white border-none">
+                    <Button onClick={handleSaveNote} disabled={isSaving || !note.trim()} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-orange-200 bg-orange-600 hover:bg-orange-700 text-white border-none transition-all active:scale-95">
                         {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
-                        حفظ ونشر الملاحظة
+                        حفظ الملاحظة
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -492,7 +507,7 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                 updatedAt: serverTimestamp()
             });
 
-            if (task.clientId && task.sourceId && task.sourceModule) {
+            if (task.clientId && task.sourceId) {
                 const txPath = getTenantPath(`clients/${task.clientId}/transactions/${task.sourceId}`, tenantId);
                 const timelineRef = doc(collection(firestore, `${txPath}/timelineEvents`));
                 
@@ -521,7 +536,7 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                             userId: userDoc.id,
                             title: '✅ تم إتمام مهمة (ذكرك الزميل)',
                             body: `أنجز ${user.fullName} المهمة "${task.title}" وذكرك في محضر الإغلاق.`,
-                            link: `/dashboard/clients/${task.clientId}/transactions/${task.sourceId}`
+                            link: `/dashboard/productivity?tab=tasks`
                         }, tenantId);
                     }
                 });
@@ -540,7 +555,6 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                 dir="rtl" 
                 className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white"
                 onInteractOutside={(e) => {
-                    // 🛡️ درع حماية: منع إغلاق النافذة عند النقر على قائمة المنشن المفتوحة في الـ Portal 🛡️
                     const target = e.target as HTMLElement;
                     if (target.closest('[data-inline-search-list-options]')) {
                         e.preventDefault();
@@ -548,8 +562,8 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                 }}
             >
                 <DialogHeader className="p-8 bg-green-600 text-white border-b shrink-0">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                    <div className="flex items-center gap-4 text-right">
+                        <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/20">
                             <CheckCircle2 className="h-8 w-8 text-white" />
                         </div>
                         <div>
@@ -574,14 +588,14 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
                             value={completionNote} 
                             onValueChange={setCompletionNote} 
                             placeholder={isShared ? "اشرح ما تم إنجازه للزملاء والعميل..." : "أي ملاحظات نهائية..."}
-                            className="rounded-[2rem] border-2 p-6 text-base font-medium min-h-[140px] focus-visible:ring-2 focus-visible:ring-green-500/20"
+                            className="rounded-[2rem] border-2 p-6 text-lg font-bold min-h-[140px] focus-visible:ring-2 focus-visible:ring-green-500/20 shadow-inner"
                         />
                     </div>
                 </div>
 
                 <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
                     <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                    <Button onClick={handleConfirm} disabled={isSaving || (isShared && !completionNote.trim())} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-green-200 bg-green-600 hover:bg-green-700 text-white border-none">
+                    <Button onClick={handleConfirm} disabled={isSaving || (isShared && !completionNote.trim())} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-green-200 bg-green-600 hover:bg-green-700 text-white border-none transition-all active:scale-95">
                         {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                         تأكيد الإغلاق والتوثيق
                     </Button>
@@ -633,8 +647,8 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
                     }
                 }}
             >
-                <DialogHeader className="p-8 bg-primary/5 border-b">
-                    <div className="flex items-center gap-4">
+                <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
+                    <div className="flex items-center gap-4 text-right">
                         <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
                             <Pencil className="h-6 w-6" />
                         </div>
@@ -648,13 +662,13 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
                 <div className="p-8 space-y-6">
                     <div className="grid gap-2">
                         <Label className="font-black text-slate-400 text-[10px] uppercase pr-1">عنوان المهمة *</Label>
-                        <Input value={title} onChange={e => setTitle(e.target.value)} className="h-12 rounded-xl border-2 font-black text-black" />
+                        <Input value={title} onChange={e => setTitle(e.target.value)} className="h-12 rounded-xl border-2 font-black text-black text-lg shadow-sm" />
                     </div>
 
                     <div className="grid gap-2">
                         <Label className="font-black text-slate-700 pr-1">نوع الإجراء</Label>
                         <Select value={actionType} onValueChange={setActionType}>
-                            <SelectTrigger className="h-11 rounded-xl border-2 font-bold">
+                            <SelectTrigger className="h-11 rounded-xl border-2 font-bold text-black bg-white">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent dir="rtl">
@@ -670,13 +684,13 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
 
                     <div className="grid gap-2">
                         <Label className="font-black text-slate-400 text-[10px] uppercase pr-1">الموعد النهائي المحدث</Label>
-                        <DateInput value={dueDate} onChange={setDueDate} className="h-11 rounded-xl border-2" />
+                        <DateInput value={dueDate} onChange={setDueDate} className="h-11 rounded-xl border-2 bg-white" />
                     </div>
                 </div>
 
-                <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
+                <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3 shrink-0">
                     <Button variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                    <Button onClick={handleUpdate} disabled={isSaving || !title.trim()} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-primary/30 gap-2">
+                    <Button onClick={handleUpdate} disabled={isSaving || !title.trim()} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-primary/30 gap-2 bg-primary text-white border-none transition-all active:scale-95">
                         {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                         حفظ التغييرات
                     </Button>
