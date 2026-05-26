@@ -33,9 +33,11 @@ import { useAuth } from '@/context/auth-context';
 import { getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Separator } from '../ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 
 /**
