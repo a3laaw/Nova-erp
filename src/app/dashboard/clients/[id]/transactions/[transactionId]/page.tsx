@@ -107,7 +107,6 @@ export default function TransactionDetailPage() {
   const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
         if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId || isLocked) return;
 
-        // 🛡️ درع الرقابة الإلزامي: لا توثيق لا إجراء 🛡️
         if (!actionNote.trim()) {
             toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى كتابة ملاحظات الإنجاز لتفعيل هذا الإجراء.' });
             return;
@@ -335,7 +334,7 @@ export default function TransactionDetailPage() {
                                         </div>
                                     )}
 
-                                    {!isLockedRow && stage.status === 'pending' && (
+                                    {!isLockedRow && !isLocked && stage.status === 'pending' && (
                                         <div className="mt-8 pt-8 border-t border-dashed border-slate-100 space-y-4">
                                             <div className="space-y-3">
                                                 <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-1">اكتب ملاحظة البدء لتفعيل المسار:</Label>

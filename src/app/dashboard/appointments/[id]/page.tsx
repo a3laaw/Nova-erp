@@ -27,7 +27,8 @@ import {
     CheckCircle2, Ban, ShieldCheck, Calculator,
     Undo2,
     MessageSquare,
-    Play
+    Play,
+    Edit3
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -53,8 +54,8 @@ const stageStatusColors: Record<string, string> = {
 
 const stageStatusTranslations: Record<string, string> = {
   pending: 'بانتظار البدء',
-  'in-progress': 'قيد العمل الميداني',
-  completed: 'تم الإنجاز',
+  'in-progress': 'قيد التنفيذ',
+  completed: 'منجزة',
 };
 
 export default function AppointmentDetailsPage() {
@@ -83,10 +84,14 @@ export default function AppointmentDetailsPage() {
     const { data: clientTransactions = [] } = useSubscription<ClientTransaction>(firestore, appointment?.clientId ? `clients/${appointment.clientId}/transactions` : null, [where('status', 'in', ['new', 'in-progress'])]);
     const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
+    // 🛡️ درع القفل والسيادة 🛡️
+    const isLocked = useMemo(() => {
+        return transaction?.status === 'cancelled' || transaction?.status === 'on-hold';
+    }, [transaction?.status]);
+
     const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
-        if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId) return;
+        if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId || isLocked) return;
         
-        // 🛡️ درع الرقابة الإلزامي: لا إجراء بدون تعليق 🛡️
         if (!actionNote.trim()) {
             toast({ variant: 'destructive', title: 'تنبيه', description: 'يرجى كتابة ملاحظات العمل الميداني أولاً لتوثيق الإجراء.' });
             return;
@@ -126,7 +131,7 @@ export default function AppointmentDetailsPage() {
             
             const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
             batch.set(timelineRef, {
-                type: 'comment', // تحويله لتعليق لضمان الظهور في التايم لاين
+                type: 'comment',
                 content: `**[إجراء ميداني: ${action === 'complete' ? 'إنهاء' : action === 'start' ? 'بدء' : 'تعديل'}]** في مرحلة: ${stage.name}.\nالملاحظات: ${actionNote}`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
@@ -313,7 +318,7 @@ export default function AppointmentDetailsPage() {
                                                     </div>
                                                 )}
 
-                                                {!isLocked && stage.status === 'pending' && (
+                                                {!isLockedRow && !isLocked && stage.status === 'pending' && (
                                                     <div className="mt-6 pt-6 border-t border-dashed border-slate-100 space-y-4">
                                                         <div className="space-y-2">
                                                             <Label className="text-[10px] font-black text-slate-400">اكتب ملاحظة البدء لتفعيل المسار:</Label>
@@ -327,7 +332,7 @@ export default function AppointmentDetailsPage() {
                                                         <Button 
                                                             onClick={() => handleStageAction(stage.stageId, 'start')} 
                                                             disabled={isSaving || !actionNote.trim()} 
-                                                            className="w-full h-11 rounded-2xl font-black gap-2"
+                                                            className="w-full h-11 rounded-2xl font-black gap-2 shadow-lg"
                                                         >
                                                             <Play className="h-4 w-4" /> بدء العمل الميداني
                                                         </Button>
