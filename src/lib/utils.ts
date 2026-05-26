@@ -89,7 +89,7 @@ export function getTenantPath(path: string | null | undefined, tenantId: string 
   if (path.includes('companies/')) return path;
   
   if (!tenantId) {
-      // 🛡️ رادار الانتظار: إذا لم يتوفر tenantId بعد، نرجع مساراً وهمياً آمناً لمنع الانهيار
+      // 🛡️ رادار الانتظار: نرجع مساراً وهمياً آمناً لمنع الانهيار
       return `_WAITING_/${path}`;
   }
   

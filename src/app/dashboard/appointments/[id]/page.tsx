@@ -4,13 +4,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, increment, Timestamp, addDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
 import type { Appointment, Client, ClientTransaction, AppointmentAuditLog, TransactionStage, Holiday } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Link2, Plus, ShieldCheck, UserPlus, FileText, Target, History, RotateCcw, Link as LinkIcon } from 'lucide-react';
+import { 
+    AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Link2, Plus, ShieldCheck, UserPlus, 
+    FileText, Target, History, RotateCcw, Link as LinkIcon 
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -27,10 +30,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * صفحة تفاصيل الزيارة المحدثة (The Sovereign Visit Control Center V83.0):
- * تم حقن "محرك المطالبات الآلية" لضمان ربط الإنجاز الميداني بالتحصيل المالي فوراً.
+ * صفحة تفاصيل الزيارة الموحدة (Sovereign Visit Hub V84.0):
+ * تم تحصين الاستيرادات المفقودة ومعالجة أنواع البيانات لضمان ثبات البناء.
  */
 export default function AppointmentDetailsPage() {
     const params = useParams();
@@ -76,7 +81,6 @@ export default function AppointmentDetailsPage() {
         return transaction.stages.filter(s => s.status !== 'completed');
     }, [transaction?.stages]);
 
-    // ✨ محرك حساب المطالبات المالية الآلية (Financial Claim Radar) ✨
     const calculateFinancialClaim = async (stageName: string) => {
         if (!firestore || !tenantId || !transaction?.contract?.clauses) return null;
         try {
@@ -114,9 +118,11 @@ export default function AppointmentDetailsPage() {
     const handleLinkTransaction = async () => {
         if (!firestore || !tenantId || !appointment || !selectedTxToLink) return;
         setIsLinking(true);
+        const finalApptPath = getTenantPath(`appointments/${appointment.id}`, tenantId)!;
+        
         try {
             const batch = writeBatch(firestore);
-            const apptRef = doc(firestore, apptPath!);
+            const apptRef = doc(firestore, finalApptPath);
             batch.update(apptRef, { 
                 transactionId: selectedTxToLink,
                 updatedAt: serverTimestamp(),
@@ -133,19 +139,23 @@ export default function AppointmentDetailsPage() {
             });
             await batch.commit();
             toast({ title: 'تم الربط بنجاح' });
-        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الربط' }); } finally { setIsLinking(false); }
+        } catch (e: any) { 
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: finalApptPath,
+                operation: 'update'
+            }));
+        } finally { setIsLinking(false); }
     };
 
     const handleUpdateVisitStatus = async () => {
         if (!firestore || !currentUser || !tenantId || !appointment || !selectedStageId || !transaction) return;
         setIsSaving(true);
         const stageToUpdate = transaction.stages?.find(s => s.stageId === selectedStageId);
-        
+        const finalTxPath = getTenantPath(`clients/${appointment.clientId}/transactions/${appointment.transactionId}`, tenantId)!;
+
         try {
             const batch = writeBatch(firestore);
-            const txPath = getTenantPath(`clients/${appointment.clientId}/transactions/${appointment.transactionId}`, tenantId);
-            const finalApptPath = getTenantPath(`appointments/${appointment.id}`, tenantId);
-            const txRef = doc(firestore, txPath!);
+            const txRef = doc(firestore, finalTxPath);
             
             const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
             const stageIdx = currentStages.findIndex(s => s.stageId === selectedStageId);
@@ -156,7 +166,6 @@ export default function AppointmentDetailsPage() {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 
-                // تفعيل المراحل التالية
                 const nextIds = stage.nextStageIds || [];
                 if (nextIds.length > 0) {
                     nextIds.forEach(nid => {
@@ -164,9 +173,7 @@ export default function AppointmentDetailsPage() {
                         if (target && target.status === 'pending') {
                             target.status = 'in-progress';
                             target.startDate = Timestamp.fromDate(now);
-                            if (target.expectedDurationDays) {
-                                target.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, target.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
-                            }
+                            target.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, target.expectedDurationDays || 7, branding?.work_hours?.holidays || [], publicHolidays));
                         }
                     });
                 } else {
@@ -174,16 +181,13 @@ export default function AppointmentDetailsPage() {
                     if (nextStage && nextStage.status === 'pending') {
                         nextStage.status = 'in-progress';
                         nextStage.startDate = Timestamp.fromDate(now);
-                        if (nextStage.expectedDurationDays) {
-                            nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
-                        }
+                        nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays || 7, branding?.work_hours?.holidays || [], publicHolidays));
                     }
                 }
 
                 let financeComment = "";
                 let updatedClauses = transaction.contract?.clauses || null;
                 
-                // 💰 محرك المطالبات والتحصيل الآلي 💰
                 if (updatedClauses) {
                     updatedClauses = updatedClauses.map((clause: any) => {
                         if (clause.condition === stage.name && clause.status === 'غير مستحقة') {
@@ -195,14 +199,14 @@ export default function AppointmentDetailsPage() {
                     
                     const claim = await calculateFinancialClaim(stage.name);
                     if (claim) {
-                        const appCounterPath = getTenantPath('counters/paymentApplications', tenantId);
-                        const appCounterDoc = await getDoc(doc(firestore, appCounterPath!));
+                        const appCounterPath = getTenantPath('counters/paymentApplications', tenantId)!;
+                        const appCounterDoc = await getDoc(doc(firestore, appCounterPath));
                         const currentYear = new Date().getFullYear();
                         const appNextNumber = ((appCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
                         const appNumber = `APP-AUTO-${currentYear}-${String(appNextNumber).padStart(4, '0')}`;
                         
-                        const appsPath = getTenantPath('payment_applications', tenantId);
-                        const newAppRef = doc(collection(firestore, appsPath!));
+                        const appsPath = getTenantPath('payment_applications', tenantId)!;
+                        const newAppRef = doc(collection(firestore, appsPath));
                         
                         batch.set(newAppRef, {
                             applicationNumber: appNumber,
@@ -225,7 +229,7 @@ export default function AppointmentDetailsPage() {
                             createdAt: serverTimestamp(),
                             createdBy: currentUser.id
                         });
-                        batch.set(doc(firestore, appCounterPath!), { counts: { [currentYear]: appNextNumber } }, { merge: true });
+                        batch.set(doc(firestore, appCounterPath), { counts: { [currentYear]: appNextNumber } }, { merge: true });
                         financeComment += `\n**[مطالبة آلية]** تم إصدار مستخلص رقم **${appNumber}** بقيمة صافية: **${formatCurrency(claim.totalDebt)}**.`;
                     }
                 }
@@ -249,7 +253,8 @@ export default function AppointmentDetailsPage() {
                 });
             }
 
-            const apptRef = doc(firestore, finalApptPath!);
+            const apptPathDoc = getTenantPath(`appointments/${appointment.id}`, tenantId)!;
+            const apptRef = doc(firestore, apptPathDoc);
             batch.update(apptRef, { 
                 workStageUpdated: true, 
                 notes, 
@@ -268,11 +273,18 @@ export default function AppointmentDetailsPage() {
                 companyId: tenantId
             });
 
-            await batch.commit();
+            await batch.commit().catch(async (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: finalTxPath,
+                    operation: 'write'
+                }));
+                throw serverError;
+            });
+
             toast({ title: 'تم توثيق الإنجاز', description: 'تم تحديث كافة مسارات العمل والمطالبات المالية آلياً.' });
             router.push('/dashboard/appointments');
-        } catch (e) { 
-            toast({ variant: 'destructive', title: 'خطأ في التوثيق' }); 
+        } catch (e: any) { 
+            toast({ variant: 'destructive', title: 'خطأ في التوثيق', description: e.message }); 
         } finally { setIsSaving(false); }
     };
 
@@ -494,7 +506,7 @@ export default function AppointmentDetailsPage() {
                 <ClientTransactionForm 
                     isOpen={isTxFormOpen} 
                     onClose={() => setIsTxFormOpen(false)} 
-                    clientId={appointment.clientId} 
+                    clientId={appointment.clientId!} 
                     clientName={client?.nameAr || ''}
                     fromAppointmentId={appointment.id}
                 />

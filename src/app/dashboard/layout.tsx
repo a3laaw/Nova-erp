@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -82,7 +81,6 @@ export default function DashboardLayout({
         <ParticleBackground />
         
         <main className="relative z-10 flex flex-col items-center justify-center w-full px-6 pointer-events-none">
-            {/* 🛡️ تكبير الحاوية للسماح بالنبض الواسع V67 🛡️ */}
             <div className="nova-image-container animate-pulse-nova relative w-full max-w-md aspect-square flex items-center justify-center pointer-events-auto">
                 <img 
                     alt="Nova Nebula" 
@@ -113,7 +111,10 @@ export default function DashboardLayout({
     );
   }
 
-  if (!user || !user.currentCompanyId) {
+  // 🛡️ تصحيح منطق المطور: السماح بدخول الداشبورد للمطور حتى لو لم يكن مرتبطاً بشركة
+  const hasAccess = user && (user.currentCompanyId || user.role === 'Developer');
+
+  if (!hasAccess) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#fdfaf3]" dir="rtl">
         <div className="p-6 bg-red-50/10 rounded-full border-2 border-red-500/20 mb-4">
