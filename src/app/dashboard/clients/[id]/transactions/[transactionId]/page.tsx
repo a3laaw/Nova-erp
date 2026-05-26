@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, Timestamp, writeBatch, where } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, Timestamp, writeBatch, where, increment } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -42,11 +42,13 @@ import {
     Sparkles,
     ChevronLeft,
     X,
-    Save
+    Save,
+    TrendingUp,
+    Zap
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import type { Client, ClientTransaction, TransactionStage, Holiday } from '@/lib/types';
+import type { Client, ClientTransaction, TransactionStage, Holiday, UserProfile } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
@@ -146,23 +148,53 @@ export default function TransactionDetailPage() {
             const stage = currentStages[stageIndex];
             const now = new Date();
 
+            let logLabel = '';
+
             if (action === 'start') {
                 stage.status = 'in-progress';
                 stage.startDate = Timestamp.fromDate(now);
+                logLabel = 'بدء العمل';
                 if (stage.expectedDurationDays) {
                     stage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, stage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
                 }
             } else if (action === 'modify') {
                 stage.currentCount = (stage.currentCount || 0) + 1;
+                logLabel = `تعديل فني (رقم ${stage.currentCount})`;
             } else if (action === 'complete') {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
-                const nextStage = currentStages.find(s => s.order === stage.order + 1);
-                if (nextStage && nextStage.status === 'pending') {
-                    nextStage.status = 'in-progress';
-                    nextStage.startDate = Timestamp.fromDate(now);
-                    if (nextStage.expectedDurationDays) {
-                        nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
+                logLabel = 'إتمام وإنجاز';
+                
+                // 1. منح نقاط XP للموظف عند الإنجاز
+                const userPath = getTenantPath(`users/${currentUser.id}`, tenantId);
+                const ledgerPath = getTenantPath(`points_ledger`, tenantId);
+                const userRef = doc(firestore, userPath!);
+                
+                batch.update(userRef, { totalPoints: increment(10) });
+                batch.set(doc(collection(firestore, ledgerPath!)), {
+                    userId: currentUser.id,
+                    points: 10,
+                    source: 'wbs_completion',
+                    description: `إنجاز مرحلة: ${stage.name}`,
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
+                });
+
+                // 2. تفعيل المراحل التالية
+                const nextIds = stage.nextStageIds || [];
+                if (nextIds.length > 0) {
+                    nextIds.forEach(nid => {
+                        const target = currentStages.find(s => s.stageId === nid);
+                        if (target && target.status === 'pending') {
+                            target.status = 'in-progress';
+                            target.startDate = Timestamp.fromDate(now);
+                        }
+                    });
+                } else {
+                    const nextStage = currentStages.find(s => s.order === stage.order + 1);
+                    if (nextStage && nextStage.status === 'pending') {
+                        nextStage.status = 'in-progress';
+                        nextStage.startDate = Timestamp.fromDate(now);
                     }
                 }
             }
@@ -172,7 +204,7 @@ export default function TransactionDetailPage() {
             const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
             batch.set(timelineRef, {
                 type: 'comment',
-                content: `**[إجراء فني: ${action === 'complete' ? 'إنهاء' : action === 'start' ? 'بدء' : 'تعديل'}]** في مرحلة: ${stage.name}.\nالملاحظات: ${actionNote}`,
+                content: `**[إجراء فني: ${logLabel}]** في مرحلة: ${stage.name}.\nالملاحظات: ${actionNote}`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
@@ -180,6 +212,7 @@ export default function TransactionDetailPage() {
                 companyId: tenantId
             });
 
+            // تحديث العقد المالي إذا وجد
             if (action === 'complete' && transaction.contract) {
                 const contract = transaction.contract;
                 const clauseIndex = contract.clauses?.findIndex((c: any) => c.condition === stage.name);
@@ -206,7 +239,7 @@ export default function TransactionDetailPage() {
             }
 
             await batch.commit();
-            toast({ title: '✅ تم حفظ المعلومات ومزامنة المالية' });
+            toast({ title: '✅ تم حفظ الإجراء وتحديث الـ XP' });
             setActionNote('');
             setActiveAction(null);
         } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsProcessing(false); }
@@ -302,10 +335,18 @@ export default function TransactionDetailPage() {
                                                 <div className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-white rounded-full border-2 border-primary flex items-center justify-center font-mono font-black text-[8px] text-primary shadow-sm">{idx + 1}</div>
                                             </div>
                                             <div className="space-y-1">
-                                                <span className="font-black text-2xl text-slate-900">{stage.name}</span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="font-black text-2xl text-slate-900">{stage.name}</span>
+                                                    {stage.currentCount! > 0 && <Badge variant="secondary" className="bg-orange-100 text-orange-700 font-black h-5 px-2 text-[9px]">{stage.currentCount} تعديلات</Badge>}
+                                                </div>
                                                 {isCurrent && stage.expectedEndDate && (
                                                     <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 uppercase tracking-widest">
                                                         <Clock className="h-3 w-3" /> التسليم المخطط: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}
+                                                    </p>
+                                                )}
+                                                {isCompleted && stage.endDate && (
+                                                    <p className="text-[10px] font-bold text-green-600 flex items-center gap-1.5 uppercase tracking-widest">
+                                                        <CheckCircle2 className="h-3 w-3" /> تم الإنجاز بتاريخ: {format(toFirestoreDate(stage.endDate)!, 'dd/MM/yyyy')}
                                                     </p>
                                                 )}
                                             </div>
@@ -336,9 +377,11 @@ export default function TransactionDetailPage() {
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-center pr-1">
                                                     <Label className="font-black text-xs text-primary flex items-center gap-2 uppercase tracking-[0.2em]">
-                                                        <MessageSquare className="h-4 w-4" /> محضر التوثيق الميداني (إلزامي لـ {activeAction.type === 'complete' ? 'الإنهاء' : 'التعديل'}) *
+                                                        <MessageSquare className="h-4 w-4" /> محضر التوثيق الميداني (إلزامي) *
                                                     </Label>
-                                                    <Badge className="bg-primary/10 text-primary border-none text-[9px] font-black uppercase">Action Bubble Node</Badge>
+                                                    <Badge className="bg-primary/10 text-primary border-none text-[9px] font-black uppercase flex items-center gap-1">
+                                                        <Zap className="h-2.5 w-2.5 fill-primary" /> {activeAction.type === 'complete' ? '+10 XP Points' : '+2 XP Points'}
+                                                    </Badge>
                                                 </div>
                                                 <Textarea 
                                                     autoFocus

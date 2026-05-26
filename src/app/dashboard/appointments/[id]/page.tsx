@@ -14,7 +14,8 @@ import {
     serverTimestamp, 
     Timestamp, 
     getDoc,
-    updateDoc 
+    updateDoc,
+    increment 
 } from 'firebase/firestore';
 import type { Appointment, Client, ClientTransaction, TransactionStage, Holiday } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +31,8 @@ import {
     Play,
     Edit3,
     X,
-    Save
+    Save,
+    Zap
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -110,25 +112,40 @@ export default function AppointmentDetailsPage() {
             const stage = currentStages[stageIndex];
             const now = new Date();
 
+            let logLabel = '';
+
             if (action === 'start') {
                 stage.status = 'in-progress';
                 stage.startDate = Timestamp.fromDate(now);
+                logLabel = 'بدء الزيارة الميدانية';
                 if (stage.expectedDurationDays) {
                     stage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, stage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
                 }
             } else if (action === 'modify') {
                 stage.currentCount = (stage.currentCount || 0) + 1;
+                logLabel = `تعديل ميداني (رقم ${stage.currentCount})`;
             } else if (action === 'complete') {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
+                logLabel = 'إغلاق المرحلة ميدانياً';
+
+                // 1. منح نقاط XP للموظف عند الإنجاز من الزيارة
+                const userPath = getTenantPath(`users/${currentUser.id}`, tenantId);
+                const ledgerPath = getTenantPath(`points_ledger`, tenantId);
+                batch.update(doc(firestore, userPath!), { totalPoints: increment(10) });
+                batch.set(doc(collection(firestore, ledgerPath!)), {
+                    userId: currentUser.id,
+                    points: 10,
+                    source: 'site_visit_completion',
+                    description: `إنجاز مرحلة عبر الموقع: ${stage.name}`,
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
+                });
                 
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
                     nextStage.startDate = Timestamp.fromDate(now);
-                    if (nextStage.expectedDurationDays) {
-                        nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
-                    }
                 }
             }
 
@@ -137,7 +154,7 @@ export default function AppointmentDetailsPage() {
             const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
             batch.set(timelineRef, {
                 type: 'comment',
-                content: `**[محضر زيارة: ${action === 'complete' ? 'إنهاء' : action === 'start' ? 'بدء' : 'تعديل'}]** للمرحلة: ${stage.name}.\nالملاحظات: ${actionNote}`,
+                content: `**[محضر زيارة: ${logLabel}]** للمرحلة: ${stage.name}.\nالملاحظات: ${actionNote}`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
@@ -179,7 +196,7 @@ export default function AppointmentDetailsPage() {
             }
 
             await batch.commit();
-            toast({ title: '✅ تم توثيق الإنجاز الميداني' });
+            toast({ title: '✅ تم توثيق الإنجاز الميداني ومنح الـ XP' });
             setActionNote('');
             setActiveAction(null);
         } catch (e: any) { console.error(e); } finally { setIsSaving(false); }
@@ -279,10 +296,18 @@ export default function AppointmentDetailsPage() {
                                                             <div className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-white rounded-full border-2 border-primary flex items-center justify-center font-mono font-black text-[8px] text-primary shadow-sm">{idx + 1}</div>
                                                         </div>
                                                         <div className="space-y-1">
-                                                            <span className="font-black text-2xl text-slate-900">{stage.name}</span>
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="font-black text-2xl text-slate-900">{stage.name}</span>
+                                                                {stage.currentCount! > 0 && <Badge variant="secondary" className="bg-orange-100 text-orange-700 font-black h-5 px-2 text-[9px]">{stage.currentCount} تعديلات</Badge>}
+                                                            </div>
                                                             {isCurrent && stage.expectedEndDate && (
                                                                 <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 uppercase tracking-widest">
                                                                     <Clock className="h-3 w-3" /> التسليم المخطط: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}
+                                                                </p>
+                                                            )}
+                                                            {isCompleted && stage.endDate && (
+                                                                <p className="text-[10px] font-bold text-green-600 flex items-center gap-1.5 uppercase tracking-widest">
+                                                                    <CheckCircle2 className="h-3 w-3" /> تم الإنجاز بتاريخ: {format(toFirestoreDate(stage.endDate)!, 'dd/MM/yyyy')}
                                                                 </p>
                                                             )}
                                                         </div>
@@ -312,7 +337,9 @@ export default function AppointmentDetailsPage() {
                                                                 <Label className="font-black text-xs text-primary flex items-center gap-2 uppercase tracking-[0.2em]">
                                                                     <MessageSquare className="h-4 w-4" /> محضر الأعمال الميدانية (إلزامي) *
                                                                 </Label>
-                                                                <Badge className="bg-primary/10 text-primary border-none text-[9px] font-black uppercase">Action Bubble</Badge>
+                                                                <Badge className="bg-primary/10 text-primary border-none text-[9px] font-black uppercase flex items-center gap-1">
+                                                                    <Zap className="h-2.5 w-2.5 fill-primary" /> {activeAction.type === 'complete' ? '+10 XP Points' : '+2 XP Points'}
+                                                                </Badge>
                                                             </div>
                                                             <Textarea 
                                                                 autoFocus
