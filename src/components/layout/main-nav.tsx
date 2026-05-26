@@ -80,7 +80,8 @@ import {
   Sparkles,
   History,
   Coins,
-  Layers
+  Layers,
+  HandCoins
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -88,7 +89,6 @@ import { useLanguage } from '@/context/language-context';
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
-// 🛡️ القائمة الموحدة التي تظهر وتختفي ديناميكياً بناءً على الدور 🛡️
 const navItems = {
   ar: [
     { href: '/dashboard', label: 'الرئيسية', icon: LayoutGrid },
@@ -104,7 +104,7 @@ const navItems = {
       ]
     },
     { 
-      label: 'المسار الفني والمقاولات',
+      label: 'المقاولات والعمل الميداني',
       icon: PencilRuler,
       hrefPrefix: '/dashboard/construction',
       children: [
@@ -112,7 +112,7 @@ const navItems = {
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
         { href: '/dashboard/construction/boq', label: 'جدول الكميات (BOQ)', icon: ClipboardList },
         { href: '/dashboard/construction/schedules', label: 'الجدول الزمني (Gantt)', icon: Clock },
-        { href: '/dashboard/construction/payment-applications', label: 'المستخلصات', icon: Coins },
+        { href: '/dashboard/construction/payment-applications', label: 'المستخلصات الميدانية', icon: Coins },
       ]
     },
     { 
@@ -124,6 +124,7 @@ const navItems = {
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
+        { href: '/dashboard/accounting/claims', label: 'المطالبات والتحصيل', icon: HandCoins },
         { href: '/dashboard/accounting/reconciliation', label: 'التسوية البنكية', icon: RotateCcw },
         { href: '/dashboard/accounting/reports', label: 'التقارير والقوائم المالية', icon: PieChart },
       ]
@@ -147,6 +148,7 @@ const navItems = {
         { href: '/dashboard/settings/branding', label: 'الهوية والشعار', icon: Palette },
         { href: '/dashboard/settings/users', label: 'دخول الموظفين', icon: UserCheck },
         { href: '/dashboard/settings/reference-data', label: 'تجهيز القوائم', icon: Network },
+        { href: '/dashboard/settings/data-integrity', label: 'تحديث البيانات', icon: ShieldCheck },
       ]
     },
   ],
@@ -159,7 +161,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   const { setOpenMobile, state } = useSidebar();
   const Icon = item.icon;
 
-  // 🛡️ محرك الاختفاء الذكي: إخفاء الإعدادات عن غير المديرين 🛡️
   if (item.label.includes('الإعدادات') && userRole !== 'Admin' && userRole !== 'Developer') return null;
 
   const isAnyChildActive = React.useMemo(() => {
