@@ -4,7 +4,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات الموحدة (V134.0 - Matrix Enforcement Edition)
+    // 🛡️ مصفوفة الصلاحيات الموحدة (V140.0 - Dynamic Profession Edition) 🛡️
     
     function isAuthenticated() {
       return request.auth != null;
@@ -22,24 +22,17 @@ service cloud.firestore {
               request.auth.token.currentCompanyId == companyId);
     }
 
-    // 🛡️ رادار فحص الأدوار (The Role Radar) 🛡️
-    function hasRole(roleName) {
-        return request.auth.token.role == roleName;
+    // رادار فحص الصلاحيات من المصفوفة الديناميكية
+    function hasPermission(companyId, module, action) {
+        let role = request.auth.token.role;
+        let matrix = get(/databases/$(database)/documents/companies/$(companyId)/settings/permissions_matrix).data.data;
+        let key = role + "-" + module + "-" + action;
+        return matrix[key] == true;
     }
 
     // هل يملك صلاحية إدارية عليا؟
     function isAdminPower() {
-        return hasRole('Admin') || hasRole('Developer');
-    }
-
-    // هل يملك صلاحية مالية؟ (مدير مالي أو محاسب أو مدير مشاريع)
-    function isFinancePrivileged() {
-        return isAdminPower() || hasRole('CFO') || hasRole('Accountant') || hasRole('ProjectManager');
-    }
-
-    // هل يملك صلاحية فنية؟ (مدير مشاريع، مدير هندسي، مهندس، مساح)
-    function isTechnicalPrivileged() {
-        return isAdminPower() || hasRole('ProjectManager') || hasRole('EngineeringManager') || hasRole('Engineer') || hasRole('Surveyor');
+        return request.auth.token.role == 'Admin' || isDeveloper();
     }
 
     match /{document=**} {
@@ -52,49 +45,39 @@ service cloud.firestore {
       
       // 🏢 إدارة العملاء (CRM) 🏢
       match /clients/{clientId} {
-        allow read: if isTenantMember(companyId);
-        allow create, update: if isTenantMember(companyId) && (isAdminPower() || hasRole('ProjectManager') || hasRole('Secretary'));
-        allow delete: if isAdminPower();
+        allow read: if isTenantMember(companyId) && (hasPermission(companyId, 'clients', 'view') || isAdminPower());
+        allow create: if isTenantMember(companyId) && (hasPermission(companyId, 'clients', 'create') || isAdminPower());
+        allow update: if isTenantMember(companyId) && (hasPermission(companyId, 'clients', 'update') || isAdminPower());
+        allow delete: if isTenantMember(companyId) && (hasPermission(companyId, 'clients', 'delete') || isAdminPower());
       }
 
       // 📂 المعاملات والمسار الفني 📂
       match /transactions/{txId} {
-        allow read: if isTenantMember(companyId) && (isTechnicalPrivileged() || isFinancePrivileged() || hasRole('Secretary'));
-        allow create, update: if isTenantMember(companyId) && (isAdminPower() || hasRole('ProjectManager') || hasRole('EngineeringManager') || (hasRole('Engineer') && resource.data.assignedEngineerId == request.auth.token.employeeId));
+        allow read: if isTenantMember(companyId) && (hasPermission(companyId, 'transactions', 'view') || isAdminPower());
+        allow create, update: if isTenantMember(companyId) && (hasPermission(companyId, 'transactions', 'create') || isAdminPower());
         allow delete: if isAdminPower();
       }
 
       // 🏗️ الزيارات الميدانية 🏗️
       match /field_visits/{visitId} {
-        allow read: if isTenantMember(companyId) && isTechnicalPrivileged();
-        allow create, update: if isTenantMember(companyId) && (isTechnicalPrivileged() || hasRole('Secretary'));
+        allow read: if isTenantMember(companyId) && (hasPermission(companyId, 'site_visits', 'view') || isAdminPower());
+        allow create, update: if isTenantMember(companyId) && (hasPermission(companyId, 'site_visits', 'create') || isAdminPower());
         allow delete: if isAdminPower();
       }
 
-      // 💰 المحاسبة (القيود، السندات، المستخلصات) 💰
+      // 💰 المحاسبة والمالية 💰
       match /journalEntries/{id} {
-        allow read: if isTenantMember(companyId) && (isFinancePrivileged() || hasRole('CFO'));
-        allow write: if isTenantMember(companyId) && (isAdminPower() || hasRole('CFO') || hasRole('Accountant'));
+        allow read, write: if isTenantMember(companyId) && (hasPermission(companyId, 'journal_entries', 'view') || isAdminPower());
       }
       
       match /cashReceipts/{id} {
-        allow read: if isTenantMember(companyId) && (isFinancePrivileged() || hasRole('CFO'));
-        allow write: if isTenantMember(companyId) && (isAdminPower() || hasRole('CFO') || hasRole('Accountant'));
-      }
-
-      match /payment_applications/{id} {
-        allow read: if isTenantMember(companyId);
-        allow write: if isTenantMember(companyId) && (isFinancePrivileged());
+        allow read, write: if isTenantMember(companyId) && (hasPermission(companyId, 'vouchers', 'view') || isAdminPower());
       }
 
       // 👥 الموارد البشرية 👥
       match /employees/{id} {
-        allow read: if isTenantMember(companyId) && (isAdminPower() || hasRole('HR') || hasRole('CFO') || hasRole('ProjectManager') || hasRole('Secretary'));
-        allow write: if isAdminPower() || hasRole('HR');
-      }
-
-      match /payroll/{id} {
-        allow read, write: if isAdminPower() || hasRole('HR') || hasRole('CFO') || hasRole('Accountant');
+        allow read: if isTenantMember(companyId) && (hasPermission(companyId, 'hr_employees', 'view') || isAdminPower());
+        allow write: if isTenantMember(companyId) && (hasPermission(companyId, 'hr_employees', 'create') || isAdminPower());
       }
 
       // ⚙️ الإعدادات (Sovereign Settings) ⚙️

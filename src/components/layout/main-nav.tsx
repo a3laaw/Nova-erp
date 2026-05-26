@@ -49,7 +49,6 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   PieChart,
-  CalendarCheck,
   Clock,
   Banknote,
   ClipboardList,
@@ -80,7 +79,8 @@ import {
   BarChart3,
   Sparkles,
   History,
-  Coins
+  Coins,
+  Layers
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -88,19 +88,13 @@ import { useLanguage } from '@/context/language-context';
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
-// 🛡️ تحديث مصفوفة الأذونات في القائمة بناءً على طلبك 🛡️
+// 🛡️ القائمة الموحدة التي تظهر وتختفي ديناميكياً بناءً على الدور 🛡️
 const navItems = {
   ar: [
-    { 
-      href: '/dashboard', 
-      label: 'الرئيسية', 
-      icon: LayoutGrid, 
-      roles: ['Developer', 'Admin', 'CFO', 'ProjectManager', 'EngineeringManager', 'Engineer', 'Accountant', 'Secretary', 'Surveyor'] 
-    },
+    { href: '/dashboard', label: 'الرئيسية', icon: LayoutGrid },
     { 
       label: 'العملاء والـ CRM',
       icon: UsersRound,
-      roles: ['Developer', 'Admin', 'CFO', 'ProjectManager', 'EngineeringManager', 'Engineer', 'Accountant', 'Secretary', 'Surveyor'],
       hrefPrefix: '/dashboard/clients',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
@@ -112,7 +106,6 @@ const navItems = {
     { 
       label: 'المسار الفني والمقاولات',
       icon: PencilRuler,
-      roles: ['Developer', 'Admin', 'ProjectManager', 'EngineeringManager', 'Engineer', 'Surveyor', 'CFO', 'Secretary'],
       hrefPrefix: '/dashboard/construction',
       children: [
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
@@ -125,7 +118,6 @@ const navItems = {
     { 
       label: 'المالية والمحاسبة', 
       icon: Landmark, 
-      roles: ['Developer', 'Admin', 'CFO', 'Accountant', 'ProjectManager'],
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'دليل الحسابات', icon: ListTree },
@@ -139,7 +131,6 @@ const navItems = {
     { 
       label: 'الموارد البشرية (HR)', 
       icon: Users, 
-      roles: ['Developer', 'Admin', 'HR', 'CFO', 'ProjectManager', 'Secretary'],
       hrefPrefix: '/dashboard/hr',
       children: [
         { href: '/dashboard/hr/employees', label: 'بيانات الموظفين', icon: Users },
@@ -151,7 +142,6 @@ const navItems = {
     { 
       label: 'الإعدادات السيادية', 
       icon: Settings2, 
-      roles: ['Developer', 'Admin'],
       hrefPrefix: '/dashboard/settings',
       children: [
         { href: '/dashboard/settings/branding', label: 'الهوية والشعار', icon: Palette },
@@ -161,33 +151,28 @@ const navItems = {
     },
   ],
   en: [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'CFO', 'Engineer', 'Accountant'] },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
   ]
 };
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
   const { setOpenMobile, state } = useSidebar();
   const Icon = item.icon;
-  if (item.roles && !item.roles.includes(userRole)) return null;
 
-  const visibleChildren = React.useMemo(() => {
-    if (!item.children) return null;
-    return item.children.filter((child: any) => !child.roles || child.roles.includes(userRole));
-  }, [item.children, userRole]);
-
-  if (item.children && (!visibleChildren || visibleChildren.length === 0)) return null;
+  // 🛡️ محرك الاختفاء الذكي: إخفاء الإعدادات عن غير المديرين 🛡️
+  if (item.label.includes('الإعدادات') && userRole !== 'Admin' && userRole !== 'Developer') return null;
 
   const isAnyChildActive = React.useMemo(() => {
-    if (!visibleChildren) return false;
-    return visibleChildren.some((child: any) => {
+    if (!item.children) return false;
+    return item.children.some((child: any) => {
         const baseUrl = child.href.split('?')[0];
         return currentPath.startsWith(baseUrl);
     });
-  }, [visibleChildren, currentPath]);
+  }, [item.children, currentPath]);
 
   const isActive = item.href ? currentPath === item.href : (item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : isAnyChildActive);
 
-  if (!visibleChildren && item.href) {
+  if (!item.children && item.href) {
     return (
       <SidebarMenuItem className="px-4">
         <BaseSidebarMenuButton 
@@ -209,7 +194,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     );
   }
   
-  if (visibleChildren) {
+  if (item.children) {
     if (state === 'collapsed') {
       return (
         <SidebarMenuItem className="px-3 group-data-[collapsible=icon]:px-0">
@@ -237,7 +222,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             <DropdownMenuContent side="left" align="start" className="w-72 rounded-[1.8rem] p-2 shadow-2xl bg-white border-none" dir="rtl">
               <DropdownMenuLabel className="font-black text-slate-400 text-[10px] uppercase tracking-widest px-4 py-3 border-b mb-2">{item.label}</DropdownMenuLabel>
               <ScrollArea className="max-h-[70vh]">
-                {visibleChildren.map((child: any) => {
+                {item.children.map((child: any) => {
                     const isChildActive = currentPath === child.href.split('?')[0];
                     return (
                         <DropdownMenuItem key={child.href} asChild className={cn(
@@ -280,7 +265,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           </CollapsibleTrigger>
           <CollapsibleContent>
             <SidebarMenuSub className="mt-1 mb-2 space-y-1.5 sidebar-no-offset">
-              {visibleChildren.map((child: any) => {
+              {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href.split('?')[0];
                 return (
                   <SidebarMenuSubItem key={child.href}>

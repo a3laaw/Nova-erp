@@ -34,8 +34,8 @@ export interface UserProfile extends BaseEntity {
   uid: string;
   username: string;
   email: string;
-  // 🛡️ تحديث الأدوار السيادية لتطابق المصفوفة المعتمدة 🛡️
-  role: 'Developer' | 'Admin' | 'CFO' | 'ProjectManager' | 'EngineeringManager' | 'Engineer' | 'Accountant' | 'Secretary' | 'Surveyor' | 'User';
+  // 🛡️ التوسيع السيادي: دعم كافة المسميات المهنية كأدوار نظام 🛡️
+  role: string; 
   isActive: boolean;
   employeeId?: string;
   fullName?: string;
@@ -179,4 +179,16 @@ export interface HubPost extends BaseEntity {
     voters: string[];
     pointsAwarded: number;
     companyId: string;
+}
+
+export interface Job extends BaseEntity {
+    name: string;
+    order?: number;
+    parentId?: string; // departmentId
+}
+
+export interface Department extends BaseEntity {
+    name: string;
+    order?: number;
+    activityTypes?: string[];
 }
