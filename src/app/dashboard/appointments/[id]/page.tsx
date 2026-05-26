@@ -25,7 +25,9 @@ import {
     AlertCircle, ArrowRight, Calendar, Workflow, 
     Check, Loader2, Target, Clock, Pencil, 
     CheckCircle2, Ban, ShieldCheck, Calculator,
-    Undo2
+    Undo2,
+    MessageSquare,
+    Play
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -83,6 +85,13 @@ export default function AppointmentDetailsPage() {
 
     const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
         if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId) return;
+        
+        // 🛡️ درع الرقابة الإلزامي: لا إجراء بدون تعليق 🛡️
+        if (!actionNote.trim()) {
+            toast({ variant: 'destructive', title: 'تنبيه', description: 'يرجى كتابة ملاحظات العمل الميداني أولاً لتوثيق الإجراء.' });
+            return;
+        }
+
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
@@ -117,16 +126,16 @@ export default function AppointmentDetailsPage() {
             
             const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
             batch.set(timelineRef, {
-                type: 'log',
-                content: `تم تسجيل ${action === 'complete' ? 'إنجاز' : action === 'start' ? 'بدء عمل' : 'تعديل'} في مرحلة: ${stage.name}.${actionNote ? `\nالملاحظات: ${actionNote}` : ''}`,
+                type: 'comment', // تحويله لتعليق لضمان الظهور في التايم لاين
+                content: `**[إجراء ميداني: ${action === 'complete' ? 'إنهاء' : action === 'start' ? 'بدء' : 'تعديل'}]** في مرحلة: ${stage.name}.\nالملاحظات: ${actionNote}`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp(),
                 companyId: tenantId
             });
 
             if (action === 'complete') {
-                // 🛡️ إغلاق الزيارة وتحديث حالتها 🛡️
                 batch.update(doc(firestore, apptPath!), { 
                     workStageUpdated: true, 
                     status: 'confirmed',
@@ -193,7 +202,7 @@ export default function AppointmentDetailsPage() {
                                 <Calendar className="h-4 w-4 text-primary" /> {apptDate ? format(apptDate, 'eeee, dd MMMM HH:mm', { locale: ar }) : '-'}
                             </CardDescription>
                         </div>
-                        <Badge variant="outline" className="bg-white px-4 h-7 rounded-full font-black border-primary/20 text-primary">زيارة معمارية</Badge>
+                        <Badge variant="outline" className="bg-white px-4 h-7 rounded-full font-black border-primary/20 text-primary shadow-sm">زيارة معمارية</Badge>
                     </div>
                 </CardHeader>
 
@@ -223,26 +232,26 @@ export default function AppointmentDetailsPage() {
                             )}
                         </div>
                     ) : (
-                        <div className="space-y-8">
-                             <div className="flex items-center gap-3 bg-primary/5 p-5 rounded-[2rem] border-2 border-dashed border-primary/20">
-                                <div className="p-3 bg-white rounded-2xl shadow-inner text-primary"><Target className="h-6 w-6" /></div>
+                        <div className="space-y-10">
+                             <div className="flex items-center gap-3 bg-primary/5 p-6 rounded-[2.5rem] border-2 border-dashed border-primary/20">
+                                <div className="p-3 bg-white rounded-2xl shadow-inner text-primary"><Target className="h-7 w-7" /></div>
                                 <div>
-                                    <p className="text-[10px] font-black text-primary uppercase tracking-widest">المسار الفني المرتبط</p>
+                                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1">المسار الفني المرتبط</p>
                                     <p className="font-black text-xl text-slate-900">{transaction?.transactionType}</p>
                                 </div>
                              </div>
 
                              <div className="space-y-6">
-                                <h3 className="font-black text-lg border-r-8 border-primary pr-4 flex items-center gap-2">
-                                    <Workflow className="h-5 w-5 text-primary" /> مراحل الإنجاز الميداني
+                                <h3 className="font-black text-lg border-r-8 border-primary pr-4 flex items-center gap-3">
+                                    <Workflow className="h-6 w-6 text-primary" /> مراحل الإنجاز الميداني (WBS)
                                 </h3>
-                                <div className="space-y-6">
+                                
+                                <div className="space-y-8">
                                     {(transaction?.stages || []).map((stage, idx) => {
                                         const isCompleted = stage.status === 'completed';
                                         const isCurrent = stage.status === 'in-progress';
                                         const isLockedRow = idx > 0 && transaction.stages![idx-1].status !== 'completed';
 
-                                        // 🛡️ الظهور التدريجي: لا تظهر المرحلة التالية إلا بعد إنهاء الحالية 🛡️
                                         if (isLockedRow && !isCurrent) return null;
 
                                         return (
@@ -252,7 +261,7 @@ export default function AppointmentDetailsPage() {
                                             )}>
                                                 <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
                                                     <div className="flex items-center gap-6">
-                                                        <Badge variant="outline" className={cn("px-4 py-1 rounded-xl font-black text-[10px] border-2", stageStatusColors[stage.status])}>
+                                                        <Badge variant="outline" className={cn("w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2", stageStatusColors[stage.status])}>
                                                             {stageStatusTranslations[stage.status]}
                                                         </Badge>
                                                         <div className="space-y-1">
@@ -265,35 +274,63 @@ export default function AppointmentDetailsPage() {
                                                         </div>
                                                     </div>
                                                     
-                                                    <div className="flex items-center gap-3 no-print">
-                                                        {!isLockedRow && !isCompleted && (
-                                                            <>
-                                                                {stage.status === 'pending' ? (
-                                                                    <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isSaving} className="rounded-xl font-black px-10 h-11 shadow-lg">بدء</Button>
-                                                                ) : (
-                                                                    <>
-                                                                        <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isSaving} className="rounded-xl font-black px-6 h-11 border-orange-200 text-orange-700 bg-white">تعديل</Button>
-                                                                        <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} disabled={isSaving} className="rounded-xl font-black px-10 h-11 bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-100">إنهاء</Button>
-                                                                    </>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                        {isCompleted && (
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-6 w-6"/></div>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    {isCompleted && (
+                                                        <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-7 w-7"/></div>
+                                                    )}
                                                 </div>
+
                                                 {isCurrent && (
-                                                    <div className="mt-6 pt-6 border-t border-dashed border-primary/20">
-                                                        <Label className="font-black text-[10px] text-primary mb-2 block uppercase tracking-widest">نتائج العمل الميداني / مبررات التعديل:</Label>
-                                                        <Textarea 
-                                                            value={actionNote} 
-                                                            onChange={e => setActionNote(e.target.value)} 
-                                                            placeholder="اكتب هنا ملخص الإنجاز أو الملاحظات الفنية..." 
-                                                            className="rounded-2xl border-none shadow-inner bg-white/50 text-sm p-4 font-medium"
-                                                        />
+                                                    <div className="mt-8 pt-8 border-t border-dashed border-primary/20 space-y-6">
+                                                        <div className="space-y-3">
+                                                            <Label className="font-black text-xs text-primary flex items-center gap-2 uppercase tracking-widest">
+                                                                <MessageSquare className="h-4 w-4" /> محضر الأعمال الميدانية (إلزامي) *
+                                                            </Label>
+                                                            <Textarea 
+                                                                value={actionNote} 
+                                                                onChange={e => setActionNote(e.target.value)} 
+                                                                placeholder="اكتب هنا ملخص الأعمال التي تمت لتمكين أزرار الإنجاز..." 
+                                                                className="rounded-3xl border-none bg-white shadow-inner p-5 font-medium text-lg leading-relaxed min-h-[120px]"
+                                                            />
+                                                        </div>
+                                                        
+                                                        <div className="flex items-center gap-3">
+                                                            <Button 
+                                                                onClick={() => handleStageAction(stage.stageId, 'modify')} 
+                                                                disabled={isSaving || !actionNote.trim()} 
+                                                                variant="outline" 
+                                                                className="flex-1 h-12 rounded-2xl font-black gap-2 border-orange-200 text-orange-700 bg-white"
+                                                            >
+                                                                <Pencil className="h-4 w-4" /> تسجيل تعديل
+                                                            </Button>
+                                                            <Button 
+                                                                onClick={() => handleStageAction(stage.stageId, 'complete')} 
+                                                                disabled={isSaving || !actionNote.trim()} 
+                                                                className="flex-[2] h-12 rounded-2xl font-black gap-2 bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-100"
+                                                            >
+                                                                <CheckCircle2 className="h-5 w-5" /> إنهاء المرحلة
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {!isLocked && stage.status === 'pending' && (
+                                                    <div className="mt-6 pt-6 border-t border-dashed border-slate-100 space-y-4">
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[10px] font-black text-slate-400">اكتب ملاحظة البدء لتفعيل المسار:</Label>
+                                                            <Input 
+                                                                value={actionNote} 
+                                                                onChange={e => setActionNote(e.target.value)} 
+                                                                placeholder="مثال: استلام الموقع وبدء الأعمال..."
+                                                                className="h-10 rounded-xl bg-white border-dashed border-2"
+                                                            />
+                                                        </div>
+                                                        <Button 
+                                                            onClick={() => handleStageAction(stage.stageId, 'start')} 
+                                                            disabled={isSaving || !actionNote.trim()} 
+                                                            className="w-full h-11 rounded-2xl font-black gap-2"
+                                                        >
+                                                            <Play className="h-4 w-4" /> بدء العمل الميداني
+                                                        </Button>
                                                     </div>
                                                 )}
                                             </div>

@@ -35,7 +35,9 @@ import {
     Undo2,
     Ban,
     Lock,
-    CheckCircle2
+    CheckCircle2,
+    Play,
+    Edit3
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -52,6 +54,7 @@ import { UniversalActionTrigger } from '@/components/productivity/universal-acti
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 
 const stageStatusColors: Record<string, string> = {
   pending: 'bg-slate-100 text-slate-800 border-slate-200',
@@ -103,6 +106,13 @@ export default function TransactionDetailPage() {
 
   const handleStageAction = async (stageId: string, action: 'start' | 'modify' | 'complete') => {
         if (!firestore || !currentUser || !transaction || !transactionPath || !tenantId || isLocked) return;
+
+        // 🛡️ درع الرقابة الإلزامي: لا توثيق لا إجراء 🛡️
+        if (!actionNote.trim()) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى كتابة ملاحظات الإنجاز لتفعيل هذا الإجراء.' });
+            return;
+        }
+
         setIsProcessing(true);
         try {
             const batch = writeBatch(firestore);
@@ -137,10 +147,11 @@ export default function TransactionDetailPage() {
             
             const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
             batch.set(timelineRef, {
-                type: 'log',
-                content: `تم تسجيل ${action === 'complete' ? 'إنجاز' : action === 'start' ? 'بدء عمل' : 'تعديل'} في مرحلة: ${stage.name}.${actionNote ? `\nالملاحظات: ${actionNote}` : ''}`,
+                type: 'comment',
+                content: `**[إجراء فني: ${action === 'complete' ? 'إنهاء' : action === 'start' ? 'بدء' : 'تعديل'}]** في مرحلة: ${stage.name}.\nالملاحظات: ${actionNote}`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
+                userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp(),
                 companyId: tenantId
             });
@@ -205,10 +216,10 @@ export default function TransactionDetailPage() {
   return (
     <div className='space-y-6 max-w-6xl mx-auto pb-20' dir='rtl'>
         {isLocked && (
-            <Alert className={cn("rounded-[2rem] border-2 shadow-2xl py-6 bg-red-50 border-red-500")}>
-                <Ban className="h-8 w-8 text-red-600" />
+            <Alert className={cn("rounded-[2.5rem] border-2 shadow-2xl py-8 bg-red-50 border-red-500 animate-in zoom-in-95")}>
+                <Ban className="h-10 w-10 text-red-600" />
                 <AlertTitle className="text-2xl font-black text-red-900">المسار الفني مغلق</AlertTitle>
-                <AlertDescription className="text-lg font-bold text-red-700">هذه المعاملة مجمدة أو ملغاة؛ لا يمكن تعديل المراحل الفنية.</AlertDescription>
+                <AlertDescription className="text-lg font-bold text-red-700 mt-1">هذه المعاملة مجمدة أو ملغاة؛ لا يمكن تعديل المراحل الفنية حتى يتم فك التجميد.</AlertDescription>
             </Alert>
         )}
 
@@ -225,11 +236,11 @@ export default function TransactionDetailPage() {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10 bg-white">
                 <div className="flex items-center gap-4 text-sm">
                     <div className="p-2.5 bg-slate-50 rounded-xl text-primary"><User className="h-5 w-5 opacity-40"/></div>
-                    <div><p className="text-[10px] font-black text-slate-400 uppercase">المهندس المسؤول</p><p className="font-black text-slate-800">{employeesMap.get(transaction.assignedEngineerId || '') || 'غير مسند'}</p></div>
+                    <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">المهندس المسؤول</p><p className="font-black text-slate-800 text-lg">{employeesMap.get(transaction.assignedEngineerId || '') || 'غير مسند'}</p></div>
                 </div>
                 <div className="flex items-center gap-4 text-sm">
                     <div className="p-2.5 bg-slate-50 rounded-xl text-primary"><Calendar className="h-5 w-5 opacity-40"/></div>
-                    <div><p className="text-[10px] font-black text-slate-400 uppercase">تاريخ فتح المسار</p><p className="font-bold">{format(toFirestoreDate(transaction.createdAt)!, 'dd MMMM yyyy', { locale: ar })}</p></div>
+                    <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">تاريخ فتح المسار</p><p className="font-bold text-lg">{format(toFirestoreDate(transaction.createdAt)!, 'dd MMMM yyyy', { locale: ar })}</p></div>
                 </div>
             </CardContent>
         </Card>
@@ -244,12 +255,12 @@ export default function TransactionDetailPage() {
                 </TabsList>
             </div>
 
-            <TabsContent value="stages">
+            <TabsContent value="stages" className="animate-in fade-in duration-700">
                 <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
                     <CardHeader className="border-b bg-muted/5 p-8 px-10">
                         <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'><Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الفني</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-10 space-y-6">
+                    <CardContent className="p-10 space-y-8">
                         {(transaction.stages || []).map((stage, idx) => {
                             const isCompleted = stage.status === 'completed';
                             const isCurrent = stage.status === 'in-progress';
@@ -259,7 +270,7 @@ export default function TransactionDetailPage() {
 
                             return (
                                 <div key={stage.stageId} className={cn(
-                                    "p-8 border-2 rounded-[2.5rem] transition-all relative group",
+                                    "p-8 border-2 rounded-[2.8rem] transition-all relative group",
                                     isCurrent ? "border-primary bg-primary/5 shadow-2xl scale-[1.02]" : "border-slate-100 opacity-60"
                                 )}>
                                     <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
@@ -268,7 +279,7 @@ export default function TransactionDetailPage() {
                                                 {stageStatusTranslations[stage.status]}
                                             </Badge>
                                             <div className="space-y-1">
-                                                <span className="font-black text-xl text-slate-900">{stage.name}</span>
+                                                <span className="font-black text-2xl text-slate-900">{stage.name}</span>
                                                 {isCurrent && stage.expectedEndDate && (
                                                     <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1">
                                                         <Clock className="h-3 w-3" /> التسليم المخطط: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}
@@ -279,35 +290,69 @@ export default function TransactionDetailPage() {
                                         
                                         <div className="flex items-center gap-3 no-print">
                                             {!isLockedRow && !isCompleted && (
-                                                <>
-                                                    <UniversalActionTrigger title={transaction.transactionType} subItemName={stage.name} sourceModule="المراحل الفنية" sourceId={transaction.id!} sourceSubId={stage.stageId} />
-                                                    {stage.status === 'pending' ? (
-                                                        <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-xl font-black px-8 h-11 bg-[#FF7A00] text-white shadow-lg">بدء</Button>
-                                                    ) : (
-                                                        <>
-                                                            <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isProcessing} className="rounded-xl font-black px-6 h-11 border-orange-200 text-orange-700 bg-white">تعديل</Button>
-                                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} disabled={isProcessing} className="rounded-xl font-black px-10 h-11 bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-100">إنهاء</Button>
-                                                        </>
-                                                    )}
-                                                </>
+                                                <UniversalActionTrigger title={transaction.transactionType} subItemName={stage.name} sourceModule="المراحل الفنية" sourceId={transaction.id!} sourceSubId={stage.stageId} />
                                             )}
                                             {isCompleted && (
                                                 <div className="flex items-center gap-4">
-                                                    <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-6 w-6"/></div>
+                                                    <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-7 w-7"/></div>
                                                     {isAdmin && <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="text-orange-400 hover:text-orange-600"><Undo2 className="h-5 w-5"/></Button>}
                                                 </div>
                                             )}
                                         </div>
                                     </div>
+
                                     {isCurrent && (
-                                        <div className="mt-6 pt-6 border-t border-dashed border-primary/20">
-                                            <Label className="font-black text-[10px] text-primary mb-2 block uppercase tracking-widest">ملاحظات العمل لهذا الإجراء:</Label>
-                                            <Textarea 
-                                                value={actionNote} 
-                                                onChange={e => setActionNote(e.target.value)} 
-                                                placeholder="اكتب هنا نتائج العمل أو مبررات التعديل..." 
-                                                className="rounded-2xl border-none bg-white shadow-inner p-4 font-medium"
-                                            />
+                                        <div className="mt-8 pt-8 border-t border-dashed border-primary/20 space-y-6">
+                                            <div className="space-y-3">
+                                                <Label className="font-black text-xs text-primary flex items-center gap-2 uppercase tracking-widest">
+                                                    <MessageSquare className="h-4 w-4" /> محضر الأعمال الميدانية (إلزامي) *
+                                                </Label>
+                                                <Textarea 
+                                                    value={actionNote} 
+                                                    onChange={e => setActionNote(e.target.value)} 
+                                                    placeholder="اشرح ما تم إنجازه أو مبررات التعديل لفتح الأزرار..." 
+                                                    className="rounded-3xl border-none bg-white shadow-inner p-6 font-medium text-lg leading-relaxed min-h-[140px]"
+                                                />
+                                            </div>
+                                            
+                                            <div className="flex items-center gap-4">
+                                                <Button 
+                                                    onClick={() => handleStageAction(stage.stageId, 'modify')} 
+                                                    disabled={isProcessing || !actionNote.trim()} 
+                                                    variant="outline" 
+                                                    className="flex-1 h-14 rounded-2xl font-black text-xl gap-3 border-orange-200 text-orange-700 bg-white shadow-sm"
+                                                >
+                                                    <Edit3 className="h-5 w-5" /> تسجيل تعديل
+                                                </Button>
+                                                <Button 
+                                                    onClick={() => handleStageAction(stage.stageId, 'complete')} 
+                                                    disabled={isProcessing || !actionNote.trim()} 
+                                                    className="flex-[2] h-14 rounded-2xl font-black text-xl gap-3 bg-green-600 hover:bg-green-700 text-white shadow-2xl shadow-green-100 border-none"
+                                                >
+                                                    <CheckCircle2 className="h-6 w-6" /> إنهاء المرحلة
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {!isLockedRow && stage.status === 'pending' && (
+                                        <div className="mt-8 pt-8 border-t border-dashed border-slate-100 space-y-4">
+                                            <div className="space-y-3">
+                                                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pr-1">اكتب ملاحظة البدء لتفعيل المسار:</Label>
+                                                <Input 
+                                                    value={actionNote} 
+                                                    onChange={e => setActionNote(e.target.value)} 
+                                                    placeholder="مثال: استلام الموقع وبدء الأعمال..."
+                                                    className="h-12 rounded-2xl bg-white border-dashed border-2 font-bold"
+                                                />
+                                            </div>
+                                            <Button 
+                                                onClick={() => handleStageAction(stage.stageId, 'start')} 
+                                                disabled={isProcessing || !actionNote.trim()} 
+                                                className="w-full h-12 rounded-2xl font-black text-lg gap-3 shadow-lg"
+                                            >
+                                                <Play className="h-5 w-5" /> بدء العمل الميداني
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
