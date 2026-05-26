@@ -18,9 +18,9 @@ interface MentionTextareaProps extends React.ComponentProps<typeof Textarea> {
 }
 
 /**
- * مكون مساحة النص مع المنشن الذكي (Sovereign Mention Engine V118.0):
- * - تم تحصين الفلترة ضد القيم غير المعرفة (undefined) لمنع انهيار الواجهة.
- * - تباين عالٍ (أسود قاتم) للوضوح المطلق.
+ * مكون مساحة النص مع المنشن الذكي (Sovereign Mention Engine V119.0):
+ * - تم تحويل المحاذاة لجهة اليمين (right-0) لتناسب واجهة RTL وتكون قريبة من حرف @.
+ * - تحصين الفلترة ضد القيم غير المعرفة (undefined) لمنع انهيار الواجهة.
  */
 export function MentionTextarea({ value, onValueChange, className, ...props }: MentionTextareaProps) {
   const { firestore } = useFirebase();
@@ -114,7 +114,7 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
       />
 
       {showMentions && filteredUsers.length > 0 && (
-        <Card className="absolute bottom-full left-0 mb-2 z-[9999] w-72 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-2 border-primary/20 bg-white/95 backdrop-blur-xl overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
+        <Card className="absolute top-full right-0 mt-2 z-[9999] w-72 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-2 border-primary/20 bg-white/95 backdrop-blur-xl overflow-hidden animate-in slide-in-from-top-2 duration-200">
           <div className="p-3 bg-primary/5 border-b flex items-center justify-between">
              <div className="flex items-center gap-2">
                 <AtSign className="h-3.5 w-3.5 text-primary" />
