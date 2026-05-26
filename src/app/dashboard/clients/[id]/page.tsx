@@ -105,7 +105,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-// 🛡️ تعريف ثوابت الألوان والحالات (Sovereign Style Palette) 🛡️
 const statusTranslations: Record<string, string> = {
   new: 'جديد',
   'in-progress': 'قيد التنفيذ',
@@ -162,8 +161,7 @@ export default function ClientProfilePage() {
     ['Admin', 'Accountant', 'HR', 'Secretary', 'Developer'].includes(currentUser?.role || '')
   , [currentUser?.role]);
 
-  // 🛡️ رادار استعادة البيانات (The Dual-Path Recovery Sync) 🛡️
-  // الاستماع للمسار القديم (تحت العميل) والمسار الجديد (المسطح) ودمجهما
+  // 🛡️ رادار استعادة البيانات: الاستماع للمسارين (المتداخل والمسطح) 🛡️
   const { data: nestedTransactions, loading: nestedLoading } = useSubscription<ClientTransaction>(
       firestore, 
       `clients/${id}/transactions`,
@@ -184,7 +182,6 @@ export default function ClientProfilePage() {
       flatTxQuery
   );
 
-  // دمج البيانات ومنع التكرار (Merge & Deduplicate)
   const transactions = useMemo(() => {
     const all = [...nestedTransactions, ...flatTransactions];
     const seen = new Set();
@@ -208,7 +205,6 @@ export default function ClientProfilePage() {
     });
   }, [firestore, tenantId]);
 
-  // 🛡️ محرك إجراءات الحذف والإلغاء (Sovereign Action Handlers) 🛡️
   const handleConfirmDeleteQuotation = async () => {
     if (!quotationToDelete || !firestore || !tenantId) return;
     setIsProcessing(true);
@@ -526,7 +522,7 @@ export default function ClientProfilePage() {
                                                     >
                                                         {tx.subServiceName || 'خدمة تأسيسية'}
                                                     </Link>
-                                                    <Badge className={cn("px-4 py-0.5 rounded-full font-black text-[9px] border-none shadow-sm", transactionStatusColors[tx.status] || 'bg-slate-100 text-slate-500')}>
+                                                    <Badge className={cn("px-4 py-0.5 rounded-full font-black text-[9px] border-none shadow-sm", transactionStatusColors[tx.status])}>
                                                         {statusTranslations[tx.status]}
                                                     </Badge>
                                                 </div>
@@ -573,7 +569,7 @@ export default function ClientProfilePage() {
                                                             </DropdownMenuItem>
                                                         </>
                                                     ) : (
-                                                        <DropdownMenuItem onSelect={() => setTransactionToCancel(tx)} className="rounded-lg py-3 font-black gap-3 cursor-pointer text-orange-600 focus:bg-orange-50">
+                                                        <DropdownMenuItem onSelect={() => setTransactionToCancel(tx)} className="rounded-lg font-black gap-3 cursor-pointer text-orange-600 focus:bg-orange-50">
                                                             <Ban className="h-4 w-4" /> فسخ وإلغاء العقد المالي
                                                         </DropdownMenuItem>
                                                     )}

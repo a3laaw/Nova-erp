@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -69,6 +68,15 @@ const stageStatusTranslations: Record<string, string> = {
   completed: 'منجزة',
 };
 
+const statusTranslations: Record<string, string> = {
+    new: 'جديد',
+    'in-progress': 'قيد التنفيذ',
+    completed: 'منتهي/مكتمل',
+    submitted: 'تم التسليم',
+    'on-hold': 'معلق إدارياً',
+    cancelled: 'ملغي/مفسوخ',
+};
+
 export default function TransactionDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -84,20 +92,23 @@ export default function TransactionDetailPage() {
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionNote, setActionNote] = useState('');
-
-  // 🛡️ التعديل الجوهري V101: البحث عن المعاملة في المسار المسطح (الرئيسي) والمسار القديم 🛡️
   const [transactionPath, setTransactionPath] = useState<string | null>(null);
   
+  // 🛡️ رادار تحديد المسار الصحيح (Flat vs Nested)
   useEffect(() => {
       if (!firestore || !tenantId || !clientId || !transactionId) return;
       const findCorrectPath = async () => {
           const flatPath = getTenantPath(`transactions/${transactionId}`, tenantId)!;
           const nestedPath = getTenantPath(`clients/${clientId}/transactions/${transactionId}`, tenantId)!;
           
-          const flatSnap = await getDoc(doc(firestore, flatPath));
-          if (flatSnap.exists()) {
-              setTransactionPath(flatPath);
-          } else {
+          try {
+              const flatSnap = await getDoc(doc(firestore, flatPath));
+              if (flatSnap.exists()) {
+                  setTransactionPath(flatPath);
+              } else {
+                  setTransactionPath(nestedPath);
+              }
+          } catch (e) {
               setTransactionPath(nestedPath);
           }
       };
@@ -111,6 +122,7 @@ export default function TransactionDetailPage() {
 
   const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
+  // 🛡️ حماية ضد بيانات الـ null لمنع كراش الصفحة
   const isLocked = transaction?.status === 'cancelled' || transaction?.status === 'on-hold';
   const isAdmin = ['Admin', 'HR', 'Developer', 'Accountant'].includes(currentUser?.role || '');
 
@@ -174,7 +186,7 @@ export default function TransactionDetailPage() {
                 companyId: tenantId
             });
 
-            if (action === 'complete') {
+            if (action === 'complete' && transaction.contract) {
                 const contract = transaction.contract;
                 if (contract?.clauses) {
                     const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
@@ -229,7 +241,14 @@ export default function TransactionDetailPage() {
         } finally { setIsProcessing(false); }
   };
 
-  if (transactionLoading || clientLoading) return <div className="p-8 max-w-5xl mx-auto" dir="rtl"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
+  if (transactionLoading || clientLoading || !transaction) {
+      return (
+          <div className="p-8 max-w-5xl mx-auto space-y-6" dir="rtl">
+              <Skeleton className="h-48 w-full rounded-[3rem]" />
+              <Skeleton className="h-96 w-full rounded-[2.5rem]" />
+          </div>
+      );
+  }
 
   return (
     <div className='space-y-6 max-w-6xl mx-auto pb-20' dir='rtl'>
@@ -257,8 +276,8 @@ export default function TransactionDetailPage() {
                     <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">المهندس المسؤول</p><p className="font-black text-slate-800 text-lg">{employeesMap.get(transaction.assignedEngineerId || '') || 'غير مسند'}</p></div>
                 </div>
                 <div className="flex items-center gap-4 text-sm">
-                    <div className="p-2.5 bg-slate-50 rounded-xl text-primary"><Calendar className="h-5 w-5 opacity-40"/></div>
-                    <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">تاريخ فتح المسار</p><p className="font-bold text-lg">{format(toFirestoreDate(transaction.createdAt)!, 'dd MMMM yyyy', { locale: ar })}</p></div>
+                    <div className="p-2.5 bg-slate-50 rounded-xl text-primary"><CalendarIcon className="h-5 w-5 opacity-40"/></div>
+                    <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">تاريخ فتح المسار</p><p className="font-bold text-lg">{toFirestoreDate(transaction.createdAt) ? format(toFirestoreDate(transaction.createdAt)!, 'dd MMMM yyyy', { locale: ar }) : '-'}</p></div>
                 </div>
             </CardContent>
         </Card>
