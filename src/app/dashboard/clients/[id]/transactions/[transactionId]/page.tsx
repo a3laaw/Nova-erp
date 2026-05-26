@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -35,7 +34,8 @@ import {
     Clock,
     Undo2,
     Ban,
-    Lock
+    Lock,
+    CheckCircle2
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -54,14 +54,14 @@ import { addWorkingDays } from '@/services/leave-calculator';
 import { Textarea } from '@/components/ui/textarea';
 
 const stageStatusColors: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-800',
-  'in-progress': 'bg-blue-100 text-blue-800',
-  completed: 'bg-green-100 text-green-800',
+  pending: 'bg-slate-100 text-slate-800 border-slate-200',
+  'in-progress': 'bg-blue-50 text-blue-800 border-blue-200',
+  completed: 'bg-green-50 text-green-800 border-green-200',
 };
 
 const stageStatusTranslations: Record<string, string> = {
-  pending: 'معلقة',
-  'in-progress': 'قيد العمل',
+  pending: 'بانتظار البدء',
+  'in-progress': 'قيد التنفيذ',
   completed: 'منجزة',
 };
 
@@ -114,7 +114,9 @@ export default function TransactionDetailPage() {
             if (action === 'start') {
                 stage.status = 'in-progress';
                 stage.startDate = Timestamp.fromDate(now);
-                stage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, stage.expectedDurationDays || 7, branding?.work_hours?.holidays || [], publicHolidays));
+                if (stage.expectedDurationDays) {
+                    stage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, stage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
+                }
             } else if (action === 'modify') {
                 stage.currentCount = (stage.currentCount || 0) + 1;
             } else if (action === 'complete') {
@@ -125,10 +127,25 @@ export default function TransactionDetailPage() {
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
                     nextStage.startDate = Timestamp.fromDate(now);
-                    nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays || 7, branding?.work_hours?.holidays || [], publicHolidays));
+                    if (nextStage.expectedDurationDays) {
+                        nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays, branding?.work_hours?.holidays || [], publicHolidays));
+                    }
                 }
+            }
 
-                // 🛡️ الربط المالي الآلي: تفعيل المستخلصات عند الإنجاز 🛡️
+            batch.update(doc(firestore, transactionPath), cleanFirestoreData({ stages: currentStages, updatedAt: serverTimestamp() }));
+            
+            const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
+            batch.set(timelineRef, {
+                type: 'log',
+                content: `تم تسجيل ${action === 'complete' ? 'إنجاز' : action === 'start' ? 'بدء عمل' : 'تعديل'} في مرحلة: ${stage.name}.${actionNote ? `\nالملاحظات: ${actionNote}` : ''}`,
+                userId: currentUser.id,
+                userName: currentUser.fullName,
+                createdAt: serverTimestamp(),
+                companyId: tenantId
+            });
+
+            if (action === 'complete') {
                 const contract = transaction.contract;
                 if (contract?.clauses) {
                     const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
@@ -155,22 +172,10 @@ export default function TransactionDetailPage() {
                 }
             }
 
-            batch.update(doc(firestore, transactionPath), cleanFirestoreData({ stages: currentStages, updatedAt: serverTimestamp() }));
-            
-            const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
-            batch.set(timelineRef, {
-                type: 'log',
-                content: `تم تسجيل ${action === 'complete' ? 'إنجاز' : action === 'start' ? 'بدء عمل' : 'تعديل'} في مرحلة: ${stage.name}.${actionNote ? `\nالملاحظات: ${actionNote}` : ''}`,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                createdAt: serverTimestamp(),
-                companyId: tenantId
-            });
-
             await batch.commit();
             toast({ title: 'تم حفظ المعلومات' });
             setActionNote('');
-        } finally { setIsProcessing(false); }
+        } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsProcessing(false); }
   };
 
   const handleUndoStage = async (stageId: string) => {
@@ -180,7 +185,6 @@ export default function TransactionDetailPage() {
             const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
             const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
             
-            // 🛡️ التراجع العكسي الشامل: إعادة كافة المراحل اللاحقة لحالة الانتظار 🛡️
             currentStages.forEach((s, idx) => {
                 if (idx >= stageIndex) {
                     s.status = (idx === stageIndex) ? 'in-progress' : 'pending';
@@ -215,7 +219,7 @@ export default function TransactionDetailPage() {
                         <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
                         <CardDescription className="text-base font-medium">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline font-bold'>{client?.nameAr || '...'}</Link></CardDescription>
                     </div>
-                    <Badge variant="outline" className="px-6 py-1.5 rounded-full font-black text-sm border-2">{statusTranslations[transaction.status]}</Badge>
+                    <Badge variant="outline" className="px-6 py-1.5 rounded-full font-black text-sm border-2">{transaction.status}</Badge>
                 </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10 bg-white">
@@ -243,7 +247,7 @@ export default function TransactionDetailPage() {
             <TabsContent value="stages">
                 <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
                     <CardHeader className="border-b bg-muted/5 p-8 px-10">
-                        <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'><Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الميداني</CardTitle>
+                        <CardTitle className='flex items-center gap-3 text-xl font-black text-[#1e1b4b]'><Workflow className='text-primary h-6 w-6'/> مسار مراحل الإنجاز الفني</CardTitle>
                     </CardHeader>
                     <CardContent className="p-10 space-y-6">
                         {(transaction.stages || []).map((stage, idx) => {
@@ -251,21 +255,20 @@ export default function TransactionDetailPage() {
                             const isCurrent = stage.status === 'in-progress';
                             const isLockedRow = idx > 0 && transaction.stages![idx-1].status !== 'completed';
 
-                            // 🛡️ الظهور التدريجي: لا تظهر المرحلة إلا إذا كانت الحالية أو القادمة المسموح بها 🛡️
                             if (isLockedRow && !isCurrent) return null;
 
                             return (
                                 <div key={stage.stageId} className={cn(
                                     "p-8 border-2 rounded-[2.5rem] transition-all relative group",
-                                    isCurrent ? "border-primary bg-primary/5 shadow-lg scale-[1.01]" : "border-slate-100 opacity-60"
+                                    isCurrent ? "border-primary bg-primary/5 shadow-2xl scale-[1.02]" : "border-slate-100 opacity-60"
                                 )}>
                                     <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
                                         <div className="flex items-center gap-6">
-                                            <Badge variant="outline" className={cn("w-32 justify-center h-8 rounded-xl font-black text-[10px]", stageStatusColors[stage.status])}>
+                                            <Badge variant="outline" className={cn("w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2", stageStatusColors[stage.status])}>
                                                 {stageStatusTranslations[stage.status]}
                                             </Badge>
                                             <div className="space-y-1">
-                                                <span className="font-black text-xl text-slate-800">{stage.name}</span>
+                                                <span className="font-black text-xl text-slate-900">{stage.name}</span>
                                                 {isCurrent && stage.expectedEndDate && (
                                                     <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1">
                                                         <Clock className="h-3 w-3" /> التسليم المخطط: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}
@@ -274,23 +277,23 @@ export default function TransactionDetailPage() {
                                             </div>
                                         </div>
                                         
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-3 no-print">
                                             {!isLockedRow && !isCompleted && (
                                                 <>
                                                     <UniversalActionTrigger title={transaction.transactionType} subItemName={stage.name} sourceModule="المراحل الفنية" sourceId={transaction.id!} sourceSubId={stage.stageId} />
                                                     {stage.status === 'pending' ? (
-                                                        <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-xl font-black px-8 h-11 bg-orange-600">بدء</Button>
+                                                        <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-xl font-black px-8 h-11 bg-[#FF7A00] text-white shadow-lg">بدء</Button>
                                                     ) : (
                                                         <>
-                                                            <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isProcessing} className="rounded-xl font-black px-6 h-11 border-orange-200 text-orange-700">تعديل</Button>
-                                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} disabled={isProcessing} className="rounded-xl font-black px-8 h-11 bg-green-600">إنهاء</Button>
+                                                            <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isProcessing} className="rounded-xl font-black px-6 h-11 border-orange-200 text-orange-700 bg-white">تعديل</Button>
+                                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} disabled={isProcessing} className="rounded-xl font-black px-10 h-11 bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-100">إنهاء</Button>
                                                         </>
                                                     )}
                                                 </>
                                             )}
                                             {isCompleted && (
                                                 <div className="flex items-center gap-4">
-                                                    <div className="p-3 bg-green-100 rounded-full text-green-700"><Check className="h-6 w-6"/></div>
+                                                    <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-6 w-6"/></div>
                                                     {isAdmin && <Button variant="ghost" size="icon" onClick={() => handleUndoStage(stage.stageId)} className="text-orange-400 hover:text-orange-600"><Undo2 className="h-5 w-5"/></Button>}
                                                 </div>
                                             )}
@@ -298,12 +301,12 @@ export default function TransactionDetailPage() {
                                     </div>
                                     {isCurrent && (
                                         <div className="mt-6 pt-6 border-t border-dashed border-primary/20">
-                                            <Label className="font-black text-xs text-primary mb-2 block">ملاحظات العمل لهذا الإجراء:</Label>
+                                            <Label className="font-black text-[10px] text-primary mb-2 block uppercase tracking-widest">ملاحظات العمل لهذا الإجراء:</Label>
                                             <Textarea 
                                                 value={actionNote} 
                                                 onChange={e => setActionNote(e.target.value)} 
                                                 placeholder="اكتب هنا نتائج العمل أو مبررات التعديل..." 
-                                                className="rounded-2xl border-none bg-white shadow-inner"
+                                                className="rounded-2xl border-none bg-white shadow-inner p-4 font-medium"
                                             />
                                         </div>
                                     )}
