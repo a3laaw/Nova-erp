@@ -18,10 +18,10 @@ interface MentionTextareaProps extends React.ComponentProps<typeof Textarea> {
 }
 
 /**
- * محرك المنشن المتكيف (Adaptive Sovereign Mention Engine V121.0):
- * - يظهر آلياً للأعلى (Above) لضمان عدم القص في النوافذ السفلية.
- * - تحصين مطلق لبيانات المستخدمين لمنع انهيار الواجهة.
- * - تصميم عائم لؤلؤي يتناسب مع الهوية البصرية للمكتب.
+ * محرك المنشن المتكيف السيادي (Sovereign Mention Engine V122.0):
+ * - تم رفع الـ z-index لسيادة مطلقة فوق كافة عناصر الواجهة.
+ * - استخدام خلفية بيضاء مصمتة 100% لمنع تداخل النصوص الخلفية.
+ * - ضبط المحاذاة والظلال لضمان وضوح فائق الجودة في الواجهة العربية.
  */
 export function MentionTextarea({ value, onValueChange, className, ...props }: MentionTextareaProps) {
   const { firestore } = useFirebase();
@@ -30,7 +30,7 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
   const [selectedIndex, setSelectedIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // جلب كافة مستخدمي المنشأة مع ضمان وجود بيانات آمنة
+  // جلب كافة مستخدمي المنشأة
   const { data: users = [] } = useSubscription<UserProfile>(firestore, 'users');
 
   const filteredUsers = useMemo(() => {
@@ -81,7 +81,6 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
   };
 
   const selectUser = (user: UserProfile) => {
-    // 🛡️ درع حماية سيادي: التأكد من وجود كائن المستخدم واسم المستخدم 🛡️
     if (!user || !user.username) {
         setShowMentions(false);
         return;
@@ -98,7 +97,6 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
     onValueChange(newValue);
     setShowMentions(false);
     
-    // إعادة التركيز وتحديد موقع المؤشر بدقة
     setTimeout(() => {
         if (textareaRef.current) {
             textareaRef.current.focus();
@@ -118,19 +116,20 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
         onChange={handleInput}
         onKeyDown={handleKeyDown}
         className={cn(
-          "rounded-[2.5rem] p-8 text-xl font-bold leading-relaxed border-2 focus-visible:ring-primary/20 text-black placeholder:text-slate-300 shadow-sm",
+          "rounded-[2.5rem] p-8 text-xl font-bold leading-relaxed border-2 focus-visible:ring-primary/20 text-black placeholder:text-slate-300 shadow-sm min-h-[140px]",
           className
         )}
       />
 
       {showMentions && filteredUsers.length > 0 && (
         <Card className={cn(
-            "absolute z-[9999] w-full max-w-[340px] rounded-[2.5rem] shadow-[0_30px_70px_rgba(0,0,0,0.3)] border-2 border-primary/30 bg-white/98 backdrop-blur-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-300",
-            "bottom-full mb-4 right-4" // ظهور للأعلى لتجنب القص في النماذج السفلية
+            "absolute w-full max-w-[340px] rounded-[2.5rem] border-2 border-primary/30 bg-white overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-300",
+            "bottom-full mb-2 right-2", // تطفو للأعلى بمحاذاة اليمين
+            "z-[99999999] shadow-[0_35px_80px_-15px_rgba(0,0,0,0.4)]" // سيادة مطلقة وظل عميق
         )}>
-          <div className="p-5 bg-gradient-to-l from-primary/10 to-transparent border-b flex items-center justify-between">
+          <div className="p-5 bg-primary/5 border-b flex items-center justify-between">
              <div className="flex items-center gap-3">
-                <div className="p-1.5 bg-primary rounded-lg shadow-lg shadow-primary/20">
+                <div className="p-1.5 bg-primary rounded-lg shadow-lg">
                     <AtSign className="h-4 w-4 text-white" />
                 </div>
                 <span className="text-[10px] font-black uppercase text-[#1e1b4b] tracking-[0.2em]">إشارة ذكية لزميل</span>
@@ -147,7 +146,7 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={cn(
                     "w-full flex items-center gap-4 p-4 rounded-3xl transition-all text-right group/item",
-                    idx === selectedIndex ? "bg-primary text-white shadow-xl scale-[1.02] -translate-y-0.5" : "hover:bg-primary/5 text-black"
+                    idx === selectedIndex ? "bg-primary text-white shadow-xl scale-[1.02]" : "hover:bg-primary/5 text-black"
                   )}
                 >
                   <div className="relative shrink-0">
@@ -157,14 +156,9 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
                             {user.username?.charAt(0).toUpperCase() || 'U'}
                         </AvatarFallback>
                       </Avatar>
-                      {idx === selectedIndex && (
-                        <div className="absolute -bottom-1 -left-1 h-4 w-4 bg-white rounded-full flex items-center justify-center shadow-lg">
-                            <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-                        </div>
-                      )}
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <p className="font-black text-base truncate leading-none mb-1.5">{user.fullName || user.username}</p>
+                    <p className={cn("font-black text-base truncate leading-none mb-1.5", idx === selectedIndex ? "text-white" : "text-[#000000]")}>{user.fullName || user.username}</p>
                     <p className={cn("text-[10px] font-bold font-mono tracking-wider", idx === selectedIndex ? "text-white/70" : "text-primary")}>@{user.username}</p>
                   </div>
                 </button>
