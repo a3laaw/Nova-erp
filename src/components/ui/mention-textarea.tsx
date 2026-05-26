@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useState, useRef, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Textarea } from './textarea';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -9,7 +10,7 @@ import type { UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import { ScrollArea } from './scroll-area';
-import { AtSign, Sparkles, Command } from 'lucide-react';
+import { AtSign, Command } from 'lucide-react';
 import { Card } from './card';
 import { Badge } from './badge';
 
@@ -18,19 +19,25 @@ interface MentionTextareaProps extends React.ComponentProps<typeof Textarea> {
 }
 
 /**
- * محرك المنشن الذكي المتكيف (Sovereign Adaptive Mention Engine V125.0):
- * - محرك "التفكير المكاني": يحدد اتجاه الفتح (أعلى/أسفل) بناءً على المساحة المتاحة.
- * - عزل بصري مطلق بـ z-index سيادي لمنع أي تداخل مع رؤوس النوافذ أو التبويبات.
- * - تباين أسود (#000000) للوضوح المطلق في الواجهة العربية اللؤلؤية.
+ * محرك المنشن السيادي العابر للطبقات (Sovereign Portal Mention Engine V126.0):
+ * - يستخدم React Portal للظهور فوق كافة النوافذ المنبثقة (Modals) دون أن يُقص.
+ * - محرك حساب إحداثيات (Fixed Positioning) يضمن تلاحم القائمة مع منطقة الكتابة.
+ * - ذكاء مكاني كامل (Auto-Flip) للظهور بالأعلى أو الأسفل حسب المساحة المتاحة في الشاشة.
  */
 export function MentionTextarea({ value, onValueChange, className, ...props }: MentionTextareaProps) {
   const { firestore } = useFirebase();
   const [showMentions, setShowMentions] = useState(false);
   const [mentionQuery, setMentionSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [openUpwards, setOpenUpwards] = useState(false); 
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 0, openUpwards: false });
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   const { data: users = [] } = useSubscription<UserProfile>(firestore, 'users');
 
@@ -46,12 +53,32 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
       .slice(0, 8);
   }, [users, mentionQuery]);
 
-  useEffect(() => {
-    if (showMentions && textareaRef.current) {
+  // محرك حساب الموقع العائم
+  const updateMenuPosition = () => {
+    if (textareaRef.current) {
         const rect = textareaRef.current.getBoundingClientRect();
         const spaceBelow = window.innerHeight - rect.bottom;
-        setOpenUpwards(spaceBelow < 250);
+        const shouldOpenUp = spaceBelow < 250;
+        
+        setMenuPosition({
+            top: shouldOpenUp ? rect.top - 8 : rect.bottom + 8,
+            left: rect.left,
+            width: rect.width,
+            openUpwards: shouldOpenUp
+        });
     }
+  };
+
+  useEffect(() => {
+    if (showMentions) {
+        updateMenuPosition();
+        window.addEventListener('scroll', updateMenuPosition, true);
+        window.addEventListener('resize', updateMenuPosition);
+    }
+    return () => {
+        window.removeEventListener('scroll', updateMenuPosition, true);
+        window.removeEventListener('resize', updateMenuPosition);
+    };
   }, [showMentions]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -116,76 +143,84 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
     }, 10);
   };
 
+  const mentionList = showMentions && filteredUsers.length > 0 && mounted ? (
+    <Card 
+        className={cn(
+            "fixed rounded-[2.5rem] border-2 border-primary/30 bg-white overflow-hidden shadow-[0_45px_100px_-20px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200",
+            menuPosition.openUpwards ? "origin-bottom" : "origin-top"
+        )}
+        style={{ 
+            top: menuPosition.openUpwards ? 'auto' : `${menuPosition.top}px`,
+            bottom: menuPosition.openUpwards ? `${window.innerHeight - menuPosition.top}px` : 'auto',
+            left: `${menuPosition.left}px`,
+            width: `${menuPosition.width}px`,
+            zIndex: 999999999, // سيادة مطلقة فوق أي نافذة منبثقة
+        }}
+        dir="rtl"
+    >
+      <div className="p-4 bg-primary/5 border-b flex items-center justify-between">
+         <div className="flex items-center gap-3">
+            <div className="p-1.5 bg-primary rounded-lg">
+                <AtSign className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-[10px] font-black uppercase text-[#1e1b4b] tracking-[0.2em]">إشارة ذكية لزميل</span>
+         </div>
+         <Badge variant="secondary" className="text-[8px] font-black bg-white border-primary/10 px-3">{filteredUsers.length} متاحين</Badge>
+      </div>
+      <ScrollArea className="max-h-60">
+        <div className="p-2 space-y-1">
+          {filteredUsers.map((user, idx) => (
+            <button
+              key={user.id}
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); selectUser(user); }} // Use onMouseDown to prevent focus loss
+              onMouseEnter={() => setSelectedIndex(idx)}
+              className={cn(
+                "w-full flex items-center gap-4 p-3 rounded-2xl transition-all text-right",
+                idx === selectedIndex ? "bg-primary text-white scale-[1.01]" : "hover:bg-primary/5 text-black"
+              )}
+            >
+                <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+                    <AvatarImage src={user.avatarUrl} className="object-cover" />
+                    <AvatarFallback className={cn("font-black text-xs", idx === selectedIndex ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}>
+                        {user.username?.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 overflow-hidden">
+                    <p className={cn("font-black text-sm truncate", idx === selectedIndex ? "text-white" : "text-black")}>
+                        {user.fullName || user.username}
+                    </p>
+                    <p className={cn("text-[9px] font-mono", idx === selectedIndex ? "text-white/70" : "text-primary")}>
+                        @{user.username}
+                    </p>
+                </div>
+            </button>
+          ))}
+        </div>
+      </ScrollArea>
+      <div className="p-2.5 bg-slate-50 border-t flex justify-center">
+         <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <Command className="h-3 w-3" /> استخدم الأسهم للتحكم و Enter للاختيار
+         </p>
+      </div>
+    </Card>
+  ) : null;
+
   return (
-    <div className="relative w-full" ref={containerRef}>
+    <div className="relative w-full">
       <Textarea
         {...props}
         ref={textareaRef}
         value={value}
         onChange={handleInput}
         onKeyDown={handleKeyDown}
+        onBlur={() => setTimeout(() => setShowMentions(false), 200)}
         className={cn(
           "rounded-[2.5rem] p-8 text-xl font-bold leading-relaxed border-2 focus-visible:ring-primary/20 text-black placeholder:text-slate-300 shadow-sm min-h-[140px] bg-white",
           className
         )}
       />
-
-      {showMentions && filteredUsers.length > 0 && (
-        <Card className={cn(
-            "absolute w-full max-w-[340px] rounded-[2.5rem] border-2 border-primary/30 bg-white overflow-hidden animate-in zoom-in-95 duration-300",
-            openUpwards ? "bottom-full mb-3" : "top-full mt-3",
-            "right-2", 
-            "z-[999999999] shadow-[0_45px_100px_-20px_rgba(0,0,0,0.5)]" 
-        )}>
-          <div className="p-5 bg-primary/5 border-b flex items-center justify-between">
-             <div className="flex items-center gap-3">
-                <div className="p-1.5 bg-primary rounded-lg shadow-lg">
-                    <AtSign className="h-4 w-4 text-white" />
-                </div>
-                <span className="text-[10px] font-black uppercase text-[#1e1b4b] tracking-[0.2em]">إشارة ذكية لزميل</span>
-             </div>
-             <Badge variant="secondary" className="text-[8px] font-black bg-white border-primary/10 shadow-sm px-3">{filteredUsers.length} زملاء</Badge>
-          </div>
-          <ScrollArea className="max-h-72">
-            <div className="p-3 space-y-1.5">
-              {filteredUsers.map((user, idx) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => selectUser(user)}
-                  onMouseEnter={() => setSelectedIndex(idx)}
-                  className={cn(
-                    "w-full flex items-center gap-4 p-4 rounded-3xl transition-all text-right group/item",
-                    idx === selectedIndex ? "bg-primary text-white shadow-xl scale-[1.02]" : "hover:bg-primary/5 text-black"
-                  )}
-                >
-                  <div className="relative shrink-0">
-                      <Avatar className="h-12 w-12 border-2 border-white shadow-md group-hover/item:scale-105 transition-transform">
-                        <AvatarImage src={user.avatarUrl} className="object-cover" />
-                        <AvatarFallback className={cn("font-black text-sm", idx === selectedIndex ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}>
-                            {user.username?.charAt(0).toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    <p className={cn("font-black text-base truncate leading-none mb-1.5", idx === selectedIndex ? "text-white" : "text-[#000000]")}>
-                        {user.fullName || user.username}
-                    </p>
-                    <p className={cn("text-[10px] font-bold font-mono tracking-wider", idx === selectedIndex ? "text-white/70" : "text-primary")}>
-                        @{user.username}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </ScrollArea>
-          <div className="p-3 bg-slate-50 border-t flex justify-center">
-             <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <Command className="h-3 w-3" /> استخدم الأسهم للتنقل و Enter للاختيار
-             </p>
-          </div>
-        </Card>
-      )}
+      {mounted && createPortal(mentionList, document.body)}
     </div>
   );
 }

@@ -46,9 +46,10 @@ import { MentionTextarea } from '@/components/ui/mention-textarea';
 import { createNotification } from '@/services/notification-service';
 
 /**
- * منصة الإنتاجية السيادية (Productivity Platform V125.0):
+ * منصة الإنتاجية السيادية (Productivity Platform V126.0):
  * - تم تفعيل نظام التنبيهات للمنشن في المذكرات البينية.
- * - تصحيح استيرادات Skeleton و Separator لضمان استقرار البناء.
+ * - تم تصحيح مسارات استيراد المكونات لضمان ثبات البناء.
+ * - محرك المنشن يعمل الآن بتقنية الـ Portal لمنع الاختفاء داخل النوافذ.
  */
 function ProductivityContent() {
     const { firestore } = useFirebase();
@@ -227,7 +228,7 @@ function TaskCard({ task, onEdit, onComplete, onAddComment }: { task: UserProduc
         setIsDeleting(true);
         try {
             await deleteDoc(doc(firestore, taskPath));
-            toast({ title: 'تم الحذف' });
+            toast({ title: 'تم الحفظ' });
         } finally { setIsDeleting(false); }
     };
 
@@ -271,22 +272,21 @@ function TaskCard({ task, onEdit, onComplete, onAddComment }: { task: UserProduc
                     <div className="flex items-center gap-2 no-print">
                          {!isCompleted && (
                             <>
-                                <Button 
-                                    variant="ghost" size="icon" 
+                                <button 
                                     onClick={() => onAddComment(task)} 
-                                    className="h-8 w-8 rounded-full hover:bg-orange-50 text-orange-600"
+                                    className="h-8 w-8 rounded-full hover:bg-orange-50 text-orange-600 flex items-center justify-center transition-all"
                                     title="إضافة ملاحظة للسجل"
                                 >
                                     <MessageCircle className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={() => onEdit(task)} className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary">
+                                </button>
+                                <button onClick={() => onEdit(task)} className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary flex items-center justify-center transition-all">
                                     <Pencil className="h-4 w-4" />
-                                </Button>
+                                </button>
                             </>
                          )}
-                         <Button variant="ghost" size="icon" onClick={handleDelete} disabled={isDeleting} className="h-8 w-8 rounded-full hover:bg-red-50 text-red-300 hover:text-red-600">
+                         <button onClick={handleDelete} disabled={isDeleting} className="h-8 w-8 rounded-full hover:bg-red-50 text-red-300 hover:text-red-600 flex items-center justify-center transition-all">
                             {isDeleting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
-                        </Button>
+                        </button>
                     </div>
                 </div>
                 <CardTitle className="text-xl font-black text-black leading-tight tracking-tight group-hover:text-primary transition-colors">
@@ -379,7 +379,6 @@ function TaskProgressNoteDialog({ isOpen, onClose, task }: { isOpen: boolean, on
 
                 await batch.commit();
 
-                // 🚀 رادار المنشن: إرسال تنبيهات فورية إذا وُجدت منشنات في المذكرة
                 const mentionedUsernames = extractMentions(noteText);
                 if (mentionedUsernames.length > 0) {
                     const usersPath = getTenantPath('users', tenantId);
@@ -500,7 +499,6 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
 
             await batch.commit();
 
-            // 🚀 رادار التنبيهات للمنشنات في ملاحظة الإغلاق
             const mentionedUsernames = extractMentions(noteText);
             if (mentionedUsernames.length > 0) {
                 const usersPath = getTenantPath('users', tenantId);
@@ -599,7 +597,7 @@ function EditTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClose: (
             toast({ title: '✅ تم تحديث المهمة' });
             onClose();
         } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ in Save' });
+            toast({ variant: 'destructive', title: 'خطأ' });
         } finally { setIsSaving(false); }
     };
 
