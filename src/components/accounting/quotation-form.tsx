@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -394,7 +395,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                           <Controller name="financialsType" control={control} render={({ field }) => (
                                             <Select value={field.value} onValueChange={field.onChange}>
                                                 <SelectTrigger className="w-36 h-8 rounded-xl border-none bg-white font-black text-primary text-xs shadow-md"><SelectValue /></SelectTrigger>
-                                                <SelectContent dir="rtl" className="text-xs"><SelectItem value="fixed">مبالغ ثابتة (KWD)</SelectItem><SelectItem value="percentage">نسب مئوية (%)</SelectItem></SelectContent>
+                                                <SelectContent dir="rtl" className="text-xs"><SelectItem value="fixed">مبلغ ثابت (KWD)</SelectItem><SelectItem value="percentage">نسب مئوية (%)</SelectItem></SelectContent>
                                             </Select>
                                           )} />
                                       </div>
@@ -443,7 +444,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                                                         type="number" step="any" 
                                                         {...register(financialsType === 'percentage' ? `items.${itemIdx}.percentage` : `items.${itemIdx}.unitPrice`)} 
                                                         className="text-center font-black text-3xl text-primary border-none shadow-none focus-visible:ring-0 bg-transparent font-mono h-10" 
-                                                        placeholder="0" 
+                                                        placeholder="" 
                                                       />
                                                   </TableCell>
                                                   <TableCell className="text-center no-print">
@@ -485,7 +486,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
             className="h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-2xl shadow-primary/30 flex-1 gap-4 transition-all hover:scale-[1.02] bg-[#7209B7] text-white border-none"
           >
               {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-              اعتماد ونشر العرض المالي
+              اعتماد
           </Button>
       </DialogFooter>
     </form>

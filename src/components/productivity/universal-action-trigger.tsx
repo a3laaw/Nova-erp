@@ -68,7 +68,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                 sourceSubId,
                 sourceUrl: window.location.pathname,
             });
-            toast({ title: 'تمت الإضافة للمفضلة' });
+            toast({ title: 'تم حفظ المعلومات في المفضلة' });
         } finally { setIsSaving(false); }
     };
 
@@ -93,7 +93,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                 sourceUrl: window.location.pathname,
             });
 
-            // إشعار الزملاء المشاركين
+            // 🚀 إشعار الزملاء المشاركين (تفعيل النقطة 2 و 3) 🚀
             for (const targetId of assignedUserIds) {
                 await addDoc(collection(firestore, 'notifications'), cleanFirestoreData({
                     userId: targetId,
@@ -136,29 +136,38 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                             <p className="font-bold text-lg text-primary">{subItemName || title}</p>
                         </div>
                         <div className="grid gap-2">
-                            <Label className="font-black">نوع الإجراء *</Label>
+                            <Label className="font-black text-gray-700">نوع الإجراء *</Label>
                             <Select value={actionType} onValueChange={setActionType}>
-                                <SelectTrigger className="h-12 rounded-xl border-2"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                     <SelectItem value="review">مراجعة وتدقيق</SelectItem>
                                     <SelectItem value="decision">اتخاذ قرار</SelectItem>
-                                    <SelectItem value="design">تصميم / عمل</SelectItem>
+                                    <SelectItem value="design">تصميم / عمل فني</SelectItem>
                                     <SelectItem value="meeting">اجتماع فني</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
+                        {/* 🚀 دعم المشاركة الجماعية (تفعيل النقطة 2) 🚀 */}
                         <div className="grid gap-2">
-                            <Label className="font-black">مشاركة المهمة مع الزملاء</Label>
-                            <MultiSelect options={userOptions} selected={assignedUserIds} onChange={setAssignedUserIds} placeholder="اختر مهندسين أو سكرتارية..." className="rounded-xl" />
+                            <Label className="font-black text-gray-700 flex items-center gap-2">
+                                <Users className="h-4 w-4 text-primary" /> مشاركة المهمة مع الزملاء
+                            </Label>
+                            <MultiSelect 
+                                options={userOptions} 
+                                selected={assignedUserIds} 
+                                onChange={setAssignedUserIds} 
+                                placeholder="اختر مهندسين أو سكرتارية..." 
+                                className="rounded-xl" 
+                            />
                         </div>
                         <div className="grid gap-2">
-                            <Label className="font-black">موعد التسليم</Label>
+                            <Label className="font-black text-gray-700">موعد التسليم</Label>
                             <DateInput value={dueDate} onChange={setDueDate} className="h-12 rounded-xl" />
                         </div>
                     </div>
                     <DialogFooter className="gap-3 border-t pt-6">
                         <Button variant="ghost" onClick={() => setIsTaskDialogOpen(false)} disabled={isSaving}>إلغاء</Button>
-                        <Button onClick={handleCreateTask} disabled={isSaving} className="rounded-xl font-black px-10 h-12 shadow-xl">
+                        <Button onClick={handleCreateTask} disabled={isSaving} className="rounded-xl font-black px-10 h-12 shadow-xl shadow-primary/30 bg-primary text-white border-none">
                             {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5" />} حفظ المهمة
                         </Button>
                     </DialogFooter>

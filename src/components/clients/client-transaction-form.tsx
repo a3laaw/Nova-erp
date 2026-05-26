@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -119,10 +119,10 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const selectedSub = subServices.find(s => s.id === selectedSubServiceId);
 
-            // 🛡️ محرك التسمية المتسلسلة: منع تكرار الأسماء المتشابهة 🛡️
+            // 🛡️ محرك التسمية المتسلسلة (Unique Index Engine): منع تكرار الأسماء المتشابهة 🛡️
             const txsPath = getTenantPath(`clients/${clientId}/transactions`, tenantId);
-            const existingSnap = await getDocs(query(collection(firestore, txsPath!), where('transactionType', '==', transactionTypeName)));
-            const sameTypeCount = existingSnap.size;
+            const existingSnap = await getDocs(query(collection(firestore, txsPath!), where('transactionType', '>=', transactionTypeName), where('transactionType', '<=', transactionTypeName + '\uf8ff')));
+            const sameTypeCount = existingSnap.docs.filter(d => d.data().transactionType.startsWith(transactionTypeName)).length;
             
             const finalTypeName = sameTypeCount > 0 
                 ? `${transactionTypeName} - ${String(sameTypeCount + 1).padStart(3, '0')}`
@@ -207,7 +207,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                             <InlineSearchList 
                                 value={transactionTypeName} 
                                 onSelect={setTransactionTypeName} 
-                                options={transactionTypes.map(t => ({ value: t.name, label: t.name }))} 
+                                options={transactionTypeOptions} 
                                 placeholder="اختر الخدمة..." 
                                 disabled={typesLoading || isSaving} 
                             />

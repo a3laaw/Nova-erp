@@ -16,8 +16,7 @@ export interface UserProductivityItem extends BaseEntity {
   title: string;
   actionType?: 'review' | 'decision' | 'design' | 'redesign' | 'meeting' | 'general';
   status?: 'pending' | 'in-progress' | 'completed' | 'cancelled';
-  inviteStatus?: Record<string, 'pending' | 'accepted' | 'rejected'>; // لتعقب دعوات الزملاء
-  assignedUserIds?: string[]; // قائمة الزملاء المشاركين
+  assignedUserIds?: string[]; // قائمة الزملاء المشاركين في المهمة
   startDate?: Timestamp | any;
   dueDate?: Timestamp | any;
   completedAt?: Timestamp | any;

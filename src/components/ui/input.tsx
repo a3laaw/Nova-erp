@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, value, ...props }, ref) => {
-    // 🛡️ درع تصفير الحقول السيادي: منع ظهور الأصفار التلقائية 🛡️
+    // 🛡️ درع تصفير الحقول السيادي (Empty-by-Default Matrix): 
+    // يضمن ظهور الحقل فارغاً تماماً إذا لم يتم إدخال قيمة، مع استثناء الصفر المقصود.
     const displayValue = (type === "number" && (value === 0 || value === "0")) ? "" : value;
 
     return (

@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, Timestamp, addDoc, where, writeBatch, limit } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, updateDoc, getDoc, serverTimestamp, Timestamp, writeBatch, where } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -21,27 +21,21 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { 
     Pencil, 
     User, 
     Calendar, 
     Workflow, 
-    Play, 
     Check, 
     History, 
     MessageSquare, 
     ArrowRight,
-    AlertCircle,
-    Layers,
     Loader2,
     Target,
     Clock,
-    IterationCcw,
     Undo2,
-    Save,
-    Lock,
-    Ban
+    Ban,
+    Lock
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -51,7 +45,7 @@ import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
+import { cn, getTenantPath, cleanFirestoreData, formatCurrency } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
 import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
@@ -127,12 +121,37 @@ export default function TransactionDetailPage() {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
                 
-                // تفعيل المرحلة التالية تلقائياً (الخطوة التالية في الـ WBS)
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
                     nextStage.startDate = Timestamp.fromDate(now);
                     nextStage.expectedEndDate = Timestamp.fromDate(addWorkingDays(now, nextStage.expectedDurationDays || 7, branding?.work_hours?.holidays || [], publicHolidays));
+                }
+
+                // 🛡️ الربط المالي الآلي: تفعيل المستخلصات عند الإنجاز 🛡️
+                const contract = transaction.contract;
+                if (contract?.clauses) {
+                    const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
+                    if (clauseIndex !== -1 && contract.clauses[clauseIndex].status === 'غير مستحقة') {
+                        const updatedClauses = [...contract.clauses];
+                        updatedClauses[clauseIndex].status = 'مستحقة';
+                        batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
+                        
+                        const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
+                        batch.set(appRef, cleanFirestoreData({
+                            applicationNumber: `APP-AUTO-${now.getTime().toString().substring(7)}`,
+                            date: serverTimestamp(),
+                            projectId: transaction.id,
+                            clientId: transaction.clientId,
+                            clientName: client?.nameAr,
+                            projectName: transaction.transactionType,
+                            totalAmount: updatedClauses[clauseIndex].amount,
+                            status: 'draft',
+                            createdAt: serverTimestamp(),
+                            createdBy: 'system-auto-chain',
+                            companyId: tenantId
+                        }));
+                    }
                 }
             }
 
@@ -160,16 +179,15 @@ export default function TransactionDetailPage() {
         try {
             const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
             const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
-            const stage = currentStages[stageIndex];
             
-            stage.status = 'in-progress';
-            stage.endDate = null;
-
-            // إرجاع المراحل اللاحقة لوضع الانتظار
+            // 🛡️ التراجع العكسي الشامل: إعادة كافة المراحل اللاحقة لحالة الانتظار 🛡️
             currentStages.forEach((s, idx) => {
-                if (idx > stageIndex) {
-                    s.status = 'pending';
-                    s.startDate = null; s.endDate = null; s.expectedEndDate = null;
+                if (idx >= stageIndex) {
+                    s.status = (idx === stageIndex) ? 'in-progress' : 'pending';
+                    s.endDate = null;
+                    if (idx > stageIndex) {
+                        s.startDate = null; s.expectedEndDate = null;
+                    }
                 }
             });
 
@@ -195,7 +213,7 @@ export default function TransactionDetailPage() {
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="text-right space-y-2">
                         <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
-                        <CardDescription className="text-base font-medium">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline font-bold'>{client?.nameAr}</Link></CardDescription>
+                        <CardDescription className="text-base font-medium">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline font-bold'>{client?.nameAr || '...'}</Link></CardDescription>
                     </div>
                     <Badge variant="outline" className="px-6 py-1.5 rounded-full font-black text-sm border-2">{statusTranslations[transaction.status]}</Badge>
                 </div>
@@ -231,10 +249,10 @@ export default function TransactionDetailPage() {
                         {(transaction.stages || []).map((stage, idx) => {
                             const isCompleted = stage.status === 'completed';
                             const isCurrent = stage.status === 'in-progress';
-                            const isLocked = idx > 0 && transaction.stages![idx-1].status !== 'completed';
+                            const isLockedRow = idx > 0 && transaction.stages![idx-1].status !== 'completed';
 
-                            // إظهار المراحل تدريجياً: فقط المرحلة الحالية أو المرحلة التالية القابلة للفتح
-                            if (isLocked && !isCurrent) return null;
+                            // 🛡️ الظهور التدريجي: لا تظهر المرحلة إلا إذا كانت الحالية أو القادمة المسموح بها 🛡️
+                            if (isLockedRow && !isCurrent) return null;
 
                             return (
                                 <div key={stage.stageId} className={cn(
@@ -257,9 +275,9 @@ export default function TransactionDetailPage() {
                                         </div>
                                         
                                         <div className="flex items-center gap-3">
-                                            {!isLocked && !isCompleted && (
+                                            {!isLockedRow && !isCompleted && (
                                                 <>
-                                                    <UniversalActionTrigger title={transaction.transactionType} subItemName={stage.name} sourceModule="مراحل العمل" sourceId={transaction.id!} sourceSubId={stage.stageId} />
+                                                    <UniversalActionTrigger title={transaction.transactionType} subItemName={stage.name} sourceModule="المراحل الفنية" sourceId={transaction.id!} sourceSubId={stage.stageId} />
                                                     {stage.status === 'pending' ? (
                                                         <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isProcessing} className="rounded-xl font-black px-8 h-11 bg-orange-600">بدء</Button>
                                                     ) : (

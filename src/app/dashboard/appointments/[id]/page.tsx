@@ -5,15 +5,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, getDoc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, getDocs, collection, query, where, orderBy, writeBatch, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 import type { Appointment, Client, ClientTransaction, TransactionStage, Holiday } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { 
-    AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Link2, ShieldCheck, UserPlus, 
-    FileText, Target, History, RotateCcw, IterationCcw, CheckCircle2, Lock, Ban, ChevronLeft
+    AlertCircle, ArrowRight, Calendar, Workflow, 
+    Check, Loader2, Target, Clock, Pencil, 
+    CheckCircle2, Ban, ShieldCheck, Calculator
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -25,11 +26,11 @@ import Link from 'next/link';
 import { formatCurrency, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { toFirestoreDate } from '@/services/date-converter';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const stageStatusColors: Record<string, string> = {
   pending: 'bg-gray-100 text-gray-800',
@@ -88,7 +89,8 @@ export default function AppointmentDetailsPage() {
             } else if (action === 'complete') {
                 stage.status = 'completed';
                 stage.endDate = Timestamp.fromDate(now);
-                // تفعيل المرحلة التالية تلقائياً
+                
+                // تفعيل المرحلة التالية تلقائياً (الخطوة التالية في الـ WBS)
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
                     nextStage.status = 'in-progress';
@@ -97,12 +99,12 @@ export default function AppointmentDetailsPage() {
                 }
             }
 
-            batch.update(doc(firestore, transactionPath), { stages: currentStages, updatedAt: serverTimestamp() });
+            batch.update(doc(firestore, transactionPath), cleanFirestoreData({ stages: currentStages, updatedAt: serverTimestamp() }));
             
             const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
             batch.set(timelineRef, {
-                type: 'comment',
-                content: `تم تسجيل ${action === 'complete' ? 'إنجاز' : action === 'start' ? 'بدء عمل' : 'تعديل'} في مرحلة ${stage.name}. ${actionNote ? `\nملاحظة: ${actionNote}` : ''}`,
+                type: 'log',
+                content: `تم تسجيل ${action === 'complete' ? 'إنجاز' : action === 'start' ? 'بدء عمل' : 'تعديل'} في مرحلة: ${stage.name}.${actionNote ? `\nالملاحظات: ${actionNote}` : ''}`,
                 userId: currentUser.id,
                 userName: currentUser.fullName,
                 createdAt: serverTimestamp(),
@@ -111,9 +113,42 @@ export default function AppointmentDetailsPage() {
 
             if (action === 'complete') {
                 batch.update(doc(firestore, apptPath!), { workStageUpdated: true, actualCompletionDate: serverTimestamp() });
+
+                // 🛡️ المزامنة المالية: فحص الاستحقاق وإصدار مسودة مستخلص 🛡️
+                const contract = transaction.contract;
+                if (contract?.clauses) {
+                    const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
+                    if (clauseIndex !== -1 && contract.clauses[clauseIndex].status === 'غير مستحقة') {
+                        const updatedClauses = [...contract.clauses];
+                        updatedClauses[clauseIndex].status = 'مستحقة';
+                        batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
+
+                        const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
+                        batch.set(appRef, cleanFirestoreData({
+                            applicationNumber: `APP-AUTO-${now.getTime().toString().substring(7)}`,
+                            date: serverTimestamp(),
+                            projectId: transaction.id,
+                            clientId: transaction.clientId,
+                            clientName: client?.nameAr,
+                            projectName: transaction.transactionType,
+                            totalAmount: updatedClauses[clauseIndex].amount,
+                            status: 'draft',
+                            createdAt: serverTimestamp(),
+                            createdBy: 'system-auto-chain',
+                            companyId: tenantId
+                        }));
+                    }
+                }
             }
 
-            await batch.commit();
+            await batch.commit().catch(async (err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: transactionPath,
+                    operation: 'write'
+                }));
+                throw err;
+            });
+
             toast({ title: 'تم حفظ المعلومات' });
             setActionNote('');
         } finally { setIsSaving(false); }
@@ -182,7 +217,7 @@ export default function AppointmentDetailsPage() {
                                         const isCurrent = stage.status === 'in-progress';
                                         const isLocked = idx > 0 && transaction.stages![idx-1].status !== 'completed';
 
-                                        // إظهار المراحل تدريجياً: فقط المرحلة الحالية أو المرحلة التالية القابلة للفتح
+                                        // 🛡️ الظهور التدريجي: لا تظهر المرحلة إلا إذا كانت الحالية أو القادمة المسموح بها 🛡️
                                         if (isLocked && !isCurrent) return null;
 
                                         return (
@@ -195,14 +230,16 @@ export default function AppointmentDetailsPage() {
                                                         <span className="font-black text-lg block">{stage.name}</span>
                                                         <Badge variant="outline" className={cn("text-[9px] font-black", stageStatusColors[stage.status])}>{stageStatusTranslations[stage.status]}</Badge>
                                                     </div>
+                                                    
+                                                    {/* 🛡️ الزر الثلاثي الموحد: بدء - تعديل - إنهاء 🛡️ */}
                                                     <div className="flex gap-2">
                                                         {stage.status === 'pending' && !isLocked && (
-                                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} className="rounded-xl font-black px-6 h-9">بدء</Button>
+                                                            <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'start')} disabled={isSaving} className="rounded-xl font-black px-6 h-9">بدء</Button>
                                                         )}
                                                         {isCurrent && (
                                                             <>
-                                                                <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} className="rounded-xl font-black px-6 h-9 border-orange-200 text-orange-700">تعديل</Button>
-                                                                <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} className="rounded-xl font-black px-6 h-9 bg-green-600 hover:bg-green-700 text-white">إنهاء</Button>
+                                                                <Button variant="outline" size="sm" onClick={() => handleStageAction(stage.stageId, 'modify')} disabled={isSaving} className="rounded-xl font-black px-6 h-9 border-orange-200 text-orange-700">تعديل</Button>
+                                                                <Button size="sm" onClick={() => handleStageAction(stage.stageId, 'complete')} disabled={isSaving} className="rounded-xl font-black px-6 h-9 bg-green-600 hover:bg-green-700 text-white">إنهاء</Button>
                                                             </>
                                                         )}
                                                         {isCompleted && <div className="p-2 bg-green-100 rounded-full text-green-700"><Check className="h-4 w-4"/></div>}

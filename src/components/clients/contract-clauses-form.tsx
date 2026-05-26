@@ -105,9 +105,10 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             let clientAccountId = clientAccSnap.docs[0]?.id;
             if (!clientAccountId) {
                 const nextClientNum = (coaSubCounterDoc.data()?.lastNumber || 0) + 1;
-                const newAccRef = doc(collection(firestore, coaPath!));
+                const clientCode = `1102C${String(nextClientNum).padStart(4, '0')}`;
+                const newAccRef = doc(collection(firestore, coaPath));
                 clientAccountId = newAccRef.id;
-                transaction_fs.set(newAccRef, { code: `1102C${String(nextClientNum).padStart(4, '0')}`, name: clientName, type: 'asset', level: 3, parentCode: '1102', isPayable: true, companyId: tenantId, createdAt: serverTimestamp() });
+                transaction_fs.set(newAccRef, { code: clientCode, name: clientName, type: 'asset', level: 3, parentCode: '1102', isPayable: true, companyId: tenantId, createdAt: serverTimestamp() });
                 transaction_fs.set(coaSubCounterRef, { lastNumber: nextClientNum }, { merge: true });
             }
 
@@ -121,16 +122,24 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             });
 
             const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+            
+            // 🛡️ المزايرة المالية: إثبات العقد في قيود اليومية مع التاريخ المعتمد 🛡️
             transaction_fs.set(doc(collection(firestore, getTenantPath('journalEntries', tenantId)!)), cleanFirestoreData({
                 entryNumber: `JV-PR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
-                date: serverTimestamp(), 
-                narration: `تم إنشاء القيد المحاسبي للعقد: ${transaction.transactionType || transaction.subject}`,
-                totalDebit: financials.totalAmount, totalCredit: financials.totalAmount, status: 'posted',
+                date: serverTimestamp(), // التاريخ المعتمد للتعاقد
+                narration: `عقد: ${transaction.transactionType || transaction.subject} لـ ${clientName}`,
+                totalDebit: financials.totalAmount, 
+                totalCredit: financials.totalAmount, 
+                status: 'posted',
                 lines: [
                     { accountId: clientAccountId, accountName: clientName, debit: financials.totalAmount, credit: 0, auto_profit_center: targetTxId },
                     { accountId: revenueAccSnap.docs[0]?.id, accountName: 'إيرادات عقود', debit: 0, credit: financials.totalAmount, auto_profit_center: targetTxId }
                 ],
-                clientId, transactionId: targetTxId, createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
+                clientId, 
+                transactionId: targetTxId, 
+                createdAt: serverTimestamp(), 
+                createdBy: currentUser.id, 
+                companyId: tenantId
             }));
 
             if (quotationIdToUpdate) {
@@ -140,7 +149,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             transaction_fs.set(jeCounterRef, { [`counts.${currentYear}`]: nextJeNum }, { merge: true });
         });
 
-        toast({ title: 'تم تفعيل العقد المالي' });
+        toast({ title: 'تم توقيع العقد وإنشاء القيد المحاسبي' });
         onClose();
         router.push(`/dashboard/clients/${clientId}`);
     } catch (e: any) {
