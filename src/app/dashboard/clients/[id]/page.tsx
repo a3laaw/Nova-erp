@@ -105,6 +105,25 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
+// 🛡️ تعريف ثوابت الألوان والحالات (Sovereign Style Palette) 🛡️
+const statusTranslations: Record<string, string> = {
+  new: 'جديد',
+  'in-progress': 'قيد التنفيذ',
+  completed: 'منتهي/مكتمل',
+  submitted: 'تم التسليم',
+  'on-hold': 'معلق إدارياً',
+  cancelled: 'ملغي/مفسوخ',
+};
+
+const transactionStatusColors: Record<string, string> = {
+  new: 'bg-blue-50 text-blue-700 border-blue-100',
+  'in-progress': 'bg-green-50 text-green-700 border-green-100',
+  completed: 'bg-purple-50 text-purple-700 border-purple-100',
+  submitted: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+  'on-hold': 'bg-orange-50 text-orange-700 border-orange-100',
+  cancelled: 'bg-red-50 text-red-700 border-red-100',
+};
+
 function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string, value: any }) {
     if (!value) return null;
     return (
@@ -144,7 +163,7 @@ export default function ClientProfilePage() {
   , [currentUser?.role]);
 
   // 🛡️ رادار استعادة البيانات (The Dual-Path Recovery Sync) 🛡️
-  // نقوم بالاستماع للمسار القديم (تحت العميل) والمسار الجديد (المسطح) ودمجهما
+  // الاستماع للمسار القديم (تحت العميل) والمسار الجديد (المسطح) ودمجهما
   const { data: nestedTransactions, loading: nestedLoading } = useSubscription<ClientTransaction>(
       firestore, 
       `clients/${id}/transactions`,
@@ -189,34 +208,7 @@ export default function ClientProfilePage() {
     });
   }, [firestore, tenantId]);
 
-  const handleToggleFreeze = async (tx: ClientTransaction) => {
-    if (!firestore || !tenantId || !tx.id || !id) return;
-    setIsProcessing(true);
-    const newStatus = tx.status === 'on-hold' ? 'new' : 'on-hold';
-    
-    // محاولة إيجاد المسار الصحيح للمعاملة (مسطح أو متداخل)
-    let finalPath = getTenantPath(`transactions/${tx.id}`, tenantId)!;
-    try {
-        const checkRef = doc(firestore, finalPath);
-        const snap = await getDoc(checkRef);
-        if (!snap.exists()) {
-            finalPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId)!;
-        }
-
-        await updateDoc(doc(firestore, finalPath), { 
-            status: newStatus,
-            updatedAt: serverTimestamp() 
-        });
-        toast({ title: '✅ تم حفظ المعلومات', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
-    } catch (e: any) {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: finalPath,
-            operation: 'update',
-            requestResourceData: { status: newStatus }
-        }));
-    } finally { setIsProcessing(false); }
-  };
-
+  // 🛡️ محرك إجراءات الحذف والإلغاء (Sovereign Action Handlers) 🛡️
   const handleConfirmDeleteQuotation = async () => {
     if (!quotationToDelete || !firestore || !tenantId) return;
     setIsProcessing(true);
@@ -371,6 +363,33 @@ export default function ClientProfilePage() {
     }
   };
 
+  const handleToggleFreeze = async (tx: ClientTransaction) => {
+    if (!firestore || !tenantId || !tx.id || !id) return;
+    setIsProcessing(true);
+    const newStatus = tx.status === 'on-hold' ? 'new' : 'on-hold';
+    
+    let finalPath = getTenantPath(`transactions/${tx.id}`, tenantId)!;
+    try {
+        const checkRef = doc(firestore, finalPath);
+        const snap = await getDoc(checkRef);
+        if (!snap.exists()) {
+            finalPath = getTenantPath(`clients/${id}/transactions/${tx.id}`, tenantId)!;
+        }
+
+        await updateDoc(doc(firestore, finalPath), { 
+            status: newStatus,
+            updatedAt: serverTimestamp() 
+        });
+        toast({ title: '✅ تم حفظ المعلومات', description: `تم ${newStatus === 'on-hold' ? 'تجميد' : 'إعادة تفعيل'} المعاملة بنجاح.` });
+    } catch (e: any) {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: finalPath,
+            operation: 'update',
+            requestResourceData: { status: newStatus }
+        }));
+    } finally { setIsProcessing(false); }
+  };
+
   const groupedTransactions = useMemo(() => {
     const groups = new Map<string, ClientTransaction[]>();
     transactions.forEach(tx => {
@@ -507,7 +526,7 @@ export default function ClientProfilePage() {
                                                     >
                                                         {tx.subServiceName || 'خدمة تأسيسية'}
                                                     </Link>
-                                                    <Badge className={cn("px-4 py-0.5 rounded-full font-black text-[9px] border-none shadow-sm", transactionStatusColors[tx.status])}>
+                                                    <Badge className={cn("px-4 py-0.5 rounded-full font-black text-[9px] border-none shadow-sm", transactionStatusColors[tx.status] || 'bg-slate-100 text-slate-500')}>
                                                         {statusTranslations[tx.status]}
                                                     </Badge>
                                                 </div>
