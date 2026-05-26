@@ -3,14 +3,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات الموحدة (V130.0 - Sovereign Master Edition)
+    // 🛡️ مصفوفة الصلاحيات الموحدة (V132.0 - Sovereign Master Edition)
     
     function isAuthenticated() {
       return request.auth != null;
     }
 
     // ⚡ محرك التعرف على المطور السيادي (Sovereign ID Engine)
-    // يدعم الرتبة (Role) أو البريد المباشر كدرع حماية احتياطي للمطور الرئيسي
     function isDeveloper() {
       return isAuthenticated() && 
              (request.auth.token.role == 'Developer' || 
@@ -18,6 +17,7 @@ service cloud.firestore {
               request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
     }
 
+    // 🛡️ محرك التحقق من العضوية والسيادة على المنشأة
     function isTenantMember(companyId) {
       return isAuthenticated() && 
              (request.auth.token.companyId == companyId || 
@@ -30,7 +30,6 @@ service cloud.firestore {
     }
 
     // 🌍 محركات النظام العالمية (Sovereign Global Collections)
-    // مفتوحة للقراءة للجميع (لجلب القاموس) ومقفلة للكتابة إلا للمطور
     match /system_lexicon/{id} {
       allow read: if isAuthenticated();
       allow write: if isDeveloper();
@@ -41,11 +40,13 @@ service cloud.firestore {
       allow write: if isDeveloper();
     }
 
-    // 🏢 عزل بيانات المنشآت (Multi-tenancy Isolation)
+    // 🏢 عزل بيانات المنشآت (SaaS Multi-tenancy Protection)
+    // تم تشديد القواعد لضمان أن العضو يرى ويكتب فقط في شركته
     match /companies/{companyId} {
-      allow read: if isAuthenticated();
+      allow read: if isDeveloper() || isTenantMember(companyId);
       allow write: if isDeveloper() || isTenantMember(companyId);
       
+      // السماح بالوصول لكافة المجموعات الفرعية (القيود، الفواتير، المعاملات...)
       match /{allSubcollections=**} {
         allow read, write: if isDeveloper() || isTenantMember(companyId);
       }

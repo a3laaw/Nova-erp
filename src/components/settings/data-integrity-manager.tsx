@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import { useFirebase, useSubscription } from '@/firebase';
@@ -96,25 +96,14 @@ function TechnicalWbsSyncTool() {
             });
 
             if (updateCount > 0) {
-                batch.commit()
-                    .then(() => {
-                        toast({ title: 'نجاح المزامنة العميقة', description: `تم تحديث ذكاء الـ WBS لـ ${updateCount} معاملة قديمة بنجاح.` });
-                    })
-                    .catch(async (serverError) => {
-                        errorEmitter.emit('permission-error', new FirestorePermissionError({
-                            path: '[WBS_BATCH_SYNC]',
-                            operation: 'write'
-                        }));
-                    })
-                    .finally(() => setIsProcessing(false));
+                await batch.commit();
+                toast({ title: 'نجاح المزامنة العميقة', description: `تم تحديث ذكاء الـ WBS لـ ${updateCount} معاملة بنجاح.` });
             } else {
-                toast({ title: 'البيانات محدثة', description: 'كافة المعاملات تتبع القواعد الحالية للقوائم المرجعية.' });
-                setIsProcessing(false);
+                toast({ title: 'البيانات محدثة', description: 'كافة المعاملات تتبع القواعد الحالية.' });
             }
         } catch (e: any) {
             toast({ variant: 'destructive', title: 'فشل المزامنة', description: e.message });
-            setIsProcessing(false);
-        }
+        } finally { setIsProcessing(false); }
     };
 
     return (
@@ -137,7 +126,8 @@ function TechnicalWbsSyncTool() {
 }
 
 /**
- * 🔥 محرك التطهير المالي والعملياتي الشامل (The Sovereign Purge Engine) 🔥
+ * 🔥 محرك التطهير المالي والعملياتي الشامل (The Sovereign Purge Engine V81) 🔥
+ * تم تحويل كافة المسارات لتكون صريحة ومباشرة (Flat) لضمان الصلاحيات.
  */
 function UniversalDataPurgeTool() {
     const { firestore } = useFirebase();
@@ -150,6 +140,7 @@ function UniversalDataPurgeTool() {
     const tenantId = user?.currentCompanyId;
 
     const collectionsToPurge = [
+        'transactions', // المعاملات أصبحت فلات تحت المنشأة
         'journalEntries',
         'cashReceipts',
         'paymentVouchers',
@@ -163,7 +154,8 @@ function UniversalDataPurgeTool() {
         'field_visits',
         'notifications',
         'userProductivity',
-        'hub_posts'
+        'hub_posts',
+        'points_ledger'
     ];
 
     const handlePurge = async () => {
@@ -171,39 +163,30 @@ function UniversalDataPurgeTool() {
         
         setIsPurging(true);
         try {
-            // 1. مسح المجموعات المسطحة (Collections)
+            // 🛡️ تنفيذ التطهير المتسلسل والمحمي 🛡️
             for (const collName of collectionsToPurge) {
                 const collPath = getTenantPath(collName, tenantId);
                 if (!collPath) continue;
 
                 const snap = await getDocs(collection(firestore, collPath));
+                if (snap.empty) continue;
+
+                // مسح البيانات في حزم (Batches) لضمان استقرار السيرفر
                 const batch = writeBatch(firestore);
                 snap.forEach(d => batch.delete(d.ref));
                 
-                batch.commit()
-                    .catch(async (serverError) => {
-                        errorEmitter.emit('permission-error', new FirestorePermissionError({
-                            path: collPath,
-                            operation: 'delete'
-                        } satisfies SecurityRuleContext));
-                    });
-            }
-
-            // 2. مسح المعاملات (Nested Subcollections) عبر الـ Collection Group
-            const txsSnap = await getDocs(query(collectionGroup(firestore, 'transactions'), where('companyId', '==', tenantId)));
-            const txBatch = writeBatch(firestore);
-            txsSnap.forEach(d => txBatch.delete(d.ref));
-            txBatch.commit()
-                .catch(async (serverError) => {
+                await batch.commit().catch(async (serverError) => {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({
-                        path: '[TRANSACTIONS_GROUP_PURGE]',
+                        path: collPath,
                         operation: 'delete'
                     } satisfies SecurityRuleContext));
+                    throw serverError;
                 });
+            }
 
-            // 3. تصفير حالة العملاء وإعادة ضبط عدادات الترقيم
-            const clientsSnap = await getDocs(query(collection(firestore, getTenantPath('clients', tenantId)!)));
+            // 🛡️ تصفير حالة العملاء وإعادة ضبط العدادات 🛡️
             const clientBatch = writeBatch(firestore);
+            const clientsSnap = await getDocs(query(collection(firestore, getTenantPath('clients', tenantId)!)));
             clientsSnap.forEach(d => {
                 clientBatch.update(d.ref, { 
                     status: 'new', 
@@ -212,19 +195,19 @@ function UniversalDataPurgeTool() {
                 });
             });
 
-            // تصفير كافة العدادات (Counters)
-            const countersSnap = await getDocs(query(collection(firestore, getTenantPath('counters', tenantId)!)));
             const counterBatch = writeBatch(firestore);
+            const countersSnap = await getDocs(query(collection(firestore, getTenantPath('counters', tenantId)!)));
             countersSnap.forEach(d => counterBatch.delete(d.ref));
             
-            clientBatch.commit();
-            counterBatch.commit();
+            await clientBatch.commit();
+            await counterBatch.commit();
 
-            toast({ title: '✅ تم تطهير البيانات بالكامل', description: 'المنظومة الآن جاهزة لبدء دورة عمل نظيفة وجديدة.' });
+            toast({ title: '✅ تم التطهير الشامل', description: 'تم تصفير كافة العمليات المالية والتقنية للمنشأة.' });
             setIsImportConfirmOpen(false);
             setConfirmText('');
         } catch (e: any) {
-            toast({ variant: 'destructive', title: 'فشل التطهير', description: e.message });
+            console.error("Purge Error:", e);
+            toast({ variant: 'destructive', title: 'فشل التطهير', description: 'تأكد من صلاحيات المدير وأعد المحاولة.' });
         } finally {
             setIsPurging(false);
         }
@@ -236,12 +219,12 @@ function UniversalDataPurgeTool() {
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-white rounded-2xl shadow-sm text-red-600 border border-red-100"><Ban className="h-6 w-6"/></div>
                     <div>
-                        <h3 className="font-black text-xl text-red-700">تطهير البيانات المالية والعملياتية (Reset)</h3>
-                        <p className="text-xs font-bold text-red-600/70 mt-0.5">مسح كافة القيود والسندات والعمليات للبدء من جديد (مع الإبقاء على العملاء والموظفين).</p>
+                        <h3 className="font-black text-xl text-red-700">تطهير العمليات الحالية (Sovereign Reset)</h3>
+                        <p className="text-xs font-bold text-red-600/70 mt-0.5">مسح كافة القيود، العقود، المعاملات، والمستخلصات (مع الإبقاء على العملاء والموظفين).</p>
                     </div>
                 </div>
                 <Button onClick={() => setIsImportConfirmOpen(true)} variant="destructive" className="rounded-xl font-black gap-2 shadow-xl shadow-red-200 px-8 h-12">
-                    <Trash2 className="h-5 w-5" /> مسح كافة العمليات الحالية
+                    <Trash2 className="h-5 w-5" /> مسح السجلات والعمليات
                 </Button>
             </div>
 
@@ -251,16 +234,10 @@ function UniversalDataPurgeTool() {
                         <div className="p-4 bg-red-100 rounded-3xl w-fit mb-4 border border-red-200 animate-pulse">
                             <DatabaseZap className="h-10 w-10 text-red-600" />
                         </div>
-                        <AlertDialogTitle className="text-2xl font-black text-red-800 tracking-tighter">إجراء خطير: تطهير كامل للبيانات!</AlertDialogTitle>
+                        <AlertDialogTitle className="text-2xl font-black text-red-800 tracking-tighter">إجراء سيادي: تصفير المنظومة!</AlertDialogTitle>
                         <AlertDialogDescription className="text-lg font-bold text-slate-600 leading-relaxed mt-2">
-                            هذا الإجراء سيقوم بمسح نهائي لكافة:
-                            <ul className="list-disc pr-6 mt-3 text-sm text-red-700 space-y-1">
-                                <li>قيود اليومية والسندات المالية.</li>
-                                <li>عروض الأسعار والعقود المبرمة.</li>
-                                <li>مسارات المعاملات ومراحل الإنجاز.</li>
-                                <li>المستخلصات وجداول الكميات.</li>
-                            </ul>
-                            <br />
+                            سيقوم هذا المحرك بمسح نهائي لكافة العمليات المالية والميدانية لضمان بدء دورة عمل نظيفة.
+                            <br /><br />
                             <span className="text-red-900 font-black italic block bg-red-50 p-4 rounded-2xl border-2 border-red-200">
                                 تنبيه: لا يمكن التراجع عن هذا الإجراء أبداً. اكتب كلمة "تطهير" أدناه للتأكيد:
                             </span>
@@ -275,13 +252,13 @@ function UniversalDataPurgeTool() {
                         />
                     </div>
                     <AlertDialogFooter className="gap-3">
-                        <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">إلغاء وتراجع</AlertDialogCancel>
+                        <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">إلغاء</AlertDialogCancel>
                         <AlertDialogAction 
                             onClick={handlePurge} 
                             disabled={confirmText !== 'تطهير' || isPurging} 
                             className="bg-red-600 hover:bg-black rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200 flex-1"
                         >
-                            {isPurging ? <Loader2 className="animate-spin h-5 w-5"/> : 'نعم، قم بالتطهير النهائي'}
+                            {isPurging ? <Loader2 className="animate-spin h-5 w-5"/> : 'نعم، تطهير المنشأة'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -300,19 +277,19 @@ function TerminatedEmployeesManager() {
   const employeesPath = getTenantPath('employees', tenantId);
 
   const terminatedEmployeesQuery = useMemo(() => [where('status', '==', 'terminated')], []);
-  const { data: terminatedEmployees, loading } = useSubscription<Employee>(firestore, employeesPath, terminatedEmployeesQuery);
+  const { data: terminatedEmployees, loading } = useSubscription<Employee>(firestore, 'employees', terminatedEmployeesQuery);
 
   const handleConfirmDelete = async () => {
-    if (!firestore || !employeeToDelete || !employeesPath) return;
+    if (!firestore || !employeeToDelete || !employeesPath || !tenantId) return;
     
-    const docPath = `${employeesPath}/${employeeToDelete.id}`;
-    deleteDoc(doc(firestore, docPath))
+    const docPath = getTenantPath(`employees/${employeeToDelete.id}`, tenantId);
+    deleteDoc(doc(firestore, docPath!))
         .then(() => {
             toast({ title: 'نجاح', description: `تم حذف الموظف نهائياً.` });
         })
         .catch(async (serverError) => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: docPath,
+                path: docPath!,
                 operation: 'delete'
             }));
         })
@@ -326,8 +303,8 @@ function TerminatedEmployeesManager() {
             <Table>
                 <TableHeader className="bg-slate-50"><TableRow><TableHead className="px-8 font-black text-slate-900">اسم الموظف السابق</TableHead><TableHead className="font-black text-slate-900">تاريخ الإنهاء</TableHead><TableHead className="text-left px-8 font-black text-slate-900">حذف نهائي</TableHead></TableRow></TableHeader>
                 <TableBody>
-                    {!loading && terminatedEmployees.length === 0 ? <TableRow><TableCell colSpan={3} className="h-32 text-center opacity-30 italic font-black text-xl">لا توجد سجلات.</TableCell></TableRow> :
-                    terminatedEmployees.map(emp => (
+                    {!loading && (terminatedEmployees || []).length === 0 ? <TableRow><TableCell colSpan={3} className="h-32 text-center opacity-30 italic font-black text-xl">لا توجد سجلات.</TableCell></TableRow> :
+                    (terminatedEmployees || []).map(emp => (
                         <TableRow key={emp.id} className="h-16 hover:bg-red-50/10">
                             <TableCell className="font-black px-8 text-slate-800">{emp.fullName}</TableCell>
                             <TableCell className="font-bold text-xs opacity-60">{emp.terminationDate ? format(toFirestoreDate(emp.terminationDate)!, 'dd/MM/yyyy') : '-'}</TableCell>
