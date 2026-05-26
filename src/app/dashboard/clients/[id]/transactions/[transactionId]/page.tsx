@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import { 
     Pencil, 
     User, 
-    Calendar, 
+    Calendar as CalendarIcon, 
     Workflow, 
     Check, 
     History, 

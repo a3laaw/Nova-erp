@@ -669,8 +669,9 @@ export default function ClientProfilePage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-10 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2 text-black">إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmDeleteQuotation} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">
-                        {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف العرض'}
+                    <AlertDialogAction onClick={handleConfirmDeleteQuotation} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200 min-w-[180px]"
+                    >
+                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، حذف العرض'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
