@@ -41,11 +41,12 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
-import { Textarea } from '@/components/ui/textarea';
+import { MentionTextarea } from '@/components/ui/mention-textarea';
 
 /**
- * منصة الإنتاجية السيادية (Productivity Platform V114.0):
- * تم إصلاح أخطاء الاستيراد (Skeleton/Separator) وتحصين المصافحة التشاركية.
+ * منصة الإنتاجية السيادية (Productivity Platform V117.0):
+ * - تفعيل محرك المنشن التفاعلي في فقاعة الإنجاز.
+ * - تحصين الروابط السيادية لضمان التوثيق المتبادل.
  */
 function ProductivityContent() {
     const { firestore } = useFirebase();
@@ -386,14 +387,20 @@ function CompleteTaskDialog({ isOpen, onClose, task }: { isOpen: boolean, onClos
 
                 <div className="p-8 space-y-6">
                     <div className="grid gap-3">
-                        <Label className="font-black text-slate-700 flex items-center gap-2">
-                            <MessageSquare className="h-4 w-4 text-primary" /> {isShared ? 'محضر الإنجاز والتسليم (إلزامي) *' : 'ملاحظات الإنجاز (اختياري)'}
-                        </Label>
-                        <Textarea 
+                        <div className="flex justify-between items-center pr-1">
+                            <Label className="font-black text-slate-700 flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4 text-primary" /> {isShared ? 'محضر الإنجاز والتسليم (إلزامي) *' : 'ملاحظات الإنجاز (اختياري)'}
+                            </Label>
+                            <Badge className="bg-primary/10 text-primary border-none text-[8px] font-black uppercase flex items-center gap-1">
+                                <Sparkles className="h-2.5 w-2.5 fill-primary" /> جرب استخدام @ للمنشن
+                            </Badge>
+                        </div>
+                        {/* ✨ استخدام محرك المنشن الجديد هنا ✨ */}
+                        <MentionTextarea 
                             autoFocus
                             value={completionNote} 
-                            onChange={e => setCompletionNote(e.target.value)} 
-                            placeholder={isShared ? "اشرح ما تم إنجازه للزملاء والعميل..." : "أي ملاحظات إضافية..."}
+                            onValueChange={setCompletionNote} 
+                            placeholder={isShared ? "اشرح ما تم إنجازه للزملاء والعميل... استخدم @ للمنشن" : "أي ملاحظات إضافية..."}
                             className="rounded-[2rem] border-2 p-6 text-base font-medium min-h-[140px] focus-visible:ring-2 focus-visible:ring-green-500/20"
                         />
                     </div>

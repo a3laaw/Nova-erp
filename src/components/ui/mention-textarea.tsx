@@ -8,34 +8,32 @@ import type { UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import { ScrollArea } from './scroll-area';
-import { Badge } from './badge';
-import { AtSign, Search, User } from 'lucide-react';
+import { AtSign, User } from 'lucide-react';
+import { Card } from './card';
 
 interface MentionTextareaProps extends React.ComponentProps<typeof Textarea> {
   onValueChange: (value: string) => void;
 }
 
 /**
- * مكون مساحة النص مع المنشن الذكي (Sovereign Mention Engine V1.0):
- * - يظهر قائمة مستخدمين عند كتابة @.
- * - يدعم الاختيار بالماوس أو لوحة المفاتيح.
- * - يضمن تباين النصوص باللون الأسود القوي.
+ * مكون مساحة النص مع المنشن الذكي (Sovereign Mention Engine V117.0):
+ * - يظهر قائمة مستخدمين عائمة عند كتابة @.
+ * - تباين عالٍ (أسود قاتم) للوضوح المطلق.
  */
 export function MentionTextarea({ value, onValueChange, className, ...props }: MentionTextareaProps) {
   const { firestore } = useFirebase();
   const [showMentions, setShowMentions] = useState(false);
   const [mentionQuery, setMentionSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [coords, setCoords] = useState({ top: 0, left: 0 });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // جلب كافة مستخدمي المنشأة
-  const { data: users, loading } = useSubscription<UserProfile>(firestore, 'users');
+  const { data: users = [] } = useSubscription<UserProfile>(firestore, 'users');
 
   const filteredUsers = useMemo(() => {
-    const query = mentionQuery.toLowerCase();
+    const queryStr = mentionQuery.toLowerCase();
     return users
-      .filter(u => u.username.toLowerCase().includes(query) || u.fullName?.toLowerCase().includes(query))
+      .filter(u => u.username.toLowerCase().includes(queryStr) || u.fullName?.toLowerCase().includes(queryStr))
       .slice(0, 8);
   }, [users, mentionQuery]);
 
@@ -58,19 +56,16 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
-    const cursor = e.target.selectionStart;
+    const cursor = e.target.selectionStart || 0;
     onValueChange(text);
 
-    // البحث عن آخر @ قبل مكان المؤشر
     const lastAt = text.lastIndexOf('@', cursor - 1);
     if (lastAt !== -1) {
       const queryText = text.slice(lastAt + 1, cursor);
-      // تأكد أنه لا توجد مسافات بين @ والكلمة
-      if (!queryText.includes(' ')) {
+      if (!queryText.includes(' ') && !queryText.includes('\n')) {
         setMentionSearch(queryText);
         setShowMentions(true);
-        // حساب موقع القائمة (تقريبي أسفل المساحة)
-        setCoords({ top: 40, left: 0 }); 
+        setSelectedIndex(0);
         return;
       }
     }
@@ -88,11 +83,19 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
     
     onValueChange(newValue);
     setShowMentions(false);
-    textareaRef.current?.focus();
+    
+    // إعادة التركيز للمساحة النصية
+    setTimeout(() => {
+        if (textareaRef.current) {
+            textareaRef.current.focus();
+            const newPos = before.length + user.username.length + 2;
+            textareaRef.current.setSelectionRange(newPos, newPos);
+        }
+    }, 10);
   };
 
   return (
-    <div className="relative w-full group">
+    <div className="relative w-full">
       <Textarea
         {...props}
         ref={textareaRef}
@@ -100,16 +103,19 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
         onChange={handleInput}
         onKeyDown={handleKeyDown}
         className={cn(
-          "rounded-[2.5rem] p-8 text-xl leading-relaxed font-black placeholder:italic bg-transparent text-black",
+          "rounded-[2rem] p-6 text-lg font-bold leading-relaxed border-2 focus-visible:ring-primary/20 text-black placeholder:text-slate-300",
           className
         )}
       />
 
       {showMentions && filteredUsers.length > 0 && (
-        <Card className="absolute z-[9999] w-72 rounded-[2rem] shadow-2xl border-2 border-primary/20 bg-white/95 backdrop-blur-xl overflow-hidden animate-in zoom-in-95 duration-200 mt-2">
-          <div className="p-3 bg-primary/5 border-b flex items-center gap-2">
-             <AtSign className="h-3 w-3 text-primary" />
-             <span className="text-[10px] font-black uppercase text-primary tracking-widest">إشارة إلى زميل</span>
+        <Card className="absolute bottom-full left-0 mb-2 z-[9999] w-72 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-2 border-primary/20 bg-white/95 backdrop-blur-xl overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
+          <div className="p-3 bg-primary/5 border-b flex items-center justify-between">
+             <div className="flex items-center gap-2">
+                <AtSign className="h-3.5 w-3.5 text-primary" />
+                <span className="text-[10px] font-black uppercase text-primary tracking-widest">إشارة إلى زميل</span>
+             </div>
+             <Badge variant="secondary" className="text-[8px] font-black bg-white">{filteredUsers.length} نتائج</Badge>
           </div>
           <ScrollArea className="max-h-64">
             <div className="p-2 space-y-1">
@@ -124,13 +130,16 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
                     idx === selectedIndex ? "bg-primary text-white shadow-lg scale-[1.02]" : "hover:bg-primary/5 text-black"
                   )}
                 >
-                  <Avatar className="h-8 w-8 border-2 border-white shadow-sm">
-                    <AvatarImage src={user.avatarUrl} />
-                    <AvatarFallback className="bg-primary/10 text-primary font-black text-[10px]">{user.username.charAt(0).toUpperCase()}</AvatarFallback>
-                  </Avatar>
+                  <div className="relative">
+                      <Avatar className="h-8 w-8 border-2 border-white shadow-sm">
+                        <AvatarImage src={user.avatarUrl} className="object-cover" />
+                        <AvatarFallback className="bg-primary/10 text-primary font-black text-[10px]">{user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      {idx === selectedIndex && <div className="absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 bg-white rounded-full flex items-center justify-center shadow-sm"><div className="h-1.5 w-1.5 bg-primary rounded-full animate-pulse" /></div>}
+                  </div>
                   <div className="flex-1 overflow-hidden">
-                    <p className="font-black text-xs truncate">{user.fullName || user.username}</p>
-                    <p className={cn("text-[9px] font-bold opacity-60", idx === selectedIndex ? "text-white/70" : "text-primary")}>@{user.username}</p>
+                    <p className="font-black text-xs truncate leading-none">{user.fullName || user.username}</p>
+                    <p className={cn("text-[9px] font-bold mt-1", idx === selectedIndex ? "text-white/70" : "text-primary")}>@{user.username}</p>
                   </div>
                 </button>
               ))}
@@ -141,3 +150,5 @@ export function MentionTextarea({ value, onValueChange, className, ...props }: M
     </div>
   );
 }
+
+import { Badge } from './badge';
