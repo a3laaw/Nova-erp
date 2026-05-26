@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -73,6 +72,7 @@ import {
     Search
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 import { TransactionAssignmentDialog } from '@/components/clients/transaction-assignment-dialog';
@@ -194,7 +194,6 @@ export default function ClientProfilePage() {
     setIsProcessing(true);
     const newStatus = tx.status === 'on-hold' ? 'new' : 'on-hold';
     
-    // محاولة تحديد المسار الصحيح للمستند (دعم المسارين)
     let finalPath = getTenantPath(`transactions/${tx.id}`, tenantId);
     try {
         const checkRef = doc(firestore, finalPath!);
@@ -237,7 +236,7 @@ export default function ClientProfilePage() {
 
         toast({ title: '✅ تم حذف عرض السعر' });
     } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+        toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
     } finally {
         setIsProcessing(false);
         setQuotationToDelete(null);
@@ -248,7 +247,6 @@ export default function ClientProfilePage() {
     if (!firestore || !tenantId || !transactionToCancel?.id || !id || !currentUser) return;
     setIsProcessing(true);
     
-    // محاولة العثور على المسار الصحيح
     let finalTxPath = getTenantPath(`transactions/${transactionToCancel.id}`, tenantId)!;
 
     try {
