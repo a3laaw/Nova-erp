@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
- * @fileOverview مسار تشخيصي متطور للتحقق من حالة اتصال الذكاء الاصطناعي والفوترة.
+ * @fileOverview مسار تشخيصي مبسط للتحقق من حالة اتصال الذكاء الاصطناعي.
+ * تم تجريده من أي نصوص قد تسبب مشاكل ByteString أثناء البناء.
  */
 
 const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
@@ -13,8 +14,7 @@ export async function GET() {
   if (!apiKey) {
     return NextResponse.json({ 
       success: false, 
-      error: "Missing API Key",
-      solution: "يرجى إضافة GOOGLE_GENAI_API_KEY في إعدادات البيئة (Environment Variables)."
+      error: "Missing API Key"
     }, { status: 500 });
   }
 
@@ -22,8 +22,8 @@ export async function GET() {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    // فحص بسيط للتحقق من الاتصال
-    const result = await model.generateContent("Test connection");
+    // فحص بسيط للتحقق من الاتصال بنص لاتيني صرف
+    const result = await model.generateContent("AI status check");
     const response = await result.response;
     const text = response.text();
 
@@ -31,31 +31,15 @@ export async function GET() {
       success: true,
       status: 'AI Engine is Online',
       model: 'gemini-2.0-flash',
-      message: "تم الاتصال بنجاح. المفتاح يعمل والنموذج متاح.",
       aiResponse: text
     });
   } catch (error: any) {
     console.error("AI Diagnostic Error:", error);
     
-    let userFriendlyError = "حدث خطأ غير معروف.";
-    let solution = "يرجى مراجعة سجلات الخادم.";
-
-    if (error.message?.includes('404')) {
-        userFriendlyError = "النموذج غير موجود (404).";
-        solution = "تأكد من تفعيل 'Generative Language API' في Google Cloud Console لهذا المشروع تحديداً.";
-    } else if (error.message?.includes('403')) {
-        userFriendlyError = "تم رفض الوصول (403).";
-        solution = "المفتاح غير صالح أو تم تقييد استخدامه. تأكد من إعدادات الفوترة أو قيود المفتاح.";
-    } else if (error.message?.includes('429')) {
-        userFriendlyError = "خطأ يرجى الاتصال بالمطور";
-        solution = "تنبيه: تم استنفاد حصة الطلبات المجانية (429 Quota Exceeded).";
-    }
-
     return NextResponse.json({ 
         success: false, 
-        error: error.message,
-        details: userFriendlyError,
-        solution: solution
+        error: "AI Connection Failed",
+        details: error.message
     }, { status: 500 });
   }
 }

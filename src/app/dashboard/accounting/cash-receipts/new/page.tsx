@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import {
   Card,
   CardContent,
@@ -21,9 +21,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Save, Loader2, Target, Banknote, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, getDocs, doc, runTransaction, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, getDocs, doc, runTransaction, getDoc, orderBy, Timestamp } from 'firebase/firestore';
 import type { Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -47,8 +47,13 @@ const getTotalPaidForProject = async (projectId: string, db: any, tenantId: stri
     return total;
 };
 
-export function NewCashReceiptPage() {
+/**
+ * مكون محتوى سند القبض (The Receipt Engine Content):
+ * تم فصل المحتوى ليتم تغليفه بـ Suspense لضمان استقرار البناء.
+ */
+function NewCashReceiptContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { branding } = useBranding();
@@ -227,7 +232,6 @@ export function NewCashReceiptPage() {
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             
-            // 🛡️ تعريف العدادات في بداية الـ Transaction 🛡️
             const counterPath = getTenantPath('counters/cashReceipts', tenantId);
             const jeCounterPath = getTenantPath('counters/journalEntries', tenantId);
             
@@ -316,29 +320,6 @@ export function NewCashReceiptPage() {
         savingRef.current = false;
     }
   };
-
-  const clientAccountOptions = useMemo(() => 
-    accounts.filter(a => a.code.startsWith('1102')).map(a => ({
-      value: a.id!,
-      label: `السيد/ ${a.name} (${a.code})`,
-      searchKey: a.code
-    }))
-  , [accounts]);
-
-  const projectOptions = useMemo(() => 
-    clientProjects.map(p => ({ 
-        value: p.id!, 
-        label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})`
-    }))
-  , [clientProjects]);
-
-  const debitAccountOptions = useMemo(() => {
-    if (!paymentMethod) return [];
-    const isCash = paymentMethod === 'Cash';
-    return accounts
-        .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes(isCash ? 'صندوق' : 'بنك'))
-        .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
-  }, [accounts, paymentMethod]);
 
   return (
     <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden glass-effect" dir="rtl">
@@ -445,4 +426,33 @@ export function NewCashReceiptPage() {
       </CardFooter>
     </Card>
   );
+}
+
+const clientAccountOptions = (accounts: Account[]) => 
+  accounts.filter(a => a.code.startsWith('1102')).map(a => ({
+    value: a.id!,
+    label: `السيد/ ${a.name} (${a.code})`,
+    searchKey: a.code
+  }));
+
+const projectOptions = (projects: ClientTransaction[]) => 
+  projects.map(p => ({ 
+      value: p.id!, 
+      label: `${p.subServiceName || p.transactionType} (${p.transactionNumber})`
+  }));
+
+const debitAccountOptions = (accounts: Account[], paymentMethod: string) => {
+  if (!paymentMethod) return [];
+  const isCash = paymentMethod === 'Cash';
+  return accounts
+      .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes(isCash ? 'صندوق' : 'بنك'))
+      .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+};
+
+export default function NewCashReceiptPage() {
+    return (
+        <Suspense fallback={<div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>}>
+            <NewCashReceiptContent />
+        </Suspense>
+    );
 }

@@ -1,11 +1,12 @@
 'use server';
 
 /**
- * @fileOverview A data-driven cash flow projection engine.
+ * @fileOverview محرك توقعات التدفق النقدي المعتمد على البيانات.
+ * تم تصحيح استيراد قاعدة البيانات لضمان نجاح البناء.
  */
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { firestore } from '@/firebase/server-init';
+import { db as firestore } from '@/firebase/server-init';
 import { addMonths, format } from 'date-fns';
 import type { Client, ClientTransaction, Employee } from '@/lib/types';
 
@@ -47,7 +48,7 @@ export async function runCashFlowProjection(input: { months: number }) {
 
   clientsWithContracts.forEach(({ transactions }) => {
       transactions.forEach(tx => {
-          tx.contract?.clauses?.forEach(clause => {
+          tx.contract?.clauses?.forEach((clause: any) => {
               if (clause.status === 'مستحقة' || clause.status === 'غير مستحقة') {
                    const stage = tx.stages?.find(s => s.name === clause.condition);
                    let dueDate: Date | null = null;
