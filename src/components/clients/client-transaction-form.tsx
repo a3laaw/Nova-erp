@@ -193,6 +193,14 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         }
     };
 
+    const transactionTypeOptions = useMemo(() => 
+        transactionTypes.map(t => ({ value: t.name, label: t.name })), 
+    [transactionTypes]);
+
+    const engineerOptions = useMemo(() => 
+        engineers.map(e => ({ value: e.id!, label: e.fullName })), 
+    [engineers]);
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
             <DialogContent dir="rtl" className="max-w-lg rounded-[2.5rem] border-none shadow-2xl p-0 bg-white">

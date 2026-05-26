@@ -23,7 +23,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, PlusCircle, Trash2, FileSignature, Calculator, ShieldCheck } from 'lucide-react';
+import { Loader2, Save, X, FileSignature, Calculator, ShieldCheck } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, orderBy, getDoc, Timestamp } from 'firebase/firestore';
@@ -123,14 +123,14 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
 
             const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
             
-            // 🛡️ المزايرة المالية: إثبات العقد في قيود اليومية مع التاريخ المعتمد 🛡️
+            // 🛡️ المزامنة المالية السيادية (V88.0): إثبات القيد بالتاريخ المعتمد والوصف الذكي 🛡️
             transaction_fs.set(doc(collection(firestore, getTenantPath('journalEntries', tenantId)!)), cleanFirestoreData({
                 entryNumber: `JV-PR-${currentYear}-${String(nextJeNum).padStart(4, '0')}`,
-                date: serverTimestamp(), // التاريخ المعتمد للتعاقد
-                narration: `عقد: ${transaction.transactionType || transaction.subject} لـ ${clientName}`,
+                date: serverTimestamp(), // تم إضافة التاريخ المفقود
+                narration: `[عقد مالي] إثبات مديونية: ${transaction.transactionType || transaction.subject} لـ ${clientName}`,
                 totalDebit: financials.totalAmount, 
                 totalCredit: financials.totalAmount, 
-                status: 'posted',
+                status: 'posted', // ترحيل فوري لمنع تشتيت المستخدم
                 lines: [
                     { accountId: clientAccountId, accountName: clientName, debit: financials.totalAmount, credit: 0, auto_profit_center: targetTxId },
                     { accountId: revenueAccSnap.docs[0]?.id, accountName: 'إيرادات عقود', debit: 0, credit: financials.totalAmount, auto_profit_center: targetTxId }
@@ -143,6 +143,7 @@ export function ContractClausesForm({ isOpen, onClose, transaction, clientId, cl
             }));
 
             if (quotationIdToUpdate) {
+                // 🛡️ تحديث حالة عرض السعر إلى "تم" (Accepted) آلياً 🛡️
                 transaction_fs.update(doc(firestore, getTenantPath(`quotations/${quotationIdToUpdate}`, tenantId)!), { status: 'accepted' });
             }
 
