@@ -164,3 +164,16 @@ export interface Quotation extends BaseEntity {
   financialsType: 'fixed' | 'percentage';
   transactionId?: string;
 }
+
+export interface HubPost extends BaseEntity {
+    userId: string;
+    userName: string;
+    userAvatar?: string;
+    postType: 'system_achievement' | 'employee_idea' | 'kudos' | 'birthday';
+    content: string;
+    moodIcon?: string;
+    votesCount: number;
+    voters: string[];
+    pointsAwarded: number;
+    companyId: string;
+}

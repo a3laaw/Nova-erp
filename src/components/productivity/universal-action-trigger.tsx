@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -41,8 +42,10 @@ interface UniversalActionTriggerProps {
 }
 
 /**
- * محرك الإجراءات الموحد (Universal Action Trigger V107.0):
- * تم إصلاح خطأ DropdownMenuLabel المفقود وضمان استقرار المزامنة التشاركية.
+ * محرك الإجراءات الموحد (Universal Action Trigger V111.0):
+ * - تفعيل نظام "المشاركة مع زميل" لجدولة المهام المتبادلة.
+ * - إرسال تنبيهات تشاركية فورية.
+ * - ربط "المسار الفني" تلقائياً بالجدول الشخصي.
  */
 export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSubId, subItemName }: UniversalActionTriggerProps) {
     const { user: currentUser } = useAuth();
@@ -58,7 +61,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
 
     const tenantId = currentUser?.currentCompanyId;
 
-    // جلب الموظفين لتمكين المشاركة
+    // جلب الموظفين لتمكين المشاركة التشاركية
     const { data: allUsers = [], loading: usersLoading } = useSubscription<UserProfile>(
         firestore, 
         tenantId ? 'users' : null
@@ -93,6 +96,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
             const service = new ProductivityService(firestore, tenantId);
             const taskTitle = subItemName ? `${title} - ${subItemName}` : title;
             
+            // 1. إنشاء المهمة لنفسي
             await service.createItem({
                 userId: currentUser.id,
                 entryType: 'task',
@@ -106,21 +110,24 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                 sourceUrl: window.location.pathname,
             });
 
+            // 2. إذا تم اختيار زملاء، إنشاء مهام لهم وإرسال تنبيهات
             if (assignedUserIds.length > 0) {
                 const notifPath = getTenantPath('notifications', tenantId);
                 const taskPath = getTenantPath('userProductivity', tenantId);
 
                 for (const targetId of assignedUserIds) {
+                    // إرسال تنبيه
                     await addDoc(collection(firestore, notifPath!), cleanFirestoreData({
                         userId: targetId,
-                        title: 'مهمة عمل تشاركية',
-                        body: `أضافك ${currentUser.fullName} في مهمة: "${taskTitle}" للمتابعة.`,
+                        title: '📍 مهمة عمل تشاركية',
+                        body: `قام زميلك ${currentUser.fullName} بإسناد مهمة إليك: "${taskTitle}" للمتابعة.`,
                         link: '/dashboard/productivity?tab=tasks',
                         isRead: false,
                         createdAt: serverTimestamp(),
                         companyId: tenantId
                     }));
 
+                    // إنشاء المهمة في جدول الزميل
                     await addDoc(collection(firestore, taskPath!), cleanFirestoreData({
                         userId: targetId,
                         entryType: 'task',
@@ -128,7 +135,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                         actionType: actionType as any,
                         dueDate,
                         status: 'pending',
-                        sourceModule: `${sourceModule} (بواسطة ${currentUser.fullName})`,
+                        sourceModule: `${sourceModule} (مسندة من ${currentUser.fullName})`,
                         sourceId,
                         sourceSubId,
                         sourceUrl: window.location.pathname,
@@ -138,7 +145,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                 }
             }
 
-            toast({ title: '✅ تمت جدولة المهمة وإخطار الزملاء' });
+            toast({ title: '✅ تمت الجدولة والمشاركة بنجاح' });
             setIsTaskDialogOpen(false);
             setAssignedUserIds([]);
         } catch (e) {
@@ -151,13 +158,13 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="rounded-xl border-primary/20 text-primary gap-2 h-9 font-black shadow-sm group">
-                        <Sparkles className="h-4 w-4 animate-pulse" /> محرك العمل
+                        <Sparkles className="h-4 w-4 animate-pulse" /> محرك العمل والإنتاجية
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl bg-white border-none">
-                    <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 p-3">إجراءات الإنتاجية</DropdownMenuLabel>
+                    <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 p-3">إجراءات المسار الفني</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => setIsTaskDialogOpen(true)} className="rounded-xl py-3 cursor-pointer gap-3 font-bold text-black hover:bg-primary/5">
-                        <PlusCircle className="h-4 w-4 text-green-600" /> جدولة مهمة عمل
+                        <PlusCircle className="h-4 w-4 text-green-600" /> جدولة مهمة عمل (تشاركية)
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleAddBookmark} className="rounded-xl py-3 cursor-pointer gap-3 font-bold text-black hover:bg-primary/5">
                         <Bookmark className="h-4 w-4 text-primary" /> حفظ في المفضلة
@@ -171,50 +178,50 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><CheckCircle2 className="h-6 w-6"/></div>
                             <div>
-                                <DialogTitle className="text-xl font-black text-[#1e1b4b]">جدولة مهمة تشاركية</DialogTitle>
-                                <DialogDescription className="font-bold text-slate-500">سيتم إرسال تنبيه فوري للزملاء المشاركين وجدولة المهمة لديهم.</DialogDescription>
+                                <DialogTitle className="text-xl font-black text-[#1e1b4b]">إضافة مهمة لجدول العمل</DialogTitle>
+                                <DialogDescription className="font-bold text-slate-500">سيتم ربط المعاملة الحالية بالمهمة وإخطار الزملاء المشاركين.</DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
 
                     <div className="p-8 space-y-6">
                         <div className="p-5 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                            <Label className="text-[10px] font-black text-slate-400 block mb-1">بند العمل المستخلص:</Label>
+                            <Label className="text-[10px] font-black text-slate-400 block mb-1">المصدر (المسار الفني):</Label>
                             <p className="font-black text-lg text-primary leading-tight">{subItemName || title}</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-6">
                             <div className="grid gap-2">
-                                <Label className="font-black text-gray-700 pr-1">نوع الإجراء</Label>
+                                <Label className="font-black text-gray-700 pr-1">نوع الإجراء المطلوبة</Label>
                                 <Select value={actionType} onValueChange={setActionType}>
                                     <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger>
                                     <SelectContent dir="rtl">
                                         <SelectItem value="review">مراجعة وتدقيق</SelectItem>
-                                        <SelectItem value="decision">اتخاذ قرار</SelectItem>
-                                        <SelectItem value="design">تصميم فني</SelectItem>
+                                        <SelectItem value="decision">اتخاذ قرار نهائي</SelectItem>
+                                        <SelectItem value="design">تصميم / رسم فني</SelectItem>
                                         <SelectItem value="meeting">اجتماع مع العميل</SelectItem>
                                         <SelectItem value="general">متابعة عامة</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="grid gap-2">
-                                <Label className="font-black text-gray-700 pr-1">موعد التسليم</Label>
-                                <DateInput value={dueDate} onChange={setDueDate} className="h-11 rounded-xl" />
+                                <Label className="font-black text-gray-700 pr-1">موعد التسليم (Dead-line)</Label>
+                                <DateInput value={dueDate} onChange={setDueDate} className="h-11 rounded-xl border-2" />
                             </div>
                         </div>
 
                         <div className="grid gap-3">
                             <Label className="font-black text-gray-700 pr-1 flex items-center gap-2">
-                                <Users className="h-4 w-4 text-primary" /> إشراك الزملاء في المهمة
+                                <Users className="h-4 w-4 text-primary" /> مشاركة المهمة مع زميل (اختياري)
                             </Label>
                             <MultiSelect 
                                 options={userOptions} 
                                 selected={assignedUserIds} 
                                 onChange={setAssignedUserIds} 
-                                placeholder={usersLoading ? "جاري تحميل قائمة الموظفين..." : "اختر الزملاء (مهندس، سكرتير...)"} 
+                                placeholder={usersLoading ? "جاري تحميل قائمة الزملاء..." : "اختر الزملاء للمشاركة..."} 
                                 className="rounded-xl" 
                             />
-                            <p className="text-[10px] font-bold text-slate-400 pr-1 italic">سيتم إخطارهم فوراً وتظهر المهمة في شاشاتهم.</p>
+                            <p className="text-[9px] font-bold text-slate-400 pr-1 italic">سيصلهم تنبيه فوري وتظهر المهمة في شاشاتهم آلياً.</p>
                         </div>
                     </div>
 
@@ -222,7 +229,7 @@ export function UniversalActionTrigger({ title, sourceModule, sourceId, sourceSu
                         <Button type="button" variant="outline" onClick={() => setIsTaskDialogOpen(false)} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
                         <Button onClick={handleCreateTask} disabled={isSaving} className="flex-1 h-12 rounded-xl font-black text-lg shadow-xl shadow-primary/30 gap-2 bg-primary text-white border-none">
                             {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Send className="h-5 w-5 rotate-180" />}
-                            اعتماد وجدولة المهمة
+                            اعتماد المهمة ونشرها
                         </Button>
                     </DialogFooter>
                 </DialogContent>

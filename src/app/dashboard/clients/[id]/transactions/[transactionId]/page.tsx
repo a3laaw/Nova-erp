@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -61,6 +62,7 @@ import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
 
 const stageStatusColors: Record<string, string> = {
   pending: 'bg-slate-100 text-slate-800 border-slate-200',
@@ -279,7 +281,16 @@ export default function TransactionDetailPage() {
             <CardHeader className="bg-primary/5 pb-8 px-10 border-b">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="text-right space-y-2">
-                        <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
+                        <div className="flex items-center gap-3">
+                            <CardTitle className='text-3xl font-black text-[#1e1b4b] tracking-tighter'>{transaction.transactionType}</CardTitle>
+                            {!isLocked && (
+                                <UniversalActionTrigger 
+                                    title={transaction.transactionType}
+                                    sourceModule="المعاملات"
+                                    sourceId={transaction.id!}
+                                />
+                            )}
+                        </div>
                         <CardDescription className="text-base font-medium">العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline font-bold'>{client?.nameAr || '...'}</Link></CardDescription>
                     </div>
                     <Badge variant="outline" className="px-6 py-1.5 rounded-full font-black text-sm border-2">{statusTranslations[transaction.status]}</Badge>
