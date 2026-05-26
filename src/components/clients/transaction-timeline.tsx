@@ -3,13 +3,13 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { useFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore'; 
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore'; 
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { MentionTextarea } from '@/components/ui/mention-textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Send, Loader2, Lock } from 'lucide-react';
+import { Send, Loader2, Lock, MessageSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -105,7 +105,6 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
 
     addDoc(collection(firestore, finalPath), commentData)
         .then(async () => {
-            // 🔍 محرك المنشن السيادي 🔍
             const mentionedUsernames = extractMentions(commentText);
             if (mentionedUsernames.length > 0) {
                 const usersPath = getTenantPath('users', tenantId);
@@ -158,12 +157,12 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
               <AvatarFallback className="bg-primary/10 text-primary font-black">{currentUser?.fullName?.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-1 space-y-4">
-              <Textarea
+              <MentionTextarea
                 placeholder="اكتب ملاحظاتك... استخدم @ لمنشن الزملاء"
                 value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
+                onValueChange={setNewComment}
                 rows={4}
-                className="border-none shadow-none focus-visible:ring-0 text-xl leading-relaxed font-black placeholder:italic bg-transparent p-4 text-slate-900 min-h-[140px]"
+                className="border-none shadow-none focus-visible:ring-0 text-xl leading-relaxed font-black placeholder:italic bg-transparent p-4 text-black min-h-[140px]"
               />
               <div className="flex justify-end">
                 <Button 
@@ -214,7 +213,7 @@ export function TransactionTimeline({ clientId, transactionId, filterType, showI
                             <p className="font-black text-sm text-[#1e1b4b]">{event.userName}</p>
                             <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">{formatDate(event.createdAt)}</p>
                         </div>
-                        <p className="text-lg font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{event.content}</p>
+                        <p className="text-lg font-bold text-[#000000] leading-relaxed whitespace-pre-wrap">{event.content}</p>
                     </div>
                 </div>
             ))}

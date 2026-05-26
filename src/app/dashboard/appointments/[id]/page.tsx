@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -43,7 +42,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { formatCurrency, getTenantPath, cleanFirestoreData, cn } from '@/lib/utils';
-import { Textarea } from '@/components/ui/textarea';
+import { MentionTextarea } from '@/components/ui/mention-textarea';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
@@ -229,7 +228,7 @@ export default function AppointmentDetailsPage() {
                                 {appointment.clientId && (
                                     <UniversalActionTrigger 
                                         title={appointment.clientName}
-                                        clientId={appointment.clientId} // 🛡️ تمرير المعرف
+                                        clientId={appointment.clientId} 
                                         sourceModule="المواعيد"
                                         sourceId={appointment.id!}
                                     />
@@ -352,11 +351,11 @@ export default function AppointmentDetailsPage() {
                                                                     <Zap className="h-2.5 w-2.5 fill-primary" /> {activeAction.type === 'complete' ? '+10 XP Points' : '+2 XP Points'}
                                                                 </Badge>
                                                             </div>
-                                                            <Textarea 
+                                                            <MentionTextarea 
                                                                 autoFocus
                                                                 value={actionNote} 
-                                                                onChange={e => setActionNote(e.target.value)} 
-                                                                placeholder="اشرح ما تم إنجازه اليوم لتمكين الحفظ..." 
+                                                                onValueChange={setActionNote} 
+                                                                placeholder="اشرح ما تم إنجازه اليوم لتمكين الحفظ... استخدم @ للمنشن" 
                                                                 className="rounded-[2.5rem] border-none bg-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)] p-8 font-medium text-xl leading-relaxed min-h-[160px] focus-visible:ring-2 focus-visible:ring-primary/20"
                                                             />
                                                         </div>

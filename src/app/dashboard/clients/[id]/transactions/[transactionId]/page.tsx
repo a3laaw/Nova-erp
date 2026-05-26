@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -53,6 +52,7 @@ import type { Client, ClientTransaction, TransactionStage, Holiday, UserProfile 
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
+import { MentionTextarea } from '@/components/ui/mention-textarea';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { cn, getTenantPath, cleanFirestoreData, formatCurrency } from '@/lib/utils';
@@ -60,7 +60,6 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
 import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
-import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
 
@@ -231,7 +230,7 @@ export default function TransactionDetailPage() {
                             {!isLocked && (
                                 <UniversalActionTrigger 
                                     title={transaction.transactionType}
-                                    clientId={clientId} // 🛡️ تمرير معرف العميل
+                                    clientId={clientId} 
                                     sourceModule="المعاملات"
                                     sourceId={transaction.id!}
                                 />
@@ -337,11 +336,11 @@ export default function TransactionDetailPage() {
                                                         <Zap className="h-2.5 w-2.5 fill-primary" /> {activeAction.type === 'complete' ? '+10 XP Points' : '+2 XP Points'}
                                                     </Badge>
                                                 </div>
-                                                <Textarea 
+                                                <MentionTextarea 
                                                     autoFocus
                                                     value={actionNote} 
-                                                    onChange={e => setActionNote(e.target.value)} 
-                                                    placeholder="اشرح بالتفصيل ما تم إنجازه أو مبررات التعديل الفني..." 
+                                                    onValueChange={setActionNote} 
+                                                    placeholder="اشرح بالتفصيل ما تم إنجازه أو مبررات التعديل الفني... استخدم @ للمنشن" 
                                                     className="rounded-[2.5rem] border-none bg-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)] p-8 font-medium text-xl leading-relaxed min-h-[160px] focus-visible:ring-2 focus-visible:ring-primary/20"
                                                 />
                                             </div>
