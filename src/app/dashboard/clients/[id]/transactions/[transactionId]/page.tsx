@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -84,6 +83,10 @@ const statusTranslations: Record<string, string> = {
     cancelled: 'ملغي/مفسوخ',
 };
 
+/**
+ * تفاصيل المعاملة (Transaction Details V135.0):
+ * تم تحديث محرك الاستحقاق الآلي لتوثيق المراحل "المدفوعة مسبقاً" في سجل العميل.
+ */
 export default function TransactionDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -192,66 +195,84 @@ export default function TransactionDetailPage() {
                     }
                 }
 
-                // 🛡️ المزامنة المالية السيادية (Sovereign Auto-Chain V131.0) 🛡️
+                // 🛡️ المزامنة المالية السيادية (Sovereign Auto-Chain V135.0) 🛡️
                 const contract = transaction.contract;
                 if (contract?.clauses) {
                     const clauseIndex = contract.clauses.findIndex((c: any) => c.condition === stage.name);
-                    if (clauseIndex !== -1 && contract.clauses[clauseIndex].status === 'غير مستحقة') {
-                        const updatedClauses = [...contract.clauses];
-                        updatedClauses[clauseIndex].status = 'مستحقة';
-                        batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
+                    if (clauseIndex !== -1) {
+                        const targetClause = contract.clauses[clauseIndex];
+                        const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
 
-                        // أ. توليد مسودة مستخلص
-                        const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
-                        const finalAppAmount = updatedClauses[clauseIndex].amount;
-                        batch.set(appRef, cleanFirestoreData({
-                            applicationNumber: `APP-AUTO-${now.getTime().toString().substring(7)}`,
-                            date: serverTimestamp(),
-                            projectId: transaction.id,
-                            clientId: transaction.clientId,
-                            clientName: client?.nameAr,
-                            projectName: transaction.transactionType,
-                            totalAmount: finalAppAmount,
-                            status: 'draft',
-                            createdAt: serverTimestamp(),
-                            createdBy: 'system-auto-chain',
-                            companyId: tenantId
-                        }));
+                        if (targetClause.status === 'غير مستحقة') {
+                            const updatedClauses = [...contract.clauses];
+                            updatedClauses[clauseIndex].status = 'مستحقة';
+                            batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
 
-                        // ب. توليد مسودة قيد مالي (المديونية)
-                        const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
-                        const revenueAccSnap = await getDocs(query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1)));
-                        const clientAccSnap = await getDocs(query(collection(firestore, coaPath), where('name', '==', client?.nameAr), where('parentCode', '==', '1102'), limit(1)));
-
-                        if (!revenueAccSnap.empty && !clientAccSnap.empty) {
-                            const newJeRef = doc(collection(firestore, getTenantPath('journalEntries', tenantId)!));
-                            batch.set(newJeRef, cleanFirestoreData({
-                                entryNumber: `JE-AUTO-${now.getTime().toString().substring(8)}`,
+                            // أ. توليد مسودة مستخلص
+                            const appRef = doc(collection(firestore, getTenantPath('payment_applications', tenantId)!));
+                            const finalAppAmount = updatedClauses[clauseIndex].amount;
+                            batch.set(appRef, cleanFirestoreData({
+                                applicationNumber: `APP-AUTO-${now.getTime().toString().substring(7)}`,
                                 date: serverTimestamp(),
-                                narration: `[استحقاق آلي] إنجاز مرحلة "${stage.name}" - معاملة #${transaction.transactionNumber}`,
-                                status: 'draft',
-                                totalDebit: finalAppAmount,
-                                totalCredit: finalAppAmount,
-                                lines: [
-                                    { accountId: clientAccSnap.docs[0].id, accountName: client?.nameAr, debit: finalAppAmount, credit: 0, auto_profit_center: transaction.id },
-                                    { accountId: revenueAccSnap.docs[0].id, accountName: 'إيرادات عقود', debit: 0, credit: finalAppAmount, auto_profit_center: transaction.id }
-                                ],
+                                projectId: transaction.id,
                                 clientId: transaction.clientId,
-                                transactionId: transaction.id,
+                                clientName: client?.nameAr,
+                                projectName: transaction.transactionType,
+                                totalAmount: finalAppAmount,
+                                currentMilestone: stage.name, // ✨ إضافة اسم المرحلة للمستخلص ✨
+                                status: 'draft',
                                 createdAt: serverTimestamp(),
+                                createdBy: 'system-auto-chain',
                                 companyId: tenantId
                             }));
+
+                            // ب. توليد مسودة قيد مالي (المديونية)
+                            const coaPath = getTenantPath('chartOfAccounts', tenantId)!;
+                            const revenueAccSnap = await getDocs(query(collection(firestore, coaPath), where('code', '==', '4101'), limit(1)));
+                            const clientAccSnap = await getDocs(query(collection(firestore, coaPath), where('name', '==', client?.nameAr), where('parentCode', '==', '1102'), limit(1)));
+
+                            if (!revenueAccSnap.empty && !clientAccSnap.empty) {
+                                const newJeRef = doc(collection(firestore, getTenantPath('journalEntries', tenantId)!));
+                                batch.set(newJeRef, cleanFirestoreData({
+                                    entryNumber: `JE-AUTO-${now.getTime().toString().substring(8)}`,
+                                    date: serverTimestamp(),
+                                    narration: `[استحقاق آلي] إنجاز مرحلة "${stage.name}" - معاملة #${transaction.transactionNumber}`,
+                                    status: 'draft',
+                                    totalDebit: finalAppAmount,
+                                    totalCredit: finalAppAmount,
+                                    lines: [
+                                        { accountId: clientAccSnap.docs[0].id, accountName: client?.nameAr, debit: finalAppAmount, credit: 0, auto_profit_center: transaction.id },
+                                        { accountId: revenueAccSnap.docs[0].id, accountName: 'إيرادات عقود', debit: 0, credit: finalAppAmount, auto_profit_center: transaction.id }
+                                    ],
+                                    clientId: transaction.clientId,
+                                    transactionId: transaction.id,
+                                    createdAt: serverTimestamp(),
+                                    companyId: tenantId
+                                }));
+                            }
+                            logLabel += ' (وتم تفعيل المطالبة المالية)';
+                        } 
+                        else if (targetClause.status === 'مدفوعة') {
+                            // ✨ توثيق مالي للمراحل المدفوعة مسبقاً (The Pre-paid Financial Handshake) ✨
+                            batch.set(timelineRef, {
+                                type: 'comment',
+                                content: `**[إشعار مالي: استحقاق مدفوع مسبقاً]**\nتم إنجاز مرحلة **"${stage.name}"**.\nتبين في السجلات المالية أن قيمة هذه المرحلة قد تمت تسويتها مسبقاً من واقع التحصيلات السابقة لهذا المشروع.`,
+                                userId: currentUser.id,
+                                userName: currentUser.fullName,
+                                userAvatar: currentUser.avatarUrl,
+                                createdAt: serverTimestamp(),
+                                companyId: tenantId
+                            });
+                            logLabel += ' (مستحق مدفوع مسبقاً)';
                         }
-                        
-                        logLabel += ' (وتم تفعيل المطالبة المالية)';
                     }
                 }
             }
 
             batch.update(doc(firestore, transactionPath), cleanFirestoreData({ stages: currentStages, updatedAt: serverTimestamp() }));
             
-            const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
-            batch.set(timelineRef, {
+            const mainTimelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
+            batch.set(mainTimelineRef, {
                 type: 'comment',
                 content: `**[إجراء فني: ${logLabel}]** في مرحلة: ${stage.name}.\nالملاحظات: ${actionNote}`,
                 userId: currentUser.id,
@@ -426,7 +447,7 @@ export default function TransactionDetailPage() {
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-center pr-1">
                                                     <Label className="font-black text-xs text-primary flex items-center gap-2 uppercase tracking-[0.2em]">
-                                                        <MessageSquare className="h-4 w-4" /> محضر الأعمال والتوثيق (إلزامي) *
+                                                        <MessageSquare className="h-4 w-4 text-primary" /> محضر الأعمال والتوثيق (إلزامي) *
                                                     </Label>
                                                     <Badge className="bg-primary/10 text-primary border-none text-[8px] font-black uppercase flex items-center gap-1">
                                                         <Zap className="h-2.5 w-2.5 fill-primary" /> {activeAction.type === 'complete' ? '+10 XP Points' : '+2 XP Points'}

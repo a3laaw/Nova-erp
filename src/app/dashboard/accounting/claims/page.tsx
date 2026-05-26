@@ -18,7 +18,8 @@ import {
     Landmark,
     Sparkles,
     Wallet,
-    Eye
+    Eye,
+    Target
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -40,9 +41,7 @@ import {
 
 /**
  * شاشة المطالبات المالية والتحصيل (Claims & Collection Control Center):
- * - تجميع كافة المستخلصات المعتمدة بانتظار التحصيل.
- * - رصد أعمار الديون والتقادم الزمني.
- * - إحصائيات التدفق النقدي من واقع المطالبات.
+ * - تم توضيح "بند الاستحقاق" لكل مطالبة لضمان الوضوح المطلق للمحاسب.
  */
 export default function FinancialClaimsPage() {
     const { firestore } = useFirebase();
@@ -102,7 +101,6 @@ export default function FinancialClaimsPage() {
 
     return (
         <div className="space-y-10" dir="rtl">
-            {/* 🛡️ الهيدر المحدث بالهوية البرتقالية 🛡️ */}
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                 <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                 <CardHeader className="pb-10 pt-10 px-10 relative z-10">
@@ -182,21 +180,25 @@ export default function FinancialClaimsPage() {
                                 <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-bold italic text-xl">لا توجد مطالبات نشطة.</TableCell></TableRow>
                             ) : (
                                 filteredClaims.map(claim => (
-                                    <TableRow key={claim.id} className={cn("h-20 hover:bg-[#F3E8FF]/20 group transition-colors", claim.isCritical && "bg-red-50/30")}>
+                                    <TableRow key={claim.id} className={cn("h-24 hover:bg-[#F3E8FF]/20 group transition-colors", claim.isCritical && "bg-red-50/30")}>
                                         <TableCell className="px-10 font-mono font-black text-primary">
                                             <Link href={`/dashboard/construction/payment-applications/${claim.id}`} className="hover:underline">
                                                 {claim.applicationNumber}
                                             </Link>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="font-black text-slate-900">{claim.clientName}</span>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-black text-slate-900 text-lg leading-none">{claim.clientName}</span>
                                                 <span className="text-[10px] font-bold text-muted-foreground uppercase">{claim.projectName}</span>
+                                                {/* ✨ توضيح موضوع المطالبة (بند الاستحقاق) ✨ */}
+                                                <Badge variant="outline" className="w-fit bg-primary/5 text-primary border-primary/20 text-[9px] font-black h-5 gap-1">
+                                                    <Target className="h-2 w-2"/> بند: {claim.currentMilestone || '---'}
+                                                </Badge>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-left font-mono font-bold text-slate-400">{formatCurrency(claim.totalAmount)}</TableCell>
                                         <TableCell className="text-left font-mono font-black text-2xl text-green-700 bg-green-50/20 border-r border-green-100">
-                                            {claim.remaining > 0 ? formatCurrency(claim.remaining) : <Badge className="bg-green-600 text-white">مسدد</Badge>}
+                                            {claim.remaining > 0 ? formatCurrency(claim.remaining) : <Badge className="bg-green-600 text-white font-black px-4">تم السداد</Badge>}
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Badge variant="outline" className={cn(
@@ -211,7 +213,7 @@ export default function FinancialClaimsPage() {
                                         <TableCell className="text-center">
                                             {claim.remaining > 0 ? (
                                                 <Button asChild variant="outline" className="h-10 rounded-xl font-black gap-2 border-primary/20 text-primary hover:bg-primary hover:text-white transition-all shadow-sm">
-                                                    <Link href={`/dashboard/accounting/cash-receipts/new?clientId=${claim.clientId}&projectId=${claim.projectId}&amount=${claim.remaining}&description=${encodeURIComponent(`سداد مستخلص #${claim.applicationNumber}`)}`}>
+                                                    <Link href={`/dashboard/accounting/cash-receipts/new?clientId=${claim.clientId}&projectId=${claim.projectId}&amount=${claim.remaining}&description=${encodeURIComponent(`سداد مستخلص #${claim.applicationNumber} - عن ${claim.currentMilestone}`)}`}>
                                                         <ArrowDownLeft className="h-4 w-4" /> تحصيل السداد
                                                     </Link>
                                                 </Button>
