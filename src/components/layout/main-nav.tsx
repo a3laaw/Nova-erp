@@ -131,13 +131,13 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
       children: [
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'الحسابات', icon: ListTree },
-        { href: '/dashboard/accounting/journal-entries', label: 'حركات الحساب', icon: BookOpen },
-        { href: '/dashboard/accounting/claims', label: 'التحصيل', icon: Coins },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'دليل الحسابات', icon: ListTree },
+        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
+        { href: '/dashboard/accounting/claims', label: 'المطالبات والتحصيل', icon: Coins },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-        { href: '/dashboard/accounting/reconciliation', label: 'مطابقة البنك', icon: RotateCcw },
-        { href: '/dashboard/accounting/reports', label: 'الأرباح', icon: PieChart },
+        { href: '/dashboard/accounting/reconciliation', label: 'التسوية البنكية', icon: RotateCcw },
+        { href: '/dashboard/accounting/reports', label: 'التقارير والقوائم المالية', icon: PieChart },
       ]
     },
     { 
