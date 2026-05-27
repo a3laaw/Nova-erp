@@ -36,106 +36,101 @@ import {
 } from '@/components/ui/tooltip';
 import {
   LayoutGrid,
-  FileSignature,
-  Landmark,
-  PencilRuler,
-  Settings2,
-  UsersRound,
+  Users,
   Search,
-  ListTree,
+  FileSignature,
+  Construction,
+  MapPin,
+  Wallet,
   BookOpen,
   ArrowDownLeft,
   ArrowUpRight,
-  PieChart,
-  Clock,
-  Banknote,
-  ClipboardList,
+  ChevronDown,
+  Layers,
+  UserX,
+  Zap,
+  ChevronLeft,
   Briefcase,
-  MapPin,
-  Palette,
-  Network,
-  UserCheck,
-  RotateCcw,
-  Waves,
-  Lock,
+  PieChart,
+  ListTree,
+  Clock,
+  Settings2,
+  Building2,
+  ShieldCheck,
   Calculator,
   Coins,
-  ChevronLeft,
-  ChevronDown,
-  Sparkles,
-  GripVertical
+  Waves,
+  UserCheck,
+  Banknote,
+  Lock,
+  Network,
+  Palette
 } from 'lucide-react';
-import { cn, getTenantPath } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
-import { useFirebase, useDocument } from '@/firebase';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 const navItems = {
   ar: [
-    { id: 'dashboard', href: '/dashboard', label: 'الرئيسية', icon: LayoutGrid },
+    { id: 'dashboard', href: '/dashboard', label: 'لوحة التحكم المركزية', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
       id: 'clients',
-      label: 'إدارة العملاء',
-      icon: UsersRound,
+      label: 'علاقات العملاء (CRM)', 
+      icon: Users, 
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard/clients',
       children: [
-        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
-        { href: '/dashboard/clients?view=prospective', label: 'المحتملون', icon: Search },
+        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
+        { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
       ]
     },
     { 
-      id: 'contracts',
-      label: 'المبيعات والعقود',
-      icon: FileSignature,
-      hrefPrefix: '/dashboard/contracts',
-      children: [
-        { id: 'quotations', href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: Calculator },
-        { id: 'contracts', href: '/dashboard/contracts', label: 'العقود المبرمة', icon: FileSignature },
-      ]
-    },
-    { 
-      id: 'tech_workflow',
-      label: 'المقاولات والميدان',
-      icon: PencilRuler,
+      id: 'construction',
+      label: 'المقاولات والقياسات',
+      icon: Construction,
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
       hrefPrefix: '/dashboard/construction',
       children: [
-        { id: 'tech_workflow', href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
-        { id: 'site_visits', href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
-        { id: 'wbs_mgmt', href: '/dashboard/construction/boq', label: 'جداول الكميات', icon: ClipboardList },
-        { id: 'payment_apps', href: '/dashboard/construction/payment-applications', label: 'المستخلصات', icon: Coins },
+        { href: '/dashboard/contracts', label: 'عروض الأسعار والعقود', icon: FileSignature },
+        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
+        { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
+        { href: '/dashboard/construction/boq', label: 'جداول الكميات (BOQ)', icon: ListTree },
+        { href: '/dashboard/construction/payment-applications', label: 'المستخلصات المالية', icon: Coins },
       ]
     },
     { 
-      id: 'vouchers',
-      label: 'المالية والحسابات', 
-      icon: Landmark, 
+      id: 'accounting',
+      label: 'المطالبات المالية', 
+      icon: Wallet, 
+      roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
       children: [
-        { id: 'coa', href: '/dashboard/accounting/chart-of-accounts', label: 'دليل الحسابات', icon: ListTree },
-        { id: 'journal_entries', href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية', icon: BookOpen },
-        { id: 'vouchers', href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
-        { id: 'vouchers', href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-        { id: 'financial_reports', href: '/dashboard/accounting/reports', label: 'التقارير المالية', icon: PieChart },
-        { id: 'liquidity_radar', href: '/dashboard/accounting/financial-forecast', label: 'رادار السيولة', icon: Waves },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Layers },
+        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
+        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
+        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
+        { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: PieChart },
       ]
     },
     { 
-      id: 'hr_employees',
+      id: 'hr',
       label: 'الموارد البشرية', 
       icon: UserCheck, 
+      roles: ['Developer', 'Admin', 'HR'],
       hrefPrefix: '/dashboard/hr',
       children: [
-        { id: 'hr_employees', href: '/dashboard/hr/employees', label: 'بيانات الموظفين', icon: UserCheck },
-        { id: 'payroll_leaves', href: '/dashboard/hr/payroll', label: 'الرواتب والإجازات', icon: Banknote },
-        { id: 'tasks_scheduling', href: '/dashboard/hr/permissions', label: 'الاستئذانات', icon: Clock },
+        { href: '/dashboard/hr/employees', label: 'بيانات الموظفين', icon: UserCheck },
+        { href: '/dashboard/hr/payroll', label: 'الرواتب والإجازات', icon: Banknote },
+        { href: '/dashboard/hr/permissions', label: 'الاستئذانات', icon: Clock },
       ]
     },
     { 
       id: 'settings',
       label: 'إعدادات النظام', 
       icon: Settings2, 
+      roles: ['Developer', 'Admin'],
       hrefPrefix: '/dashboard/settings',
       children: [
         { href: '/dashboard/settings/permissions', label: 'مصفوفة الصلاحيات', icon: Lock },
@@ -147,83 +142,78 @@ const navItems = {
   ],
 };
 
-function NavItem({ item, userRole, currentPath, matrix, state }: { item: any, userRole: string, currentPath: string, matrix: any, state: string }) {
+function NavItem({ item, userRole, currentPath, state }: { item: any, userRole: string, currentPath: string, state: string }) {
   const { setOpenMobile } = useSidebar();
   const Icon = item.icon;
 
-  const hasAccess = useMemo(() => {
-    if (userRole === 'Developer' || userRole === 'Admin') return true;
-    const permission = matrix[`${userRole}-${item.id}`];
-    return permission && permission !== 'none';
-  }, [userRole, item.id, matrix]);
+  if (item.roles && !item.roles.includes(userRole)) return null;
 
-  if (!hasAccess) return null;
+  const isActive = item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : (item.href ? currentPath === item.href : false);
 
-  const isAnyChildActive = useMemo(() => {
-    if (!item.children) return false;
-    return item.children.some((child: any) => {
-        const baseUrl = child.href.split('?')[0];
-        return currentPath.startsWith(baseUrl);
-    });
-  }, [item.children, currentPath]);
-
-  const isActive = item.href ? currentPath === item.href : (item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : isAnyChildActive);
-
-  // 🛡️ المظهر السيادي المحدث (تدرج ذهبي برتقالي)
-  const activeClass = "bg-gradient-to-r from-[#FFB000] to-[#e87c24] text-white shadow-xl scale-[1.02] border-none";
+  // 🛡️ الهوية البصرية الموحدة (البرتقالي الذهبي السيادي) 🛡️
+  const orangeGradientClass = "bg-gradient-to-r from-[#FFB000] to-[#e87c24] text-white shadow-xl border-none scale-[1.02]";
   const inactiveClass = "text-[#1e1b4b] hover:bg-orange-50 hover:text-[#e87c24]";
 
-  // --- الحالة 1: الشريط مغلق (Collapsed) مع تلميحات وقوائم طافية ---
+  // --- الحالة 1: الشريط مغلق (Collapsed) ---
   if (state === "collapsed") {
     return (
       <SidebarMenuItem className="flex justify-center py-1">
         <TooltipProvider delayDuration={0}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {item.children ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={cn(
-                      "size-12 rounded-2xl transition-all duration-500",
-                      isActive ? activeClass : inactiveClass
-                    )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {item.children ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className={cn(
+                        "size-12 rounded-2xl transition-all duration-500",
+                        orangeGradientClass
+                      )}
+                    >
+                      <Icon className="size-6 text-white" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent 
+                    side="left" 
+                    align="start" 
+                    dir="rtl" 
+                    className="w-64 rounded-[2rem] p-2 shadow-2xl border-2 border-primary/10 bg-white/95 backdrop-blur-xl z-[999999]"
                   >
-                    <Icon className="size-6" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-[2rem] p-2 shadow-2xl border-2 border-primary/10 bg-white/95 backdrop-blur-xl z-[999999]">
-                  <DropdownMenuLabel className="font-black text-primary px-5 py-4 text-sm border-b-2 border-primary/5 mb-2">{item.label}</DropdownMenuLabel>
-                  {item.children.map((child: any) => (
-                    <DropdownMenuItem key={child.href} asChild className="rounded-xl py-3 px-4 focus:bg-primary/5 cursor-pointer">
-                      <Link href={child.href} className="flex items-center justify-between w-full">
-                        <span className="font-black text-[#000000] text-sm">{child.label}</span>
-                        {child.icon && <child.icon className="h-4 w-4 text-primary opacity-40" />}
-                      </Link>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button 
-                asChild 
-                variant="ghost" 
-                size="icon" 
-                className={cn(
-                  "size-12 rounded-2xl transition-all duration-500",
-                  isActive ? activeClass : inactiveClass
-                )}
-              >
-                <Link href={item.href}>
-                  <Icon className="size-6" />
-                </Link>
-              </Button>
-            )}
-          </TooltipTrigger>
-          <TooltipContent side="left" className="font-black text-xs bg-slate-900 text-white rounded-lg px-3 py-1.5 z-[999999]">{item.label}</TooltipContent>
-        </Tooltip>
+                    <DropdownMenuLabel className="font-black text-primary px-5 py-4 text-sm border-b-2 border-primary/5 mb-2 uppercase tracking-widest">
+                      {item.label}
+                    </DropdownMenuLabel>
+                    {item.children.map((child: any) => (
+                      <DropdownMenuItem key={child.href} asChild className="rounded-xl py-3 px-4 focus:bg-primary/5 cursor-pointer">
+                        <Link href={child.href} className="flex items-center justify-between w-full">
+                          <span className="font-black text-[#000000] text-sm">{child.label}</span>
+                          {child.icon && <child.icon className="h-4 w-4 text-primary opacity-40" />}
+                        </Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button 
+                  asChild 
+                  variant="ghost" 
+                  size="icon" 
+                  className={cn(
+                    "size-12 rounded-2xl transition-all duration-500",
+                    orangeGradientClass
+                  )}
+                >
+                  <Link href={item.href}>
+                    <Icon className="size-6 text-white" />
+                  </Link>
+                </Button>
+              )}
+            </TooltipTrigger>
+            <TooltipContent side="left" className="font-black text-xs bg-slate-900 text-white rounded-lg px-3 py-1.5 z-[999999]">
+              {item.label}
+            </TooltipContent>
+          </Tooltip>
         </TooltipProvider>
       </SidebarMenuItem>
     );
@@ -237,8 +227,8 @@ function NavItem({ item, userRole, currentPath, matrix, state }: { item: any, us
           isActive={isActive} 
           asChild 
           className={cn(
-            "nav-item-box my-1.5 h-14 transition-all duration-500",
-            isActive ? activeClass : "text-[#1e1b4b] hover:bg-orange-50/50"
+            "my-1.5 h-14 transition-all duration-500",
+            isActive ? orangeGradientClass : inactiveClass
           )}
         >
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full h-full px-4">
@@ -258,8 +248,8 @@ function NavItem({ item, userRole, currentPath, matrix, state }: { item: any, us
             <SidebarMenuButton 
               isActive={isActive} 
               className={cn(
-                "nav-item-box my-1.5 h-14 transition-all duration-500",
-                isActive ? activeClass : "text-[#1e1b4b] hover:bg-orange-50/50"
+                "my-1.5 h-14 transition-all duration-500",
+                isActive ? orangeGradientClass : inactiveClass
               )}
             >
               <div className="flex items-center justify-between w-full h-full px-4">
@@ -270,7 +260,7 @@ function NavItem({ item, userRole, currentPath, matrix, state }: { item: any, us
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className="mt-1 mb-2 space-y-1.5 sidebar-no-offset">
+            <SidebarMenuSub className="mt-1 mb-2 space-y-1.5 border-none">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href.split('?')[0];
                 return (
@@ -292,21 +282,15 @@ function NavItem({ item, userRole, currentPath, matrix, state }: { item: any, us
       </Collapsible>
     );
   }
+
   return null;
 }
 
 export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLogout: () => void }) {
   const pathname = usePathname();
   const { language } = useLanguage();
-  const { firestore } = useFirebase();
   const { state } = useSidebar();
-  const tenantId = currentUser?.currentCompanyId;
-
-  // جلب مصفوفة الصلاحيات
-  const matrixPath = useMemo(() => tenantId ? `companies/${tenantId}/settings/permissions_matrix` : null, [tenantId]);
-  const { data: matrixDoc } = useDocument<any>(firestore, matrixPath);
-  const matrix = matrixDoc?.data || {};
-
+  
   const currentNavItems = (navItems as any)[language] || navItems.ar;
 
   return (
@@ -326,11 +310,10 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
         <SidebarMenu className="gap-1">
           {currentNavItems.map((item: any, index: number) => (
             <NavItem 
-                key={`${item.id}-${index}`} 
+                key={`${item.id || item.label}-${index}`} 
                 item={item} 
                 userRole={currentUser.role} 
                 currentPath={pathname}
-                matrix={matrix}
                 state={state}
             />
           ))}
