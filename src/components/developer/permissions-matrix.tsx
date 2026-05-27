@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -30,7 +29,8 @@ import {
     Sparkles,
     Eye,
     Zap,
-    Waves
+    Waves,
+    UserCheck
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -40,10 +40,17 @@ import { cn, getTenantPath } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from '@/components/ui/select';
 
 /**
- * مصفوفة الصلاحيات السيادية (The Ultimate Sovereign Matrix V145.0):
- * - مطابقة تامة للجدول المقترح من المهندس.
+ * مصفوفة الصلاحيات السيادية (The Ultimate Sovereign Matrix V147.0):
+ * - تم إصلاح أخطاء الاستيراد (Select Components).
  * - ربط ديناميكي بكافة المهن المضافة في المنظومة.
  * - دعم مستويات النفاذ (كامل، عرض، جزئي، مخفي).
  */
@@ -68,8 +75,6 @@ const MODULES = [
     { id: 'payroll_leaves', name: 'الرواتب والإجازات', icon: Banknote },
     { id: 'settings', name: 'إعدادات النظام + الأدوار', icon: Settings2 },
 ];
-
-import { UserCheck } from 'lucide-react';
 
 export function PermissionsMatrix() {
     const { firestore } = useFirebase();
@@ -139,7 +144,7 @@ export function PermissionsMatrix() {
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-indigo-600 rounded-3xl border border-white/20 shadow-xl"><Lock className="h-8 w-8" /></div>
                         <div className="text-right">
-                            <CardTitle className="text-3xl font-black">مصفوفة الرتب والصلاحيات السيادية</CardTitle>
+                            <CardTitle className="text-3xl font-black text-white">مصفوفة الرتب والصلاحيات السيادية</CardTitle>
                             <CardDescription className="text-indigo-200 font-bold opacity-70">تحكم كامل في نفاذ الموظفين والمديرين لكافة أجزاء المنظومة.</CardDescription>
                         </div>
                     </div>
