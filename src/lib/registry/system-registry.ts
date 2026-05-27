@@ -4,13 +4,13 @@ import {
     BarChart3, Activity, Zap, Clock, Coins, 
     History, MapPin, ClipboardList, Briefcase,
     PieChart, BookOpen, ArrowDownLeft, ArrowUpRight,
-    Waves, UserCheck, Banknote, ListTree, Settings2
+    Waves, UserCheck, Banknote, ListTree, Settings2,
+    ListChecks, Sparkles
 } from 'lucide-react';
 
 /**
  * 👑 سجل النظام الموحد (NOVA_SYSTEM_REGISTRY V150.0) 👑
  * المصدر الوحيد للحقيقة للصلاحيات وهياكل الداشبورد.
- * تم دمج موديولات المبيعات والعقود والمقاولات في مصفوفة موحدة.
  */
 
 export interface DashboardComponent {

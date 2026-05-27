@@ -1,16 +1,13 @@
 'use client';
 
+import { NOVA_SYSTEM_REGISTRY, type SystemRoleConfig } from './system-registry';
+import type { AuthenticatedUser } from '@/context/auth-context';
+
 /**
  * @fileOverview مهايئ النفاذ السيادي (NovaAccessAdapter V150.0).
  * يقوم بترجمة المسمى الوظيفي الفعلي إلى رتبة نظام لضمان مرونة التقسيم الإداري.
  */
 
-import { NOVA_SYSTEM_REGISTRY, type SystemRoleConfig } from './system-registry';
-import type { AuthenticatedUser } from '@/context/auth-context';
-
-/**
- * خرائط المواءمة للمهن (Profession-to-Rank Mapping)
- */
 const PROFESSION_RANK_MAP: Record<string, string> = {
     'مدير عام': 'owner_executive',
     'مدير مشاريع': 'owner_executive',
@@ -33,7 +30,7 @@ export class NovaAccessAdapter {
         const mappedRank = jobTitle ? PROFESSION_RANK_MAP[jobTitle] : null;
         if (mappedRank) return mappedRank;
 
-        // Fallback logic based on base system role
+        // Fallback logic
         if (baseRole === 'Accountant') return 'financial_manager';
         if (baseRole === 'Engineer') return 'engineer';
         
