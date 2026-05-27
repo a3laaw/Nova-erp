@@ -237,9 +237,9 @@ export default function AppointmentDetailsPage() {
     };
 
     /**
-     * 🛡️ محرك التراجع السيادي المتسلسل (Sovereign Sequential Rollback V141.0) 🛡️
+     * 🛡️ محرك التراجع السيادي المتسلسل (Sovereign Sequential Rollback V142.0) 🛡️
      * - تم تحصينه ليقوم بالتصفير القسري لكافة المراحل اللاحقة (Forced Cascade Reset).
-     * - لا يسمح بوجود أكثر من مرحلة نشطة في آن واحد.
+     * - تم دمج "المبلغ المفسر" في التعليق التوثيقي لبيان قيمة المطالبة الملغاة.
      */
     const handleUndoStage = async (stageId: string) => {
         if (!firestore || !transaction || !transactionPath || !tenantId || isLocked) return;
@@ -273,6 +273,14 @@ export default function AppointmentDetailsPage() {
             }
 
             const stage = currentStages[stageIndex];
+            
+            // 💰 جلب مبلغ المطالبة لإدراجه في التعليق 💰
+            let cancelledAmount = 0;
+            const contract = transaction.contract;
+            if (contract?.clauses) {
+                const clause = contract.clauses.find((c: any) => c.condition === stage.name);
+                if (clause) cancelledAmount = clause.amount || 0;
+            }
 
             // 3. التراجع المالي والرقابي
             const appsPath = getTenantPath('payment_applications', tenantId);
@@ -291,7 +299,6 @@ export default function AppointmentDetailsPage() {
             });
 
             // 4. تصفير حالة الدفعة في العقد
-            const contract = transaction.contract;
             if (contract?.clauses) {
                 const updatedClauses = contract.clauses.map((c: any) => {
                     if (c.condition === stage.name) return { ...c, status: 'غير مستحقة' };
@@ -311,11 +318,11 @@ export default function AppointmentDetailsPage() {
                 batch.update(doc(firestore, apptPath!), { workStageUpdated: false, status: 'scheduled' });
             }
 
-            // 7. توثيق التراجع في التايم لاين
+            // 7. توثيق التراجع في التايم لاين مع إدراج المبلغ الفعلي
             const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
             batch.set(timelineRef, {
                 type: 'comment',
-                content: `**[تراجع تقني ومالي متسلسل وقسري]**\nتم التراجع عن إغلاق مرحلة **"${stage.name}"**.\n\n• تمت إعادة المرحلة لحالة قيد التنفيذ.\n• تم تصفير كافة المراحل اللاحقة قسرياً لضمان سلامة المسار.\n• تم إلغاء المطالبة المالية المرتبطة وتصفير استحقاق العقد.`,
+                content: `**[تراجع تقني ومالي متسلسل وقسري]**\nتم التراجع عن إغلاق مرحلة **"${stage.name}"**.\n\n• تمت إعادة المرحلة لحالة قيد التنفيذ.\n• تم تصفير كافة المراحل اللاحقة قسرياً لضمان سلامة المسار.\n• تم إلغاء المطالبة المالية المرتبطة بقيمة **${formatCurrency(cancelledAmount)}** وتصفير استحقاق العقد.`,
                 userId: currentUser?.id,
                 userName: currentUser?.fullName,
                 userAvatar: currentUser?.avatarUrl,
