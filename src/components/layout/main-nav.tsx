@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -89,22 +88,26 @@ import { useLanguage } from '@/context/language-context';
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
+/**
+ * القائمة الجانبية الموحدة (MainNav V143.0):
+ * تم تبسيط المسميات بناءً على طلب المهندس لضمان عدم قص النصوص (No Truncation).
+ */
 const navItems = {
   ar: [
     { href: '/dashboard', label: 'الرئيسية', icon: LayoutGrid },
     { 
-      label: 'العملاء والـ CRM',
+      label: 'إدارة العملاء',
       icon: UsersRound,
       hrefPrefix: '/dashboard/clients',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
-        { href: '/dashboard/clients?view=prospective', label: 'المحتملون (Leads)', icon: Search },
+        { href: '/dashboard/clients?view=prospective', label: 'المحتملون', icon: Search },
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
         { href: '/dashboard/contracts', label: 'العقود والاتفاقيات', icon: FileSignature },
       ]
     },
     { 
-      label: 'المقاولات والعمل الميداني',
+      label: 'المقاولات والميدان',
       icon: PencilRuler,
       hrefPrefix: '/dashboard/construction',
       children: [
@@ -116,7 +119,7 @@ const navItems = {
       ]
     },
     { 
-      label: 'المالية والمحاسبة', 
+      label: 'المالية والحسابات', 
       icon: Landmark, 
       hrefPrefix: '/dashboard/accounting',
       children: [
@@ -130,7 +133,7 @@ const navItems = {
       ]
     },
     { 
-      label: 'الموارد البشرية (HR)', 
+      label: 'الموارد البشرية', 
       icon: Users, 
       hrefPrefix: '/dashboard/hr',
       children: [
@@ -141,7 +144,7 @@ const navItems = {
       ]
     },
     { 
-      label: 'الإعدادات السيادية', 
+      label: 'إعدادات النظام', 
       icon: Settings2, 
       hrefPrefix: '/dashboard/settings',
       children: [
