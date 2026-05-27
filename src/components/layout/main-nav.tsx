@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -76,9 +76,9 @@ import { useLanguage } from '@/context/language-context';
 import { useFirebase, useDocument } from '@/firebase';
 
 /**
- * القائمة الجانبية الموحدة (MainNav V146.0):
+ * القائمة الجانبية الموحدة (MainNav V146.1):
+ * - تم إصلاح خطأ useMemo المفقود.
  * - ربط ذكي بمصفوفة الصلاحيات السيادية.
- * - إظهار رابط مصفوفة الصلاحيات للمديرين.
  */
 const navItems = {
   ar: [
@@ -159,8 +159,7 @@ function NavItem({ item, userRole, currentPath, matrix }: { item: any, userRole:
   const { setOpenMobile } = useSidebar();
   const Icon = item.icon;
 
-  // 🛡️ درع الرؤية السيادي: فحص المصفوفة 🛡️
-  const hasAccess = React.useMemo(() => {
+  const hasAccess = useMemo(() => {
     if (userRole === 'Developer' || userRole === 'Admin') return true;
     const permission = matrix[`${userRole}-${item.id}`];
     return permission && permission !== 'none';
@@ -168,7 +167,7 @@ function NavItem({ item, userRole, currentPath, matrix }: { item: any, userRole:
 
   if (!hasAccess) return null;
 
-  const isAnyChildActive = React.useMemo(() => {
+  const isAnyChildActive = useMemo(() => {
     if (!item.children) return false;
     return item.children.some((child: any) => {
         const baseUrl = child.href.split('?')[0];
