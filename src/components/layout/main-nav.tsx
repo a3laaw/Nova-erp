@@ -169,7 +169,7 @@ function NavItem({ item, userRole, currentPath, state }: { item: any, userRole: 
                       size="icon" 
                       className={cn(
                         "size-12 rounded-2xl transition-all duration-500",
-                        orangeGradientClass
+                        orangeGradientClass // كافة الأيقونات برتقالية في وضع الإغلاق كما طلبت
                       )}
                     >
                       <Icon className="size-6 text-white" />
@@ -181,14 +181,14 @@ function NavItem({ item, userRole, currentPath, state }: { item: any, userRole: 
                     dir="rtl" 
                     className="w-64 rounded-[2rem] p-2 shadow-2xl border-2 border-primary/10 bg-white/95 backdrop-blur-xl z-[999999]"
                   >
-                    <DropdownMenuLabel className="font-black text-primary px-5 py-4 text-sm border-b-2 border-primary/5 mb-2 uppercase tracking-widest">
+                    <DropdownMenuLabel className="font-black text-primary px-5 py-4 text-sm border-b-2 border-primary/5 mb-2 uppercase tracking-widest text-right">
                       {item.label}
                     </DropdownMenuLabel>
                     {item.children.map((child: any) => (
                       <DropdownMenuItem key={child.href} asChild className="rounded-xl py-3 px-4 focus:bg-primary/5 cursor-pointer">
                         <Link href={child.href} className="flex items-center justify-between w-full">
-                          <span className="font-black text-[#000000] text-sm">{child.label}</span>
-                          {child.icon && <child.icon className="h-4 w-4 text-primary opacity-40" />}
+                          <span className="font-black text-[#000000] text-sm text-right flex-1">{child.label}</span>
+                          {child.icon && <child.icon className="h-4 w-4 text-primary opacity-40 ml-2" />}
                         </Link>
                       </DropdownMenuItem>
                     ))}
