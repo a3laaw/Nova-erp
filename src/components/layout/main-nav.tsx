@@ -62,13 +62,15 @@ import {
   Coins,
   ChevronLeft,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  GripVertical
 } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase, useDocument } from '@/firebase';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 const navItems = {
   ar: [
@@ -167,15 +169,16 @@ function NavItem({ item, userRole, currentPath, matrix, state }: { item: any, us
 
   const isActive = item.href ? currentPath === item.href : (item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : isAnyChildActive);
 
-  // 🛡️ المظهر السيادي للعنصر النشط (التدرج الذهبي)
+  // 🛡️ المظهر السيادي المحدث (تدرج ذهبي برتقالي)
   const activeClass = "bg-gradient-to-r from-[#FFB000] to-[#e87c24] text-white shadow-xl scale-[1.02] border-none";
   const inactiveClass = "text-[#1e1b4b] hover:bg-orange-50 hover:text-[#e87c24]";
 
-  // --- الحالة 1: الشريط مغلق (Collapsed) ---
+  // --- الحالة 1: الشريط مغلق (Collapsed) مع تلميحات وقوائم طافية ---
   if (state === "collapsed") {
     return (
       <SidebarMenuItem className="flex justify-center py-1">
-        <Tooltip delayDuration={0}>
+        <TooltipProvider delayDuration={0}>
+        <Tooltip>
           <TooltipTrigger asChild>
             {item.children ? (
               <DropdownMenu>
@@ -191,7 +194,7 @@ function NavItem({ item, userRole, currentPath, matrix, state }: { item: any, us
                     <Icon className="size-6" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-[2rem] p-2 shadow-2xl border-2 border-primary/10 bg-white/95 backdrop-blur-xl">
+                <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-[2rem] p-2 shadow-2xl border-2 border-primary/10 bg-white/95 backdrop-blur-xl z-[999999]">
                   <DropdownMenuLabel className="font-black text-primary px-5 py-4 text-sm border-b-2 border-primary/5 mb-2">{item.label}</DropdownMenuLabel>
                   {item.children.map((child: any) => (
                     <DropdownMenuItem key={child.href} asChild className="rounded-xl py-3 px-4 focus:bg-primary/5 cursor-pointer">
@@ -219,8 +222,9 @@ function NavItem({ item, userRole, currentPath, matrix, state }: { item: any, us
               </Button>
             )}
           </TooltipTrigger>
-          <TooltipContent side="left" className="font-black text-xs bg-slate-900 text-white rounded-lg px-3 py-1.5">{item.label}</TooltipContent>
+          <TooltipContent side="left" className="font-black text-xs bg-slate-900 text-white rounded-lg px-3 py-1.5 z-[999999]">{item.label}</TooltipContent>
         </Tooltip>
+        </TooltipProvider>
       </SidebarMenuItem>
     );
   }
@@ -274,7 +278,7 @@ function NavItem({ item, userRole, currentPath, matrix, state }: { item: any, us
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn("rounded-xl py-2 h-11 border-none px-4", isChildActive ? "bg-primary/10 text-primary font-black shadow-sm" : "bg-white/60 hover:bg-orange-50 text-slate-600")}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full h-full">
-                            <span className="text-[12px] font-bold truncate flex-1 text-right">{child.label}</span>
+                            <span className="text-[12px] font-black truncate flex-1 text-right text-[#000000]">{child.label}</span>
                             {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-primary" : "text-slate-400")} />}
                         </div>
                       </Link>
@@ -298,6 +302,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
   const { state } = useSidebar();
   const tenantId = currentUser?.currentCompanyId;
 
+  // جلب مصفوفة الصلاحيات
   const matrixPath = useMemo(() => tenantId ? `companies/${tenantId}/settings/permissions_matrix` : null, [tenantId]);
   const { data: matrixDoc } = useDocument<any>(firestore, matrixPath);
   const matrix = matrixDoc?.data || {};
