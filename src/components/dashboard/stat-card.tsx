@@ -5,12 +5,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
 
 /**
- * بطاقة الإحصائيات الموحدة (Sovereign Stat Card):
- * تم تحصينها لتدعم عرض الأرقام المجردة أو العملة بمرونة تامة.
+ * بطاقة الإحصائيات الموحدة (Sovereign Stat Card V150.1):
+ * تم تحصينها لتدعم عرض الأرقام المجردة أو العملة بمرونة تامة مع دعم الـ Glassmorphism.
  */
 export const StatCard = ({ title, value, icon, description, colorClass, loading, subText, isCurrency = false }: any) => (
     <Card className="overflow-hidden border-white/30 bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] hover-lift group border-2 shadow-sm transition-all duration-500">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
             <div className="flex items-center gap-3">
                 <div className={cn("p-2 rounded-xl shadow-inner transition-transform group-hover:scale-110 duration-500", colorClass)}>
                     {icon}
@@ -18,7 +18,7 @@ export const StatCard = ({ title, value, icon, description, colorClass, loading,
                 <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{title}</CardTitle>
             </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-8 pb-8 pt-0">
             {loading ? (
                 <Skeleton className="h-10 w-32 mt-1 rounded-lg" />
             ) : (
@@ -29,7 +29,7 @@ export const StatCard = ({ title, value, icon, description, colorClass, loading,
                     }
                 </div>
             )}
-            <p className="text-[10px] text-slate-400 mt-1 font-bold italic">{subText || description || 'تحديث فوري'}</p>
+            <p className="text-[10px] text-slate-400 mt-2 font-bold italic">{subText || description || 'تحديث فوري من الميدان'}</p>
         </CardContent>
     </Card>
 );

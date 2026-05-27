@@ -1,7 +1,6 @@
-
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StatCard } from './stat-card';
 import { RecentActivity } from './recent-activity';
 import { TaskPrioritization } from './task-prioritization';
@@ -14,11 +13,11 @@ import {
     ArrowUpRight, MapPin, CheckCircle2, Sparkles, Zap, Activity 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { SystemRoleConfig, DashboardComponent } from '@/lib/registry/system-registry';
+import type { SystemRoleConfig } from '@/lib/registry/system-registry';
 
 /**
  * حاوية الداشبورد الديناميكية المطورة (V150.0):
- * تقوم برسم الواجهة بناءً على سجل الصلاحيات والرتبة السيادية للمستخدم.
+ * تقوم برسم الواجهة بناءً على سجل الصلاحيات والرتبة السيادية للمستخدم بتصميم Glassmorphism.
  */
 
 const iconMap: Record<string, any> = {
@@ -42,6 +41,8 @@ export function UpgradedDashboardContainer({ config, analyticsData }: { config: 
                     val = (analyticsData.projects || []).filter((p: any) => p.status === 'قيد التنفيذ').length;
                 } else if (kpi.id === 'client_base') {
                     val = (analyticsData.clients || []).length;
+                } else if (kpi.id === 'draft_entries') {
+                    val = (analyticsData.journalEntries || []).filter((e: any) => e.status === 'draft').length;
                 }
                 
                 return (
@@ -57,7 +58,7 @@ export function UpgradedDashboardContainer({ config, analyticsData }: { config: 
         </div>
     );
 
-    // محرك رندرة الإجراءات السريعة بتصميم Glassmorphism
+    // محرك رندرة الإجراءات السريعة بتصميم Glassmorphism لؤلؤي
     const renderQuickActions = () => (
         <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white/30 backdrop-blur-md border border-white/20">
             <CardHeader className="p-8 pb-4">
