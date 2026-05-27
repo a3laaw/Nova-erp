@@ -74,11 +74,12 @@ import { cn, getTenantPath } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase, useDocument } from '@/firebase';
+import { Badge } from '@/components/ui/badge';
 
 /**
- * القائمة الجانبية الموحدة (MainNav V146.1):
- * - تم إصلاح خطأ useMemo المفقود.
- * - ربط ذكي بمصفوفة الصلاحيات السيادية.
+ * القائمة الجانبية الموحدة (MainNav V146.2):
+ * - تم إصلاح خطأ Badge is not defined.
+ * - ربط ذكي بمصفوفة الصلاحيات السيادية للتحكم في ظهور الموديولات.
  */
 const navItems = {
   ar: [
