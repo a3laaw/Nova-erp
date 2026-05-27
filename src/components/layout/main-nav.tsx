@@ -8,7 +8,7 @@ import {
   SidebarContent,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarMenuButton as BaseSidebarMenuButton,
+  SidebarMenuButton,
   SidebarFooter,
   SidebarMenuSub,
   SidebarMenuSubItem,
@@ -21,6 +21,20 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   LayoutGrid,
   FileSignature,
   Landmark,
@@ -28,7 +42,6 @@ import {
   Settings2,
   UsersRound,
   Search,
-  FileText,
   ListTree,
   BookOpen,
   ArrowDownLeft,
@@ -43,32 +56,13 @@ import {
   Network,
   UserCheck,
   RotateCcw,
-  Scale,
-  TrendingUp,
-  Activity,
-  Package,
-  ShoppingCart,
-  FileCheck,
-  ArrowUpFromLine,
-  ArrowLeftRight,
-  Users,
-  Trash2,
-  Zap,
-  ListChecks,
-  Bookmark,
-  ChevronLeft,
-  Wallet,
-  Building2,
-  ShieldCheck,
-  Calculator,
-  BarChart3,
-  Sparkles,
-  History,
-  Coins,
-  Layers,
-  HandCoins,
   Waves,
-  Lock
+  Lock,
+  Calculator,
+  Coins,
+  ChevronLeft,
+  ChevronDown,
+  Sparkles
 } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -76,11 +70,6 @@ import { useLanguage } from '@/context/language-context';
 import { useFirebase, useDocument } from '@/firebase';
 import { Badge } from '@/components/ui/badge';
 
-/**
- * القائمة الجانبية الموحدة (MainNav V146.2):
- * - تم إصلاح خطأ Badge is not defined.
- * - ربط ذكي بمصفوفة الصلاحيات السيادية للتحكم في ظهور الموديولات.
- */
 const navItems = {
   ar: [
     { id: 'dashboard', href: '/dashboard', label: 'الرئيسية', icon: LayoutGrid },
@@ -133,7 +122,7 @@ const navItems = {
     { 
       id: 'hr_employees',
       label: 'الموارد البشرية', 
-      icon: Users, 
+      icon: UserCheck, 
       hrefPrefix: '/dashboard/hr',
       children: [
         { id: 'hr_employees', href: '/dashboard/hr/employees', label: 'بيانات الموظفين', icon: UserCheck },
@@ -156,7 +145,7 @@ const navItems = {
   ],
 };
 
-function NavItem({ item, userRole, currentPath, matrix }: { item: any, userRole: string, currentPath: string, matrix: any }) {
+function NavItem({ item, userRole, currentPath, matrix, state }: { item: any, userRole: string, currentPath: string, matrix: any, state: string }) {
   const { setOpenMobile } = useSidebar();
   const Icon = item.icon;
 
@@ -178,19 +167,81 @@ function NavItem({ item, userRole, currentPath, matrix }: { item: any, userRole:
 
   const isActive = item.href ? currentPath === item.href : (item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : isAnyChildActive);
 
+  // 🛡️ المظهر السيادي للعنصر النشط (التدرج الذهبي)
+  const activeClass = "bg-gradient-to-r from-[#FFB000] to-[#e87c24] text-white shadow-xl scale-[1.02] border-none";
+  const inactiveClass = "text-[#1e1b4b] hover:bg-orange-50 hover:text-[#e87c24]";
+
+  // --- الحالة 1: الشريط مغلق (Collapsed) ---
+  if (state === "collapsed") {
+    return (
+      <SidebarMenuItem className="flex justify-center py-1">
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            {item.children ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={cn(
+                      "size-12 rounded-2xl transition-all duration-500",
+                      isActive ? activeClass : inactiveClass
+                    )}
+                  >
+                    <Icon className="size-6" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-[2rem] p-2 shadow-2xl border-2 border-primary/10 bg-white/95 backdrop-blur-xl">
+                  <DropdownMenuLabel className="font-black text-primary px-5 py-4 text-sm border-b-2 border-primary/5 mb-2">{item.label}</DropdownMenuLabel>
+                  {item.children.map((child: any) => (
+                    <DropdownMenuItem key={child.href} asChild className="rounded-xl py-3 px-4 focus:bg-primary/5 cursor-pointer">
+                      <Link href={child.href} className="flex items-center justify-between w-full">
+                        <span className="font-black text-[#000000] text-sm">{child.label}</span>
+                        {child.icon && <child.icon className="h-4 w-4 text-primary opacity-40" />}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button 
+                asChild 
+                variant="ghost" 
+                size="icon" 
+                className={cn(
+                  "size-12 rounded-2xl transition-all duration-500",
+                  isActive ? activeClass : inactiveClass
+                )}
+              >
+                <Link href={item.href}>
+                  <Icon className="size-6" />
+                </Link>
+              </Button>
+            )}
+          </TooltipTrigger>
+          <TooltipContent side="left" className="font-black text-xs bg-slate-900 text-white rounded-lg px-3 py-1.5">{item.label}</TooltipContent>
+        </Tooltip>
+      </SidebarMenuItem>
+    );
+  }
+
+  // --- الحالة 2: الشريط مفتوح (Expanded) ---
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem className="px-4">
-        <BaseSidebarMenuButton 
+        <SidebarMenuButton 
           isActive={isActive} 
           asChild 
-          className={cn("nav-item-box my-1.5 h-14", isActive && "nav-item-box-active")}
+          className={cn(
+            "nav-item-box my-1.5 h-14 transition-all duration-500",
+            isActive ? activeClass : "text-[#1e1b4b] hover:bg-orange-50/50"
+          )}
         >
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full h-full px-4">
-            <span className="flex-1 text-right truncate text-[14px] font-black group-data-[collapsible=icon]:hidden">{item.label}</span>
-            {Icon && <Icon className="size-6 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0" />}
+            <span className="flex-1 text-right truncate text-[14px] font-black">{item.label}</span>
+            <Icon className={cn("size-6 shrink-0 ml-3", isActive ? "text-white" : "text-primary")} />
           </Link>
-        </BaseSidebarMenuButton>
+        </SidebarMenuButton>
       </SidebarMenuItem>
     );
   }
@@ -200,13 +251,19 @@ function NavItem({ item, userRole, currentPath, matrix }: { item: any, userRole:
       <Collapsible defaultOpen={isActive} className="group/collapsible px-4">
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <BaseSidebarMenuButton isActive={isActive} className={cn("nav-item-box my-1.5 h-14", isActive && "nav-item-box-active")}>
+            <SidebarMenuButton 
+              isActive={isActive} 
+              className={cn(
+                "nav-item-box my-1.5 h-14 transition-all duration-500",
+                isActive ? activeClass : "text-[#1e1b4b] hover:bg-orange-50/50"
+              )}
+            >
               <div className="flex items-center justify-between w-full h-full px-4">
-                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-40", isActive ? "text-black" : "text-white")} />
-                <span className="text-right truncate text-[14px] font-black flex-1 pr-2 group-data-[collapsible=icon]:hidden">{item.label}</span>
-                {Icon && <Icon className="size-6 shrink-0 ml-3" />}
+                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-40", isActive ? "text-white" : "text-primary")} />
+                <span className="text-right truncate text-[14px] font-black flex-1 pr-2">{item.label}</span>
+                <Icon className={cn("size-6 shrink-0 ml-3", isActive ? "text-white" : "text-primary")} />
               </div>
-            </BaseSidebarMenuButton>
+            </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <SidebarMenuSub className="mt-1 mb-2 space-y-1.5 sidebar-no-offset">
@@ -214,11 +271,11 @@ function NavItem({ item, userRole, currentPath, matrix }: { item: any, userRole:
                 const isChildActive = currentPath === child.href.split('?')[0];
                 return (
                   <SidebarMenuSubItem key={child.href}>
-                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn("rounded-xl py-2 h-11 border-none px-4", isChildActive ? "nav-item-box-active font-black" : "bg-white/60 hover:bg-orange-50")}>
+                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn("rounded-xl py-2 h-11 border-none px-4", isChildActive ? "bg-primary/10 text-primary font-black shadow-sm" : "bg-white/60 hover:bg-orange-50 text-slate-600")}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full h-full">
                             <span className="text-[12px] font-bold truncate flex-1 text-right">{child.label}</span>
-                            {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-black" : "text-primary")} />}
+                            {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-primary" : "text-slate-400")} />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>
@@ -238,9 +295,9 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
   const pathname = usePathname();
   const { language } = useLanguage();
   const { firestore } = useFirebase();
+  const { state } = useSidebar();
   const tenantId = currentUser?.currentCompanyId;
 
-  // جلب مصفوفة الصلاحيات
   const matrixPath = useMemo(() => tenantId ? `companies/${tenantId}/settings/permissions_matrix` : null, [tenantId]);
   const { data: matrixDoc } = useDocument<any>(firestore, matrixPath);
   const matrix = matrixDoc?.data || {};
@@ -249,16 +306,18 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
 
   return (
     <>
-      <SidebarHeader className="p-6 mb-8 group-data-[collapsible=icon]:p-3">
+      <SidebarHeader className="p-6 mb-8 transition-all duration-500">
         <div className="flex flex-col items-center">
-          <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter">Nova</span>
-          <div className="flex items-center gap-2 mt-1 group-data-[collapsible=icon]:hidden">
+          <span className={cn("font-black text-[#1e1b4b] tracking-tighter transition-all duration-500", state === "collapsed" ? "text-xl" : "text-3xl")}>Nova</span>
+          {state !== "collapsed" && (
+            <div className="flex items-center gap-2 mt-1 animate-in fade-in">
               <span className="text-[9px] font-black uppercase tracking-[0.4em] text-primary">BUSINESS</span>
-          </div>
+            </div>
+          )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="scrollbar-none">
+      <SidebarContent className="scrollbar-none px-2">
         <SidebarMenu className="gap-1">
           {currentNavItems.map((item: any, index: number) => (
             <NavItem 
@@ -267,6 +326,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
                 userRole={currentUser.role} 
                 currentPath={pathname}
                 matrix={matrix}
+                state={state}
             />
           ))}
         </SidebarMenu>
