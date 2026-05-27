@@ -4,7 +4,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات الموحدة (V140.0 - Dynamic Profession Edition) 🛡️
+    // 🛡️ مصفوفة الصلاحيات السيادية (V145.0 - Dynamic Integration Edition) 🛡️
     
     function isAuthenticated() {
       return request.auth != null;
@@ -22,12 +22,20 @@ service cloud.firestore {
               request.auth.token.currentCompanyId == companyId);
     }
 
-    // رادار فحص الصلاحيات من المصفوفة الديناميكية
-    function hasPermission(companyId, module, action) {
+    // رادار فحص الصلاحيات من مصفوفة المهن الديناميكية
+    function checkPerm(companyId, module, level) {
         let role = request.auth.token.role;
         let matrix = get(/databases/$(database)/documents/companies/$(companyId)/settings/permissions_matrix).data.data;
-        let key = role + "-" + module + "-" + action;
-        return matrix[key] == true;
+        let val = matrix[role + "-" + module];
+        
+        // كامل = full
+        // جزئي = partial (يحتاج معالجة إضافية في الفلترة)
+        // عرض = view
+        // مخفي = none
+        
+        return (level == 'view' && (val == 'view' || val == 'partial' || val == 'full')) ||
+               (level == 'write' && (val == 'partial' || val == 'full')) ||
+               (level == 'admin' && val == 'full');
     }
 
     // هل يملك صلاحية إدارية عليا؟
@@ -41,46 +49,47 @@ service cloud.firestore {
 
     match /companies/{companyId} {
       allow read: if isDeveloper() || isTenantMember(companyId);
-      allow write: if isDeveloper() || isTenantMember(companyId);
+      allow write: if isDeveloper();
       
-      // 🏢 إدارة العملاء (CRM) 🏢
+      // 🏢 إدارة العملاء 🏢
       match /clients/{clientId} {
-        allow read: if isTenantMember(companyId) && (hasPermission(companyId, 'clients', 'view') || isAdminPower());
-        allow create: if isTenantMember(companyId) && (hasPermission(companyId, 'clients', 'create') || isAdminPower());
-        allow update: if isTenantMember(companyId) && (hasPermission(companyId, 'clients', 'update') || isAdminPower());
-        allow delete: if isTenantMember(companyId) && (hasPermission(companyId, 'clients', 'delete') || isAdminPower());
+        allow read: if isTenantMember(companyId) && (checkPerm(companyId, 'clients', 'view') || isAdminPower());
+        allow create, update: if isTenantMember(companyId) && (checkPerm(companyId, 'clients', 'write') || isAdminPower());
+        allow delete: if isAdminPower();
       }
 
       // 📂 المعاملات والمسار الفني 📂
       match /transactions/{txId} {
-        allow read: if isTenantMember(companyId) && (hasPermission(companyId, 'transactions', 'view') || isAdminPower());
-        allow create, update: if isTenantMember(companyId) && (hasPermission(companyId, 'transactions', 'create') || isAdminPower());
+        allow read: if isTenantMember(companyId) && (checkPerm(companyId, 'transactions', 'view') || isAdminPower());
+        allow create, update: if isTenantMember(companyId) && (checkPerm(companyId, 'transactions', 'write') || isAdminPower());
         allow delete: if isAdminPower();
       }
 
       // 🏗️ الزيارات الميدانية 🏗️
       match /field_visits/{visitId} {
-        allow read: if isTenantMember(companyId) && (hasPermission(companyId, 'site_visits', 'view') || isAdminPower());
-        allow create, update: if isTenantMember(companyId) && (hasPermission(companyId, 'site_visits', 'create') || isAdminPower());
+        allow read: if isTenantMember(companyId) && (checkPerm(companyId, 'site_visits', 'view') || isAdminPower());
+        allow create, update: if isTenantMember(companyId) && (checkPerm(companyId, 'site_visits', 'write') || isAdminPower());
         allow delete: if isAdminPower();
       }
 
       // 💰 المحاسبة والمالية 💰
       match /journalEntries/{id} {
-        allow read, write: if isTenantMember(companyId) && (hasPermission(companyId, 'journal_entries', 'view') || isAdminPower());
+        allow read: if isTenantMember(companyId) && (checkPerm(companyId, 'journal_entries', 'view') || isAdminPower());
+        allow create, update: if isTenantMember(companyId) && (checkPerm(companyId, 'journal_entries', 'write') || isAdminPower());
       }
       
       match /cashReceipts/{id} {
-        allow read, write: if isTenantMember(companyId) && (hasPermission(companyId, 'vouchers', 'view') || isAdminPower());
+        allow read: if isTenantMember(companyId) && (checkPerm(companyId, 'vouchers', 'view') || isAdminPower());
+        allow create: if isTenantMember(companyId) && (checkPerm(companyId, 'vouchers', 'write') || isAdminPower());
       }
 
       // 👥 الموارد البشرية 👥
       match /employees/{id} {
-        allow read: if isTenantMember(companyId) && (hasPermission(companyId, 'hr_employees', 'view') || isAdminPower());
-        allow write: if isTenantMember(companyId) && (hasPermission(companyId, 'hr_employees', 'create') || isAdminPower());
+        allow read: if isTenantMember(companyId) && (checkPerm(companyId, 'hr_employees', 'view') || isAdminPower());
+        allow write: if isTenantMember(companyId) && (checkPerm(companyId, 'hr_employees', 'write') || isAdminPower());
       }
 
-      // ⚙️ الإعدادات (Sovereign Settings) ⚙️
+      // ⚙️ الإعدادات السيادية ⚙️
       match /settings/{id} {
         allow read: if isTenantMember(companyId);
         allow write: if isAdminPower();

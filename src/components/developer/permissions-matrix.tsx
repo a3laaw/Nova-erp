@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -27,22 +27,25 @@ import {
     Layers,
     Banknote,
     ListTree,
-    Sparkles
+    Sparkles,
+    Eye,
+    Zap,
+    Waves
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { doc, setDoc, serverTimestamp, collectionGroup, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
+import { cn, getTenantPath } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 /**
- * مصفوفة الصلاحيات السيادية المحدثة (The Dynamic Sovereign Matrix V140.0):
- * - ربط آلي ومباشر مع "المهن" (Jobs) المضافة في إعدادات المنظومة.
- * - كل مهنة جديدة تظهر فوراً كعمود مستقل في المصفوفة.
- * - عزل تام للصلاحيات المالية والفنية والإدارية.
+ * مصفوفة الصلاحيات السيادية (The Ultimate Sovereign Matrix V145.0):
+ * - مطابقة تامة للجدول المقترح من المهندس.
+ * - ربط ديناميكي بكافة المهن المضافة في المنظومة.
+ * - دعم مستويات النفاذ (كامل، عرض، جزئي، مخفي).
  */
 
 const MODULES = [
@@ -58,10 +61,15 @@ const MODULES = [
     { id: 'vouchers', name: 'سندات القبض والصرف', icon: Landmark },
     { id: 'coa', name: 'شجرة الحسابات', icon: ListTree },
     { id: 'financial_reports', name: 'التقارير المالية', icon: TrendingUp },
-    { id: 'hr_employees', name: 'HR - إدارة الموظفين', icon: ShieldCheck },
+    { id: 'liquidity_radar', name: 'رادار السيولة', icon: Waves },
+    { id: 'wbs_mgmt', name: 'إدارة المشاريع (WBS)', icon: Zap },
+    { id: 'tasks_scheduling', name: 'المهام والجدولة', icon: Activity },
+    { id: 'hr_employees', name: 'HR - إدارة الموظفين', icon: UserCheck },
     { id: 'payroll_leaves', name: 'الرواتب والإجازات', icon: Banknote },
-    { id: 'settings', name: 'إعدادات النظام والأدوار', icon: Settings2 },
+    { id: 'settings', name: 'إعدادات النظام + الأدوار', icon: Settings2 },
 ];
+
+import { UserCheck } from 'lucide-react';
 
 export function PermissionsMatrix() {
     const { firestore } = useFirebase();
@@ -72,16 +80,16 @@ export function PermissionsMatrix() {
     const [searchQuery, setSearchQuery] = useState('');
     const tenantId = user?.currentCompanyId;
 
-    // 🛡️ رادار المهن: سحب كافة الوظائف المعرفة في الأقسام 🛡️
+    // جلب المهن المعرفة في الأقسام
     const { data: jobs, loading: jobsLoading } = useSubscription<any>(
         firestore, 
         'jobs', 
         useMemo(() => [where('companyId', '==', tenantId)], [tenantId]),
-        true // collectionGroup
+        true 
     );
 
     const dynamicRoles = useMemo(() => {
-        const base = ['Admin']; // المدير العام دائماً موجود
+        const base = ['Admin', 'مدير مالي', 'مدير مشاريع', 'مدير هندسي', 'محاسب', 'سكرتير', 'مساح ميداني'];
         const jobNames = (jobs || []).map(j => j.name);
         return Array.from(new Set([...base, ...jobNames]));
     }, [jobs]);
@@ -89,7 +97,7 @@ export function PermissionsMatrix() {
     const matrixPath = useMemo(() => tenantId ? `companies/${tenantId}/settings/permissions_matrix` : null, [tenantId]);
     const { data: currentMatrixDoc, loading: matrixLoading } = useSubscription<any>(firestore, matrixPath || null);
 
-    const [matrix, setMatrix] = useState<Record<string, boolean>>({});
+    const [matrix, setMatrix] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (currentMatrixDoc?.[0]) {
@@ -97,9 +105,9 @@ export function PermissionsMatrix() {
         }
     }, [currentMatrixDoc]);
 
-    const togglePermission = (role: string, module: string, action: string) => {
-        const key = `${role}-${module}-${action}`;
-        setMatrix(prev => ({ ...prev, [key]: !prev[key] }));
+    const handlePermissionChange = (role: string, moduleId: string, value: string) => {
+        const key = `${role}-${moduleId}`;
+        setMatrix(prev => ({ ...prev, [key]: value }));
     };
 
     const handleSaveMatrix = async () => {
@@ -111,7 +119,7 @@ export function PermissionsMatrix() {
                 updatedAt: serverTimestamp(),
                 updatedBy: user?.id
             }, { merge: true });
-            toast({ title: '✅ تم حفظ مصفوفة الأمان', description: 'تم تفعيل توزيع الصلاحيات للمهن الجديدة.' });
+            toast({ title: '✅ تم تفعيل مصفوفة الأمان' });
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
         } finally { setIsSaving(false); }
@@ -131,12 +139,12 @@ export function PermissionsMatrix() {
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-indigo-600 rounded-3xl border border-white/20 shadow-xl"><Lock className="h-8 w-8" /></div>
                         <div className="text-right">
-                            <CardTitle className="text-3xl font-black">مصفوفة الصلاحيات المترابطة بالمهن</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold opacity-70">يتم إضافة أي مهنة تنشئها في "إدارة الأقسام" كعمود جديد هنا آلياً.</CardDescription>
+                            <CardTitle className="text-3xl font-black">مصفوفة الرتب والصلاحيات السيادية</CardTitle>
+                            <CardDescription className="text-indigo-200 font-bold opacity-70">تحكم كامل في نفاذ الموظفين والمديرين لكافة أجزاء المنظومة.</CardDescription>
                         </div>
                     </div>
                     <Button onClick={handleSaveMatrix} disabled={isSaving} className="h-14 px-12 rounded-2xl font-black text-xl gap-3 bg-white text-slate-900 shadow-2xl transition-all hover:scale-105 active:scale-95">
-                        {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />} حفظ مصفوفة الأمان
+                        {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />} حفظ وتفعيل المصفوفة
                     </Button>
                 </div>
             </CardHeader>
@@ -148,45 +156,54 @@ export function PermissionsMatrix() {
                     </div>
                     <div className="flex items-center gap-2">
                         <Badge variant="outline" className="bg-white font-black px-4 h-8 border-2 border-primary/20 text-primary">
-                            <Sparkles className="h-3 w-3 ml-2 animate-pulse"/> تم رصد {dynamicRoles.length} مهنة نشطة
+                            <Sparkles className="h-3 w-3 ml-2 animate-pulse"/> تم رصد {dynamicRoles.length} رتبة وظيفية
                         </Badge>
                     </div>
                 </div>
 
                 <ScrollArea className="w-full">
-                    <Table className="border-collapse min-w-[1200px]">
+                    <Table className="border-collapse min-w-[1500px]">
                         <TableHeader className="bg-slate-50 border-b">
                             <TableRow className="h-16">
                                 <TableHead className="px-10 font-black text-slate-900 border-l sticky right-0 bg-slate-50 z-20 w-[300px]">الموديول / الشاشة</TableHead>
                                 {dynamicRoles.map(role => (
-                                    <TableHead key={role} className="text-center font-black text-slate-900 border-l min-w-[180px]">
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-indigo-600 font-black text-xs">{role}</span>
-                                            <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-1">View | Create | Edit | Delete</span>
-                                        </div>
-                                    </TableHead>
+                                    <TableHead key={role} className="text-center font-black text-indigo-600 border-l min-w-[150px]">{role}</TableHead>
                                 ))}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filteredModules.map(module => (
-                                <TableRow key={module.id} className="h-20 hover:bg-muted/5 border-b last:border-0 group">
+                                <TableRow key={module.id} className="h-20 hover:bg-muted/5 border-b group">
                                     <TableCell className="px-10 border-l sticky right-0 bg-white group-hover:bg-slate-50 z-10">
                                         <div className="flex items-center gap-4">
                                             <div className="p-2.5 bg-slate-100 rounded-xl text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors"><module.icon className="h-5 w-5" /></div>
                                             <span className="font-black text-base text-slate-800">{module.name}</span>
                                         </div>
                                     </TableCell>
-                                    {dynamicRoles.map(role => (
-                                        <TableCell key={`${role}-${module.id}`} className="text-center border-l bg-slate-50/10">
-                                            <div className="flex items-center justify-center gap-4">
-                                                <Checkbox checked={!!matrix[`${role}-${module.id}-view`]} onCheckedChange={() => togglePermission(role, module.id, 'view')} className="h-5 w-5 border-2" title="عرض" />
-                                                <Checkbox checked={!!matrix[`${role}-${module.id}-create`]} onCheckedChange={() => togglePermission(role, module.id, 'create')} className="h-5 w-5 border-2 border-green-200 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600" title="إضافة" />
-                                                <Checkbox checked={!!matrix[`${role}-${module.id}-update`]} onCheckedChange={() => togglePermission(role, module.id, 'update')} className="h-5 w-5 border-2 border-blue-200 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600" title="تعديل" />
-                                                <Checkbox checked={!!matrix[`${role}-${module.id}-delete`]} onCheckedChange={() => togglePermission(role, module.id, 'delete')} className="h-5 w-5 border-2 border-red-200 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600" title="حذف" />
-                                            </div>
-                                        </TableCell>
-                                    ))}
+                                    {dynamicRoles.map(role => {
+                                        const value = matrix[`${role}-${module.id}`] || 'none';
+                                        return (
+                                            <TableCell key={`${role}-${module.id}`} className="text-center border-l bg-slate-50/10 px-4">
+                                                <Select value={value} onValueChange={(v) => handlePermissionChange(role, module.id, v)}>
+                                                    <SelectTrigger className={cn(
+                                                        "h-9 rounded-xl font-black text-[10px] border-2",
+                                                        value === 'full' ? "bg-green-600 text-white border-green-600" :
+                                                        value === 'partial' ? "bg-blue-600 text-white border-blue-600" :
+                                                        value === 'view' ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
+                                                        "bg-white text-slate-300 border-slate-100"
+                                                    )}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent dir="rtl">
+                                                        <SelectItem value="full" className="font-black text-green-600">كامل (تحكم)</SelectItem>
+                                                        <SelectItem value="partial" className="font-black text-blue-600">جزئي (ما يخصه)</SelectItem>
+                                                        <SelectItem value="view" className="font-black text-indigo-600">عرض فقط</SelectItem>
+                                                        <SelectItem value="none" className="font-black text-slate-400">- مخفي تماماً -</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </TableCell>
+                                        );
+                                    })}
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -194,10 +211,6 @@ export function PermissionsMatrix() {
                     <ScrollBar orientation="horizontal" />
                 </ScrollArea>
             </CardContent>
-            <CardFooter className="p-6 bg-muted/10 border-t flex items-center justify-between text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                <span>Nova ERP — Sovereign Role-Based Access Control (RBAC) v4.0</span>
-                <span className="flex items-center gap-2"><ShieldCheck className="h-3 w-3" /> تم تأمين مصفوفة الوصول</span>
-            </CardFooter>
         </Card>
     );
 }
