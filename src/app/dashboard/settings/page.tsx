@@ -13,7 +13,8 @@ import {
     Network,
     ArrowRight,
     Settings2,
-    Sparkles
+    Sparkles,
+    Lock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppTheme } from '@/context/theme-context';
@@ -22,10 +23,17 @@ import { Badge } from '@/components/ui/badge';
 const settingsFeatures = [
     {
         title: 'إدارة المستخدمين',
-        description: 'إدارة حسابات دخول الموظفين وتوزيع الأدوار والصلاحيات.',
+        description: 'إدارة حسابات دخول الموظفين وتفعيل هوياتهم الرقمية.',
         href: '/dashboard/settings/users',
         icon: Users,
         color: 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+    },
+    {
+        title: 'مصفوفة الصلاحيات',
+        description: 'التحكم في رتب الموظفين وما يمكنهم رؤيته من موديولات.',
+        href: '/dashboard/settings/permissions',
+        icon: Lock,
+        color: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20'
     },
     {
         title: 'الهوية والشعار',
@@ -80,7 +88,6 @@ const settingsFeatures = [
 
 export default function SettingsDashboardPage() {
   const { theme } = useAppTheme();
-  const isGlass = theme === 'glass';
 
   return (
     <div className="space-y-10 pb-20" dir="rtl">

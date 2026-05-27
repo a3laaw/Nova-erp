@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -21,20 +20,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipProvider,
-  TooltipTrigger,
-  TooltipContent,
-} from '@/components/ui/tooltip';
 import {
   LayoutGrid,
   FileSignature,
@@ -82,19 +67,18 @@ import {
   Coins,
   Layers,
   HandCoins,
-  Waves
+  Waves,
+  Lock
 } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
-import { ScrollArea } from '../ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { useFirebase, useDocument } from '@/firebase';
 
 /**
- * القائمة الجانبية الموحدة (MainNav V145.0):
+ * القائمة الجانبية الموحدة (MainNav V146.0):
  * - ربط ذكي بمصفوفة الصلاحيات السيادية.
- * - إخفاء الموديولات التي لا تملك الرتبة حق الوصول إليها.
+ * - إظهار رابط مصفوفة الصلاحيات للمديرين.
  */
 const navItems = {
   ar: [
@@ -162,6 +146,7 @@ const navItems = {
       icon: Settings2, 
       hrefPrefix: '/dashboard/settings',
       children: [
+        { href: '/dashboard/settings/permissions', label: 'مصفوفة الصلاحيات', icon: Lock },
         { href: '/dashboard/settings/branding', label: 'الهوية والشعار', icon: Palette },
         { href: '/dashboard/settings/users', label: 'دخول الموظفين', icon: UserCheck },
         { href: '/dashboard/settings/reference-data', label: 'تجهيز القوائم', icon: Network },
@@ -171,7 +156,7 @@ const navItems = {
 };
 
 function NavItem({ item, userRole, currentPath, matrix }: { item: any, userRole: string, currentPath: string, matrix: any }) {
-  const { setOpenMobile, state } = useSidebar();
+  const { setOpenMobile } = useSidebar();
   const Icon = item.icon;
 
   // 🛡️ درع الرؤية السيادي: فحص المصفوفة 🛡️
