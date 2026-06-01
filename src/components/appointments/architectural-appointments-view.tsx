@@ -39,7 +39,7 @@ import {
 } from '@dnd-kit/core';
 
 // ══════════════════════════════════════════════════════
-// ️ التحقق من تعارض وقت العميل
+// 🔍 التحقق من تعارض وقت العميل
 // ═════════════════════════════════════════════════════
 function checkClientTimeConflict(
   all: Appointment[], clientId: string, newStart: Date,
@@ -115,7 +115,7 @@ async function reconcileClientAppointments(firestore: any, tenantId: string | un
 const weekDays = [{ id: 'Sunday', label: 'الأحد' }, { id: 'Monday', label: 'الاثنين' }, { id: 'Tuesday', label: 'الثلاثاء' }, { id: 'Wednesday', label: 'الأربعاء' }, { id: 'Thursday', label: 'الخميس' }, { id: 'Friday', label: 'الجمعة' }, { id: 'Saturday', label: 'السبت' }];
 
 // ══════════════════════════════════════════════════════
-//  بطاقة الموعد (تم تحسين وضوح النصوص)
+// 🎴 بطاقة الموعد (تم تكبير الخطوط)
 // ══════════════════════════════════════════════════════
 type ApptWithMeta = Appointment & { clientArea?: string | null; bookedByName?: string | null };
 
@@ -151,27 +151,32 @@ const AppointmentCard = memo(({
 
   return (
     <>
-      <div ref={setNodeRef} style={{ ...dragStyle, position: 'absolute', inset: '4px', background: bg, border, boxShadow: shadow, borderRadius: 8, padding: '5px 7px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'visible', transition: 'box-shadow .15s, border-color .15s', pointerEvents: 'auto', touchAction: 'none', zIndex: 10 }} {...attributes}>
-        <div style={{ position: 'absolute', top: 3, left: 3, zIndex: 20 }}>
-          <button ref={btnRef} onClick={toggleMenu} onMouseDown={e => { e.stopPropagation(); e.preventDefault(); }} style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', transition: 'all .2s', zIndex: 25 }} onMouseEnter={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#000'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.95)'; e.currentTarget.style.color = '#64748b'; }}>
-            <MoreHorizontal size={14} />
-          </button>
-        </div>
-        <div onClick={e => { e.stopPropagation(); e.preventDefault(); onOpenDetails(appointment); }} style={{ flex: 1, cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', pointerEvents: 'auto' }}>
-          <div {...listeners} style={{ position: 'absolute', top: '50%', right: 4, transform: 'translateY(-50%)', cursor: 'grab', color: 'rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', zIndex: 15, padding: '4px', borderRadius: 4, pointerEvents: 'auto', touchAction: 'none' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.05)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }} onClick={e => { e.stopPropagation(); e.preventDefault(); }} onMouseDown={e => { e.stopPropagation(); e.preventDefault(); }}>
-            <GripVertical size={14} />
+      <div ref={setNodeRef} style={{ ...dragStyle, position: 'relative', height: '100%', width: '100%', minHeight: 70, boxSizing: 'border-box', background: bg, border, boxShadow: shadow, borderRadius: 0, padding: '8px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'visible', transition: 'box-shadow .15s, border-color .15s', pointerEvents: 'auto', touchAction: 'none', zIndex: 10 }} {...attributes}>
+        
+        <div style={{ flex: 1, cursor: 'default', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', width: '100%', pointerEvents: 'auto' }}>
+          
+          <div style={{ position: 'absolute', top: 4, left: 4, zIndex: 20 }}>
+            <button ref={btnRef} onClick={toggleMenu} onMouseDown={e => { e.stopPropagation(); e.preventDefault(); }} style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', transition: 'all .2s', zIndex: 25 }} onMouseEnter={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#000'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.95)'; e.currentTarget.style.color = '#64748b'; }}>
+              <MoreHorizontal size={12} />
+            </button>
           </div>
-          <div style={{ paddingLeft: 22, minWidth: 0, display: 'flex', alignItems: 'center' }}>
-            {appointment.workStageUpdated && <CheckCircle style={{ width: 10, height: 10, color: '#16a34a', flexShrink: 0, marginLeft: 3 }} />}
-            {/* ✅ تحسين وضوح اسم العميل */}
-            <span style={{ fontSize: 11, fontWeight: 900, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{appointment.clientName}</span>
+
+          <div {...listeners} style={{ position: 'absolute', top: '50%', right: 4, transform: 'translateY(-50%)', cursor: 'grab', color: 'rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', zIndex: 15, padding: '4px', borderRadius: 4, pointerEvents: 'auto', touchAction: 'none' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.05)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }} onClick={e => { e.stopPropagation(); e.preventDefault(); }} onMouseDown={e => { e.stopPropagation(); e.preventDefault(); }}>
+            <GripVertical size={16} />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3, overflow: 'hidden', flexWrap: 'nowrap' }}>
-            {appointment.visitCount && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 100, background: 'rgba(255,255,255,0.8)', color: '#475569', border: '1px solid rgba(0,0,0,0.1)', whiteSpace: 'nowrap', flexShrink: 0 }}>زيارة {appointment.visitCount}{appointment.visitCount === 1 ? ' 🆕' : ''}</span>}
-            {appointment.clientArea && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 100, background: 'rgba(255,255,255,0.8)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.3)', whiteSpace: 'nowrap', flexShrink: 0 }}>📍 {appointment.clientArea}</span>}
+
+          {/* ✅ تعديل تكبير الخط هنا */}
+          <div style={{ paddingLeft: 24, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+            {appointment.workStageUpdated && <CheckCircle style={{ width: 14, height: 14, color: '#16a34a', flexShrink: 0, marginLeft: 4 }} />}
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{appointment.clientName}</span>
           </div>
-          {/* ✅ تحسين وضوح اسم الحاجز */}
-          {appointment.bookedByName && <div style={{ fontSize: 9, color: '#475569', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>👤 حجزه: {appointment.bookedByName}</div>}
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', flexWrap: 'nowrap', marginTop: 4 }}>
+            {appointment.visitCount && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 100, background: 'rgba(255,255,255,0.8)', color: '#475569', border: '1px solid rgba(0,0,0,0.1)', whiteSpace: 'nowrap', flexShrink: 0 }}>زيارة {appointment.visitCount}{appointment.visitCount === 1 ? ' 🆕' : ''}</span>}
+            {appointment.clientArea && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 100, background: 'rgba(255,255,255,0.8)', color: '#0d9488', border: '1px solid rgba(13,148,136,0.3)', whiteSpace: 'nowrap', flexShrink: 0 }}>📍 {appointment.clientArea}</span>}
+          </div>
+          
+          {appointment.bookedByName && <div style={{ fontSize: 11, color: '#475569', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>👤 حجزه: {appointment.bookedByName}</div>}
         </div>
       </div>
 
@@ -210,14 +215,14 @@ const AppointmentCard = memo(({
 AppointmentCard.displayName = 'AppointmentCard';
 
 // ══════════════════════════════════════════════════════
-//  خانة الإفلات
+// 📦 خانة الإفلات
 // ══════════════════════════════════════════════════════
 function DroppableSlot({ id, children, onClick, isEngineerOnLeave }: { id: string; children: React.ReactNode; onClick: () => void; isEngineerOnLeave: boolean }) {
   const { isOver, setNodeRef } = useDroppable({ id, disabled: isEngineerOnLeave || !!children });
   return (
-    <div ref={setNodeRef} onClick={(e) => { if (children || isEngineerOnLeave) { e.stopPropagation(); return; } onClick(); }} style={{ minHeight: 68, height: '100%', background: isOver ? 'rgba(232,124,36,0.15)' : 'transparent', border: `2px dashed ${isOver ? '#e87c24' : 'transparent'}`, borderRadius: 8, cursor: children || isEngineerOnLeave ? 'not-allowed' : 'pointer', transition: 'all .15s', position: 'relative', display: 'flex', alignItems: children ? 'flex-start' : 'center', justifyContent: children ? 'flex-start' : 'center', pointerEvents: 'auto' }}>
+    <div ref={setNodeRef} onClick={(e) => { if (children || isEngineerOnLeave) { e.stopPropagation(); return; } onClick(); }} style={{ height: '100%', width: '100%', minHeight: 70, boxSizing: 'border-box', background: isOver ? 'rgba(232,124,36,0.15)' : 'transparent', border: `2px dashed ${isOver ? '#e87c24' : 'transparent'}`, borderRadius: 0, cursor: children || isEngineerOnLeave ? 'not-allowed' : 'pointer', transition: 'all .15s', position: 'relative', display: 'flex', alignItems: children ? 'flex-start' : 'center', justifyContent: children ? 'flex-start' : 'center', pointerEvents: 'auto' }}>
       {children}
-      {!children && isOver && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(232,124,36,0.1)', borderRadius: 8, fontSize: 20, color: '#e87c24', fontWeight: 900, pointerEvents: 'none' }}>+</div>}
+      {!children && isOver && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(232,124,36,0.1)', fontSize: 20, color: '#e87c24', fontWeight: 900, pointerEvents: 'none' }}>+</div>}
     </div>
   );
 }
@@ -268,14 +273,22 @@ function EngineerStatCard({ engineer, appointments, isOnLeave }: { engineer: Emp
 // ══════════════════════════════════════════════════════
 // 📋 نافذة الحجز/التعديل/إعادة الجدولة
 // ══════════════════════════════════════════════════════
-function AppointmentManagerDialog({ isOpen, onClose, onSaveSuccess, mode, initialData, clients, firestore, currentUser, canBypassTime, rawAppointments, slotDur }: any) {
+function AppointmentManagerDialog({ 
+  isOpen, onClose, onSaveSuccess, mode, initialData, clients, 
+  firestore, currentUser, canBypassTime, rawAppointments, slotDur, dialogData 
+}: any) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
-  const isEditing = mode !== 'create';
+  const isCreating = mode === 'create';
+  const isEditing = mode === 'edit';
+  const isRescheduling = mode === 'reschedule';
+  
   const originalApptDate = initialData?.appointmentDate ? toFirestoreDate(initialData.appointmentDate) : null;
   
   const [selectedDate, setSelectedDate] = useState<Date>(originalApptDate || new Date());
   const [selectedTime, setSelectedTime] = useState(originalApptDate ? format(originalApptDate, 'HH:mm') : '10:00');
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
   const [title, setTitle] = useState(initialData?.title || '');
   const [isNewClient, setIsNewClient] = useState(!initialData?.clientId);
   const [newName, setNewName] = useState(initialData?.clientName || '');
@@ -285,98 +298,196 @@ function AppointmentManagerDialog({ isOpen, onClose, onSaveSuccess, mode, initia
   const tenantId = currentUser?.currentCompanyId;
   const engineerId = initialData?.engineerId;
 
-  useEffect(() => { if (isOpen) { /* Reset if create */ } }, [isOpen]);
+  const finalAppointmentDateTime = useMemo(() => {
+    let dateTime: Date | null = null;
+    if (isCreating) {
+      dateTime = dialogData?.appointmentDate ? toFirestoreDate(dialogData.appointmentDate) : null;
+    } else if (isEditing || isRescheduling) {
+      const [hh, mm] = selectedTime.split(':').map(Number);
+      const combinedDate = setHours(setMinutes(selectedDate, mm), hh);
+      if (isValid(combinedDate)) {
+        dateTime = combinedDate;
+      }
+    }
+    return dateTime;
+  }, [isCreating, dialogData?.appointmentDate, isEditing, isRescheduling, selectedDate, selectedTime]);
+
+  useEffect(() => { 
+    if (isOpen) { 
+      if (isCreating) {
+        setSelectedDate(dialogData?.appointmentDate ? toFirestoreDate(dialogData.appointmentDate) : new Date());
+        setSelectedTime(dialogData?.appointmentDate ? format(toFirestoreDate(dialogData.appointmentDate), 'HH:mm') : '10:00');
+        setTitle('');
+        setIsNewClient(false); 
+        setNewName(''); setNewMobile('');
+        setSelectedClientId('');
+      } else if (isRescheduling) {
+        setSelectedDate(originalApptDate || new Date());
+        setSelectedTime(originalApptDate ? format(originalApptDate, 'HH:mm') : '10:00');
+        setTitle(initialData?.title || '');
+        setIsNewClient(false);
+        setSelectedClientId(initialData?.clientId || '');
+        setNewName(''); setNewMobile('');
+      }
+    } 
+  }, [isOpen, isCreating, isRescheduling, dialogData?.appointmentDate, originalApptDate, initialData?.title, initialData?.clientId]);
 
   const filteredClients = useMemo(() => {
-    if (!engineerId || !clients?.length) return [];
-    return clients.filter((c: Client) => (c as any).assignedEngineer === engineerId);
+    if (!engineerId) return clients;
+    return clients.filter(c => {
+      const ae = (c as any).assignedEngineer;
+      return !ae || ae === engineerId;
+    });
   }, [clients, engineerId]);
-
   const clientOptions = useMemo(() => filteredClients.map((c: Client) => ({ value: c.id!, label: c.nameAr })), [filteredClients]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore || !tenantId) return;
-    if (!title.trim()) { toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى إدخال الغرض من الزيارة.' }); return; }
-    if (!selectedTime || !isValid(selectedDate)) { toast({ variant: 'destructive', title: 'خطأ زمني', description: 'تأكد من تحديد التاريخ والوقت.' }); return; }
-    
-    const [hh, mm] = selectedTime.split(':').map(Number);
-    const finalDate = setHours(setMinutes(selectedDate, mm), hh);
-    if (isPast(finalDate) && !canBypassTime) { toast({ variant: 'destructive', title: '⏰ عائق زمني', description: 'لا يمكن الحجز في الماضي.' }); return; }
-    
-    if (isNewClient && (!newName || !newMobile)) { toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'أدخل الاسم والجوال.' }); return; }
-    if (!isNewClient && !selectedClientId) { toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'اختر العميل.' }); return; }
-
-    const isReschedule = isEditing && format(finalDate, 'HH:mm yyyy-MM-dd') !== format(originalApptDate!, 'HH:mm yyyy-MM-dd');
-
-    if (isReschedule) {
-      const clientIdToCheck = isNewClient ? '' : selectedClientId;
-      if (clientIdToCheck) {
-        const c = checkClientTimeConflict(rawAppointments || [], clientIdToCheck, finalDate, slotDur || 45, initialData.id);
-        if (c) { toast({ variant: 'destructive', title: '⏰ العميل مشغول', description: `لديه موعد الساعة ${format(toFirestoreDate(c.appointmentDate)!, 'HH:mm')}.` }); return; }
-      }
-    }
-
+    if (!firestore || !tenantId || !currentUser) return;
     setIsSaving(true);
     try {
-      const p = getTenantPath('appointments', tenantId);
-      if (isEditing) {
-        const ref = doc(firestore, p!, initialData.id);
-        await updateDoc(ref, cleanFirestoreData({
-          engineerId, title: title.trim(), appointmentDate: Timestamp.fromDate(finalDate),
-          ...(isNewClient ? { clientName: newName, clientMobile: newMobile } : { clientId: selectedClientId }),
-          updatedAt: serverTimestamp(), updatedBy: currentUser?.id
-        }));
-        // Audit
-        const action = isReschedule ? 'rescheduled' : 'updated';
-        const details = isReschedule ? `أُعيد جدوله إلى ${format(finalDate, 'PPp', { locale: ar })}` : `تم تعديل بيانات الموعد`;
-        const batch = writeBatch(firestore);
-        batch.set(doc(collection(ref, 'auditLogs')), { action, details, userName: currentUser?.fullName, createdAt: serverTimestamp(), companyId: tenantId });
-        await batch.commit();
-      } else {
-        const ref = doc(collection(firestore, p!));
-        const batch = writeBatch(firestore);
-        const data: any = { title: title.trim(), engineerId, appointmentDate: Timestamp.fromDate(finalDate), type: 'architectural', status: 'scheduled', createdAt: serverTimestamp(), createdBy: currentUser.id, createdByName: currentUser.fullName, workStageUpdated: false, companyId: tenantId };
-        if (isNewClient) { data.clientName = newName; data.clientMobile = newMobile; data.visitCount = 1; data.color = '#facc15'; }
-        else { const vc = (rawAppointments || []).filter(a => a.clientId === selectedClientId && a.status !== 'cancelled').length + 1; data.clientId = selectedClientId; data.visitCount = vc; data.color = getVisitColor({ visitCount: vc }); }
-        batch.set(ref, cleanFirestoreData(data));
-        batch.set(doc(collection(ref, 'auditLogs')), { action: 'created', details: `أنشأه ${currentUser.fullName}.`, userName: currentUser.fullName, createdAt: serverTimestamp(), companyId: tenantId });
-        await batch.commit();
+      let clientId = selectedClientId;
+      let clientName = isNewClient ? newName : clients.find(c => c.id === selectedClientId)?.nameAr;
+      let clientMobile = isNewClient ? newMobile : clients.find(c => c.id === selectedClientId)?.mobile;
+
+      if (isNewClient) {
+        const newClientRef = doc(collection(firestore, getTenantPath('clients', tenantId)!));
+        await updateDoc(newClientRef, {
+          nameAr: newName, mobile: newMobile, isActive: true,
+          assignedEngineer: engineerId, createdAt: serverTimestamp(),
+          createdBy: currentUser.id, companyId: tenantId,
+        });
+        clientId = newClientRef.id;
+        clientName = newName;
+        clientMobile = newMobile;
       }
-      toast({ title: `✅ ${isEditing ? (isReschedule ? 'تمت إعادة الجدولة' : 'تم التعديل بنجاح') : 'تم الحجز بنجاح'}` });
-      onSaveSuccess(); onClose();
-    } catch (err: any) { toast({ variant: 'destructive', title: 'خطأ', description: err.message }); } finally { setIsSaving(false); }
+
+      const [hh, mm] = selectedTime.split(':').map(Number);
+      const appointmentDate = setHours(setMinutes(selectedDate, mm), hh);
+
+      const baseData: Partial<Appointment> = {
+        type: 'architectural',
+        engineerId,
+        engineerName: initialData?.engineerName || dialogData?.engineerName,
+        clientId,
+        clientName,
+        clientMobile,
+        title,
+        appointmentDate: Timestamp.fromDate(appointmentDate),
+        status: 'scheduled',
+        visitCount: 1,
+        color: getVisitColor({ visitCount: 1 }),
+        updatedAt: serverTimestamp(),
+        updatedBy: currentUser.id,
+        companyId: tenantId,
+      };
+
+      if (isCreating || isRescheduling) {
+        baseData.appointmentDate = Timestamp.fromDate(appointmentDate);
+        if (isCreating) {
+          baseData.createdAt = serverTimestamp();
+          baseData.createdBy = currentUser.id;
+        }
+      }
+
+      const p = getTenantPath('appointments', tenantId);
+      if (isCreating) {
+        const newRef = doc(collection(firestore, p!));
+        await updateDoc(newRef, baseData);
+        await updateDoc(doc(collection(newRef, 'auditLogs')), {
+          action: 'created', details: `أنشأه ${currentUser.fullName}`,
+          userName: currentUser.fullName, createdAt: serverTimestamp(), companyId: tenantId
+        });
+      } else if (isRescheduling) {
+        const ref = doc(firestore, p!, initialData.id!);
+        await updateDoc(ref, {
+          appointmentDate: Timestamp.fromDate(appointmentDate),
+          updatedAt: serverTimestamp(),
+          updatedBy: currentUser.id,
+        });
+        await updateDoc(doc(collection(ref, 'auditLogs')), {
+          action: 'rescheduled', details: `أُعيد جدولته إلى ${format(appointmentDate, 'PPP HH:mm', { locale: ar })} بواسطة ${currentUser.fullName}`,
+          userName: currentUser.fullName, createdAt: serverTimestamp(), companyId: tenantId
+        });
+      }
+
+      if (clientId || clientMobile) await reconcileClientAppointments(firestore, tenantId, { clientId, clientMobile });
+      toast({ title: '✅ تمت العملية بنجاح' });
+      onSaveSuccess?.();
+      onClose();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'خطأ', description: error.message || 'حدث خطأ غير متوقع' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={o => { if (!o && !isSaving) onClose(); }}>
       <DialogContent style={{ maxWidth: 480 }}>
         <DialogHeader>
-          <DialogTitle>{isEditing ? (mode === 'reschedule' ? 'إعادة جدولة الموعد' : 'تعديل بيانات الموعد') : 'حجز موعد جديد'}</DialogTitle>
-          <DialogDescription>{initialData?.engineerName || 'مهندس غير محدد'} • {initialData?.clientName || ''}</DialogDescription>
+          <DialogTitle>{isEditing ? (mode === 'reschedule' ? 'إعادة جدولة الموعد' : 'تعديل الموعد') : 'حجز موعد جديد'}</DialogTitle>
+          <DialogDescription className="font-bold text-indigo-700">
+             {initialData?.engineerName || (dialogData?.engineerName ? dialogData.engineerName : 'مهندس غير محدد')} 
+             • 
+             {isNewClient ? newName : clients.find(c => c.id === selectedClientId)?.nameAr || ''}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>
-            <Label>التاريخ والوقت</Label>
-            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-              <Popover>
-                <PopoverTrigger asChild><Button variant="outline" style={{ flex: 1, justifyContent: 'flex-start' }}><CalendarIcon className="ml-2 w-4 h-4" />{format(selectedDate, 'PPP', { locale: ar })}</Button></PopoverTrigger>
-                {/* ✅ تحسين ستايل الكالندر */}
-                <PopoverContent className="w-auto p-0" style={{ width: 'auto', padding: 0 }}>
-                  <Calendar 
-                    mode="single" 
-                    selected={selectedDate} 
-                    locale={ar} 
-                    onSelect={d => d && setSelectedDate(d)} 
-                    className="rounded-lg border shadow-sm"
-                  />
-                </PopoverContent>
-              </Popover>
-              <Input type="time" value={selectedTime} onChange={e => setSelectedTime(e.target.value)} style={{ width: 100 }} />
+          
+          {isRescheduling && (
+            <div>
+              <Label>التاريخ والوقت *</Label>
+              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}> 
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" style={{ flex: 1, justifyContent: 'flex-start', height: '38px', fontSize: '13px' }}>
+                      <CalendarIcon className="ml-2 h-4 w-4" />
+                      {format(selectedDate, 'PPP', { locale: ar })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" style={{ width: 'auto', padding: 0 }}>
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      locale={ar}
+                      onSelect={d => { if (d) setSelectedDate(d); setIsCalendarOpen(false); }}
+                      className="rounded-lg border shadow-sm"
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Input
+                  type="time"
+                  value={selectedTime}
+                  onChange={e => setSelectedTime(e.target.value)}
+                  style={{ width: 110 }} 
+                  disabled={isSaving}
+                />
+              </div>
             </div>
+          )}
+
+          <div>
+            <Label>الغرض من الزيارة *</Label>
+            <Input
+              required
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="مثال: مناقشة المخططات..."
+              className="h-10 rounded-xl border-2 mt-1"
+              disabled={isSaving}
+            />
           </div>
-          <div><Label>الغرض من الزيارة *</Label><Input required value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: مناقشة المخططات..." className="h-10 rounded-xl mt-1" disabled={isSaving} /></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Checkbox id="newC" checked={isNewClient} onCheckedChange={c => { setIsNewClient(!!c); setSelectedClientId(''); }} disabled={isSaving} /><Label htmlFor="newC" style={{ cursor: 'pointer' }}>عميل جديد (زيارة أولى)</Label></div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Checkbox
+              id="newClientCheckbox"
+              checked={isNewClient}
+              onCheckedChange={c => { setIsNewClient(!!c); setSelectedClientId(''); }}
+              disabled={isSaving}
+            />
+            <Label htmlFor="newClientCheckbox" style={{ cursor: 'pointer' }}>عميل جديد (زيارة أولى)</Label>
+          </div>
           
           {isNewClient ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -384,9 +495,30 @@ function AppointmentManagerDialog({ isOpen, onClose, onSaveSuccess, mode, initia
               <div><Label>الجوال *</Label><Input value={newMobile} onChange={e => setNewMobile(e.target.value)} required disabled={isSaving} className="h-9 rounded-xl mt-1" /></div>
             </div>
           ) : (
-            <div><Label>العميل المسجل</Label><div className="mt-1"><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clientOptions} placeholder="ابحث عن عميل..." disabled={isSaving || clientOptions.length === 0} className="h-9" /></div></div>
+            <div>
+              <Label>العميل المسجل</Label>
+              <div className="mt-1">
+                <InlineSearchList
+                  value={selectedClientId}
+                  onSelect={setSelectedClientId}
+                  options={clientOptions}
+                  placeholder={filteredClients.length === 0 ? 'لا يوجد عملاء مخصصون...' : 'ابحث عن عميل...'}
+                  disabled={isSaving || filteredClients.length === 0}
+                  className="h-9"
+                />
+              </div>
+              {filteredClients.length === 0 && !isNewClient && (
+                <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>💡 هذا المهندس يرى فقط عملاءه المعيَّنين.</p>
+              )}
+            </div>
           )}
-          <DialogFooter><Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button><Button type="submit" disabled={isSaving}>{isSaving && <Loader2 className="w-4 h-4 animate-spin ml-2" />} تأكيد</Button></DialogFooter>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+            <Button type="submit" disabled={isSaving}>
+              {isSaving && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
+              {isEditing ? (mode === 'reschedule' ? 'إعادة جدولة' : 'حفظ التعديلات') : 'حجز الموعد'}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
@@ -394,7 +526,7 @@ function AppointmentManagerDialog({ isOpen, onClose, onSaveSuccess, mode, initia
 }
 
 // ══════════════════════════════════════════════════════
-// 🏠 المكوّن الرئيسي
+// 🏠 المكوّن الرئيسي — ArchitecturalAppointmentsView
 // ═════════════════════════════════════════════════════
 export function ArchitecturalAppointmentsView() {
   const { firestore } = useFirebase();
@@ -525,12 +657,13 @@ export function ArchitecturalAppointmentsView() {
                     {slots.map(time => {
                       const booking = grid[eng.id!]?.[time];
                       return (
+                        // ✅ تم زيادة الارتفاع ليناسب الخط الأكبر
                         <td key={time} style={{ 
-                          padding: 4, 
-                          borderBottom: '1px solid #cbd5e1', // ✅ تعزيز حدود الخلايا السفلية
-                          borderLeft: '1px solid #cbd5e1',   // ✅ تعزيز حدود الخلايا الجانبية
+                          padding: 0, 
+                          borderBottom: '1px solid #cbd5e1',
+                          borderLeft: '1px solid #cbd5e1',
                           verticalAlign: 'top', 
-                          height: 72, 
+                          height: 90,
                           overflow: 'visible', 
                           position: 'relative' 
                         }}>
@@ -554,12 +687,67 @@ export function ArchitecturalAppointmentsView() {
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={e => setActiveDragId(e.active.id as string)} onDragEnd={handleDragEnd}>
-      <div style={{ padding: 16, background: '#f1f5f9', minHeight: '100%' }}>
+      {/* ✅ إصلاح الطباعة وعدم قطع الشاشة */}
+      <style>{`
+        @media print {
+          aside, nav, header, [data-sidebar], [data-header],
+          .sidebar, .navbar, .topbar, .no-print, button {
+            display: none !important; 
+          }
+          body, main, div, section {
+            overflow: visible !important;
+            height: auto !important;
+            position: static !important;
+          }
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          table { 
+            border-collapse: collapse !important; 
+            width: 100% !important; 
+          }
+          td, th { 
+            border: 1px solid #bbb !important; 
+            padding: 4px !important; 
+          }
+          @page {
+            size: A4 landscape;
+            margin: 5mm;
+          }
+          #print-header { 
+            display: block !important; 
+          }
+        }
+        #print-header { display: none; }
+        
+        ::view-transition-group(*),
+        ::view-transition-old(*),
+        ::view-transition-new(*) {
+          animation-duration: 0.25s;
+          animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+        }
+      `}</style>
+
+      <div id="print-header" style={{ padding: '0 16px 12px', borderBottom: '2px solid #e2e8f0', marginBottom: 16 }}>
+        <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a' }}>
+          جدول المواعيد المعمارية — {date ? format(date, 'PPP', { locale: ar }) : ''}
+        </div>
+        <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+          إجمالي المواعيد: {stats.total} | زيارة أولى: {stats.yellow} | متابعة: {stats.green} | متعاقد: {stats.blue}
+        </div>
+      </div>
+
+      <div id="appointments-print-root" style={{ padding: 16, background: '#f1f5f9', minHeight: '100%' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             <div style={{ width: 36, height: 36, borderRadius: 9, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>📅</div>
             <div><div style={{ fontSize: 20, fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>{stats.total}</div><div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>مواعيد اليوم</div></div>
-            {stats.total > 0 && (<div style={{ marginRight: 'auto', display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end' }}><div style={{ width: `${Math.max(8,(stats.yellow/stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#fde047,#facc15)' }} /><div style={{ width: `${Math.max(8,(stats.green /stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#4ade80,#22c55e)' }} /><div style={{ width: `${Math.max(8,(stats.blue  /stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#60a5fa,#3b82f6)' }} /></div>)}
+            {stats.total > 0 && (<div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end' }}><div style={{ width: `${Math.max(8,(stats.yellow/stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#fde047,#facc15)' }} /><div style={{ width: `${Math.max(8,(stats.green /stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#4ade80,#22c55e)' }} /><div style={{ width: `${Math.max(8,(stats.blue  /stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#60a5fa,#3b82f6)' }} /></div>)}
           </div>
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             <div style={{ width: 36, height: 36, borderRadius: 9, background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🟡</div>
@@ -581,10 +769,20 @@ export function ArchitecturalAppointmentsView() {
             <div><div style={{ fontSize: 17, fontWeight: 900, color: '#0f172a' }}>جدول المواعيد المعمارية</div><div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginTop: 1 }}><MousePointer2 style={{ width: 10, height: 10, display: 'inline', marginLeft: 4 }} /> السحب والإفلات نشط · القواعد الثلاث مفعّلة</div></div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', color: '#16a34a', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>️ حماية تعارض القاعات</div>
+            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', color: '#16a34a', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>🛡️ حماية تعارض القاعات</div>
+            
+            <Button
+              variant="outline"
+              onClick={() => window.print()}
+              className="no-print"
+              style={{ background: '#f0fdf4', borderColor: '#bbf7d0', color: '#16a34a', fontWeight: 800, fontSize: 12 }}
+            >
+              <i style={{ marginLeft: 6, fontSize: 15 }}>🖨️</i>
+              طباعة الجدول
+            </Button>
+            
             <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-              <PopoverTrigger asChild><Button variant="outline" style={{ background: '#fff7ed', borderColor: '#fed7aa', color: '#ea580c', fontWeight: 800, fontSize: 12 }}><CalendarIcon className="ml-2 w-4 h-4" />{date ? format(date, 'PPP', { locale: ar }) : 'اختر تاريخ'}</Button></PopoverTrigger>
-              {/* ✅ تحسين ستايل الكالندر */}
+              <PopoverTrigger asChild><Button variant="outline" className="no-print" style={{ background: '#fff7ed', borderColor: '#fed7aa', color: '#ea580c', fontWeight: 800, fontSize: 12 }}><CalendarIcon className="ml-2 w-4 h-4" />{date ? format(date, 'PPP', { locale: ar }) : 'اختر تاريخ'}</Button></PopoverTrigger>
               <PopoverContent className="w-auto p-0" style={{ width: 'auto', padding: 0 }}>
                 <Calendar 
                   mode="single" 
