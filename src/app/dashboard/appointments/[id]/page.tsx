@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -58,9 +57,15 @@ import { Separator } from '@/components/ui/separator';
 import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
 
 const stageStatusColors: Record<string, string> = {
-  pending: 'bg-slate-100 text-slate-800 border-slate-200',
-  'in-progress': 'bg-blue-50 text-blue-800 border-blue-200',
-  completed: 'bg-green-50 text-green-800 border-green-200',
+  pending: 'bg-slate-100 text-slate-700 border-slate-200',
+  'in-progress': 'bg-blue-50 text-blue-700 border-blue-200',
+  completed: 'bg-green-50 text-green-700 border-green-200',
+};
+
+const stageBorderColors: Record<string, string> = {
+  pending: 'border-r-slate-300',
+  'in-progress': 'border-r-blue-500',
+  completed: 'border-r-green-500',
 };
 
 const stageStatusTranslations: Record<string, string> = {
@@ -236,18 +241,12 @@ export default function AppointmentDetailsPage() {
         } finally { setIsSaving(false); }
     };
 
-    /**
-     * 🛡️ محرك التراجع السيادي المتسلسل (Sovereign Sequential Rollback V142.0) 🛡️
-     * - تم تحصينه ليقوم بالتصفير القسري لكافة المراحل اللاحقة (Forced Cascade Reset).
-     * - تم دمج "المبلغ المفسر" في التعليق التوثيقي لبيان قيمة المطالبة الملغاة.
-     */
     const handleUndoStage = async (stageId: string) => {
         if (!firestore || !transaction || !transactionPath || !tenantId || isLocked) return;
         
         const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
         const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
         
-        // 🛡️ درع التحقق من التسلسل العكسي 🛡️
         const hasLaterCompletedStage = currentStages.some((s, idx) => idx > stageIndex && s.status === 'completed');
         if (hasLaterCompletedStage) {
             toast({ 
@@ -262,7 +261,6 @@ export default function AppointmentDetailsPage() {
         try {
             const batch = writeBatch(firestore);
             
-            // 🛡️ التصفير القسري للمستقبل (The Cascade Eraser) 🛡️
             for (let i = stageIndex; i < currentStages.length; i++) {
                 currentStages[i].status = i === stageIndex ? 'in-progress' : 'pending';
                 currentStages[i].endDate = null;
@@ -274,7 +272,6 @@ export default function AppointmentDetailsPage() {
 
             const stage = currentStages[stageIndex];
             
-            // 💰 جلب مبلغ المطالبة لإدراجه في التعليق 💰
             let cancelledAmount = 0;
             const contract = transaction.contract;
             if (contract?.clauses) {
@@ -282,7 +279,6 @@ export default function AppointmentDetailsPage() {
                 if (clause) cancelledAmount = clause.amount || 0;
             }
 
-            // 3. التراجع المالي والرقابي
             const appsPath = getTenantPath('payment_applications', tenantId);
             const appsQuery = query(
                 collection(firestore, appsPath!), 
@@ -298,7 +294,6 @@ export default function AppointmentDetailsPage() {
                 });
             });
 
-            // 4. تصفير حالة الدفعة في العقد
             if (contract?.clauses) {
                 const updatedClauses = contract.clauses.map((c: any) => {
                     if (c.condition === stage.name) return { ...c, status: 'غير مستحقة' };
@@ -307,18 +302,15 @@ export default function AppointmentDetailsPage() {
                 batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
             }
 
-            // 5. تحديث مستند المعاملة النهائي
             batch.update(doc(firestore, transactionPath), { 
                 stages: currentStages, 
                 updatedAt: serverTimestamp() 
             });
 
-            // 6. إعادة فتح الموعد إذا كان مرتبطاً
             if (appointment && appointment.workStageUpdated) {
                 batch.update(doc(firestore, apptPath!), { workStageUpdated: false, status: 'scheduled' });
             }
 
-            // 7. توثيق التراجع في التايم لاين مع إدراج المبلغ الفعلي
             const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
             batch.set(timelineRef, {
                 type: 'comment',
@@ -348,19 +340,20 @@ export default function AppointmentDetailsPage() {
         });
     };
 
-    if (apptLoading || clientLoading) return <div className="p-10"><Skeleton className="h-96 w-full rounded-[3rem]" /></div>;
+    if (apptLoading || clientLoading) return <div className="p-10"><Skeleton className="h-96 w-full rounded-2xl" /></div>;
     if (!appointment) return <div className="p-20 text-center font-black opacity-30">الموعد غير موجود.</div>;
 
     const apptDate = toFirestoreDate(appointment.appointmentDate);
 
     return (
-        <div className="max-w-3xl mx-auto space-y-6 pb-20" dir="rtl">
-            <Card className="rounded-[3rem] shadow-2xl border-none overflow-hidden bg-white">
-                <CardHeader className="bg-primary/5 pb-8 px-10 border-b">
-                    <div className="flex justify-between items-start">
+        <div className="max-w-4xl mx-auto space-y-6 pb-20" dir="rtl">
+            <Card className="rounded-2xl shadow-lg border-slate-200 overflow-hidden bg-white">
+                <CardHeader className="bg-slate-50 p-6 border-b border-slate-100">
+                    <div className="flex justify-between items-center">
                         <div className="space-y-1">
                             <div className="flex items-center gap-3">
-                                <CardTitle className="text-2xl font-black">{appointment.clientName}</CardTitle>
+                                {/* تم تكبير خط العميل ليكون بارزاً */}
+                                <CardTitle className="text-2xl font-bold text-slate-900">{appointment.clientName}</CardTitle>
                                 {appointment.clientId && (
                                     <UniversalActionTrigger 
                                         title={appointment.clientName}
@@ -370,174 +363,173 @@ export default function AppointmentDetailsPage() {
                                     />
                                 )}
                             </div>
-                            <CardDescription className="font-bold flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-primary" /> {apptDate ? format(apptDate, 'eeee, dd MMMM HH:mm', { locale: ar }) : '-'}
+                            <CardDescription className="font-semibold flex items-center gap-2 text-slate-500 text-sm">
+                                <Calendar className="h-4 w-4 text-primary" /> {apptDate ? format(apptDate, 'eeee, dd MMMM yyyy - HH:mm', { locale: ar }) : '-'}
                             </CardDescription>
                         </div>
-                        <Badge variant="outline" className="bg-white px-6 h-8 rounded-full font-black border-primary/20 text-primary shadow-sm uppercase tracking-widest text-[10px]">Site Visit Center</Badge>
+                        <Badge variant="outline" className="bg-white px-4 h-7 rounded-lg font-bold border-slate-200 text-primary shadow-sm uppercase tracking-wider text-[10px]">Site Visit</Badge>
                     </div>
                 </CardHeader>
 
-                <CardContent className="p-10 space-y-12">
+                <CardContent className="p-6 space-y-8">
                     {!appointment.transactionId ? (
-                        <div className="space-y-6 animate-in slide-in-from-top-4">
-                            <Alert className="rounded-[2rem] border-2 border-orange-200 bg-orange-50 p-6 shadow-md">
-                                <AlertCircle className="h-6 w-6 text-orange-600" />
-                                <AlertTitle className="font-black text-orange-900 text-lg">ارتباط فني مفقود</AlertTitle>
-                                <AlertDescription className="text-orange-700 font-bold mt-1">يرجى ربط هذه الزيارة بإحدى المعاملات النشطة للتمكن من توثيق الإنجاز وتحديث مراحل الـ WBS.</AlertDescription>
+                        <div className="space-y-4 animate-in slide-in-from-top-4">
+                            <Alert className="rounded-xl border border-orange-200 bg-orange-50 p-4">
+                                <AlertCircle className="h-5 w-5 text-orange-600" />
+                                <AlertTitle className="font-bold text-orange-900 text-sm">ارتباط فني مفقود</AlertTitle>
+                                <AlertDescription className="text-orange-700 text-sm mt-1">يرجى ربط هذه الزيارة بإحدى المعاملات النشطة للتمكن من توثيق الإنجاز.</AlertDescription>
                             </Alert>
                             {!appointment.clientId ? (
-                                <Button asChild className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">
+                                <Button asChild className="w-full h-12 rounded-xl font-bold text-base shadow-md shadow-primary/20">
                                     <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(appointment.clientName)}&mobile=${encodeURIComponent(appointment.clientMobile || '')}&fromAppointmentId=${appointment.id}`}>تأسيس ملف عميل رسمي</Link>
                                 </Button>
                             ) : (
-                                <div className="space-y-4">
-                                    <Label className="font-black pr-2 text-slate-500">اختر المعاملة المستهدفة بالزيارة:</Label>
+                                <div className="space-y-3 p-4 bg-white rounded-xl border border-slate-200">
+                                    <Label className="font-bold text-slate-600 text-sm">اختر المعاملة المستهدفة:</Label>
                                     <InlineSearchList 
                                         value={''} 
                                         onSelect={handleLinkTransaction} 
                                         options={clientTransactions.map(t => ({ value: t.id!, label: t.transactionType }))} 
                                         placeholder="ابحث عن مسار فني (تصميم، تراخيص...)"
-                                        className="h-12 border-2 rounded-xl"
+                                        className="h-11 border-slate-200 rounded-lg"
                                     />
                                     <Button variant="ghost" onClick={() => setIsTxFormOpen(true)} className="w-full text-xs font-bold text-primary underline hover:bg-primary/5">فتح معاملة جديدة لهذا العميل +</Button>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <div className="space-y-12">
-                             <div className="flex items-center gap-4 bg-primary/5 p-8 rounded-[3rem] border-2 border-dashed border-primary/20 shadow-inner group">
-                                <div className="p-4 bg-white rounded-[2rem] shadow-xl text-primary group-hover:scale-110 transition-transform"><Target className="h-8 w-8" /></div>
-                                <div className="space-y-0.5">
-                                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">المسار الفني المرتبط</p>
-                                    <p className="font-black text-2xl text-[#1e1b4b]">{transaction?.transactionType}</p>
+                        <div className="space-y-6">
+                             <div className="flex items-center gap-4 bg-primary/5 p-4 rounded-xl border border-primary/10 group">
+                                <div className="p-3 bg-white rounded-lg shadow-sm text-primary"><Target className="h-5 w-5" /></div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest">المسار الفني المرتبط</p>
+                                    {/* تم تكبير خط المعاملة ليكون واضحاً */}
+                                    <p className="font-bold text-xl text-slate-900">{transaction?.transactionType}</p>
                                 </div>
                              </div>
 
-                             <div className="space-y-8">
-                                <h3 className="font-black text-xl border-r-8 border-primary pr-4 flex items-center gap-3 text-[#1e1b4b]">
-                                    <Workflow className="h-7 w-7 text-primary" /> مراحل الإنجاز الميداني (WBS)
+                             <div className="space-y-4">
+                                <h3 className="font-bold text-lg border-r-4 border-primary pr-3 flex items-center gap-2 text-slate-900">
+                                    <Workflow className="h-5 w-5 text-primary" /> مراحل الإنجاز الميداني (WBS)
                                 </h3>
                                 
-                                <div className="space-y-8">
+                                <div className="space-y-3">
                                     {(transaction?.stages || []).map((stage, idx) => {
                                         const isCompleted = stage.status === 'completed';
                                         const isCurrent = stage.status === 'in-progress';
                                         const isPending = stage.status === 'pending';
                                         
-                                        // 🛡️ قانون التتابع الميداني الصارم 🛡️
                                         const isLockedRow = idx > 0 && transaction.stages![idx-1].status !== 'completed';
-                                        
                                         const isActionActive = activeAction?.stageId === stage.stageId;
-
-                                        // 🛡️ درع التراجع السيادي: لا يسمح بالتراجع إلا عن آخر مرحلة مكتملة 🛡️
                                         const isLastCompleted = isCompleted && !transaction.stages!.some((s, sIdx) => s.status === 'completed' && sIdx > idx);
 
                                         return (
                                             <div key={stage.stageId} className={cn(
-                                                "p-10 border-2 rounded-[3.5rem] transition-all relative group",
-                                                isCurrent ? "border-primary bg-primary/[0.02] shadow-2xl scale-[1.01]" : "border-slate-100 opacity-60"
+                                                "relative bg-white rounded-xl border shadow-sm transition-all overflow-hidden",
+                                                stageBorderColors[stage.status],
+                                                isCurrent ? "border-blue-100 shadow-blue-50" : "border-slate-100",
+                                                isCompleted && "bg-green-50/30 opacity-90",
+                                                isLockedRow && "opacity-50"
                                             )}>
-                                                <div className="flex flex-col sm:flex-row justify-between items-center gap-8">
-                                                    <div className="flex items-center gap-8">
-                                                        <div className="relative">
-                                                            <Badge variant="outline" className={cn("w-32 justify-center h-8 rounded-xl font-black text-[10px] border-2", stageStatusColors[stage.status])}>
-                                                                {stageStatusTranslations[stage.status]}
-                                                            </Badge>
-                                                            <div className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-white rounded-full border-2 border-primary flex items-center justify-center font-mono font-black text-[8px] text-primary shadow-sm">{idx + 1}</div>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="font-black text-2xl text-slate-900">{stage.name}</span>
-                                                                {appointment.clientId && !isLocked && (
-                                                                    <UniversalActionTrigger 
-                                                                        title={transaction?.transactionType || 'زيارة ميدانية'}
-                                                                        subItemName={stage.name}
-                                                                        clientId={appointment.clientId} 
-                                                                        sourceModule="مراحل العمل"
-                                                                        sourceId={transaction?.id || ''}
-                                                                        sourceSubId={stage.stageId}
-                                                                    />
+                                                <div className="p-5 pr-6">
+                                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="text-center">
+                                                                <div className="text-[10px] font-bold text-slate-400 mb-1">مرحلة</div>
+                                                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 text-sm">{idx + 1}</div>
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    {/* حجم خط المراحل: كبير ومريح (text-lg) بدل الصغير جداً أو الكبير المنتفخ */}
+                                                                    <span className="text-lg font-bold text-slate-900">{stage.name}</span>
+                                                                    <Badge variant="outline" className={cn("h-5 px-2 justify-center rounded-md font-bold text-[10px] border", stageStatusColors[stage.status])}>
+                                                                        {stageStatusTranslations[stage.status]}
+                                                                    </Badge>
+                                                                    {appointment.clientId && !isLocked && (
+                                                                        <UniversalActionTrigger 
+                                                                            title={transaction?.transactionType || 'زيارة ميدانية'}
+                                                                            subItemName={stage.name}
+                                                                            clientId={appointment.clientId} 
+                                                                            sourceModule="مراحل العمل"
+                                                                            sourceId={transaction?.id || ''}
+                                                                            sourceSubId={stage.stageId}
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                                {isCurrent && stage.expectedEndDate && (
+                                                                    <p className="text-xs font-semibold text-blue-600 flex items-center gap-1">
+                                                                        <Clock className="h-3 w-3" /> التسليم: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}
+                                                                    </p>
+                                                                )}
+                                                                {isCompleted && stage.endDate && (
+                                                                    <p className="text-xs font-semibold text-green-600 flex items-center gap-1">
+                                                                        <CheckCircle2 className="h-3 w-3" /> تم الإنجاز: {format(toFirestoreDate(stage.endDate)!, 'dd/MM/yyyy')}
+                                                                    </p>
                                                                 )}
                                                             </div>
-                                                            {isCurrent && stage.expectedEndDate && (
-                                                                <p className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 uppercase tracking-widest">
-                                                                    <Clock className="h-3 w-3" /> التسليم المخطط: {format(toFirestoreDate(stage.expectedEndDate)!, 'dd/MM/yyyy')}
-                                                                </p>
-                                                            )}
-                                                            {isCompleted && stage.endDate && (
-                                                                <p className="text-[10px] font-bold text-green-600 flex items-center gap-1.5 uppercase tracking-widest">
-                                                                    <CheckCircle2 className="h-3 w-3" /> تم الإنجاز بتاريخ: {format(toFirestoreDate(stage.endDate)!, 'dd/MM/yyyy')}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div className="flex items-center gap-4 no-print">
-                                                        {isCurrent && !isActionActive && (
-                                                            <div className="flex gap-2 animate-in zoom-in-95">
-                                                                <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'modify' })} variant="outline" className="h-12 px-6 rounded-2xl font-black text-xs gap-2 border-orange-200 text-orange-700 bg-white hover:bg-orange-50 transition-all"><Edit3 className="h-4 w-4" /> تسجيل تعديل</Button>
-                                                                <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'complete' })} className="h-12 px-8 rounded-2xl font-black text-xs gap-2 bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-100"><CheckCircle2 className="h-4 w-4" /> إنهاء المرحلة</Button>
-                                                            </div>
-                                                        )}
-                                                        {isPending && !isLockedRow && !isActionActive && !isLocked && (
-                                                            <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'start' })} className="h-12 px-10 rounded-2xl font-black gap-3 shadow-xl shadow-primary/20"><Play className="h-4 w-4" /> بدء الزيارة</Button>
-                                                        )}
-                                                        {isCompleted && (
-                                                            <div className="flex items-center gap-2">
-                                                                {isPrivileged && isLastCompleted && (
-                                                                    <Button 
-                                                                        variant="ghost" 
-                                                                        size="sm" 
-                                                                        onClick={() => handleUndoStage(stage.stageId)}
-                                                                        className="h-9 px-4 rounded-xl text-orange-600 hover:bg-orange-50 font-black gap-1.5 border border-orange-100"
-                                                                    >
-                                                                        <Undo2 className="h-4 w-4" /> تراجع متسلسل
-                                                                    </Button>
-                                                                )}
-                                                                <div className="p-3 bg-green-100 rounded-full text-green-700 shadow-inner"><CheckCircle2 className="h-7 w-7"/></div>
-                                                            </div>
-                                                        )}
-                                                        {isActionActive && <Button variant="ghost" size="icon" onClick={() => setActiveAction(null)} className="h-10 w-10 rounded-full text-slate-400 hover:bg-red-50 hover:text-red-500"><X className="h-5 w-5"/></Button>}
-                                                    </div>
-                                                </div>
-
-                                                {isActionActive && (
-                                                    <div className="mt-10 pt-10 border-t-2 border-dashed border-primary/20 space-y-6 animate-in slide-in-from-top-4 duration-500">
-                                                        <div className="space-y-4">
-                                                            <div className="flex justify-between items-center pr-1">
-                                                                <Label className="font-black text-xs text-primary flex items-center gap-2 uppercase tracking-[0.2em]">
-                                                                    <MessageSquare className="h-4 w-4 text-primary" /> محضر الأعمال الميدانية (إلزامي) *
-                                                                </Label>
-                                                                <Badge className="bg-primary/10 text-primary border-none text-[8px] font-black uppercase flex items-center gap-1">
-                                                                    <Zap className="h-2.5 w-2.5 fill-primary" /> {activeAction.type === 'complete' ? '+10 XP Points' : '+2 XP Points'}
-                                                                </Badge>
-                                                            </div>
-                                                            <MentionTextarea 
-                                                                autoFocus
-                                                                value={actionNote} 
-                                                                onValueChange={setActionNote} 
-                                                                placeholder="اشرح ما تم إنجازه اليوم لتمكين الحفظ... استخدم @ للمنشن" 
-                                                                className="rounded-[2.5rem] border-none bg-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)] p-8 font-medium text-xl leading-relaxed min-h-[160px] focus-visible:ring-2 focus-visible:ring-primary/20"
-                                                            />
                                                         </div>
                                                         
-                                                        <div className="flex justify-end">
-                                                            <Button 
-                                                                onClick={handleStageAction} 
-                                                                disabled={isSaving || !actionNote.trim()} 
-                                                                className={cn(
-                                                                    "h-14 px-20 rounded-[2rem] font-black text-xl shadow-2xl gap-4 min-w-[300px]",
-                                                                    activeAction.type === 'complete' ? "bg-green-600 hover:bg-green-700 shadow-green-200" : 
-                                                                    activeAction.type === 'start' ? "bg-primary shadow-primary/30" : "bg-orange-600 hover:bg-orange-700 shadow-orange-200"
-                                                                )}
-                                                            >
-                                                                {isProcessing ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                                                                تأكيد وحفظ الإنجاز
-                                                            </Button>
+                                                        <div className="flex items-center gap-2 no-print">
+                                                            {isCurrent && !isActionActive && (
+                                                                <div className="flex gap-2">
+                                                                    <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'modify' })} variant="outline" size="sm" className="h-9 px-3 rounded-lg font-bold text-xs gap-1.5 border-orange-200 text-orange-700 bg-white hover:bg-orange-50"><Edit3 className="h-3.5 w-3.5" /> تعديل</Button>
+                                                                    <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'complete' })} size="sm" className="h-9 px-4 rounded-lg font-bold text-xs gap-1.5 bg-green-600 hover:bg-green-700 text-white shadow-sm"><CheckCircle2 className="h-3.5 w-3.5" /> إنهاء</Button>
+                                                                </div>
+                                                            )}
+                                                            {isPending && !isLockedRow && !isActionActive && !isLocked && (
+                                                                <Button onClick={() => setActiveAction({ stageId: stage.stageId, type: 'start' })} size="sm" className="h-9 px-4 rounded-lg font-bold text-xs gap-1.5 shadow-sm"><Play className="h-3.5 w-3.5" /> بدء الزيارة</Button>
+                                                            )}
+                                                            {isCompleted && (
+                                                                <div className="flex items-center gap-2">
+                                                                    {isPrivileged && isLastCompleted && (
+                                                                        <Button variant="ghost" size="sm" onClick={() => handleUndoStage(stage.stageId)} className="h-7 px-2 rounded-md text-orange-600 hover:bg-orange-50 font-bold gap-1 text-[10px]">
+                                                                            <Undo2 className="h-3 w-3" /> تراجع
+                                                                        </Button>
+                                                                    )}
+                                                                    <div className="p-1.5 bg-green-100 rounded-md text-green-700"><CheckCircle2 className="h-4 w-4"/></div>
+                                                                </div>
+                                                            )}
+                                                            {isActionActive && <Button variant="ghost" size="icon" onClick={() => setActiveAction(null)} className="h-8 w-8 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-500"><X className="h-4 w-4"/></Button>}
                                                         </div>
                                                     </div>
-                                                )}
+
+                                                    {isActionActive && (
+                                                        <div className="mt-5 pt-5 border-t border-dashed border-slate-200 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                                            <div className="space-y-2">
+                                                                <div className="flex justify-between items-center">
+                                                                    <Label className="font-bold text-sm text-slate-600 flex items-center gap-1.5">
+                                                                        <MessageSquare className="h-3.5 w-3.5 text-primary" /> محضر الأعمال (إلزامي) *
+                                                                    </Label>
+                                                                    <Badge className="bg-primary/10 text-primary border-none text-[8px] font-bold uppercase flex items-center gap-1 py-0.5">
+                                                                        <Zap className="h-2.5 w-2.5 fill-primary" /> {activeAction.type === 'complete' ? '+10 XP' : '+2 XP'}
+                                                                    </Badge>
+                                                                </div>
+                                                                <MentionTextarea 
+                                                                    autoFocus
+                                                                    value={actionNote} 
+                                                                    onValueChange={setActionNote} 
+                                                                    placeholder="اشرح ما تم إنجازه اليوم لتمكين الحفظ... استخدم @ للمنشن" 
+                                                                    className="rounded-xl border-slate-200 bg-white shadow-sm p-4 font-medium text-sm leading-relaxed min-h-[120px] focus-visible:ring-1 focus-visible:ring-primary/30"
+                                                                />
+                                                            </div>
+                                                            
+                                                            <div className="flex justify-end">
+                                                                <Button 
+                                                                    onClick={handleStageAction} 
+                                                                    disabled={isSaving || !actionNote.trim()} 
+                                                                    className={cn(
+                                                                        "h-10 px-8 rounded-xl font-bold text-sm shadow-md gap-2",
+                                                                        activeAction.type === 'complete' ? "bg-green-600 hover:bg-green-700" : 
+                                                                        activeAction.type === 'start' ? "bg-primary" : "bg-orange-600 hover:bg-orange-700"
+                                                                    )}
+                                                                >
+                                                                    {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
+                                                                    تأكيد وحفظ
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         );
                                     })}
@@ -546,8 +538,8 @@ export default function AppointmentDetailsPage() {
                         </div>
                     )}
                 </CardContent>
-                <CardFooter className="bg-muted/10 p-10 flex justify-between border-t no-print">
-                    <Button variant="ghost" onClick={() => router.back()} className="font-black gap-3 h-14 text-slate-500 rounded-3xl hover:bg-white px-10 transition-all"><ArrowRight className="h-6 w-6"/> العودة للجدول</Button>
+                <CardFooter className="bg-slate-50 p-4 flex justify-between border-t border-slate-100 no-print">
+                    <Button variant="ghost" onClick={() => router.back()} className="font-bold gap-2 h-10 text-slate-500 rounded-xl hover:bg-white px-6"><ArrowRight className="h-5 w-5"/> العودة للجدول</Button>
                 </CardFooter>
             </Card>
 
