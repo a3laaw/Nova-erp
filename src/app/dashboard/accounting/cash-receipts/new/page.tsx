@@ -20,14 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, Loader2, Target, Banknote, Sparkles } from 'lucide-react';
+import { Save, Loader2, Target, Banknote } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, getDocs, doc, runTransaction, getDoc, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, serverTimestamp, getDocs, doc, runTransaction, getDoc, orderBy } from 'firebase/firestore';
 import type { Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
-import { numberToArabicWords, formatCurrency, cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
+import { numberToArabicWords, formatCurrency, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { useBranding } from '@/context/branding-context';
 import { DateInput } from '@/components/ui/date-input';
@@ -47,10 +47,6 @@ const getTotalPaidForProject = async (projectId: string, db: any, tenantId: stri
     return total;
 };
 
-/**
- * مكون محتوى سند القبض (The Receipt Engine Content):
- * تم تحويل دوال الخيارات إلى useMemo لضمان تمرير مصفوفات صحيحة لمكون البحث.
- */
 function NewCashReceiptContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -86,7 +82,6 @@ function NewCashReceiptContent() {
   const [clientProjects, setClientProjects] = useState<ClientTransaction[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
 
-  // ✨ مصفوفات الخيارات المحسنة (Memorized Options) ✨
   const clientAccountOptions = useMemo(() => 
     accounts.filter(a => a.code.startsWith('1102')).map(a => ({
       value: a.id!,
@@ -346,42 +341,46 @@ function NewCashReceiptContent() {
   };
 
   return (
-    <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden glass-effect" dir="rtl">
-        <CardHeader className="pb-8 rounded-t-[2.5rem] border-b bg-white/10">
-            <div className="flex items-center gap-4">
-                <div className="p-3 bg-[#FF7A00]/10 rounded-2xl text-[#FF7A00] shadow-inner">
-                    <Banknote className="h-8 w-8" />
+    <Card className="max-w-3xl mx-auto rounded-xl border border-slate-200 shadow-sm overflow-hidden bg-white" dir="rtl">
+        {/* ✅ الهيدر: مضغوط واحترافي */}
+        <CardHeader className="pb-4 px-6 border-b bg-slate-50/50">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <Banknote className="h-5 w-5" />
                 </div>
                 <div>
-                    <CardTitle className="text-3xl font-black text-[#1e1b4b]">سـنـد قـبـض / Cash Receipt</CardTitle>
-                    <CardDescription className="font-black text-[#1e1b4b]/60">
-                        {isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند المعتمد
+                    <CardTitle className="text-lg font-bold text-slate-900">سند قبض جديد</CardTitle>
+                    <CardDescription className="font-medium text-slate-500 text-xs mt-0.5">
+                        {isGeneratingVoucher ? <Skeleton className="h-3 w-24" /> : `رقم السند: ${voucherNumber}`}
                     </CardDescription>
                 </div>
             </div>
         </CardHeader>
-        <CardContent className="space-y-8 p-10 bg-white/95">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-end">
-                <div className="md:col-span-2 grid gap-2">
-                <Label className="font-black text-[#1e1b4b] pr-1">استلمنا من (حساب العميل المالي) *</Label>
-                <InlineSearchList 
-                    value={selectedAccountId}
-                    onSelect={handleAccountChange}
-                    options={clientAccountOptions}
-                    placeholder={accountsLoading ? 'جاري جلب الحسابات...' : 'اختر الحساب المالي للعميل...'}
-                    disabled={accountsLoading || isSaving}
-                    className="h-12 rounded-2xl border-2"
-                />
+
+        <CardContent className="space-y-4 p-6">
+            {/* ✅ الصف الأول: الحساب والتاريخ */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2 grid gap-1.5">
+                    <Label className="font-medium text-xs text-slate-700">استلمنا من (حساب العميل المالي) *</Label>
+                    <InlineSearchList 
+                        value={selectedAccountId}
+                        onSelect={handleAccountChange}
+                        options={clientAccountOptions}
+                        placeholder={accountsLoading ? 'جاري جلب الحسابات...' : 'اختر الحساب المالي للعميل...'}
+                        disabled={accountsLoading || isSaving}
+                        className="h-9 rounded-lg border border-slate-200 text-sm focus-within:ring-2 focus-within:ring-primary/20"
+                    />
                 </div>
-                <div className="grid gap-2">
-                    <Label className="font-black text-[#1e1b4b] pr-1">التاريخ *</Label>
-                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-12 rounded-2xl" />
+                <div className="grid gap-1.5">
+                    <Label className="font-medium text-xs text-slate-700">التاريخ *</Label>
+                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-9 rounded-lg border border-slate-200 text-sm" />
                 </div>
             </div>
             
-            <div className="grid gap-2 p-6 bg-primary/5 rounded-3xl border-2 border-dashed border-primary/20">
-                <Label className="font-black flex items-center gap-2 text-primary">
-                    <Target className="h-5 w-5"/> ربط بعقد/مشروع (مركز ربحية)
+            {/* ✅ قسم ربط المشروع */}
+            <div className="grid gap-1.5 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <Label className="font-medium text-xs text-slate-700 flex items-center gap-1.5">
+                    <Target className="h-3.5 w-3.5 text-primary"/> ربط بعقد/مشروع (مركز ربحية)
                 </Label>
                 <InlineSearchList 
                     value={selectedProjectId} 
@@ -389,41 +388,56 @@ function NewCashReceiptContent() {
                     options={projectOptions}
                     placeholder={!selectedClientId ? 'اختر حساب العميل أولاً' : projectsLoading ? 'جاري التحميل...' : 'اختر الخدمة الفنية (اختياري)...'}
                     disabled={!selectedClientId || projectsLoading || isSaving}
-                    className="h-12 bg-white rounded-2xl"
+                    className="h-9 bg-white rounded-lg border border-slate-200 text-sm"
                 />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="grid gap-2">
-                    <Label className="font-black text-[#1e1b4b] pr-1">المبلغ المحصل *</Label>
+            {/* ✅ قسم المبلغ والكتابة */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid gap-1.5">
+                    <Label className="font-medium text-xs text-slate-700">المبلغ المحصل *</Label>
                     <Input 
                       id="amount" 
                       type="number" 
                       step="0.001" 
                       placeholder="0.000" 
-                      className='text-left dir-ltr h-14 text-3xl font-black text-[#1e1b4b] rounded-2xl' 
+                      className='text-left dir-ltr h-9 text-sm font-semibold text-slate-900 rounded-lg border-slate-200 focus:ring-primary/20' 
                       value={amount} 
                       onChange={e => setAmount(e.target.value)} 
                       disabled={isSaving}
                       onWheel={(e) => e.currentTarget.blur()}
                     />
                 </div>
-                <div className="md:col-span-2 grid gap-2">
-                <Label className="text-xs font-black text-muted-foreground uppercase pr-1">مبلغ وقدره (كتابة)</Label>
-                <div className='p-4 text-sm font-black text-[#1e1b4b]/70 border-2 border-dashed rounded-2xl min-h-[56px] bg-muted/20 flex items-center justify-center italic text-center'>
-                    {amountInWords || '(سيتم ملؤه تلقائياً)'}
-                </div>
+                <div className="md:col-span-2 grid gap-1.5">
+                    <Label className="text-xs font-medium text-slate-500">مبلغ وقدره (كتابة)</Label>
+                    <div className='px-3 py-2 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg min-h-[36px] bg-slate-50 flex items-center italic'>
+                        {amountInWords || '(سيتم ملؤه تلقائياً)'}
+                    </div>
                 </div>
             </div>
-            <div className="grid gap-2">
-                <Label htmlFor="description" className="font-black text-[#1e1b4b] pr-1">البيان / وذلك عن</Label>
-                <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving} rows={3} className="rounded-3xl border-2" />
+            
+            {/* ✅ حقل البيان */}
+            <div className="grid gap-1.5">
+                <Label htmlFor="description" className="font-medium text-xs text-slate-700">البيان / وذلك عن</Label>
+                <Textarea 
+                    id="description" 
+                    placeholder="وصف عملية الدفع..." 
+                    value={description} 
+                    onChange={e => setDescription(e.target.value)} 
+                    disabled={isSaving} 
+                    rows={2} 
+                    className="rounded-lg border-slate-200 focus:ring-primary/20 text-sm" 
+                />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t">
-                <div className="grid gap-2">
-                    <Label className="font-black text-[#1e1b4b] pr-1">طريقة الدفع *</Label>
+            
+            {/* ✅ تفاصيل الدفع */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+                <div className="grid gap-1.5">
+                    <Label className="font-medium text-xs text-slate-700">طريقة الدفع *</Label>
                     <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
-                        <SelectTrigger className="h-12 rounded-2xl border-2 text-[#1e1b4b]"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
+                        <SelectTrigger className="h-9 rounded-lg border-slate-200 text-slate-700 text-sm">
+                            <SelectValue placeholder="اختر الطريقة..." />
+                        </SelectTrigger>
                         <SelectContent dir="rtl">
                             <SelectItem value="Cash">نقداً</SelectItem>
                             <SelectItem value="Cheque">شيك</SelectItem>
@@ -432,29 +446,51 @@ function NewCashReceiptContent() {
                         </SelectContent>
                     </Select>
                 </div>
-                 <div className="grid gap-2">
-                    <Label className="font-black text-[#1e1b4b] pr-1">حساب الإيداع *</Label>
-                    <InlineSearchList value={debitAccountId} onSelect={setDebitAccountId} options={debitAccountOptions} placeholder={!paymentMethod ? 'اختر الطريقة أولاً' : 'اختر الحساب...'} disabled={isSaving || !paymentMethod} className="h-12 rounded-2xl" />
+                <div className="grid gap-1.5">
+                    <Label className="font-medium text-xs text-slate-700">حساب الإيداع *</Label>
+                    <InlineSearchList 
+                        value={debitAccountId} 
+                        onSelect={setDebitAccountId} 
+                        options={debitAccountOptions} 
+                        placeholder={!paymentMethod ? 'اختر الطريقة أولاً' : 'اختر الحساب...'} 
+                        disabled={isSaving || !paymentMethod} 
+                        className="h-9 rounded-lg border border-slate-200 text-sm"
+                        onFocus={(e) => e.preventDefault()}
+                    />
                 </div>
-                <div className="grid gap-2">
-                <Label className="font-black text-[#1e1b4b] pr-1">رقم الشيك / المرجع</Label>
-                <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-12 rounded-2xl border-2 font-mono text-[#1e1b4b]" />
+                <div className="grid gap-1.5">
+                    <Label className="font-medium text-xs text-slate-700">رقم الشيك / المرجع</Label>
+                    <Input 
+                        value={reference} 
+                        onChange={e => setReference(e.target.value)} 
+                        disabled={isSaving} 
+                        className="h-9 rounded-lg border-slate-200 font-mono text-sm text-slate-700" 
+                    />
                 </div>
             </div>
         </CardContent>
-      <CardFooter className="flex justify-end gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
-        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-14 px-10 rounded-2xl font-bold">إلغاء</Button>
-        <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-xl shadow-primary/30 bg-[#7209B7] text-white">
-            {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />} الاعتماد والحفظ
-        </Button>
-      </CardFooter>
+        
+        {/* ✅ الفوتر والأزرار: مضغوطة */}
+        <CardFooter className="flex justify-end gap-2 p-4 border-t bg-slate-50/50">
+            <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving} className="h-9 px-4 rounded-lg font-medium text-sm border-slate-200 hover:bg-slate-100">
+                إلغاء
+            </Button>
+            <Button 
+                onClick={handleSave} 
+                disabled={isSaving || isGeneratingVoucher} 
+                className="h-9 px-6 rounded-lg font-semibold text-sm shadow-sm bg-primary hover:bg-primary/90 text-white transition-colors"
+            >
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin ml-1.5" /> : <Save className="h-4 w-4 ml-1.5" />} 
+                الاعتماد والحفظ
+            </Button>
+        </CardFooter>
     </Card>
   );
 }
 
 export default function NewCashReceiptPage() {
     return (
-        <Suspense fallback={<div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>}>
+        <Suspense fallback={<div className="p-8 max-w-3xl mx-auto"><Skeleton className="h-96 w-full rounded-xl" /></div>}>
             <NewCashReceiptContent />
         </Suspense>
     );
