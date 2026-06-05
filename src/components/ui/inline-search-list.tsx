@@ -100,7 +100,7 @@ export function InlineSearchList({
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-[--radix-popover-trigger-width] p-0 z-[999999999] border-2 border-primary/20 shadow-2xl rounded-2xl overflow-hidden bg-white" 
+        className="w-[450px] p-0 z-[999999999] border-2 border-primary/20 shadow-2xl rounded-2xl overflow-hidden bg-white" 
         align="start"
         dir="rtl"
         onOpenAutoFocus={(e) => e.preventDefault()}

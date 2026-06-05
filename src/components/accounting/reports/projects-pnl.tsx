@@ -5,7 +5,7 @@ import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth, isBefore, startOfDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Loader2, Search, TrendingUp, TrendingDown, Target, User, FileSearch, Printer, BarChart3 } from 'lucide-react';
@@ -64,7 +64,7 @@ export function ProjectsPnlReport() {
             if (!entryDate || entryDate < startDate || entryDate > endDate || entry.status !== 'posted') return;
 
             entry.lines.forEach(line => {
-                const profitCenterId = line.auto_profit_center;
+                const profitCenterId = line.auto_profit_center_id; // <-- This is the corrected line
                 if (!profitCenterId) return;
 
                 const current = pnlMap.get(profitCenterId) || { revenue: 0, directCosts: 0 };

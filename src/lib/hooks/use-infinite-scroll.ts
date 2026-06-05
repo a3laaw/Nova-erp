@@ -12,7 +12,7 @@ import {
   type DocumentSnapshot,
   type QueryConstraint,
 } from 'firebase/firestore';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase/index.tsx';
 import { useAuth } from '@/context/auth-context';
 import { getTenantPath } from '@/lib/utils';
 

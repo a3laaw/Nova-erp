@@ -8,6 +8,14 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     // يضمن ظهور الحقل فارغاً تماماً إذا كانت القيمة 0 أو لم يتم إدخال بيانات.
     const displayValue = (type === "number" && (value === 0 || value === "0" || value === null || value === undefined)) ? "" : value;
 
+    // 🛡️ معالج منع التمرير السيادي (Scroll-Guard V1.0):
+    // يمنع زيادة/نقصان القيمة عند التمرير بعجلة الماوس فوق حقول الأرقام.
+    const handleWheel = (event: React.WheelEvent<HTMLInputElement>) => {
+      if (type === 'number') {
+        event.currentTarget.blur();
+      }
+    };
+
     return (
       <input
         type={type}
@@ -18,6 +26,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         )}
         ref={ref}
         value={displayValue}
+        onWheel={handleWheel} // تطبيق المعالج
         {...props}
       />
     )

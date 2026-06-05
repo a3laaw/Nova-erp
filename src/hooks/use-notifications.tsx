@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase/index.tsx';
 import { useAuth } from '@/context/auth-context';
 import { where, QueryConstraint, orderBy } from 'firebase/firestore'; 
 import { useSubscription } from '@/hooks/use-subscription';

@@ -47,6 +47,13 @@ service cloud.firestore {
       allow read, write: if isDeveloper();
     }
 
+    // Allow reading the 'transactions' collection group for tenant members
+    match /{path=**}/transactions/{txId} {
+      allow read: if isAuthenticated() && 
+                      (request.auth.token.companyId == resource.data.companyId ||
+                       request.auth.token.currentCompanyId == resource.data.companyId);
+    }
+
     match /companies/{companyId} {
       allow read: if isDeveloper() || isTenantMember(companyId);
       allow write: if isDeveloper();
@@ -58,7 +65,7 @@ service cloud.firestore {
         allow delete: if isAdminPower();
       }
 
-      // 📂 المعاملات والمسار الفني 📂
+      // 📂 المعاملات والمسار الفني (For direct access, not collection group)
       match /transactions/{txId} {
         allow read: if isTenantMember(companyId) && (checkPerm(companyId, 'transactions', 'view') || isAdminPower());
         allow create, update: if isTenantMember(companyId) && (checkPerm(companyId, 'transactions', 'write') || isAdminPower());
@@ -73,6 +80,11 @@ service cloud.firestore {
       }
 
       // 💰 المحاسبة والمالية 💰
+      match /chartOfAccounts/{accountId} {
+        allow read: if isTenantMember(companyId) && (checkPerm(companyId, 'journal_entries', 'view') || isAdminPower());
+        allow write: if isAdminPower();
+      }
+
       match /journalEntries/{id} {
         allow read: if isTenantMember(companyId) && (checkPerm(companyId, 'journal_entries', 'view') || isAdminPower());
         allow create, update: if isTenantMember(companyId) && (checkPerm(companyId, 'journal_entries', 'write') || isAdminPower());

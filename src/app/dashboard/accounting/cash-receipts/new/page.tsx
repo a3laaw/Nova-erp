@@ -82,13 +82,29 @@ function NewCashReceiptContent() {
   const [clientProjects, setClientProjects] = useState<ClientTransaction[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
 
+  const parentAccountCodes = useMemo(() => {
+      const codes = new Set<string>();
+      if (accounts.length > 0) {
+          accounts.forEach(p => {
+              accounts.forEach(c => {
+                  if (c.code.startsWith(p.code) && c.code !== p.code) {
+                      codes.add(p.code);
+                  }
+              });
+          });
+      }
+      return codes;
+  }, [accounts]);
+
   const clientAccountOptions = useMemo(() => 
-    accounts.filter(a => a.code.startsWith('1102')).map(a => ({
-      value: a.id!,
-      label: `السيد/ ${a.name} (${a.code})`,
-      searchKey: a.code
-    }))
-  , [accounts]);
+    accounts
+      .filter(a => a.code.startsWith('1102') && !parentAccountCodes.has(a.code))
+      .map(a => ({
+        value: a.id!,
+        label: `السيد/ ${a.name} (${a.code})`,
+        searchKey: a.code
+      }))
+  , [accounts, parentAccountCodes]);
 
   const projectOptions = useMemo(() => 
     clientProjects.map(p => ({ 
@@ -101,9 +117,9 @@ function NewCashReceiptContent() {
     if (!paymentMethod) return [];
     const isCash = paymentMethod === 'Cash';
     return accounts
-        .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes(isCash ? 'صندوق' : 'بنك'))
+        .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes(isCash ? 'صندوق' : 'بنك') && !parentAccountCodes.has(acc.code))
         .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
-  }, [accounts, paymentMethod]);
+  }, [accounts, paymentMethod, parentAccountCodes]);
 
   useEffect(() => {
     if (!firestore || !tenantId) return;
@@ -144,11 +160,15 @@ function NewCashReceiptContent() {
   useEffect(() => {
     const generateDescription = async () => {
       if (!selectedProjectId || !amount || parseFloat(amount) <= 0 || !firestore || !tenantId) {
+        setDescription(''); // Clear description if conditions aren't met
         return;
       }
       
       const project = clientProjects.find(p => p.id === selectedProjectId);
-      if (!project || !project.contract?.clauses) return;
+      if (!project || !project.contract?.clauses) {
+        setDescription('دفعة مقدمة خارج بنود العقد.');
+        return;
+      }
 
       const totalPaidPreviously = await getTotalPaidForProject(selectedProjectId, firestore, tenantId);
       
@@ -165,26 +185,25 @@ function NewCashReceiptContent() {
 
         if (remainingOnClause > 0) {
           const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
-          
-          if (paymentForThisClause >= remainingOnClause && paidOnThisClausePreviously > 0) {
-            descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} استكمالاً للدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
-          } else if (paymentForThisClause >= remainingOnClause) {
-            descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
+          const newRemainingOnClause = remainingOnClause - paymentForThisClause;
+
+          if (paymentForThisClause >= remainingOnClause) {
+            descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}.`);
           } else {
-            const partText = paidOnThisClausePreviously > 0 ? "جزء إضافي" : "جزء أول";
-            descriptionParts.push(`سداد ${formatCurrency(paymentForThisClause)} كـ ${partText} من الدفعة "${clause.name}" التي قيمتها الإجمالية ${formatCurrency(clauseAmount)}`);
-            const newRemaining = remainingOnClause - paymentForThisClause;
-            if (newRemaining > 0) {
-              descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
-            }
+            descriptionParts.push(`سداد جزء من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}، والمتبقي منها ${formatCurrency(newRemainingOnClause)}.`);
           }
+          
+          if (clause.dueDate && date && new Date(clause.dueDate) > date) {
+            descriptionParts.push("(دفعة مقدمة غير مستحقة على الحساب)");
+          }
+
           remainingAmountFromCurrentPayment -= paymentForThisClause;
         }
         allocatedPaidSoFar += clauseAmount;
       }
 
       if (remainingAmountFromCurrentPayment > 0) {
-        descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة خارج بنود العقد.`);
+        descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة خارج نطاق العقد.`);
       }
       
       setDescription(descriptionParts.join('\n'));
@@ -193,7 +212,7 @@ function NewCashReceiptContent() {
     if (clientProjects.length > 0) {
         generateDescription();
     }
-  }, [amount, selectedProjectId, clientProjects, firestore, tenantId]);
+  }, [amount, selectedProjectId, clientProjects, firestore, tenantId, date]);
 
   useEffect(() => {
     if (!firestore || !selectedClientId || !tenantId) {
@@ -276,17 +295,23 @@ function NewCashReceiptContent() {
 
             const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
             
+            // UPGRADE 2 & 4: DYNAMIC DIMENSION INJECTION & LINE-MIRRORING
             let autoTags = {};
-            if (selectedProjectId && selectedProject && selectedProject.assignedEngineerId) {
-                const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
-                const dept = departments.find(d => d.name === engineer?.department);
+            if (selectedProjectId && selectedProject) {
+                // Default values from the project header (Fallback)
+                const defaultDept = departments.find(d => d.id === selectedProject.departmentId);
+                const defaultResource = employees.find(e => e.id === selectedProject.assignedEngineerId);
+
                 autoTags = {
-                    clientId: selectedClientId,
-                    transactionId: selectedProjectId,
-                    auto_profit_center: selectedProjectId,
-                    auto_resource_id: selectedProject.assignedEngineerId,
-                    ...(dept && { auto_dept_id: dept.id }),
+                    auto_general_center_id: currentUser.branchId || 'HQ', // Dimension 1
+                    auto_profit_center_id: selectedProjectId, // Dimension 3
+                    auto_dept_id: defaultDept?.id || 'SYS_UNALLOCATED', // Dimension 2 (Fallback)
+                    auto_resource_id: defaultResource?.id || 'SYS_UNALLOCATED', // Dimension 4 (Fallback)
                 };
+
+                // Work Domain Matching would be applied here if we had expense lines.
+                // Since this is a cash receipt, the tags apply to AR and Cash, which are Balance Sheet accounts.
+                // The logic is now correctly mirrored to both sides of the entry.
             }
 
             const jePath = getTenantPath('journalEntries', tenantId);
@@ -308,20 +333,33 @@ function NewCashReceiptContent() {
                 ...(selectedProjectId && { projectId: selectedProjectId, projectNameAr: selectedProject?.subServiceName || selectedProject?.transactionType })
             }));
 
+            // Apply mirrored tags to both lines
             const jeLines = [
-                { accountId: debitAccount.id!, accountName: debitAccount.name, debit: netBankDeposit, credit: 0 },
+                { accountId: debitAccount.id!, accountName: debitAccount.name, debit: netBankDeposit, credit: 0, ...autoTags },
                 { accountId: clientAccount.id!, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
             ];
 
             if (commissionAmount > 0 && selectedMethodData?.expenseAccountId) {
-                jeLines.push({ accountId: selectedMethodData.expenseAccountId, accountName: selectedMethodData.expenseAccountName || 'مصروف عمولات بنكية', debit: commissionAmount, credit: 0 });
+                const expenseAccount = accounts.find(a => a.id === selectedMethodData.expenseAccountId);
+                // The expense line is where Work Domain Matching would be critical.
+                // For now, we apply the default project tags.
+                jeLines.push({ 
+                    accountId: selectedMethodData.expenseAccountId, 
+                    accountName: expenseAccount?.name || 'مصروف عمولات بنكية', 
+                    debit: commissionAmount, 
+                    credit: 0,
+                    ...autoTags // Also tag the expense line
+                });
             }
 
             let nextJeNumber = (jeCounterDoc.data()?.counts || {})[currentYear] || 0;
             nextJeNumber++;
 
+            // UPGRADE 3: Use auto-generated description for the JE narration
+            const finalNarration = `[سند قبض] ${description.replace(/\n/g, ' | ')}`;
+
             transaction_fs.set(newJournalEntryRef, cleanFirestoreData({
-                entryNumber: `JE-${newVoucherNumber}`, date, narration: `[تحصيل مالي] ${description}`,
+                entryNumber: `JE-${newVoucherNumber}`, date, narration: finalNarration,
                 totalDebit: parseFloat(amount), totalCredit: parseFloat(amount), status: 'posted',
                 lines: jeLines, clientId: selectedClientId || null, transactionId: selectedProjectId || null,
                 createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
@@ -342,7 +380,6 @@ function NewCashReceiptContent() {
 
   return (
     <Card className="max-w-3xl mx-auto rounded-xl border border-slate-200 shadow-sm overflow-hidden bg-white" dir="rtl">
-        {/* ✅ الهيدر: مضغوط واحترافي */}
         <CardHeader className="pb-4 px-6 border-b bg-slate-50/50">
             <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-lg text-primary">
@@ -358,7 +395,6 @@ function NewCashReceiptContent() {
         </CardHeader>
 
         <CardContent className="space-y-4 p-6">
-            {/* ✅ الصف الأول: الحساب والتاريخ */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2 grid gap-1.5">
                     <Label className="font-medium text-xs text-slate-700">استلمنا من (حساب العميل المالي) *</Label>
@@ -368,16 +404,15 @@ function NewCashReceiptContent() {
                         options={clientAccountOptions}
                         placeholder={accountsLoading ? 'جاري جلب الحسابات...' : 'اختر الحساب المالي للعميل...'}
                         disabled={accountsLoading || isSaving}
-                        className="h-9 rounded-lg border border-slate-200 text-sm focus-within:ring-2 focus-within:ring-primary/20"
+                        className="h-9 rounded-lg border border-slate-200"
                     />
                 </div>
                 <div className="grid gap-1.5">
                     <Label className="font-medium text-xs text-slate-700">التاريخ *</Label>
-                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-9 rounded-lg border border-slate-200 text-sm" />
+                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-9 rounded-lg border border-slate-200" />
                 </div>
             </div>
             
-            {/* ✅ قسم ربط المشروع */}
             <div className="grid gap-1.5 p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <Label className="font-medium text-xs text-slate-700 flex items-center gap-1.5">
                     <Target className="h-3.5 w-3.5 text-primary"/> ربط بعقد/مشروع (مركز ربحية)
@@ -388,57 +423,36 @@ function NewCashReceiptContent() {
                     options={projectOptions}
                     placeholder={!selectedClientId ? 'اختر حساب العميل أولاً' : projectsLoading ? 'جاري التحميل...' : 'اختر الخدمة الفنية (اختياري)...'}
                     disabled={!selectedClientId || projectsLoading || isSaving}
-                    className="h-9 bg-white rounded-lg border border-slate-200 text-sm"
+                    className="h-9 bg-white rounded-lg border border-slate-200"
                 />
             </div>
 
-            {/* ✅ قسم المبلغ والكتابة */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="grid gap-1.5">
                     <Label className="font-medium text-xs text-slate-700">المبلغ المحصل *</Label>
-                    <Input 
-                      id="amount" 
-                      type="number" 
-                      step="0.001" 
-                      placeholder="0.000" 
-                      className='text-left dir-ltr h-9 text-sm font-semibold text-slate-900 rounded-lg border-slate-200 focus:ring-primary/20' 
-                      value={amount} 
-                      onChange={e => setAmount(e.target.value)} 
-                      disabled={isSaving}
-                      onWheel={(e) => e.currentTarget.blur()}
-                    />
+                    <Input id="amount" type="number" step="0.001" placeholder="0.000" value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving} />
                 </div>
                 <div className="md:col-span-2 grid gap-1.5">
                     <Label className="text-xs font-medium text-slate-500">مبلغ وقدره (كتابة)</Label>
-                    <div className='px-3 py-2 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg min-h-[36px] bg-slate-50 flex items-center italic'>
+                    <div className='px-3 py-2 text-xs font-medium text-slate-600 border rounded-lg min-h-[36px] bg-slate-50 flex items-center italic'>
                         {amountInWords || '(سيتم ملؤه تلقائياً)'}
                     </div>
                 </div>
             </div>
             
-            {/* ✅ حقل البيان */}
             <div className="grid gap-1.5">
-                <Label htmlFor="description" className="font-medium text-xs text-slate-700">البيان / وذلك عن</Label>
-                <Textarea 
-                    id="description" 
-                    placeholder="وصف عملية الدفع..." 
-                    value={description} 
-                    onChange={e => setDescription(e.target.value)} 
-                    disabled={isSaving} 
-                    rows={2} 
-                    className="rounded-lg border-slate-200 focus:ring-primary/20 text-sm" 
-                />
+                <Label htmlFor="description" className="font-medium text-xs text-slate-700">البيان (توليد تلقائي)</Label>
+                <Textarea id="description" value={description} readOnly disabled className="rounded-lg border-slate-200 text-xs italic bg-slate-50" />
             </div>
             
-            {/* ✅ تفاصيل الدفع */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
                 <div className="grid gap-1.5">
                     <Label className="font-medium text-xs text-slate-700">طريقة الدفع *</Label>
-                    <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
-                        <SelectTrigger className="h-9 rounded-lg border-slate-200 text-slate-700 text-sm">
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
+                        <SelectTrigger className="h-9 rounded-lg border-slate-200">
                             <SelectValue placeholder="اختر الطريقة..." />
                         </SelectTrigger>
-                        <SelectContent dir="rtl">
+                        <SelectContent>
                             <SelectItem value="Cash">نقداً</SelectItem>
                             <SelectItem value="Cheque">شيك</SelectItem>
                             <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
@@ -452,35 +466,22 @@ function NewCashReceiptContent() {
                         value={debitAccountId} 
                         onSelect={setDebitAccountId} 
                         options={debitAccountOptions} 
-                        placeholder={!paymentMethod ? 'اختر الطريقة أولاً' : 'اختر الحساب...'} 
-                        disabled={isSaving || !paymentMethod} 
-                        className="h-9 rounded-lg border border-slate-200 text-sm"
-                        onFocus={(e) => e.preventDefault()}
+                        placeholder={!paymentMethod ? 'اختر الطريقة أولاً' : 'اختر الحساب...'}
+                        disabled={isSaving || !paymentMethod}
+                        className="h-9 rounded-lg border border-slate-200"
                     />
                 </div>
                 <div className="grid gap-1.5">
                     <Label className="font-medium text-xs text-slate-700">رقم الشيك / المرجع</Label>
-                    <Input 
-                        value={reference} 
-                        onChange={e => setReference(e.target.value)} 
-                        disabled={isSaving} 
-                        className="h-9 rounded-lg border-slate-200 font-mono text-sm text-slate-700" 
-                    />
+                    <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-9 rounded-lg border-slate-200" />
                 </div>
             </div>
         </CardContent>
         
-        {/* ✅ الفوتر والأزرار: مضغوطة */}
         <CardFooter className="flex justify-end gap-2 p-4 border-t bg-slate-50/50">
-            <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving} className="h-9 px-4 rounded-lg font-medium text-sm border-slate-200 hover:bg-slate-100">
-                إلغاء
-            </Button>
-            <Button 
-                onClick={handleSave} 
-                disabled={isSaving || isGeneratingVoucher} 
-                className="h-9 px-6 rounded-lg font-semibold text-sm shadow-sm bg-primary hover:bg-primary/90 text-white transition-colors"
-            >
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin ml-1.5" /> : <Save className="h-4 w-4 ml-1.5" />} 
+            <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>إلغاء</Button>
+            <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher}>
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} 
                 الاعتماد والحفظ
             </Button>
         </CardFooter>

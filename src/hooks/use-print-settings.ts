@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase/index.tsx';
 import { useAuth } from '@/context/auth-context';
 import { useDocument } from '@/hooks/use-document';
 

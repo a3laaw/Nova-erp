@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Printer, Pencil, CheckCircle, Undo2, ArrowRight } from 'lucide-react';
+import { Printer, Pencil, CheckCircle, Undo2, ArrowRight, Loader2 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import type { JournalEntry } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Logo } from '@/components/layout/logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
@@ -17,6 +17,10 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
+import html2pdf from 'html2pdf.js';
+import { useAuth } from '@/context/auth-context';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const statusTranslations: Record<string, string> = {
     draft: 'بانتظار المراجعة',
@@ -33,13 +37,17 @@ export default function ViewJournalEntryPage() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const { branding, loading: brandingLoading } = useBranding();
 
+  const tenantId = currentUser?.currentCompanyId;
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const printableAreaRef = useRef<HTMLDivElement>(null);
 
-  const entryRef = useMemo(() => (firestore && id ? doc(firestore, 'journalEntries', id) : null), [firestore, id]);
-  const { data: entry, loading: entryLoading } = useDocument<JournalEntry>(firestore, entryRef ? entryRef.path : null);
+  const entryPath = useMemo(() => tenantId ? getTenantPath(`journalEntries/${id}`, tenantId) : null, [id, tenantId]);
+  const { data: entry, loading: entryLoading } = useDocument<JournalEntry>(firestore, entryPath);
   
   const formattedDate = useMemo(() => {
       const date = toFirestoreDate(entry?.date);
@@ -47,30 +55,88 @@ export default function ViewJournalEntryPage() {
   }, [entry]);
 
   const handlePostEntry = async () => {
-    if (!entry || !entry.id || !firestore) return;
+    const currentTenantId = currentUser?.currentCompanyId;
+    if (!firestore || !id || !currentTenantId || isProcessing) return;
     setIsProcessing(true);
-    try {
-        await updateDoc(doc(firestore, 'journalEntries', entry.id), { status: 'posted' });
+    
+    const path = getTenantPath(`journalEntries/${id}`, currentTenantId);
+    const docRef = doc(firestore, path);
+    const updateData = { status: 'posted' as const };
+
+    updateDoc(docRef, updateData)
+      .then(() => {
         toast({ title: 'تم ترحيل القيد بنجاح' });
-    } finally { setIsProcessing(false); }
+      })
+      .catch((serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: path,
+          operation: 'update',
+          requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        toast({ variant: 'destructive', title: 'فشل الترحيل', description: 'حدث خطأ أثناء محاولة ترحيل القيد. تأكد من وجود صلاحيات كافية.' });
+      })
+      .finally(() => { 
+        setIsProcessing(false); 
+      });
   };
   
   const handleUnpostEntry = async () => {
-    if (!entry || !entry.id || !firestore) return;
+    const currentTenantId = currentUser?.currentCompanyId;
+    if (!firestore || !id || !currentTenantId || isProcessing) return;
     setIsProcessing(true);
-    try {
-        await updateDoc(doc(firestore, 'journalEntries', entry.id), { status: 'draft' });
+
+    const path = getTenantPath(`journalEntries/${id}`, currentTenantId);
+    const docRef = doc(firestore, path);
+    const updateData = { status: 'draft' as const };
+
+    updateDoc(docRef, updateData)
+      .then(() => {
         toast({ title: 'تم التراجع عن الترحيل' });
-    } finally { setIsProcessing(false); }
+      })
+      .catch((serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: path,
+          operation: 'update',
+          requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        toast({ variant: 'destructive', title: 'فشل التراجع عن الترحيل', description: 'حدث خطأ أثناء محاولة إلغاء ترحيل القيد.' });
+      })
+      .finally(() => { 
+        setIsProcessing(false); 
+      });
+  };
+
+  const handlePrint = () => {
+    if (!printableAreaRef.current) return;
+    setIsPrinting(true);
+
+    const element = printableAreaRef.current;
+    const opt = {
+      margin: 10,
+      filename: `JV-${entry?.entryNumber || id}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().from(element).set(opt).save().then(() => {
+      setIsPrinting(false);
+    }).catch(err => {
+      console.error("Printing Error:", err);
+      toast({ variant: 'destructive', title: 'فشل الطباعة', description: 'حدث خطأ أثناء إنشاء ملف PDF.' });
+      setIsPrinting(false);
+    });
   };
 
   if (entryLoading || brandingLoading) return <div className="p-8 max-w-4xl mx-auto space-y-8"><Skeleton className="h-64 w-full rounded-[2.5rem]" /></div>;
   if (!entry) return <div className="text-center py-20 font-black opacity-30">لم يتم العثور على القيد.</div>;
 
   return (
-    <div className="bg-gray-100 p-4 sm:p-8 print:p-0 print:bg-white" dir="rtl">
-        <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-[2.5rem] overflow-hidden print:shadow-none print:border-none border">
-            <div id="printable-area" className="p-8 md:p-12">
+    <div className="bg-gray-100 p-4 sm:p-8" dir="rtl">
+        <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-[2.5rem] overflow-hidden border">
+            <div id="printable-area" ref={printableAreaRef} className="p-8 md:p-12 bg-white">
                 <header className="flex justify-between items-start pb-8 border-b-4 border-primary mb-10">
                     <div className="flex items-center gap-6">
                         <Logo className="h-20 w-16 !p-2 shadow-inner border rounded-2xl" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
@@ -80,7 +146,7 @@ export default function ViewJournalEntryPage() {
                         </div>
                     </div>
                     <div className="text-left space-y-2">
-                        <h2 className="text-3xl font-black text-primary tracking-tighter">قـيـد يـومـيـة</h2>
+                        <h2 className="text-3xl font-black text-primary">قيد يومية</h2>
                         <div className='flex items-center gap-2 justify-end'>
                             <Badge variant="outline" className={cn("px-4 py-1 border-2 font-black text-[10px] rounded-full", statusColors[entry.status])}>
                                 {statusTranslations[entry.status]}
@@ -136,7 +202,7 @@ export default function ViewJournalEntryPage() {
                 </footer>
             </div>
 
-            <div className="p-8 bg-muted/10 border-t flex justify-between items-center no-print">
+            <div className="p-8 bg-muted/10 border-t flex justify-between items-center">
                 <Button variant="ghost" onClick={() => router.back()} className="rounded-xl font-bold gap-2"><ArrowRight className="h-4 w-4"/> عودة</Button>
                 <div className="flex gap-3">
                     {entry.status === 'draft' && (
@@ -152,7 +218,10 @@ export default function ViewJournalEntryPage() {
                              <Undo2 className="h-4 w-4"/> تراجع عن الترحيل
                         </Button>
                     )}
-                    <Button onClick={() => window.print()} variant="secondary" className="rounded-xl font-black gap-2 h-11 px-8"><Printer className="h-4 w-4"/> طباعة</Button>
+                    <Button onClick={handlePrint} disabled={isPrinting} variant="secondary" className="rounded-xl font-black gap-2 h-11 px-8">
+                        {isPrinting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Printer className="h-4 w-4"/>}
+                        {isPrinting ? 'جاري الإنشاء...' : 'طباعة'}
+                    </Button>
                 </div>
             </div>
         </div>

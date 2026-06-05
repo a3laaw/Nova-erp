@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback, memo, useRef } from '
 import { useFirebase } from '@/firebase/provider';
 import {
   collection, query, getDocs, where,
-  serverTimestamp, Timestamp, doc, writeBatch, getDoc, deleteDoc, updateDoc, runTransaction,
+  serverTimestamp, Timestamp, doc, writeBatch, getDoc, deleteDoc, updateDoc, runTransaction, setDoc, addDoc,
 } from 'firebase/firestore';
 import {
   setHours, setMinutes, startOfDay, endOfDay,
@@ -296,7 +296,7 @@ function AppointmentManagerDialog({
   const [selectedClientId, setSelectedClientId] = useState(initialData?.clientId || '');
 
   const tenantId = currentUser?.currentCompanyId;
-  const engineerId = initialData?.engineerId;
+  const engineerId = isCreating ? dialogData?.engineerId : initialData?.engineerId;
 
   const finalAppointmentDateTime = useMemo(() => {
     let dateTime: Date | null = null;
@@ -328,9 +328,17 @@ function AppointmentManagerDialog({
         setIsNewClient(false);
         setSelectedClientId(initialData?.clientId || '');
         setNewName(''); setNewMobile('');
+      } else if (isEditing) {
+          setSelectedDate(originalApptDate || new Date());
+          setSelectedTime(originalApptDate ? format(originalApptDate, 'HH:mm') : '10:00');
+          setTitle(initialData?.title || '');
+          setIsNewClient(!initialData?.clientId);
+          setSelectedClientId(initialData?.clientId || '');
+          setNewName(initialData?.clientName || ''); 
+          setNewMobile(initialData?.clientMobile || '');
       }
     } 
-  }, [isOpen, isCreating, isRescheduling, dialogData?.appointmentDate, originalApptDate, initialData?.title, initialData?.clientId]);
+  }, [isOpen, isCreating, isRescheduling, isEditing, dialogData?.appointmentDate, originalApptDate, initialData]);
 
   const filteredClients = useMemo(() => {
     if (!engineerId) return clients;
@@ -350,16 +358,34 @@ function AppointmentManagerDialog({
       let clientName = isNewClient ? newName : clients.find(c => c.id === selectedClientId)?.nameAr;
       let clientMobile = isNewClient ? newMobile : clients.find(c => c.id === selectedClientId)?.mobile;
 
-      if (isNewClient) {
-        const newClientRef = doc(collection(firestore, getTenantPath('clients', tenantId)!));
-        await updateDoc(newClientRef, {
-          nameAr: newName, mobile: newMobile, isActive: true,
-          assignedEngineer: engineerId, createdAt: serverTimestamp(),
-          createdBy: currentUser.id, companyId: tenantId,
-        });
-        clientId = newClientRef.id;
+      if (isNewClient && (isCreating || isEditing)) {
+        if (!newName || !newMobile) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى إدخال اسم وجوال العميل الجديد.' });
+            setIsSaving(false);
+            return;
+        }
+        const clientPath = getTenantPath('clients', tenantId)!;
+        if (isCreating || !clientId) { // Create a new client
+            const newClientRef = doc(collection(firestore, clientPath));
+            await setDoc(newClientRef, {
+              nameAr: newName, mobile: newMobile, isActive: true,
+              assignedEngineer: engineerId, createdAt: serverTimestamp(),
+              createdBy: currentUser.id, companyId: tenantId,
+            });
+            clientId = newClientRef.id;
+        } else { // Update existing client if editing appointment
+            await updateDoc(doc(firestore, clientPath, clientId), {
+                nameAr: newName, mobile: newMobile, assignedEngineer: engineerId
+            });
+        }
         clientName = newName;
         clientMobile = newMobile;
+      }
+      
+      if (!clientId && !isNewClient) {
+          toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار عميل مسجل أو إنشاء عميل جديد.' });
+          setIsSaving(false);
+          return;
       }
 
       const [hh, mm] = selectedTime.split(':').map(Number);
@@ -368,44 +394,47 @@ function AppointmentManagerDialog({
       const baseData: Partial<Appointment> = {
         type: 'architectural',
         engineerId,
-        engineerName: initialData?.engineerName || dialogData?.engineerName,
+        engineerName: isCreating ? dialogData?.engineerName : initialData?.engineerName,
         clientId,
         clientName,
         clientMobile,
         title,
         appointmentDate: Timestamp.fromDate(appointmentDate),
-        status: 'scheduled',
-        visitCount: 1,
-        color: getVisitColor({ visitCount: 1 }),
+        status: 'scheduled', 
         updatedAt: serverTimestamp(),
         updatedBy: currentUser.id,
         companyId: tenantId,
       };
 
-      if (isCreating || isRescheduling) {
-        baseData.appointmentDate = Timestamp.fromDate(appointmentDate);
-        if (isCreating) {
-          baseData.createdAt = serverTimestamp();
-          baseData.createdBy = currentUser.id;
-        }
-      }
+      const p = getTenantPath('appointments', tenantId)!;
 
-      const p = getTenantPath('appointments', tenantId);
       if (isCreating) {
-        const newRef = doc(collection(firestore, p!));
-        await updateDoc(newRef, baseData);
-        await updateDoc(doc(collection(newRef, 'auditLogs')), {
+        const newRef = doc(collection(firestore, p));
+        baseData.createdAt = serverTimestamp();
+        baseData.createdBy = currentUser.id;
+        baseData.visitCount = 1; // Default for new appointment
+        baseData.color = getVisitColor({ visitCount: 1 });
+
+        await setDoc(newRef, baseData);
+        await addDoc(collection(newRef, 'auditLogs'), {
           action: 'created', details: `أنشأه ${currentUser.fullName}`,
           userName: currentUser.fullName, createdAt: serverTimestamp(), companyId: tenantId
         });
+      } else if (isEditing) {
+        const ref = doc(firestore, p, initialData.id!);
+        await updateDoc(ref, baseData);
+        await addDoc(collection(ref, 'auditLogs'), {
+            action: 'updated', details: `حدّثه ${currentUser.fullName}`,
+            userName: currentUser.fullName, createdAt: serverTimestamp(), companyId: tenantId
+        });
       } else if (isRescheduling) {
-        const ref = doc(firestore, p!, initialData.id!);
+        const ref = doc(firestore, p, initialData.id!);
         await updateDoc(ref, {
           appointmentDate: Timestamp.fromDate(appointmentDate),
           updatedAt: serverTimestamp(),
           updatedBy: currentUser.id,
         });
-        await updateDoc(doc(collection(ref, 'auditLogs')), {
+        await addDoc(collection(ref, 'auditLogs'), {
           action: 'rescheduled', details: `أُعيد جدولته إلى ${format(appointmentDate, 'PPP HH:mm', { locale: ar })} بواسطة ${currentUser.fullName}`,
           userName: currentUser.fullName, createdAt: serverTimestamp(), companyId: tenantId
         });
@@ -416,6 +445,7 @@ function AppointmentManagerDialog({
       onSaveSuccess?.();
       onClose();
     } catch (error: any) {
+      console.error('Save Error:', error);
       toast({ variant: 'destructive', title: 'خطأ', description: error.message || 'حدث خطأ غير متوقع' });
     } finally {
       setIsSaving(false);
@@ -426,16 +456,16 @@ function AppointmentManagerDialog({
     <Dialog open={isOpen} onOpenChange={o => { if (!o && !isSaving) onClose(); }}>
       <DialogContent style={{ maxWidth: 480 }}>
         <DialogHeader>
-          <DialogTitle>{isEditing ? (mode === 'reschedule' ? 'إعادة جدولة الموعد' : 'تعديل الموعد') : 'حجز موعد جديد'}</DialogTitle>
+          <DialogTitle>{isCreating ? 'حجز موعد جديد' : isRescheduling ? 'إعادة جدولة الموعد' : 'تعديل الموعد'}</DialogTitle>
           <DialogDescription className="font-bold text-indigo-700">
-             {initialData?.engineerName || (dialogData?.engineerName ? dialogData.engineerName : 'مهندس غير محدد')} 
+             {isCreating ? dialogData?.engineerName : initialData?.engineerName} 
              • 
-             {isNewClient ? newName : clients.find(c => c.id === selectedClientId)?.nameAr || ''}
+             {isNewClient ? newName : clients.find(c => c.id === selectedClientId)?.nameAr || initialData?.clientName || ''}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           
-          {isRescheduling && (
+          {(isEditing || isRescheduling) && (
             <div>
               <Label>التاريخ والوقت *</Label>
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
@@ -475,7 +505,7 @@ function AppointmentManagerDialog({
               onChange={e => setTitle(e.target.value)}
               placeholder="مثال: مناقشة المخططات..."
               className="h-10 rounded-xl border-2 mt-1"
-              disabled={isSaving}
+              disabled={isSaving || isRescheduling}
             />
           </div>
 
@@ -483,16 +513,16 @@ function AppointmentManagerDialog({
             <Checkbox
               id="newClientCheckbox"
               checked={isNewClient}
-              onCheckedChange={c => { setIsNewClient(!!c); setSelectedClientId(''); }}
-              disabled={isSaving}
+              onCheckedChange={c => { setIsNewClient(!!c); if(!!c) setSelectedClientId(''); }}
+              disabled={isSaving || isRescheduling}
             />
             <Label htmlFor="newClientCheckbox" style={{ cursor: 'pointer' }}>عميل جديد (زيارة أولى)</Label>
           </div>
           
           {isNewClient ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div><Label>الاسم *</Label><Input value={newName} onChange={e => setNewName(e.target.value)} required disabled={isSaving} className="h-9 rounded-xl mt-1" /></div>
-              <div><Label>الجوال *</Label><Input value={newMobile} onChange={e => setNewMobile(e.target.value)} required disabled={isSaving} className="h-9 rounded-xl mt-1" /></div>
+              <div><Label>الاسم *</Label><Input value={newName} onChange={e => setNewName(e.target.value)} required disabled={isSaving || isRescheduling} className="h-9 rounded-xl mt-1" /></div>
+              <div><Label>الجوال *</Label><Input value={newMobile} onChange={e => setNewMobile(e.target.value)} required disabled={isSaving || isRescheduling} className="h-9 rounded-xl mt-1" /></div>
             </div>
           ) : (
             <div>
@@ -503,7 +533,7 @@ function AppointmentManagerDialog({
                   onSelect={setSelectedClientId}
                   options={clientOptions}
                   placeholder={filteredClients.length === 0 ? 'لا يوجد عملاء مخصصون...' : 'ابحث عن عميل...'}
-                  disabled={isSaving || filteredClients.length === 0}
+                  disabled={isSaving || isRescheduling || filteredClients.length === 0}
                   className="h-9"
                 />
               </div>
@@ -516,7 +546,7 @@ function AppointmentManagerDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
-              {isEditing ? (mode === 'reschedule' ? 'إعادة جدولة' : 'حفظ التعديلات') : 'حجز الموعد'}
+              {isCreating ? 'حجز الموعد' : isRescheduling ? 'إعادة جدولة' : 'حفظ التعديلات'}
             </Button>
           </DialogFooter>
         </form>
@@ -543,7 +573,7 @@ export function ArchitecturalAppointmentsView() {
   const [loading, setLoading] = useState(true);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [dialogData, setDialogData] = useState<{ mode: 'create' | 'edit' | 'reschedule', appointmentDate?: Date, engineerId?: string, engineerName?: string, id?: string, clientId?: string, clientName?: string, clientMobile?: string, title?: string } | null>(null);
+  const [dialogData, setDialogData] = useState<any | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [appointmentToDelete, setAppointmentToDelete] = useState<ApptWithMeta | null>(null);
   const [appointmentToCancel, setAppointmentToCancel] = useState<ApptWithMeta | null>(null);
@@ -807,7 +837,7 @@ export function ArchitecturalAppointmentsView() {
       </div>
 
       {isDialogOpen && dialogData && (
-        <AppointmentManagerDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} mode={dialogData.mode} initialData={dialogData} clients={clients} firestore={firestore} currentUser={currentUser} canBypassTime={canBypassTime} rawAppointments={rawAppointments} slotDur={slotDur} />
+        <AppointmentManagerDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} mode={dialogData.mode} initialData={dialogData} clients={clients} firestore={firestore} currentUser={currentUser} canBypassTime={canBypassTime} rawAppointments={rawAppointments} slotDur={slotDur} dialogData={dialogData} />
       )}
 
       <AlertDialog open={!!appointmentToCancel} onOpenChange={() => setAppointmentToCancel(null)}>

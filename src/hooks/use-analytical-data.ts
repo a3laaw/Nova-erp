@@ -2,7 +2,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase/index.tsx';
 import { useSubscription } from './use-subscription';
 import { useAuth } from '@/context/auth-context';
 import { where, type QueryConstraint } from 'firebase/firestore';

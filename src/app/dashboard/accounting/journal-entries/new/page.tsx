@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -26,23 +25,23 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle, Target } from 'lucide-react';
+import { Save, Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup, where } from 'firebase/firestore';
-import type { Account, ClientTransaction, Employee, Department } from '@/lib/types';
+import type { Account } from '@/lib/types'; // Simplified imports
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData, getTenantPath } from '@/lib/utils';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { formatCurrency, getTenantPath, cn, cleanFirestoreData } from '@/lib/utils';
+import { Alert } from '@/components/ui/alert';
 import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 
+// --- Schema Definition ---
 const lineSchema = z.object({
   accountId: z.string().min(1, "الحساب مطلوب."),
   debit: z.any(),
   credit: z.any(),
   notes: z.string().optional(),
-  projectLink: z.string().optional(),
 });
 
 const journalEntrySchema = z.object({
@@ -53,7 +52,6 @@ const journalEntrySchema = z.object({
 }).refine(data => {
     const validLines = data.lines.filter(l => l.accountId && (Number(l.debit) > 0 || Number(l.credit) > 0));
     if (validLines.length < 2) return false;
-
     const totalDebit = validLines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
     const totalCredit = validLines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0);
     return Math.abs(totalDebit - totalCredit) < 0.001;
@@ -62,9 +60,9 @@ const journalEntrySchema = z.object({
     path: ['lines'],
 });
 
-
 type JournalEntryFormValues = z.infer<typeof journalEntrySchema>;
 
+// --- Main Component ---
 export default function NewJournalEntryPage() {
   const router = useRouter();
   const { firestore } = useFirebase();
@@ -72,9 +70,6 @@ export default function NewJournalEntryPage() {
   const { toast } = useToast();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [projects, setProjects] = useState<(ClientTransaction & { clientName: string })[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [refDataLoading, setRefDataLoading] = useState(true);
   const [entryNumber, setEntryNumber] = useState('جاري التوليد...');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,7 +77,7 @@ export default function NewJournalEntryPage() {
   
   const tenantId = currentUser?.currentCompanyId;
 
-  const { register, handleSubmit, control, formState: { errors }, setValue } = useForm<JournalEntryFormValues>({
+  const { register, handleSubmit, control } = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
     mode: 'onChange',
     defaultValues: {
@@ -90,8 +85,8 @@ export default function NewJournalEntryPage() {
       narration: '',
       reference: '',
       lines: [
-        { accountId: '', debit: '', credit: '', notes: '', projectLink: '' },
-        { accountId: '', debit: '', credit: '', notes: '', projectLink: '' },
+        { accountId: '', debit: '', credit: '', notes: '' },
+        { accountId: '', debit: '', credit: '', notes: '' },
       ],
     },
   });
@@ -99,58 +94,70 @@ export default function NewJournalEntryPage() {
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' });
   const lines = useWatch({ control, name: "lines" });
   
+  // --- Calculated Totals ---
   const totalDebit = useMemo(() => (lines || []).reduce((sum, line) => sum + (Number(line.debit) || 0), 0), [lines]);
   const totalCredit = useMemo(() => (lines || []).reduce((sum, line) => sum + (Number(line.credit) || 0), 0), [lines]);
   const balance = totalDebit - totalCredit;
+  const isBalanced = Math.abs(balance) < 0.001;
 
+  // --- Data Fetching ---
   useEffect(() => {
     if (!firestore || !tenantId) return;
     const fetchRefData = async () => {
         setRefDataLoading(true);
         try {
-            const [accSnap, projSnap, clientSnap, empSnap, deptSnap] = await Promise.all([
-                getDocs(query(collection(firestore, getTenantPath('chartOfAccounts', tenantId)!), orderBy('code'))),
-                getDocs(query(collectionGroup(firestore, 'transactions'), where('companyId', '==', tenantId))),
-                getDocs(collection(firestore, getTenantPath('clients', tenantId)!)),
-                getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!))),
-                getDocs(query(collection(firestore, getTenantPath('departments', tenantId)!))),
-            ]);
-            
+            const accSnap = await getDocs(query(collection(firestore, getTenantPath('chartOfAccounts', tenantId)!), orderBy('code')));
             setAccounts(accSnap.docs.map(d => ({id: d.id, ...d.data()} as Account)));
-            setEmployees(empSnap.docs.map(d => ({id: d.id, ...d.data()} as Employee)));
-            setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
-            
-            const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
-            const fetchedProjects = projSnap.docs.map(d => ({...d.data(), id: d.id, clientName: clientMap.get(d.data().clientId)} as ClientTransaction & { clientName: string }));
-            setProjects(fetchedProjects.filter(p => p.clientName));
-        } finally { setRefDataLoading(false); }
+        } catch(error) {
+            console.error("Error fetching accounts:", error);
+            toast({ variant: 'destructive', title: 'فشل جلب الحسابات', description: (error as Error).message });
+        } finally { 
+            setRefDataLoading(false); 
+        }
     };
     fetchRefData();
-  }, [firestore, tenantId]);
+  }, [firestore, tenantId, toast]);
   
   useEffect(() => {
     if (!firestore || !tenantId) return;
-    const currentYear = new Date().getFullYear();
-    const counterRef = doc(firestore, getTenantPath('counters/journalEntries', tenantId)!);
-    getDoc(counterRef).then(doc => {
-        const nextNumber = ((doc.data()?.counts || {})[currentYear] || 0) + 1;
-        setEntryNumber(`JV-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
+    const fetchEntryNumber = async () => {
+      const currentYear = new Date().getFullYear();
+      const counterRef = doc(firestore, getTenantPath('counters/journalEntries', tenantId)!);
+      const counterDoc = await getDoc(counterRef);
+      const nextNumber = ((counterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+      setEntryNumber(`JV-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
+    };
+    fetchEntryNumber().catch(err => {
+      console.error("Error fetching entry number:", err);
+      toast({ variant: 'destructive', title: 'فشل جلب الرقم المتسلسل'});
     });
-  }, [firestore, tenantId]);
+  }, [firestore, tenantId, toast]);
   
+  const parentAccountCodes = useMemo(() => {
+      const codes = new Set<string>();
+      if (accounts.length > 0) {
+          accounts.forEach(p => {
+              accounts.forEach(c => {
+                  if (c.code.startsWith(p.code) && c.code !== p.code) {
+                      codes.add(p.code);
+                  }
+              });
+          });
+      }
+      return codes;
+  }, [accounts]);
+
   const accountOptions: SearchOption[] = useMemo(() => 
-    accounts.filter(acc => acc.isPayable).map(acc => ({
-      value: acc.id!,
-      label: `${acc.name} (${acc.code})`,
-      searchKey: acc.code,
-    }))
-  , [accounts]);
+    accounts
+      .filter(acc => !parentAccountCodes.has(acc.code))
+      .map(acc => ({
+        value: acc.id!,
+        label: `${acc.name} (${acc.code})`,
+        searchKey: acc.code,
+      }))
+  , [accounts, parentAccountCodes]);
 
-  const projectOptions = useMemo(() => projects.map(p => ({ 
-    value: `${p.clientId}/${p.id}`, 
-    label: `${p.clientName} - ${p.subServiceName || p.transactionType} (${p.transactionNumber})` 
-  })), [projects]);
-
+  // --- Submission Logic ---
   const onSubmit = async (data: JournalEntryFormValues) => {
     if (!firestore || !currentUser || !tenantId || submittingRef.current) return;
     submittingRef.current = true;
@@ -169,151 +176,151 @@ export default function NewJournalEntryPage() {
               .filter(line => line.accountId && (Number(line.debit) > 0 || Number(line.credit) > 0))
               .map(line => {
                 const account = accounts.find(acc => acc.id === line.accountId);
-                let newLine: any = {
+                return {
                     accountId: line.accountId,
                     accountName: account?.name || 'Unknown Account',
                     debit: Number(line.debit) || 0,
                     credit: Number(line.credit) || 0,
                     notes: line.notes || ''
+                    // Analytical dimensions are now derived from source documents, not manual entry
                 };
-                if (line.projectLink) {
-                    const [cid, tid] = line.projectLink.split('/');
-                    const project = projects.find(p => p.id === tid);
-                    if (project) {
-                        const engineer = employees.find(e => e.id === project.assignedEngineerId);
-                        const department = departments.find(d => d.name === engineer?.department);
-                        newLine.clientId = cid; newLine.transactionId = tid;
-                        newLine.auto_profit_center = tid;
-                        newLine.auto_resource_id = project.assignedEngineerId;
-                        if (department) newLine.auto_dept_id = department.id;
-                    }
-                }
-                return newLine;
             });
 
-            transaction.set(newEntryRef, {
-                date: data.date, narration: data.narration, reference: data.reference,
-                lines: linesWithDetails, entryNumber: newEntryNumber,
-                totalDebit, totalCredit, status: 'draft',
-                createdAt: serverTimestamp(), createdBy: currentUser.id, companyId: tenantId
-            });
+            // Anti-Null validation would be enforced on source documents (Receipts, Invoices)
+            // This manual page is for adjustments and assumes the accountant knows the implications.
+
+            transaction.set(newEntryRef, cleanFirestoreData({
+                date: data.date, 
+                narration: data.narration, 
+                reference: data.reference || '',
+                lines: linesWithDetails, 
+                entryNumber: newEntryNumber,
+                totalDebit, 
+                totalCredit, 
+                status: 'draft',
+                createdAt: serverTimestamp(), 
+                createdBy: currentUser.id, 
+                companyId: tenantId
+            }));
 
             transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
         });
         toast({ title: 'تم إنشاء القيد المحاسبي' });
         router.push('/dashboard/accounting/journal-entries');
-    } finally { setIsSubmitting(false); submittingRef.current = false; }
+    } catch (error: any) {
+        console.error("Transaction Error:", error);
+        toast({ variant: 'destructive', title: 'فشل الحفظ', description: error.message });
+    } finally { 
+        setIsSubmitting(false); 
+        submittingRef.current = false; 
+    }
   };
 
+  // --- UI Rendering ---
   return (
-    <Card className="max-w-6xl mx-auto rounded-[2.5rem] border-none shadow-2xl glass-effect" dir="rtl">
+    <Card className="max-w-5xl mx-auto rounded-xl border border-slate-200 shadow-sm bg-white" dir="rtl">
         <form onSubmit={handleSubmit(onSubmit)}>
-            <CardHeader className="bg-primary/5 pb-8 border-b">
+            <CardHeader className="px-6 py-4 border-b">
                 <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle className="text-2xl font-black">قيد يومية جديد</CardTitle>
-                        <CardDescription>أدخل تفاصيل القيد مع إمكانية ربط كل سطر بمركز ربحية لضمان دقة التقارير.</CardDescription>
+                        <CardTitle className="text-lg font-bold">قيد يومية يدوي جديد</CardTitle>
+                        <CardDescription className="text-xs text-slate-500 mt-1">
+                            لل تسويات المحاسبية المعقدة والتصحيحات. لا تستخدم للإدخالات اليومية.
+                        </CardDescription>
                     </div>
-                     <div className="text-left bg-white p-3 rounded-2xl border shadow-inner">
-                        <Label className="text-[10px] font-black uppercase text-slate-400 mr-1">رقم القيد</Label>
-                        <div className="font-mono text-xl font-black text-primary">{entryNumber}</div>
+                     <div className="text-left bg-slate-50 px-3 py-1.5 rounded-lg border">
+                        <Label className="text-[10px] font-semibold uppercase text-slate-500">رقم القيد</Label>
+                        <div className="font-mono text-sm font-bold text-primary">{entryNumber}</div>
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-8 p-10">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="grid gap-2">
-                        <Label className="font-black text-gray-700 pr-1">التاريخ *</Label>
-                        <Controller control={control} name="date" render={({ field }) => ( <DateInput value={field.value} onChange={field.onChange} /> )} />
+            
+            <CardContent className="space-y-6 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <Label className="font-semibold text-xs mb-1.5 block">التاريخ *</Label>
+                        <Controller control={control} name="date" render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />} />
                     </div>
-                     <div className="grid gap-2">
-                        <Label className="font-black text-gray-700 pr-1">البيان (الوصف) *</Label>
-                        <Input {...register('narration')} placeholder="اشرح الغرض من القيد..." className="h-11 rounded-xl border-2 font-bold" />
+                     <div>
+                        <Label className="font-semibold text-xs mb-1.5 block">البيان (الوصف) *</Label>
+                        <Input {...register('narration')} placeholder="الغرض من القيد..." />
                     </div>
-                     <div className="grid gap-2">
-                        <Label className="font-black text-gray-700 pr-1">المرجع</Label>
-                        <Input {...register('reference')} placeholder="رقم الشيك أو الحوالة..." className="h-11 rounded-xl border-2 font-mono" />
+                     <div>
+                        <Label className="font-semibold text-xs mb-1.5 block">المرجع</Label>
+                        <Input {...register('reference')} placeholder="رقم المستند الأصلي..." />
                     </div>
                 </div>
                 
-                <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
+                <div className="border rounded-lg overflow-hidden">
                      <Table>
-                        <TableHeader className="bg-muted/50 h-14">
-                            <TableRow className="border-none">
-                                <TableHead className="w-12"></TableHead>
-                                <TableHead className="min-w-[220px] font-black">الحساب المالي</TableHead>
-                                <TableHead className="min-w-[180px] font-black">مركز الربحية</TableHead>
-                                <TableHead className="min-w-[100px] text-center font-black">مدين (+)</TableHead>
-                                <TableHead className="min-w-[100px] text-center font-black">دائن (-)</TableHead>
-                                <TableHead className="min-w-[150px] font-black">ملاحظات</TableHead>
+                        <TableHeader className="bg-slate-50">
+                            <TableRow>
+                                <TableHead className="w-10"></TableHead>
+                                <TableHead>الحساب المالي</TableHead>
+                                <TableHead className="text-center">مدين (+)</TableHead>
+                                <TableHead className="text-center">دائن (-)</TableHead>
+                                <TableHead>ملاحظات</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {fields.map((field, index) => {
-                                const selectedAccount = accounts.find(a => a.id === lines[index]?.accountId);
-                                const isAnalytical = selectedAccount && (selectedAccount.code.startsWith('5') || selectedAccount.code.startsWith('4'));
-                                return (
-                                <TableRow key={field.id} className="h-16 border-b last:border-0 hover:bg-muted/5">
-                                    <TableCell className="text-center">
-                                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 2} className="text-destructive rounded-full hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button>
+                            {fields.map((field, index) => (
+                                <TableRow key={field.id}>
+                                    <TableCell className="p-1 text-center">
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 2} className="h-7 w-7 text-destructive">
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="p-1 min-w-[300px]">
                                         <Controller control={control} name={`lines.${index}.accountId`} render={({ field: f }) => (
-                                                <InlineSearchList value={f.value} onSelect={f.onChange} options={accountOptions} placeholder="اختر حساب..." disabled={refDataLoading} className="border-none shadow-none font-bold bg-transparent" />
-                                            )}
-                                        />
+                                            <InlineSearchList value={f.value} onSelect={f.onChange} options={accountOptions} placeholder="اختر حساب..." disabled={refDataLoading} />
+                                        )}/>
                                     </TableCell>
-                                    <TableCell>
-                                        {isAnalytical ? (
-                                            <Controller control={control} name={`lines.${index}.projectLink`} render={({ field: f }) => (
-                                                <InlineSearchList value={f.value || ''} onSelect={f.onChange} options={projectOptions} placeholder="اربط بمشروع..." disabled={refDataLoading} className="border-none shadow-none text-xs bg-transparent h-10 border-dashed border-2 rounded-xl" />
-                                            )} />
-                                        ) : (
-                                            <div className="text-[10px] text-muted-foreground opacity-30 italic px-4">غير تخصصي</div>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="bg-blue-50/10">
+                                    <TableCell className="p-1">
                                         <Controller name={`lines.${index}.debit`} control={control} render={({ field: f }) => (
-                                                <Input type="number" step="any" className='dir-ltr text-center font-black text-xl border-none focus-visible:ring-0 bg-transparent text-blue-600' {...f} onChange={e => f.onChange(e.target.value)} value={f.value || ''} />
-                                            )}
-                                        />
+                                            <Input type="number" step="any" className='dir-ltr text-center' {...f} onChange={e => f.onChange(e.target.value)} value={f.value || ''} />
+                                        )}/>
                                     </TableCell>
-                                    <TableCell className="bg-red-50/10">
+                                    <TableCell className="p-1">
                                         <Controller name={`lines.${index}.credit`} control={control} render={({ field: f }) => (
-                                                <Input type="number" step="any" className='dir-ltr text-center font-black text-xl border-none focus-visible:ring-0 bg-transparent text-red-600' {...f} onChange={e => f.onChange(e.target.value)} value={f.value || ''} />
-                                            )}
-                                        />
+                                            <Input type="number" step="any" className='dir-ltr text-center' {...f} onChange={e => f.onChange(e.target.value)} value={f.value || ''} />
+                                        )}/>
                                     </TableCell>
-                                    <TableCell>
-                                        <Input {...register(`lines.${index}.notes`)} className="border-none shadow-none text-xs italic bg-transparent" placeholder="وصف البند..." />
+                                    <TableCell className="p-1">
+                                        <Input {...register(`lines.${index}.notes`)} placeholder="وصف البند..." />
                                     </TableCell>
                                 </TableRow>
-                            )})}
+                            ))}
                         </TableBody>
-                        <TableFooter className="bg-primary/5 h-20">
-                            <TableRow className="border-t-4 border-primary/20">
-                                <TableCell colSpan={3} className="text-right px-12 font-black text-xl">الإجماليات:</TableCell>
-                                <TableCell className="text-center font-mono text-xl font-black text-blue-700">{formatCurrency(totalDebit)}</TableCell>
-                                <TableCell className="text-center font-mono text-xl font-black text-red-700">{formatCurrency(totalCredit)}</TableCell>
-                                <TableCell className={cn("text-left font-mono font-black text-xs px-6", Math.abs(balance) > 0.001 ? "text-red-600" : "text-green-600")}>
-                                    الفرق: {formatCurrency(balance)}
+                        <TableFooter className="bg-slate-50">
+                            <TableRow>
+                                <TableCell colSpan={2} className="text-right font-bold">الإجماليات:</TableCell>
+                                <TableCell className="text-center font-mono font-bold text-blue-700">{formatCurrency(totalDebit)}</TableCell>
+                                <TableCell className="text-center font-mono font-bold text-red-700">{formatCurrency(totalCredit)}</TableCell>
+                                <TableCell className={cn("text-center font-mono text-xs", balance !== 0 ? 'text-red-500' : 'text-green-500')}>
+                                    {formatCurrency(balance)}
                                 </TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
                 </div>
                 
-                <div className="flex justify-start">
-                    <Button type="button" variant="outline" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '', projectLink: '' })} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 font-black text-lg text-primary gap-2">
-                        <PlusCircle className="h-5 w-5" /> إضافة
+                <div className="flex justify-between items-center">
+                    <Button type="button" variant="outline" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '' })}>
+                        <PlusCircle className="h-4 w-4 ml-2" /> إضافة سطر
                     </Button>
+                    {!isBalanced && (
+                        <Alert variant="destructive" className="w-auto p-2 text-xs">
+                            القيد غير متوازن. الفرق: {formatCurrency(Math.abs(balance))}
+                        </Alert>
+                    )}
                 </div>
             </CardContent>
-            <CardFooter className="p-10 border-t bg-muted/10 flex justify-end gap-4 rounded-b-[2.5rem]">
-                <Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-10 rounded-2xl font-bold">إلغاء</Button>
-                <Button type="submit" disabled={isSubmitting || Math.abs(balance) > 0.001} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-xl shadow-primary/30 bg-[#7209B7] text-white min-w-[320px] gap-4">
-                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="h-5 w-5"/>}
-                    اعتماد
+            
+            <CardFooter className="p-4 border-t flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>إلغاء</Button>
+                <Button type="submit" disabled={isSubmitting || !isBalanced}>
+                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}
+                    حفظ القيد
                 </Button>
             </CardFooter>
         </form>

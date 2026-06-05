@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase/index.tsx';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 
