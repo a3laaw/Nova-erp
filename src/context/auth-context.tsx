@@ -15,7 +15,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (options?: { navigate: boolean }) => Promise<void>; // Modified logout
   resetPassword: (email: string) => Promise<void>;
   refreshToken: () => Promise<void>;
 }
@@ -42,6 +42,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [masterAuth]);
 
+  const logout = useCallback(async (options = { navigate: true }) => { // Modified logout
+    if (!masterAuth) return;
+    
+    console.log("Initiating full logout...");
+    await signOut(masterAuth);
+    setUser(null);
+    setCompany(null);
+    setCurrentCompany(null);
+    clearSessionIndicators(); // Clear local storage/cookies
+
+    // V2: This ensures that any residual reactive state is cleared before navigation
+    if (options.navigate) {
+        // We use window.location to force a full page reload, clearing all state.
+        window.location.href = '/';
+    }
+    console.log("Logout complete.");
+  }, [masterAuth, setCurrentCompany]);
+
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
       setLoading(false);
@@ -63,7 +81,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const email = firebaseUser.email?.toLowerCase().trim() || '';
 
-      // 🛡️ المطور الرئيسي (Sovereign Root)
       if (email === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
           uid: firebaseUser.uid,
@@ -85,41 +102,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const globalRef = doc(masterFirestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
-        // 🛡️ التحقق من الوجود الفعلي للموظف (منع الدخول التلقائي العشوائي)
         if (!globalSnap.exists()) {
-          console.warn("🚫 Orphan session detected. Force logging out.");
-          await signOut(masterAuth);
-          setUser(null);
+          console.warn("🚫 Orphan session detected. Forcing logout.");
+          await logout({ navigate: false }); // Use new logout
           setLoading(false);
           return;
         }
 
         const { companyId } = globalSnap.data();
         
-        // جلب الملف الشخصي والمنشأة
         const [compDoc, userDoc] = await Promise.all([
           getDoc(doc(masterFirestore, 'companies', companyId)),
           getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid))
         ]);
 
         if (!userDoc.exists()) {
-            console.warn("🚫 Profile missing for current session.");
-            await signOut(masterAuth);
-            setUser(null);
+            console.warn("🚫 Profile missing for current session. Forcing logout.");
+            await logout({ navigate: false }); // Use new logout
             setLoading(false);
             return;
         }
 
         const userData = userDoc.data();
         if (!userData.isActive) {
-            await signOut(masterAuth);
-            setUser(null);
+            await logout({ navigate: false }); // Use new logout
             setError("هذا الحساب معطل حالياً.");
             setLoading(false);
             return;
         }
 
-        // 🛡️ محرك انتظار التوكن السيادي: ننتظر حتى نجد companyId داخل التوكن
         const tokenResult = await getIdTokenResult(firebaseUser, true);
         if (!tokenResult.claims.companyId) {
             console.log("⏳ Refreshing token to sync claims...");
@@ -151,7 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [masterAuth, masterFirestore, setCurrentCompany]);
+  }, [masterAuth, masterFirestore, setCurrentCompany, logout]);
 
   const login = async (email: string, password: string) => {
     if (!masterAuth) throw new Error('بوابة الدخول غير متصلة.');
@@ -165,16 +176,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = async () => {
-    if (!masterAuth) return;
-    await signOut(masterAuth);
-    setUser(null);
-    setCompany(null);
-    setCurrentCompany(null);
-    clearSessionIndicators();
-    router.replace('/');
-  };
-
   const resetPassword = (email: string) => {
     if (!masterAuth) return Promise.reject();
     return sendPasswordResetEmail(masterAuth, email.toLowerCase().trim());
@@ -182,7 +183,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const value = useMemo(() => ({ 
     user, company, loading, error, login, logout, resetPassword, refreshToken 
-  }), [user, company, loading, error, refreshToken]);
+  }), [user, company, loading, error, refreshToken, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

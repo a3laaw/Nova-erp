@@ -2,7 +2,19 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils'; // أبقينا فقط على cn المستقرة
+
+/**
+ * دالة مساعدة داخلية ومستقلة لتنسيق العملة (الدينار الكويتي بـ 3 فواصل عشرية)
+ * قمنا بدمجها هنا مباشرة لحل مشكلة الشاشة الحمراء نهائياً وبأمان
+ */
+const localFormatCurrency = (val: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KWD',
+    minimumFractionDigits: 3
+  }).format(val);
+};
 
 /**
  * بطاقة الإحصائيات الموحدة (Sovereign Stat Card V150.1):
@@ -24,7 +36,7 @@ export const StatCard = ({ title, value, icon, description, colorClass, loading,
             ) : (
                 <div className={cn("text-3xl font-black font-mono tracking-tighter text-[#1e1b4b]")}>
                     {isCurrency 
-                        ? formatCurrency(Number(value) || 0) 
+                        ? localFormatCurrency(Number(value) || 0) // استخدام الدالة الداخلية الآمنة
                         : (Number(value) || 0).toLocaleString('en-US')
                     }
                 </div>
@@ -33,3 +45,5 @@ export const StatCard = ({ title, value, icon, description, colorClass, loading,
         </CardContent>
     </Card>
 );
+
+export default StatCard;

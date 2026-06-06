@@ -3,12 +3,24 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { runCashFlowProjection } from '@/ai/flows/cash-flow-projection';
-import { formatCurrency, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils'; // استوردنا فقط cn وتجنبنا formatCurrency الخارجية المكسورة
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Label } from '@/components/ui/label';
 import { useAppTheme } from '@/context/theme-context';
+
+/**
+ * 🇰🇼 دالة مساعدة داخلية ومستقلة لتنسيق العملة (الدينار الكويتي بـ 3 فواصل عشرية)
+ * قمنا بدمجها محلياً لحل مشكلة انهيار الشاشة الحمراء نهائياً وبأمان
+ */
+const localFormatCurrency = (val: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KWD',
+    minimumFractionDigits: 3
+  }).format(val);
+};
 
 const CustomTooltip = ({ active, payload, label, isGlass }: any) => {
   if (active && payload && payload.length) {
@@ -18,10 +30,10 @@ const CustomTooltip = ({ active, payload, label, isGlass }: any) => {
           isGlass ? "bg-white/80 backdrop-blur-md border-white/20 text-[#a855f7]" : "bg-background"
       )}>
         <p className="font-bold">{label}</p>
-        <p className={isGlass ? "text-[#a855f7]" : "text-green-600"}>{`الإيرادات المتوقعة: ${formatCurrency(payload[0].value)}`}</p>
-        <p className={isGlass ? "text-pink-600" : "text-red-600"}>{`المصروفات المتوقعة: ${formatCurrency(payload[1].value)}`}</p>
+        <p className={isGlass ? "text-[#a855f7]" : "text-green-600"}>{`الإيرادات المتوقعة: ${localFormatCurrency(payload[0].value)}`}</p>
+        <p className={isGlass ? "text-pink-600" : "text-red-600"}>{`المصروفات المتوقعة: ${localFormatCurrency(payload[1].value)}`}</p>
         <hr className="my-1 opacity-20" />
-        <p className="font-semibold">{`صافي التدفق: ${formatCurrency(payload[0].value - payload[1].value)}`}</p>
+        <p className="font-semibold">{`صافي التدفق: ${localFormatCurrency(payload[0].value - payload[1].value)}`}</p>
       </div>
     );
   }
@@ -100,7 +112,7 @@ export function CashFlowProjectionChart() {
           <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={isGlass ? "rgba(168,85,247,0.1)" : "#ccc"} vertical={false} />
             <XAxis dataKey="name" tick={{ fill: isGlass ? "rgba(168,85,247,0.6)" : "#666" }} />
-            <YAxis tick={{ fill: isGlass ? "rgba(168,85,247,0.6)" : "#666" }} tickFormatter={(value) => formatCurrency(value)} />
+            <YAxis tick={{ fill: isGlass ? "rgba(168,85,247,0.6)" : "#666" }} tickFormatter={(value) => localFormatCurrency(value)} />
             <Tooltip content={<CustomTooltip isGlass={isGlass} />} />
             <Legend />
             <Bar dataKey="الإيرادات المتوقعة" fill={isGlass ? "#a855f7" : "#22c55e"} radius={[10, 10, 0, 0]} />
@@ -117,7 +129,7 @@ export function CashFlowProjectionChart() {
                 <ul className="list-disc pr-5 mt-2">
                     {negativeFlowMonths.map((month: any) => (
                         <li key={month.month}>
-                            في شهر <strong>{month.monthName}</strong>، من المتوقع أن يكون صافي التدفق النقدي سالبًا بقيمة <strong>{formatCurrency(Math.abs(month.netCashFlow))}</strong>.
+                            في شهر <strong>{month.monthName}</strong>، من المتوقع أن يكون صافي التدفق النقدي سالبًا بقيمة <strong>{localFormatCurrency(Math.abs(month.netCashFlow))}</strong>.
                         </li>
                     ))}
                 </ul>
@@ -131,11 +143,13 @@ export function CashFlowProjectionChart() {
                 isGlass ? "bg-white/5 border-white/10 text-[#a855f7]/50" : "bg-muted/50 text-muted-foreground"
             )}>
                 <h4 className="font-black mb-1 uppercase tracking-widest opacity-80">الافتراضات المستخدمة في الحساب (Engine v2.0):</h4>
-                <p>• المصروفات الثابتة تشمل إجمالي رواتب {data.assumptions.employeeCount} موظفاً (بقيمة {formatCurrency(data.assumptions.totalSalaries)} شهرياً) + إيجار تقديري {formatCurrency(data.assumptions.fixedRent)}.</p>
-                <p>• الإيرادات المتوقعة مستخلصة من جداول دفعات العقود "المستحقة والقادمة" في المعاملات النشطة فقط.</p>
+                <p>• المصروفات الثابتة تشمل إجمالي رواتب {data.assumptions.employeeCount} موظفاً (بقيمة {localFormatCurrency(data.assumptions.totalSalaries)} شهرياً) + إيجار تقديري {localFormatCurrency(data.assumptions.fixedRent)}.</p>
+                <p>• الإيرادات المتوقعة مستخلصة من جداول دفعات العقود "المستحقة والقادمة" in المعاملات النشطة فقط.</p>
             </div>
         )}
 
     </div>
   );
 }
+
+export default CashFlowProjectionChart;

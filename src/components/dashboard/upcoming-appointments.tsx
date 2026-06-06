@@ -21,6 +21,8 @@ import {
 import { useFirebase } from '@/firebase';
 import { collection, query, where, orderBy, limit, Timestamp, getDocs } from 'firebase/firestore';
 import { format } from 'date-fns';
+import { useAuth } from '@/context/auth-context';
+import { getTenantPath } from '@/lib/utils';
 import { ar } from 'date-fns/locale';
 import { useLanguage } from '@/context/language-context';
 import type { Appointment, Client, Employee } from '@/lib/types';
@@ -31,6 +33,8 @@ import { toFirestoreDate } from '@/services/date-converter';
 export function UpcomingAppointments() {
   const { language } = useLanguage();
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
+  const tenantId = currentUser?.currentCompanyId;
   const [engineersMap, setEngineersMap] = useState<Map<string, string>>(new Map());
   const [clientsMap, setClientsMap] = useState<Map<string, string>>(new Map());
   const [relatedDataLoading, setRelatedDataLoading] = useState(true);
@@ -55,9 +59,12 @@ export function UpcomingAppointments() {
     const fetchRelatedData = async () => {
       setRelatedDataLoading(true);
       try {
+        const employeesPath = tenantId ? getTenantPath('employees', tenantId) : 'employees';
+        const clientsPath = tenantId ? getTenantPath('clients', tenantId) : 'clients';
+
         const [engineersSnapshot, clientsSnapshot] = await Promise.all([
-          getDocs(collection(firestore, 'employees')),
-          getDocs(collection(firestore, 'clients'))
+          getDocs(collection(firestore, employeesPath)),
+          getDocs(collection(firestore, clientsPath))
         ]);
 
         const newEngineersMap = new Map<string, string>();
@@ -76,7 +83,7 @@ export function UpcomingAppointments() {
     };
     
     fetchRelatedData();
-  }, [firestore]);
+  }, [firestore, tenantId]);
   
   const augmentedAppointments = useMemo(() => {
       return appointments.map(appt => ({

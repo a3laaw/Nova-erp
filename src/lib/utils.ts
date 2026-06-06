@@ -5,11 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * 🛡️ دالة بناء المسار السيادية المعدلة
+ * تم تحويل المسار من tenants إلى companies لربط الواجهات بالخزنة التاريخية الحية للشركة مباشرة.
+ */
 export function getTenantPath(relativePath: string | null, tenantId: string | undefined): string | null {
   if (!relativePath || !tenantId) {
     return null;
   }
-  return `tenants/${tenantId}/${relativePath}`;
+  // 🔥 التعديل هنا: جلب البيانات من المجلد الأصلي الحقيقي للشركة
+  return `companies/${tenantId}/${relativePath}`;
 }
 
 // The original, simple, and stable version of the function.

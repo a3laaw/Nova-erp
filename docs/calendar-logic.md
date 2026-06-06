@@ -566,7 +566,7 @@ export function ArchitecturalAppointmentsView() {
                                 );
                             })}
                         </tr>
-                    ))}
+                    )))}
                 </tbody>
             </table>
         </div>
