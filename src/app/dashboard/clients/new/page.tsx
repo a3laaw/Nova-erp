@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo, Suspense } from 'react';
+import { useState, useCallback, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
@@ -10,19 +10,15 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useFirebase } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, query, where, getDocs, deleteField } from 'firebase/firestore';
+import { doc, runTransaction, collection, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import type { Client } from '@/lib/types';
 import { ClientForm } from '@/components/clients/client-form';
 import { getTenantPath, cleanFirestoreData } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
-/**
- * محتوى صفحة إضافة عميل جديد (The New Client Engine):
- * تم تغليفها بـ Suspense لضمان استقرار الخادم عند قراءة روابط الميدان.
- */
 function NewClientContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -32,7 +28,6 @@ function NewClientContent() {
     
     const [isSaving, setIsSaving] = useState(false);
     
-    // 🛡️ استخلاص البيانات القادمة من رادار المواعيد لضمان المزامنة
     const initialData = useMemo(() => ({
         nameAr: searchParams.get('nameAr') || '',
         mobile: searchParams.get('mobile') || '',
@@ -48,74 +43,59 @@ function NewClientContent() {
         const clientsCollectionPath = getTenantPath('clients', tenantId);
 
         try {
-            const mobileQuery = query(collection(firestore, clientsCollectionPath!), where('mobile', '==', newClientData.mobile));
+            const mobileQuery = query(collection(firestore, clientsCollectionPath), where('mobile', '==', newClientData.mobile));
             const mobileSnapshot = await getDocs(mobileQuery);
             if (!mobileSnapshot.empty) {
-                throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر في هذه المنشأة الموحدة.');
+                throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر.');
             }
 
             await runTransaction(firestore, async (transaction) => {
-                const currentYear = String(new Date().getFullYear());
-                const counterPath = getTenantPath('counters/clientFiles', tenantId);
-                const clientFileCounterRef = doc(firestore, counterPath!);
-                const clientFileCounterDoc = await transaction.get(clientFileCounterRef);
+                const counterRef = doc(firestore, getTenantPath('counters/clientFiles', tenantId));
+                const counterDoc = await transaction.get(counterRef);
                 
+                const currentYear = new Date().getFullYear().toString();
                 let nextFileNumber = 1;
-                if (clientFileCounterDoc.exists()) {
-                    const counts = clientFileCounterDoc.data()?.counts || {};
+                if (counterDoc.exists()) {
+                    const counts = counterDoc.data()?.counts || {};
                     nextFileNumber = (counts[currentYear] || 0) + 1;
                 }
                 
-                transaction.set(clientFileCounterRef, { counts: { [currentYear]: nextFileNumber } }, { merge: true });
-                const newFileId = `${nextFileNumber}/${currentYear}`;
+                transaction.set(counterRef, { counts: { [currentYear]: nextFileNumber } }, { merge: true });
+                const newFileNumberFormatted = `${nextFileNumber}/${currentYear}`;
 
                 const finalClientData = {
                   ...newClientData,
-                  fileId: newFileId,
-                  fileNumber: nextFileNumber,
-                  fileYear: parseInt(currentYear, 10),
-                  status: 'new' as const,
-                  transactionCounter: 0,
+                  fileNumber: newFileNumberFormatted,
+                  status: 'active' as const,
                   createdAt: serverTimestamp(),
-                  isActive: true,
                   companyId: tenantId
                 };
 
-                const newClientRef = doc(collection(firestore, clientsCollectionPath!));
-                const newClientId = newClientRef.id;
+                const newClientRef = doc(collection(firestore, clientsCollectionPath));
                 transaction.set(newClientRef, cleanFirestoreData(finalClientData));
-
-                // الربط التلقائي للمواعيد السابقة والحالية بالملف الرسمي الجديد
-                const apptsPath = getTenantPath('appointments', tenantId);
-                const apptsQuery = query(collection(firestore, apptsPath!), where('clientMobile', '==', newClientData.mobile));
-                const apptsSnapshot = await getDocs(apptsQuery);
-
-                apptsSnapshot.forEach(apptDoc => {
-                    transaction.update(apptDoc.ref, {
-                        clientId: newClientId,
-                        clientName: deleteField(),
-                        clientMobile: deleteField(),
-                        updatedAt: serverTimestamp()
-                    });
-                });
             });
 
-            toast({ title: 'نجاح المزامنة', description: 'تم إنشاء ملف العميل وربط تاريخه الميداني آلياً.' });
+            toast({ title: 'نجاح', description: 'تم إنشاء ملف العميل الرسمي بنجاح.' });
             router.push(`/dashboard/clients`);
 
         } catch (error: any) {
             toast({ title: "فشل الحفظ", description: error.message, variant: "destructive" });
+        }
+        finally {
             setIsSaving(false);
         }
     }, [firestore, currentUser, toast, router, tenantId]);
 
     return (
-        <Card className="max-w-2xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
-            <CardHeader className="bg-primary/5 pb-8 border-b">
-                <CardTitle className="text-2xl font-black">إكمال بيانات الملف الرسمي</CardTitle>
-                <CardDescription className="text-base font-medium">سيقوم النظام آلياً بدمج كافة المواعيد السابقة المرتبطة بهذا الرقم في السجل الرسمي.</CardDescription>
+        <Card className="max-w-4xl mx-auto rounded-[2rem] shadow-xl border" dir="rtl">
+            <CardHeader className="border-b bg-gray-50 rounded-t-[2rem] p-6">
+                <CardTitle className="flex items-center gap-3 text-xl font-bold">
+                    <UserPlus className='h-7 w-7'/>
+                    إنشاء ملف عميل رسمي
+                </CardTitle>
+                <CardDescription>إدخال بيانات عميل جديد لفتح ملف رسمي له في النظام.</CardDescription>
             </CardHeader>
-            <CardContent className="p-8">
+            <CardContent className="p-0">
                 <ClientForm
                     initialData={initialData}
                     onSave={handleSave}
@@ -129,8 +109,10 @@ function NewClientContent() {
 
 export default function NewClientPage() {
     return (
-        <Suspense fallback={<div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>}>
-            <NewClientContent />
+        <Suspense fallback={<div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-[600px] w-full rounded-2xl" /></div>}>
+            <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+              <NewClientContent />
+            </div>
         </Suspense>
     );
 }

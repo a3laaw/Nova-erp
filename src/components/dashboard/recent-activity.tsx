@@ -30,7 +30,7 @@ interface ActivityEvent {
 /**
  * مكون النشاط الأخير: تم إزالة الترتيب من الاستعلام المجمع لتجنب أخطاء الفهارس.
  */
-export function RecentActivity() {
+export default function RecentActivity() {
   const { firestore } = useFirebase();
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);

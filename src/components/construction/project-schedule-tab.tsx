@@ -111,7 +111,7 @@ export function ProjectScheduleTab({ project }: ProjectScheduleTabProps) {
             </div>
         </CardHeader>
         <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[70vh]">
                 <div className="min-w-[1000px]">
                     {/* Time Header */}
                     <div className="flex border-b bg-muted/10">

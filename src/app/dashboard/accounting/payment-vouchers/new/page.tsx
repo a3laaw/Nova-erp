@@ -95,6 +95,7 @@ export default function NewPaymentVoucherPage() {
             setRefDataLoading(true);
             try {
                 const counterPath = getTenantPath('counters/paymentVouchers', tenantId)!;
+                const counterRef = doc(firestore, counterPath);
                 const accPath = getTenantPath('chartOfAccounts', tenantId)!;
                 const empPath = getTenantPath('employees', tenantId)!;
                 const clientPath = getTenantPath('clients', tenantId)!;
@@ -291,7 +292,7 @@ export default function NewPaymentVoucherPage() {
                             <CardDescription>{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
                         </div>
                     </div>
-                </Header>
+                </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="grid gap-2">

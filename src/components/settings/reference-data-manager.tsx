@@ -95,6 +95,57 @@ function SummaryCard({ title, count, icon, onNavigate, colorClass, loading, desc
     );
 }
 
+// Simplified list for flat data structures like ServiceTypes
+function SimpleListManager({
+    items,
+    loading,
+    title,
+    onAddItem,
+    onEditItem,
+    onDeleteItem
+}: {
+    items: any[],
+    loading: boolean,
+    title: string,
+    onAddItem: () => void,
+    onEditItem: (item: any) => void,
+    onDeleteItem: (item: any) => void
+}) {
+    return (
+         <Card className="md:col-span-12 border-none rounded-[2rem] shadow-xl bg-white/45 backdrop-blur-xl overflow-hidden flex flex-col border-white/60">
+            <ScrollArea className="flex-1">
+                 <div className="p-6 space-y-3">
+                    {loading ? (
+                        Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-[1.8rem]" />)
+                    ) : items.length === 0 ? (
+                        <div className="text-center py-20 text-gray-400 flex flex-col items-center">
+                            <ListTree className="h-12 w-12 mb-4"/>
+                            <h3 className="font-bold">القائمة فارغة</h3>
+                            <p className="text-sm">ابدأ بإضافة عنصر جديد من الزر في الأعلى.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3">
+                            {items.map(item => (
+                                <div key={item.id} className="group flex items-center justify-between p-4 rounded-[1.8rem] bg-white/70 hover:bg-white hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-lg">
+                                    <div className="flex items-center gap-4">
+                                        <Briefcase className="h-4 w-4 text-primary opacity-60"/>
+                                        <span className="font-black text-lg text-[#1e1b4b]">{item.name}</span>
+                                    </div>
+                                    <div className={cn("flex gap-2 transition-opacity", "opacity-0 group-hover:opacity-100")}>
+                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-gray-200" onClick={() => onEditItem(item)}><Pencil className="h-4 w-4"/></Button>
+                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-red-500 hover:bg-red-100" onClick={() => onDeleteItem(item)}><Trash2 className="h-4 w-4"/></Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </ScrollArea>
+        </Card>
+    )
+}
+
+
 export function ReferenceDataManager() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -132,6 +183,7 @@ export function ReferenceDataManager() {
         if (view === 'departments') return 'jobs';
         if (view === 'locations') return 'areas';
         if (view === 'transactions') return 'subServices';
+        // serviceTypes has no secondary collection, so it returns null
         return null;
     }, [view]);
 
@@ -174,9 +226,12 @@ export function ReferenceDataManager() {
     const openPrimaryDialog = (item: any | null) => {
         setEditingItem(item);
         setItemName(item ? item.name : '');
-        if (view === 'transactions') {
-            setSelectedDeptIds(item ? item.departmentIds || [] : []);
-            setSelectedServiceTypeId(item ? item.serviceTypeId || '' : '');
+        if (view === 'transactions' && item) {
+            setSelectedDeptIds(item.departmentIds || []);
+            setSelectedServiceTypeId(item.serviceTypeId || '');
+        } else if (view === 'transactions') {
+             setSelectedDeptIds([]);
+            setSelectedServiceTypeId('');
         }
         setIsPrimaryDialogOpen(true);
     };
@@ -290,18 +345,26 @@ export function ReferenceDataManager() {
         )
     }
 
-    return (
-        <div className="space-y-6" dir="rtl">
-             <Card className="border-none rounded-[2rem] shadow-lg bg-gradient-to-r from-orange-600 to-yellow-400 text-white overflow-hidden">
-                <CardHeader className="flex-row items-center justify-between p-6">
-                    <div className="flex items-center gap-4">
-                        <Button variant="outline" size="icon" className="h-12 w-12 rounded-full bg-white/15 hover:bg-white/25 text-white border-white/20" onClick={() => setView('main')}><ArrowRight className="h-5 w-5"/></Button>
-                        <CardTitle className="text-2xl font-black">{getTitle()}</CardTitle>
-                    </div>
-                    <Button onClick={() => openPrimaryDialog(null)} variant="outline" className="rounded-full h-12 px-6 font-black gap-2 bg-white/15 hover:bg-white/25 border-white/20"><PlusCircle className="h-5 w-5"/>إضافة {view === 'transactions' ? 'عقد' : view === 'departments' ? 'قسم' : view === 'locations' ? 'محافظة' : 'نشاط'}</Button>
-                </CardHeader>
-            </Card>
+    const renderContent = () => {
+        // If the view has no secondary collection, it's a flat list. Render the simple manager.
+        if (!secondaryCollectionName) {
+            return (
+                <SimpleListManager 
+                    items={primaryItems}
+                    loading={loadingPrimary}
+                    title={getTitle()}
+                    onAddItem={() => openPrimaryDialog(null)}
+                    onEditItem={(item) => openPrimaryDialog(item)}
+                    onDeleteItem={(item) => {
+                        setItemToDelete({ ...item, target: 'primary' });
+                        setIsDeleteDialogOpen(true);
+                    }}
+                />
+            )
+        }
 
+        // Otherwise, render the master-detail view
+        return (
             <div className="grid grid-cols-1 md:grid-cols-12 min-h-[600px] gap-6">
                 <Card className="md:col-span-4 border-none rounded-[2rem] shadow-xl bg-white/45 backdrop-blur-xl overflow-hidden flex flex-col border-white/60">
                     <ScrollArea className="flex-1">
@@ -348,7 +411,9 @@ export function ReferenceDataManager() {
                                     <CardTitle className="text-xl font-black text-[#1e1b4b]">القائمة الفرعية لـ "{selectedPrimary?.name}"</CardTitle>
                                     <CardDescription>اسحب وأفلت لترتيب العناصر أو قم بإضافة عنصر جديد.</CardDescription>
                                 </div>
-                                <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-full h-11 px-5 font-black gap-2"><PlusCircle className="h-5 w-5"/>إضافة عنصر جديد</Button>
+                                {secondaryCollectionName && 
+                                    <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-full h-11 px-5 font-black gap-2"><PlusCircle className="h-5 w-5"/>إضافة عنصر جديد</Button>
+                                }
                            </CardHeader>
                             <ScrollArea className="flex-1 px-8 py-6">
                                 {loadingSecondary ? (
@@ -403,12 +468,28 @@ export function ReferenceDataManager() {
                     )}
                 </Card>
             </div>
+        );
+    };
 
-            {/* Dialog for Primary Item */}
+    return (
+        <div className="space-y-6" dir="rtl">
+             <Card className="border-none rounded-[2rem] shadow-lg bg-gradient-to-r from-orange-600 to-yellow-400 text-white overflow-hidden">
+                <CardHeader className="flex-row items-center justify-between p-6">
+                    <div className="flex items-center gap-4">
+                        <Button variant="outline" size="icon" className="h-12 w-12 rounded-full bg-white/15 hover:bg-white/25 text-white border-white/20" onClick={() => setView('main')}><ArrowRight className="h-5 w-5"/></Button>
+                        <CardTitle className="text-2xl font-black">{getTitle()}</CardTitle>
+                    </div>
+                    <Button onClick={() => openPrimaryDialog(null)} variant="outline" className="rounded-full h-12 px-6 font-black gap-2 bg-white/15 hover:bg-white/25 border-white/20"><PlusCircle className="h-5 w-5"/>إضافة {view === 'transactions' ? 'عقد' : view === 'departments' ? 'قسم' : view === 'locations' ? 'محافظة' : 'نشاط'}</Button>
+                </CardHeader>
+            </Card>
+
+            {renderContent()}
+
+            {/* Dialog for Primary Item (covers both simple and master-detail) */}
             <Dialog open={isPrimaryDialogOpen} onOpenChange={setIsPrimaryDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} {getTitle()}</DialogTitle>
+                        <DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} {primaryCollectionName === 'serviceTypes' ? 'نشاط' : 'عنصر'}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
@@ -431,7 +512,7 @@ export function ReferenceDataManager() {
                                      <InlineSearchList 
                                         options={serviceTypeOptions}
                                         value={selectedServiceTypeId}
-                                        onChange={setSelectedServiceTypeId}
+                                        onSelect={setSelectedServiceTypeId} // CORRECTED: from onChange to onSelect
                                         placeholder="ابحث عن نشاط..."
                                      />
                                 </div>

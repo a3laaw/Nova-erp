@@ -3,7 +3,7 @@
 
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useDocument, useFirebase } from '@/firebase';
+import { useSubscription, useFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { Payslip, Employee } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,10 +40,12 @@ export default function PayslipPage() {
     const { branding, loading: brandingLoading } = useBranding();
 
     const payslipRef = useMemo(() => (firestore && id ? doc(firestore, 'payroll', id) : null), [firestore, id]);
-    const { data: payslip, loading: payslipLoading } = useDocument<Payslip>(firestore, payslipRef?.path || null);
+    const { data: payslipData, loading: payslipLoading } = useSubscription<Payslip>(firestore, payslipRef?.path || null);
+    const payslip = useMemo(() => (payslipData && payslipData.length > 0) ? payslipData[0] : null, [payslipData]);
     
     const employeeRef = useMemo(() => (firestore && payslip?.employeeId ? doc(firestore, 'employees', payslip.employeeId) : null), [firestore, payslip?.employeeId]);
-    const { data: employee, loading: employeeLoading } = useDocument<Employee>(firestore, employeeRef?.path || null);
+    const { data: employeeData, loading: employeeLoading } = useSubscription<Employee>(firestore, employeeRef?.path || null);
+    const employee = useMemo(() => (employeeData && employeeData.length > 0) ? employeeData[0] : null, [employeeData]);
     
     const loading = payslipLoading || employeeLoading || brandingLoading;
 

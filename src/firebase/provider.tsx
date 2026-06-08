@@ -1,12 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import type { FirebaseApp } from 'firebase/app';
 import type { Auth } from 'firebase/auth';
-import type { Firestore } from 'firebase/firestore';
+import type { Firestore, Query } from 'firebase/firestore';
 import type { FirebaseStorage } from 'firebase/storage';
-import { onSnapshot, query, collection, orderBy as fbOrderBy } from 'firebase/firestore';
+import { onSnapshot, query, collection, orderBy as fbOrderBy, doc, onSnapshot as onDocSnapshot } from 'firebase/firestore';
 import { getFirebaseServices } from './init';
+import { getStorage } from 'firebase/storage';
 
 interface FirebaseContextType {
   app: FirebaseApp | null;
@@ -19,76 +20,82 @@ const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined
 
 export function FirebaseProvider({ children }: { children: ReactNode }) {
   const services = useMemo(() => getFirebaseServices(), []);
-  const value = services ?? { app: null, auth: null, firestore: null, storage: null };
-
   return (
-    <FirebaseContext.Provider value={value}>
+    <FirebaseContext.Provider value={services ?? { app: null, auth: null, firestore: null, storage: null }}>
       {children}
     </FirebaseContext.Provider>
   );
 }
 
-/**
- * Custom hook to access full Firebase Context
- * 🛡️ تم تحصينها هنا بالكامل لتدعم المسميات القديمة والجديدة (db و firestore) معاً
- * هذا السيرفر المزدوج يضمن ربط الجداول بالبيانات الحية فوراً ويمنع تعليق المتصفح
- */
 export function useFirebase() {
   const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    throw new Error('useFirebase must be used within a FirebaseProvider');
-  }
+  if (context === undefined) throw new Error('useFirebase must be used within a FirebaseProvider');
   return {
     ...context,
-    app: context.app,
-    firebaseApp: context.app,
-    firestore: context.firestore,
-    db: context.firestore, // الجسر السحري لربط الاستعلامات القديمة بقاعدة البيانات الحية
-    auth: context.auth,
-    storage: context.storage
+    db: context.firestore, // Alias for backward compatibility
   };
 }
 
-export function useFirebaseApp() {
-    const context = useContext(FirebaseContext);
-    if (context === undefined) {
-        throw new Error('useFirebaseApp must be used within a FirebaseProvider');
-    }
-    return context.app;
-}
-
-export function useAuth() {
-  const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within a FirebaseProvider');
-  }
-  return context.auth;
-}
-
-export function useFirestore() {
-  const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    throw new Error('useFirestore must be used within a FirebaseProvider');
-  }
-  return context.firestore;
-}
-
 export function useStorage() {
-  const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    throw new Error('useStorage must be used within a FirebaseProvider');
-  }
-  return context.storage;
+  const { app } = useFirebase();
+  return app ? getStorage(app) : null;
+}
+
+export function useDocument<T>(path: string, disabled: boolean = false): { data: T | null; loading: boolean; error: Error | null } {
+    const { firestore } = useFirebase();
+    const [data, setData] = useState<T | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
+
+    useEffect(() => {
+        if (disabled || !firestore || !path) {
+            setData(null);
+            setLoading(false);
+            return;
+        }
+
+        let isMounted = true;
+        setLoading(true);
+
+        const docRef = doc(firestore, path);
+
+        const unsubscribe = onDocSnapshot(docRef, (docSnap) => {
+            if (isMounted) {
+                if (docSnap.exists()) {
+                    setData({ id: docSnap.id, ...docSnap.data() } as T);
+                } else {
+                    setData(null);
+                }
+                setError(null);
+                setLoading(false);
+            }
+        }, (err) => {
+            if (isMounted) {
+                console.error(`🚨 Document Snapshot Error for ${path}:`, err);
+                setError(err);
+                setLoading(false);
+            }
+        });
+
+        return () => {
+            isMounted = false;
+            unsubscribe();
+        };
+    }, [firestore, path, disabled]);
+
+    return { data, loading, error };
 }
 
 /**
- * 🛡️ محرك البث الحي السيادي المطور لعرض الداتا القديمة والجديدة فوراً وبشكل قاطع
+ * 🛡️ The Sovereign Real-time Engine for fetching both legacy and new data instantly.
  * (Anti-Filtering Safe Subscription Engine)
+ * Now upgraded to handle both string paths and full Query objects.
  */
 export function useSubscription<T>(
     customFirestore: Firestore | null,
-    path: string | null,
-    orderByField: string | null = null
+    pathOrQuery: string | Query | null | undefined,
+    orderByField: string | null = null,
+    disabled: boolean = false
 ): { data: T[]; loading: boolean; error: Error | null } {
     const [data, setData] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
@@ -97,41 +104,37 @@ export function useSubscription<T>(
     const context = useContext(FirebaseContext);
     const activeFirestore = customFirestore || context?.firestore || null;
 
-    const pathRef = useRef(path);
-    const dbRef = useRef(activeFirestore);
-    
     useEffect(() => {
-        pathRef.current = path;
-        dbRef.current = activeFirestore;
-    }, [path, activeFirestore]);
-
-    useEffect(() => {
-        let currentPath = pathRef.current;
-        const currentDb = dbRef.current;
-
-        if (!currentDb || !currentPath) {
+        if (disabled || !activeFirestore || !pathOrQuery) {
             setData([]);
             setLoading(false);
             return;
         }
 
-        // 💡 تنظيف المسار التلقائي: إذا كان الكود يستدعي مساراً متبوعاً بشرطة مائلة مزدوجة أو تالفة،
-        // نقوم بتطهيره فوراً ليقرأ المجلد الرئيسي للشركة مباشرة دون حجب الداتا القديمة
-        if (currentPath.includes('//')) {
-            currentPath = currentPath.replace('//', '/');
-        }
-
         let isMounted = true;
         setLoading(true);
 
+        let q: Query;
+        let loggingPath: string;
+
         try {
-            // جلب مباشر ومستقر للمجموعة لضمان سحب كل الموظفين والعملاء القدامى المخزنين
-            let q = query(collection(currentDb, currentPath));
-            
-            if (orderByField) {
-                q = query(collection(currentDb, currentPath), fbOrderBy(orderByField));
+            if (typeof pathOrQuery === 'string') {
+                let currentPath = pathOrQuery;
+                // Automatic path cleaning
+                if (currentPath.includes('//')) {
+                    currentPath = currentPath.replace(/\/\//g, '/'); // Replace all double slashes
+                }
+                loggingPath = currentPath;
+
+                const collRef = collection(activeFirestore, currentPath);
+                q = orderByField ? query(collRef, fbOrderBy(orderByField)) : query(collRef);
+
+            } else {
+                // It's already a Query object
+                q = pathOrQuery as Query;
+                loggingPath = `custom query`;
             }
-            
+
             const unsubscribe = onSnapshot(
                 q,
                 (querySnapshot) => {
@@ -142,13 +145,14 @@ export function useSubscription<T>(
                         ...doc.data(),
                     } as T));
                     
-                    console.log(`⚡ Nova ERP Subscriptions Success from path [${currentPath}]:`, fetchedData.length, "items found.");
+                    console.log(`⚡ Nova ERP Subscriptions Success from [${loggingPath}]:`, fetchedData.length, "items found.");
                     setData(fetchedData);
+                    setError(null);
                     setLoading(false);
                 },
                 (err) => {
                     if (!isMounted) return;
-                    console.error(`🚨 Subscription Error from path [${currentPath}]:`, err);
+                    console.error(`🚨 Subscription Error from [${loggingPath}]:`, err);
                     setError(err);
                     setLoading(false);
                 }
@@ -160,14 +164,13 @@ export function useSubscription<T>(
             };
         } catch (err: any) {
             if (isMounted) {
-                console.error(`🚨 Fatal Subscription Error for ${currentPath}:`, err);
+                const errorPath = typeof pathOrQuery === 'string' ? pathOrQuery : 'custom query';
+                console.error(`🚨 Fatal Subscription Error for ${errorPath}:`, err);
                 setError(err);
                 setLoading(false);
             }
         }
-    }, [path]);
+    }, [activeFirestore, pathOrQuery, orderByField, disabled]); // Correct dependency array
 
     return { data, loading, error };
 }
-
-export default useFirebase;

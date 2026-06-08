@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useDocument, useFirebase } from '@/firebase';
+import { useSubscription, useFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,10 +22,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-/**
- * ملف التعريف المحدث للموظف:
- * تم إضافة استيراد CalendarPlus المفقود لضمان استقرار العرض.
- */
 function InfoRow({ label, value, icon, children }: { label: string, value: React.ReactNode, icon: React.ReactNode, children?: React.ReactNode }) {
     return (
         <div className="flex items-start gap-3">
@@ -51,7 +47,8 @@ export default function EmployeeProfilePage() {
         return doc(firestore, 'employees', id);
     }, [firestore, id]);
 
-    const { data: employee, loading: employeeLoading, error } = useDocument<Employee>(firestore, employeeRef ? employeeRef.path : null);
+    const { data: employeeData, loading: employeeLoading, error } = useSubscription<Employee>(firestore, employeeRef ? employeeRef.path : null);
+    const employee = useMemo(() => (employeeData && employeeData.length > 0) ? employeeData[0] : null, [employeeData]);
 
     const formatDate = (date: any) => {
         const d = toFirestoreDate(date);

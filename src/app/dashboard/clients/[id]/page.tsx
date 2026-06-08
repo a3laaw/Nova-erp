@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument, useSubscription } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { 
     doc, 
     collection, 
@@ -136,10 +136,6 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
     );
 }
 
-/**
- * ملف العميل الموحد (Client Profile V107.0):
- * تم تثبيت كافة المراجع (Separator, transactionStatusColors) وضمان استرجاع المعاملات القديمة والجديدة.
- */
 export default function ClientProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -159,13 +155,13 @@ export default function ClientProfilePage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const clientPath = useMemo(() => id && tenantId ? getTenantPath(`clients/${id}`, tenantId) : null, [id, tenantId]);
-  const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
+  const { data: clientData, loading: clientLoading } = useSubscription<Client>(firestore, clientPath);
+  const client = useMemo(() => (clientData && clientData.length > 0) ? clientData[0] : null, [clientData]);
 
   const isPrivileged = useMemo(() => 
     ['Admin', 'Accountant', 'HR', 'Secretary', 'Developer'].includes(currentUser?.role || '')
   , [currentUser?.role]);
 
-  // 🛡️ رادار استعادة البيانات: الاستماع للمسارين (المتداخل والمسطح) 🛡️
   const { data: nestedTransactions, loading: nestedLoading } = useSubscription<ClientTransaction>(
       firestore, 
       `clients/${id}/transactions`,
@@ -675,7 +671,7 @@ export default function ClientProfilePage() {
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2 text-black">إلغاء</AlertDialogCancel>
                     <AlertDialogAction onClick={handleConfirmDeleteQuotation} disabled={isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200 min-w-[180px]"
                     >
-                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، حذف العرض'}
+                        {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف العرض'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

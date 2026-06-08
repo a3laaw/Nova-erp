@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { StatCard } from './stat-card';
-import { RecentActivity } from './recent-activity';
-import { TaskPrioritization } from './task-prioritization';
+import RecentActivity from './recent-activity';
+import TaskPrioritization from './task-prioritization';
 import { CashFlowProjectionChart } from '../accounting/cash-flow-projection-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';

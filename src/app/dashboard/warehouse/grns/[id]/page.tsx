@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -26,7 +25,8 @@ export default function GrnDetailPage() {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
     const grnRef = useMemo(() => (firestore && id ? doc(firestore, 'grns', id) : null), [firestore, id]);
-    const { data: grn, loading: grnLoading } = useDocument<any>(firestore, grnRef?.path || null);
+    const { data: grnData, loading: grnLoading } = useSubscription<any>(firestore, grnRef?.path || null);
+    const grn = useMemo(() => (grnData && grnData.length > 0) ? grnData[0] : null, [grnData]);
 
     const handlePrint = () => window.print();
 

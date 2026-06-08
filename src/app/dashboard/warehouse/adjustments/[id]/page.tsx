@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { InventoryAdjustment } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,7 +33,8 @@ export default function AdjustmentDetailPage() {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
     const adjRef = useMemo(() => (firestore && id ? doc(firestore, 'inventoryAdjustments', id) : null), [firestore, id]);
-    const { data: adj, loading: adjLoading } = useDocument<InventoryAdjustment>(firestore, adjRef?.path || null);
+    const { data: adjData, loading: adjLoading } = useSubscription<InventoryAdjustment>(firestore, adjRef?.path || null);
+    const adj = useMemo(() => (adjData && adjData.length > 0) ? adjData[0] : null, [adjData]);
 
     const handlePrint = () => window.print();
 

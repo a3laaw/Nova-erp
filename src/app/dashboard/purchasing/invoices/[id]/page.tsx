@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -19,10 +18,12 @@ export default function PurchaseInvoicePage() {
 
     // الفاتورة هي في الأصل إذن استلام بضاعة (GRN)
     const grnRef = useMemo(() => (firestore && id ? doc(firestore, 'grns', id) : null), [firestore, id]);
-    const { data: grn, loading: grnLoading } = useDocument<any>(firestore, grnRef?.path || null);
+    const { data: grnData, loading: grnLoading } = useSubscription<any>(firestore, grnRef?.path || null);
+    const grn = useMemo(() => (grnData && grnData.length > 0) ? grnData[0] : null, [grnData]);
 
     const vendorRef = useMemo(() => (firestore && grn?.vendorId ? doc(firestore, 'vendors', grn.vendorId) : null), [firestore, grn?.vendorId]);
-    const { data: vendor, loading: vendorLoading } = useDocument<Vendor>(firestore, vendorRef?.path || null);
+    const { data: vendorData, loading: vendorLoading } = useSubscription<Vendor>(firestore, vendorRef?.path || null);
+    const vendor = useMemo(() => (vendorData && vendorData.length > 0) ? vendorData[0] : null, [vendorData]);
 
     const handlePrint = () => window.print();
 

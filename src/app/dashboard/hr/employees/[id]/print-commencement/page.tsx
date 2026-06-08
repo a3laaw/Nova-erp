@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useDocument, useFirebase } from '@/firebase';
+import { useSubscription, useFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,7 +17,8 @@ export default function PrintCommencementNoticePage() {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
     const employeeRef = useMemo(() => firestore && id ? doc(firestore, 'employees', id) : null, [firestore, id]);
-    const { data: employee, loading: employeeLoading } = useDocument<Employee>(firestore, employeeRef?.path || null);
+    const { data: employeeData, loading: employeeLoading } = useSubscription<Employee>(firestore, employeeRef?.path || null);
+    const employee = useMemo(() => (employeeData && employeeData.length > 0) ? employeeData[0] : null, [employeeData]);
 
     const handlePrint = () => window.print();
 

@@ -1,9 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useFirebase } from '@/firebase/index.tsx';
+import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { useDocument } from '@/hooks/use-document';
 
 /**
  * @fileOverview خطاف جلب إعدادات الطباعة السيادية (Branding).
@@ -19,7 +18,8 @@ export function usePrintSettings() {
     return `companies/${user.currentCompanyId}/settings/branding`;
   }, [user?.currentCompanyId]);
 
-  const { data: branding, loading, error } = useDocument<any>(firestore, brandingPath);
+  const { data: brandingData, loading, error } = useSubscription<any>(firestore, brandingPath);
+  const branding = useMemo(() => (brandingData && brandingData.length > 0) ? brandingData[0] : null, [brandingData]);
 
   return { 
     branding, 

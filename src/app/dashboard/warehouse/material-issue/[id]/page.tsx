@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { InventoryAdjustment, ConstructionProject } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,7 +26,8 @@ export default function MaterialIssueDetailPage() {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
     const issueRef = useMemo(() => (firestore && id ? doc(firestore, 'inventoryAdjustments', id) : null), [firestore, id]);
-    const { data: issue, loading: issueLoading } = useDocument<InventoryAdjustment>(firestore, issueRef?.path || null);
+    const { data: issueData, loading: issueLoading } = useSubscription<InventoryAdjustment>(firestore, issueRef?.path || null);
+    const issue = useMemo(() => (issueData && issueData.length > 0) ? issueData[0] : null, [issueData]);
 
     const handlePrint = () => window.print();
 

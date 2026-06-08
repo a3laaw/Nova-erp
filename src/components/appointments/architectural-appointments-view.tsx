@@ -100,7 +100,7 @@ async function reconcileClientAppointments(firestore: any, tenantId: string | un
     let contractSigned = false;
     if (id.clientId) {
       const cs = await getDoc(doc(firestore, getTenantPath(`clients/${id.clientId}`, tenantId)!));
-      contractSigned = cs.exists() && ['contracted', 'reContracted'].includes((cs.data() as any)?.status);
+      contractSigned = cs.exists() && ['contracted', 'reContracted', 'active'].includes((cs.data() as any)?.status);
     }
     const batch = writeBatch(firestore);
     let dirty = false;
@@ -293,6 +293,7 @@ function AppointmentManagerDialog({
   const [isNewClient, setIsNewClient] = useState(!initialData?.clientId);
   const [newName, setNewName] = useState(initialData?.clientName || '');
   const [newMobile, setNewMobile] = useState(initialData?.clientMobile || '');
+  const [newCity, setNewCity] = useState('');
   const [selectedClientId, setSelectedClientId] = useState(initialData?.clientId || '');
 
   const tenantId = currentUser?.currentCompanyId;
@@ -318,8 +319,8 @@ function AppointmentManagerDialog({
         setSelectedDate(dialogData?.appointmentDate ? toFirestoreDate(dialogData.appointmentDate) : new Date());
         setSelectedTime(dialogData?.appointmentDate ? format(toFirestoreDate(dialogData.appointmentDate), 'HH:mm') : '10:00');
         setTitle('');
-        setIsNewClient(false); 
-        setNewName(''); setNewMobile('');
+        setIsNewClient(true); 
+        setNewName(''); setNewMobile(''); setNewCity('');
         setSelectedClientId('');
       } else if (isRescheduling) {
         setSelectedDate(originalApptDate || new Date());
@@ -327,7 +328,7 @@ function AppointmentManagerDialog({
         setTitle(initialData?.title || '');
         setIsNewClient(false);
         setSelectedClientId(initialData?.clientId || '');
-        setNewName(''); setNewMobile('');
+        setNewName(''); setNewMobile(''); setNewCity('');
       } else if (isEditing) {
           setSelectedDate(originalApptDate || new Date());
           setSelectedTime(originalApptDate ? format(originalApptDate, 'HH:mm') : '10:00');
@@ -336,56 +337,93 @@ function AppointmentManagerDialog({
           setSelectedClientId(initialData?.clientId || '');
           setNewName(initialData?.clientName || ''); 
           setNewMobile(initialData?.clientMobile || '');
+          setNewCity((initialData as any)?.clientArea || '');
       }
     } 
   }, [isOpen, isCreating, isRescheduling, isEditing, dialogData?.appointmentDate, originalApptDate, initialData]);
 
   const filteredClients = useMemo(() => {
     if (!engineerId) return clients;
+    // Show all clients if status is prospective, otherwise filter by assigned engineer
     return clients.filter(c => {
-      const ae = (c as any).assignedEngineer;
-      return !ae || ae === engineerId;
+        if (c.status === 'prospective') return true;
+        const ae = (c as any).assignedEngineer;
+        return !ae || ae === engineerId;
     });
   }, [clients, engineerId]);
-  const clientOptions = useMemo(() => filteredClients.map((c: Client) => ({ value: c.id!, label: c.nameAr })), [filteredClients]);
+
+  const clientOptions = useMemo(() => filteredClients.map((c: Client) => ({ value: c.id!, label: `${c.nameAr} (${c.fileNumber || 'جديد'})` })), [filteredClients]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore || !tenantId || !currentUser) return;
     setIsSaving(true);
-    try {
-      let clientId = selectedClientId;
-      let clientName = isNewClient ? newName : clients.find(c => c.id === selectedClientId)?.nameAr;
-      let clientMobile = isNewClient ? newMobile : clients.find(c => c.id === selectedClientId)?.mobile;
+    let newClientId: string | null = null;
 
-      if (isNewClient && (isCreating || isEditing)) {
+    try {
+      let finalClientId: string | null = selectedClientId;
+      let finalClientName: string | undefined = isNewClient ? newName : clients.find(c => c.id === selectedClientId)?.nameAr;
+      let finalClientMobile: string | undefined = isNewClient ? newMobile : clients.find(c => c.id === selectedClientId)?.mobile;
+
+      if (isNewClient && isCreating) {
         if (!newName || !newMobile) {
-            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى إدخال اسم وجوال العميل الجديد.' });
-            setIsSaving(false);
-            return;
-        }
-        const clientPath = getTenantPath('clients', tenantId)!;
-        if (isCreating || !clientId) { // Create a new client
-            const newClientRef = doc(collection(firestore, clientPath));
-            await setDoc(newClientRef, {
-              nameAr: newName, mobile: newMobile, isActive: true,
-              assignedEngineer: engineerId, createdAt: serverTimestamp(),
-              createdBy: currentUser.id, companyId: tenantId,
-            });
-            clientId = newClientRef.id;
-        } else { // Update existing client if editing appointment
-            await updateDoc(doc(firestore, clientPath, clientId), {
-                nameAr: newName, mobile: newMobile, assignedEngineer: engineerId
-            });
-        }
-        clientName = newName;
-        clientMobile = newMobile;
-      }
-      
-      if (!clientId && !isNewClient) {
-          toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار عميل مسجل أو إنشاء عميل جديد.' });
+          toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى إدخال اسم وجوال العميل الجديد.' });
           setIsSaving(false);
           return;
+        }
+
+        await runTransaction(firestore, async (transaction) => {
+          const counterRef = doc(firestore, getTenantPath('counters/clientFiles', tenantId));
+          const counterDoc = await transaction.get(counterRef);
+          const currentYear = new Date().getFullYear().toString();
+          const counts = counterDoc.exists() ? counterDoc.data()?.counts || {} : {};
+          const nextFileNumber = (counts[currentYear] || 0) + 1;
+          transaction.set(counterRef, { counts: { ...counts, [currentYear]: nextFileNumber } }, { merge: true });
+          const newFileNumberFormatted = `${nextFileNumber}/${currentYear}`;
+
+          const newClientRef = doc(collection(firestore, getTenantPath('clients', tenantId)));
+          transaction.set(newClientRef, {
+            nameAr: newName,
+            mobile: newMobile,
+            address: { city: newCity }, // Storing city in a structured address object
+            assignedEngineer: engineerId,
+            status: 'prospective',
+            fileNumber: newFileNumberFormatted,
+            createdAt: serverTimestamp(),
+            createdBy: currentUser.id,
+            companyId: tenantId,
+            source: 'appointment',
+            isActive: true, // Remains true, status field differentiates
+          });
+          newClientId = newClientRef.id;
+
+          // Add audit log for client creation
+          const auditLogRef = doc(collection(newClientRef, 'auditLogs'));
+          transaction.set(auditLogRef, {
+              action: 'created',
+              details: `تم إنشاء الملف كعميل محتمل من شاشة المواعيد.`,
+              userName: currentUser.fullName,
+              userId: currentUser.id,
+              createdAt: serverTimestamp(),
+          });
+        });
+
+        finalClientId = newClientId;
+        finalClientName = newName;
+        finalClientMobile = newMobile;
+
+      } else if (isNewClient && isEditing) {
+        // This case should ideally not happen if we disable the form correctly, but as a fallback
+        finalClientName = newName;
+        finalClientMobile = newMobile;
+        finalClientId = null;
+      } else {
+        if (!selectedClientId) {
+          toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار عميل مسجل.' });
+          setIsSaving(false);
+          return;
+        }
+        finalClientId = selectedClientId;
       }
 
       const [hh, mm] = selectedTime.split(':').map(Number);
@@ -395,9 +433,9 @@ function AppointmentManagerDialog({
         type: 'architectural',
         engineerId,
         engineerName: isCreating ? dialogData?.engineerName : initialData?.engineerName,
-        clientId,
-        clientName,
-        clientMobile,
+        clientId: finalClientId,
+        clientName: finalClientName,
+        clientMobile: finalClientMobile,
         title,
         appointmentDate: Timestamp.fromDate(appointmentDate),
         status: 'scheduled', 
@@ -412,7 +450,7 @@ function AppointmentManagerDialog({
         const newRef = doc(collection(firestore, p));
         baseData.createdAt = serverTimestamp();
         baseData.createdBy = currentUser.id;
-        baseData.visitCount = 1; // Default for new appointment
+        baseData.visitCount = 1;
         baseData.color = getVisitColor({ visitCount: 1 });
 
         await setDoc(newRef, baseData);
@@ -440,7 +478,7 @@ function AppointmentManagerDialog({
         });
       }
 
-      if (clientId || clientMobile) await reconcileClientAppointments(firestore, tenantId, { clientId, clientMobile });
+      if (finalClientId || finalClientMobile) await reconcileClientAppointments(firestore, tenantId, { clientId: finalClientId, clientMobile: finalClientMobile });
       toast({ title: '✅ تمت العملية بنجاح' });
       onSaveSuccess?.();
       onClose();
@@ -451,6 +489,7 @@ function AppointmentManagerDialog({
       setIsSaving(false);
     }
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={o => { if (!o && !isSaving) onClose(); }}>
@@ -520,9 +559,15 @@ function AppointmentManagerDialog({
           </div>
           
           {isNewClient ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div><Label>الاسم *</Label><Input value={newName} onChange={e => setNewName(e.target.value)} required disabled={isSaving || isRescheduling} className="h-9 rounded-xl mt-1" /></div>
-              <div><Label>الجوال *</Label><Input value={newMobile} onChange={e => setNewMobile(e.target.value)} required disabled={isSaving || isRescheduling} className="h-9 rounded-xl mt-1" /></div>
+            <div className="space-y-2">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div><Label>الاسم *</Label><Input value={newName} onChange={e => setNewName(e.target.value)} required disabled={isSaving || isRescheduling} className="h-9 rounded-xl mt-1" /></div>
+                  <div><Label>الجوال *</Label><Input value={newMobile} onChange={e => setNewMobile(e.target.value)} required disabled={isSaving || isRescheduling} className="h-9 rounded-xl mt-1" /></div>
+              </div>
+              <div>
+                  <Label>المدينة</Label>
+                  <Input value={newCity} onChange={e => setNewCity(e.target.value)} placeholder="اختياري" disabled={isSaving || isRescheduling} className="h-9 rounded-xl mt-1" />
+              </div>
             </div>
           ) : (
             <div>
@@ -601,7 +646,7 @@ export function ArchitecturalAppointmentsView() {
   }, [branding, date]);
 
   const fetchAppointments = useCallback(async (d: Date) => { if (!firestore || !tenantId) return; setLoading(true); try { const p = getTenantPath('appointments', tenantId); const snap = await getDocs(query(collection(firestore, p!), where('appointmentDate', '>=', startOfDay(d)), where('appointmentDate', '<=', endOfDay(d)))); setRawAppointments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment)).filter(a => a.type === 'architectural')); } finally { setLoading(false); } }, [firestore, tenantId]);
-  useEffect(() => { if (!firestore || !tenantId) return; getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!), where('status', 'in', ['active', 'on-leave']))).then(snap => { setEngineers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'))); }); getDocs(query(collection(firestore, getTenantPath('clients', tenantId)!), where('isActive', '==', true))).then(snap => { setClients(snap.docs.map(d => ({ id: d.id, ...d.data() } as Client)).sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar'))); }); getDocs(query(collection(firestore, getTenantPath('leaveRequests', tenantId)!), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => { setLeaveRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest))); }); }, [firestore, tenantId]);
+  useEffect(() => { if (!firestore || !tenantId) return; getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!), where('status', 'in', ['active', 'on-leave']))).then(snap => { setEngineers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'))); }); getDocs(query(collection(firestore, getTenantPath('clients', tenantId)!))).then(snap => { setClients(snap.docs.map(d => ({ id: d.id, ...d.data() } as Client)).sort((a, b) => (b.fileNumber || '').localeCompare(a.fileNumber || '', undefined, { numeric: true }))); }); getDocs(query(collection(firestore, getTenantPath('leaveRequests', tenantId)!), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => { setLeaveRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest))); }); }, [firestore, tenantId]);
   useEffect(() => { if (date) fetchAppointments(date); }, [date, fetchAppointments]);
 
   const clientsMap = useMemo(() => { const map = new Map<string, Client>(); clients.forEach(c => map.set(c.id, c)); return map; }, [clients]);
@@ -777,7 +822,7 @@ export function ArchitecturalAppointmentsView() {
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             <div style={{ width: 36, height: 36, borderRadius: 9, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>📅</div>
             <div><div style={{ fontSize: 20, fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>{stats.total}</div><div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>مواعيد اليوم</div></div>
-            {stats.total > 0 && (<div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end' }}><div style={{ width: `${Math.max(8,(stats.yellow/stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#fde047,#facc15)' }} /><div style={{ width: `${Math.max(8,(stats.green /stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#4ade80,#22c55e)' }} /><div style={{ width: `${Math.max(8,(stats.blue  /stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#60a5fa,#3b82f6)' }} /></div>)}
+            {stats.total > 0 && (<div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end' }}><div style={{ width: `${Math.max(8,(stats.yellow/stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#fde047,#facc15)' }} /><div style={{ width: `${Math.max(8,(stats.green /stats.total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#4ade80,#22c55e)' }} /><div style={{ width: `${Math.max(8,(stats.blue  /total)*40)}px`, height: 4, borderRadius: 100, background: 'linear-gradient(90deg,#60a5fa,#3b82f6)' }} /></div>)}
           </div>
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             <div style={{ width: 36, height: 36, borderRadius: 9, background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🟡</div>

@@ -18,7 +18,7 @@ import Link from 'next/link';
 import { useAppTheme } from '@/context/theme-context';
 import { cn } from '@/lib/utils';
 
-export function TaskPrioritization() {
+export default function TaskPrioritization() {
   const { transactions, projects, loading } = useAnalyticalData();
   const { theme } = useAppTheme();
   const [urgentTasks, setUrgentTasks] = useState<any[]>([]);

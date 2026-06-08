@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import type { PurchaseRequest, ConstructionProject } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,10 +43,12 @@ export default function PurchaseRequestDetailPage() {
     const [isUpdating, setIsUpdating] = useState(false);
 
     const prRef = useMemo(() => (firestore && id ? doc(firestore, 'purchase_requests', id) : null), [firestore, id]);
-    const { data: pr, loading: prLoading } = useDocument<PurchaseRequest>(firestore, prRef?.path || null);
+    const { data: prData, loading: prLoading } = useSubscription<PurchaseRequest>(firestore, prRef?.path || null);
+    const pr = useMemo(() => (prData && prData.length > 0) ? prData[0] : null, [prData]);
 
     const projectRef = useMemo(() => (firestore && pr?.projectId ? doc(firestore, 'projects', pr.projectId) : null), [firestore, pr?.projectId]);
-    const { data: project, loading: projectLoading } = useDocument<ConstructionProject>(firestore, projectRef?.path || null);
+    const { data: projectData, loading: projectLoading } = useSubscription<ConstructionProject>(firestore, projectRef?.path || null);
+    const project = useMemo(() => (projectData && projectData.length > 0) ? projectData[0] : null, [projectData]);
 
     const handleAction = async (status: 'approved' | 'rejected') => {
         if (!prRef || !currentUser) return;
@@ -69,7 +70,6 @@ export default function PurchaseRequestDetailPage() {
 
     const handleConvertToPO = () => {
         if (!pr) return;
-        // نمرر بيانات الـ PR عبر الـ Query Params لشاشة أمر الشراء الجديد
         const query = new URLSearchParams({
             projectId: pr.projectId,
             sourcePrId: pr.id!

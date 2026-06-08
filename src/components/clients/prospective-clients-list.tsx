@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Table,
@@ -10,16 +10,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Calendar, MoreHorizontal, Trash2, Loader2, Search, RotateCcw, AlertTriangle, Users } from 'lucide-react';
+import { UserPlus, Calendar, MoreHorizontal, Loader2, Search, Users, Archive, ArchiveRestore } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, writeBatch, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, serverTimestamp, query, where, orderBy, runTransaction } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Appointment, Employee } from '@/lib/types';
+import type { Client, Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
-import { format, isPast } from 'date-fns';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Badge } from '../ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, getTenantPath } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,42 +38,29 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { toFirestoreDate } from '@/services/date-converter';
+import { useAuth } from '@/context/auth-context';
 
-interface ProspectiveClient {
-  id: string; 
-  name: string;
-  mobile: string;
-  engineerId: string;
-  engineerName: string;
-  lastAppointmentDate: Date;
-  visitCount: number;
-  status: 'active-visit' | 'no-show' | 'cancelled-visit';
-}
-
-const statusTranslations: Record<ProspectiveClient['status'], string> = {
-    'active-visit': 'زيارة قادمة',
-    'no-show': 'لم يحضر',
-    'cancelled-visit': 'زيارة ملغاة'
-};
-
-const statusColors: Record<ProspectiveClient['status'], string> = {
-    'active-visit': 'bg-blue-100 text-blue-800 border-blue-200',
-    'no-show': 'bg-red-100 text-red-800 border-red-200',
-    'cancelled-visit': 'bg-gray-100 text-gray-800 border-gray-200',
-};
 
 export function ProspectiveClientsList() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
+  const tenantId = currentUser?.currentCompanyId;
+  
   const [searchQuery, setSearchQuery] = useState('');
-  const [clientToUnfollow, setClientToUnfollow] = useState<ProspectiveClient | null>(null);
+  const [clientToUpdate, setClientToUpdate] = useState<{client: Client, status: 'inactive' | 'prospective'} | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [filter, setFilter] = useState<'active' | 'cancelled'>('active');
+  const [filter, setFilter] = useState<'prospective' | 'inactive'>('prospective');
 
-  const prospectiveQuery = useMemo(() => [where('clientMobile', '>', '')], []);
-  const { data: prospectiveAppointments, loading: appointmentsLoading } = useSubscription<Appointment>(firestore, 'appointments', prospectiveQuery);
-  const { data: employees } = useSubscription<Employee>(firestore, 'employees');
+  const clientsPath = useMemo(() => tenantId ? getTenantPath('clients', tenantId) : undefined, [tenantId]);
+
+  const prospectiveQuery = useMemo(() => clientsPath ? query(collection(firestore!, clientsPath), where('status', '==', 'prospective'), orderBy('fileNumber', 'desc')) : undefined, [clientsPath, firestore]);
+  const inactiveQuery = useMemo(() => clientsPath ? query(collection(firestore!, clientsPath), where('status', '==', 'inactive'), orderBy('fileNumber', 'desc')) : undefined, [clientsPath, firestore]);
+  const employeesPath = useMemo(() => tenantId ? getTenantPath('employees', tenantId): undefined, [tenantId]);
+
+  const { data: prospectiveClients, loading: prospectiveLoading } = useSubscription<Client>(firestore, prospectiveQuery);
+  const { data: inactiveClients, loading: inactiveLoading } = useSubscription<Client>(firestore, inactiveQuery);
+  const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, employeesPath);
   
   const engineersMap = useMemo(() => {
     const newMap = new Map<string, string>();
@@ -82,153 +68,150 @@ export function ProspectiveClientsList() {
     return newMap;
   }, [employees]);
 
-  const prospectiveClients = useMemo(() => {
-    const clientsMap = new Map<string, { appointments: Appointment[] }>();
-    (prospectiveAppointments || []).forEach(appt => {
-      if (!appt.clientMobile) return;
-      if (!clientsMap.has(appt.clientMobile)) clientsMap.set(appt.clientMobile, { appointments: [] });
-      clientsMap.get(appt.clientMobile)!.appointments.push(appt);
-    });
+  const clients = useMemo(() => (filter === 'prospective' ? prospectiveClients : inactiveClients), [filter, prospectiveClients, inactiveClients]);
 
-    const result: ProspectiveClient[] = [];
-    clientsMap.forEach((data, mobile) => {
-        if (data.appointments.length === 0) return;
-        const sortedAppointments = data.appointments.sort((a, b) => (toFirestoreDate(b.appointmentDate)?.getTime() || 0) - (toFirestoreDate(a.appointmentDate)?.getTime() || 0));
-        const lastAppointment = sortedAppointments[0];
-        const lastAppointmentDate = toFirestoreDate(lastAppointment.appointmentDate);
-        if (!lastAppointmentDate) return; 
-
-        let status: ProspectiveClient['status'] = 'active-visit';
-        const allCancelled = data.appointments.every(a => a.status === 'cancelled');
-        if (allCancelled) status = 'cancelled-visit';
-        else if (lastAppointment.status === 'cancelled') {
-           const nextLatestActive = sortedAppointments.find(a => a.status !== 'cancelled');
-           if (nextLatestActive) {
-                const nextLatestDate = toFirestoreDate(nextLatestActive.appointmentDate);
-                if (nextLatestDate && isPast(nextLatestDate) && !nextLatestActive.workStageUpdated) status = 'no-show';
-           } else status = 'cancelled-visit';
-        }
-        else if (isPast(lastAppointmentDate) && !lastAppointment.workStageUpdated) status = 'no-show';
-
-        result.push({
-            id: mobile,
-            name: lastAppointment.clientName || 'اسم غير معروف',
-            mobile: mobile,
-            engineerId: lastAppointment.engineerId,
-            engineerName: engineersMap.get(lastAppointment.engineerId) || 'غير معروف',
-            lastAppointmentDate: lastAppointmentDate,
-            visitCount: data.appointments.filter(a => a.status !== 'cancelled').length,
-            status,
-        });
-    });
-    return result.sort((a,b) => b.lastAppointmentDate.getTime() - a.lastAppointmentDate.getTime());
-  }, [prospectiveAppointments, engineersMap]);
-  
   const filteredClients = useMemo(() => {
-      const searchFiltered = searchQuery 
-        ? prospectiveClients.filter(client => client.name.toLowerCase().includes(searchQuery.toLowerCase()) || client.mobile.includes(searchQuery))
-        : prospectiveClients;
-      return filter === 'active' ? searchFiltered.filter(c => c.status !== 'cancelled-visit') : searchFiltered.filter(c => c.status === 'cancelled-visit');
-  }, [prospectiveClients, searchQuery, filter]);
+      return searchQuery && clients
+        ? clients.filter(client => client.nameAr.toLowerCase().includes(searchQuery.toLowerCase()) || client.mobile.includes(searchQuery))
+        : clients;
+  }, [clients, searchQuery]);
 
-  const loading = appointmentsLoading;
+  const loading = prospectiveLoading || inactiveLoading || employeesLoading;
   
-  const handleConfirmUnfollow = async () => {
-    if (!clientToUnfollow || !firestore) return;
+  const handleUpdateStatus = useCallback(async () => {
+    if (!clientToUpdate || !firestore || !clientsPath) return;
     setIsProcessing(true);
     try {
-        const batch = writeBatch(firestore);
-        const q = query(collection(firestore, 'appointments'), where('clientMobile', '==', clientToUnfollow.mobile));
-        const snap = await getDocs(q);
-        snap.forEach(doc => batch.update(doc.ref, { status: 'cancelled' }));
-        await batch.commit();
-        toast({ title: 'نجاح', description: `تم نقل العميل ${clientToUnfollow.name} إلى المتابعات الملغاة.` });
-    } finally { setIsProcessing(false); setClientToUnfollow(null); }
-  };
+        const clientRef = doc(firestore, clientsPath, clientToUpdate.client.id!)
+        await updateDoc(clientRef, { 
+          status: clientToUpdate.status,
+          updatedAt: serverTimestamp(),
+          updatedBy: currentUser?.id,
+        });
+        toast({ title: 'نجاح', description: `تم تحديث حالة العميل.` });
+    } catch (error) {
+        console.error('Error updating client status:', error)
+        toast({ variant: 'destructive', title: 'حدث خطأ', description: 'فشل تحديث الحالة' });
+    } finally { 
+        setIsProcessing(false); 
+        setClientToUpdate(null); 
+    }
+  }, [clientToUpdate, firestore, clientsPath, toast, currentUser]);
+
+  const handleConvertToActive = useCallback(async (client: Client) => {
+    if (!firestore || !clientsPath) return;
+    setIsProcessing(true);
+    try {
+        const clientRef = doc(firestore, clientsPath, client.id!)
+        await updateDoc(clientRef, { 
+          status: 'active',
+          contractSignedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          updatedBy: currentUser?.id,
+        });
+        toast({ title: '🎉 تهانينا!', description: `تم نقل العميل ${client.nameAr} إلى قائمة العملاء المسجلين بنجاح.` });
+    } catch (error) {
+        console.error('Error converting client to active:', error)
+        toast({ variant: 'destructive', title: 'حدث خطأ', description: 'فشل نقل العميل' });
+    } finally { 
+        setIsProcessing(false); 
+    }
+  }, [firestore, clientsPath, toast, currentUser]);
+
+
+  const getActionDetails = () => {
+    if (!clientToUpdate) return { title: '', description: '', buttonText: '' };
+    return clientToUpdate.status === 'inactive'
+      ? { title: 'تأكيد إلغاء المتابعة', description: `سيتم نقل العميل إلى قائمة المحذوفات. هل أنت متأكد؟`, buttonText: 'نعم، إلغاء المتابعة' }
+      : { title: 'تأكيد استعادة المتابعة', description: `سيتم إعادة العميل إلى قائمة المتابعات النشطة. هل أنت متأكد؟`, buttonText: 'نعم، استعادة المتابعة' };
+  }
 
   return (
-    <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-[#F8F9FE] p-4 rounded-[2rem] border shadow-inner no-print">
-            <div className="flex bg-muted p-1 rounded-2xl border shadow-inner shrink-0">
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setFilter('active')}
-                    className={cn("rounded-xl px-6 h-9 font-black transition-all", filter === 'active' && "bg-white shadow-md text-[#7209B7]")}
-                >
-                    متابعات نشطة
-                </Button>
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setFilter('cancelled')}
-                    className={cn("rounded-xl px-6 h-9 font-black transition-all", filter === 'cancelled' && "bg-white shadow-md text-[#7209B7]")}
-                >
-                    متابعات ملغاة
-                </Button>
-            </div>
+    <div className="space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="relative w-full md:w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                     placeholder="ابحث بالاسم أو رقم الجوال..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-11 rounded-xl bg-white border-none shadow-sm font-bold"
+                    className="pr-10 h-10 rounded-lg bg-white shadow-sm font-medium border"
                 />
+            </div>
+             <div className="flex bg-gray-100 p-1 rounded-lg border">
+                <Button 
+                    variant={filter === 'prospective' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    onClick={() => setFilter('prospective')}
+                    className={cn("rounded-md px-4 h-8 font-bold text-sm")}
+                >
+                    <Users className="ml-2 h-4 w-4"/>
+                    عملاء محتملون
+                </Button>
+                <Button 
+                    variant={filter === 'inactive' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    onClick={() => setFilter('inactive')}
+                    className={cn("rounded-md px-4 h-8 font-bold text-sm")}
+                >
+                    <Archive className="ml-2 h-4 w-4" />
+                    متابعات ملغاة
+                </Button>
             </div>
         </div>
 
-        <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
+        <div className="border rounded-lg overflow-hidden">
             <Table>
-                <TableHeader className="bg-[#F8F9FE]">
-                    <TableRow className="border-none">
-                        <TableHead className="px-8 py-5 font-black text-[#7209B7]">الاسم</TableHead>
-                        <TableHead className="font-black text-[#7209B7]">الجوال</TableHead>
-                        <TableHead className="font-black text-[#7209B7]">آخر تفاعل</TableHead>
-                        <TableHead className="font-black text-[#7209B7]">الحالة</TableHead>
-                        <TableHead className="text-center font-black text-[#7209B7]">الإجراء</TableHead>
+                <TableHeader className="bg-gray-50">
+                    <TableRow>
+                        <TableHead>رقم الملف</TableHead>
+                        <TableHead>الاسم</TableHead>
+                        <TableHead>المدينة</TableHead>
+                        <TableHead>المهندس المسؤول</TableHead>
+                        <TableHead>تاريخ الإضافة</TableHead>
+                        <TableHead className="text-center">الإجراءات</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {loading ? (
-                        Array.from({ length: 3 }).map((_, i) => (
-                            <TableRow key={i}><TableCell colSpan={5} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
+                    {loading || isProcessing ? (
+                        Array.from({ length: 4 }).map((_, i) => (
+                            <TableRow key={i}><TableCell colSpan={6}>{isProcessing ? <div className='flex items-center justify-center'><Loader2 className='h-5 w-5 animate-spin'/></div> : <Skeleton className="h-8 w-full" />}</TableCell></TableRow>
                         ))
-                    ) : filteredClients.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-bold italic">لا يوجد عملاء محتملون للمتابعة.</TableCell></TableRow>
+                    ) : !filteredClients || filteredClients.length === 0 ? (
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-gray-500">لا يوجد عملاء لعرضهم.</TableCell></TableRow>
                     ) : (
                         filteredClients.map(client => (
-                            <TableRow key={client.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-20">
-                                <TableCell className="px-8 font-black text-gray-800">{client.name}</TableCell>
-                                <TableCell dir="ltr" className="text-right font-mono font-bold opacity-60">{client.mobile}</TableCell>
-                                <TableCell>
-                                    <div className="font-bold text-xs">{format(client.lastAppointmentDate, "PPP", { locale: ar })}</div>
-                                    <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1 font-bold"><Users className="h-2 w-2"/> {client.engineerName}</div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[client.status])}>
-                                        {statusTranslations[client.status]}
-                                    </Badge>
-                                </TableCell>
+                            <TableRow key={client.id} className="hover:bg-gray-50">
+                                <TableCell className="font-mono text-sm">{client.fileNumber}</TableCell>
+                                <TableCell className="font-semibold">{client.nameAr}</TableCell>
+                                <TableCell className="text-sm text-gray-600">{(client as any).city || '-'}</TableCell>
+                                <TableCell className="text-sm">{engineersMap.get(client.assignedEngineer) || 'غير محدد'}</TableCell>
+                                <TableCell className="text-sm text-gray-600">{client.createdAt ? format(client.createdAt.toDate(), "P", { locale: ar }) : '-'}</TableCell>
                                 <TableCell className="text-center">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent dir="rtl" className="rounded-xl">
-                                            <DropdownMenuLabel>إجراءات المتابعة</DropdownMenuLabel>
+                                        <DropdownMenuContent dir="rtl">
+                                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                            <DropdownMenuItem onClick={() => handleConvertToActive(client)} className="text-green-600 focus:text-green-700">
+                                                <UserPlus className="ml-2 h-4 w-4" /> توقيع عقد (نقل للمسجلين)
+                                            </DropdownMenuItem>
                                             <DropdownMenuItem asChild>
-                                                <Link href={`/dashboard/appointments/new?nameAr=${encodeURIComponent(client.name)}&mobile=${encodeURIComponent(client.mobile)}&engineerId=${encodeURIComponent(client.engineerId)}`}>
+                                                <Link href={`/dashboard/appointments?clientId=${client.id}`}>
                                                     <Calendar className="ml-2 h-4 w-4" /> حجز موعد جديد
                                                 </Link>
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem asChild>
-                                                <Link href={`/dashboard/clients/new?nameAr=${encodeURIComponent(client.name)}&mobile=${encodeURIComponent(client.mobile)}&engineerId=${encodeURIComponent(client.engineerId)}`}>
-                                                    <UserPlus className="ml-2 h-4 w-4" /> تحويل إلى عميل رسمي
-                                                </Link>
-                                            </DropdownMenuItem>
                                             <DropdownMenuSeparator />
-                                            {filter === 'active' && <DropdownMenuItem className="text-orange-600" onClick={() => setClientToUnfollow(client)}><Trash2 className="ml-2 h-4 w-4" /> إلغاء المتابعة</DropdownMenuItem>}
+                                            {filter === 'prospective' ? (
+                                                <DropdownMenuItem className="text-red-600 focus:text-red-700" onClick={() => setClientToUpdate({ client, status: 'inactive'})}>
+                                                    <Archive className="ml-2 h-4 w-4" /> إلغاء المتابعة
+                                                </DropdownMenuItem>
+                                            ) : (
+                                                <DropdownMenuItem onClick={() => setClientToUpdate({ client, status: 'prospective'})}>
+                                                    <ArchiveRestore className="ml-2 h-4 w-4" /> إعادة تنشيط المتابعة
+                                                </DropdownMenuItem>
+                                            )}
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>
@@ -239,16 +222,16 @@ export function ProspectiveClientsList() {
             </Table>
         </div>
 
-        <AlertDialog open={!!clientToUnfollow} onOpenChange={() => setClientToUnfollow(null)}>
-            <AlertDialogContent dir="rtl" className="rounded-3xl">
+        <AlertDialog open={!!clientToUpdate} onOpenChange={() => setClientToUpdate(null)}>
+            <AlertDialogContent dir="rtl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>تأكيد إلغاء المتابعة</AlertDialogTitle>
-                    <AlertDialogDescription>سيتم نقل العميل "{clientToUnfollow?.name}" إلى قائمة "المتابعات الملغاة".</AlertDialogDescription>
+                    <AlertDialogTitle>{getActionDetails().title}</AlertDialogTitle>
+                    <AlertDialogDescription>{getActionDetails().description}</AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter className="gap-2">
-                    <AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmUnfollow} disabled={isProcessing} className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold">
-                        {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالإلغاء'}
+                <AlertDialogFooter>
+                    <AlertDialogCancel>تراجع</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleUpdateStatus} disabled={isProcessing} className={cn(clientToUpdate?.status === 'inactive' && 'bg-red-600 hover:bg-red-700')}>
+                        {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : getActionDetails().buttonText}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

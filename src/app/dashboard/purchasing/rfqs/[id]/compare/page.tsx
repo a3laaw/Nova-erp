@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { RequestForQuotation } from '@/lib/types';
 import { RfqComparisonView } from '@/components/purchasing/rfq-comparison-view';
@@ -11,10 +11,6 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, BarChart3, Printer, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
-/**
- * صفحة مصفوفة مقارنة عروض الأسعار (Sovereign RFQ Analysis):
- * تم تحصينها لضمان استقرار البناء البرمجي وتوافر كافة المراجع البصرية.
- */
 export default function CompareRfqPage() {
     const params = useParams();
     const router = useRouter();
@@ -22,7 +18,8 @@ export default function CompareRfqPage() {
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
     const rfqRef = useMemo(() => (firestore && id ? doc(firestore, 'rfqs', id) : null), [firestore, id]);
-    const { data: rfq, loading } = useDocument<RequestForQuotation>(firestore, rfqRef?.path || null);
+    const { data: rfqData, loading } = useSubscription<RequestForQuotation>(firestore, rfqRef?.path || null);
+    const rfq = useMemo(() => (rfqData && rfqData.length > 0) ? rfqData[0] : null, [rfqData]);
     
     const handlePrint = () => {
         window.print();

@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Save, X, Loader2 } from 'lucide-react';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -35,9 +35,9 @@ export default function EditEmployeePage() {
     const tenantId = currentUser?.currentCompanyId;
     const [isSaving, setIsSaving] = useState(false);
 
-    // 🛡️ توجيه مسار الاستماع للمنظومة المعزولة
     const employeePath = useMemo(() => getTenantPath(`employees/${id}`, tenantId), [id, tenantId]);
-    const { data: employee, loading } = useDocument<Employee>(firestore, employeePath);
+    const { data: employeeData, loading } = useSubscription<Employee>(firestore, employeePath);
+    const employee = useMemo(() => (employeeData && employeeData.length > 0) ? employeeData[0] : null, [employeeData]);
 
     const handleSave = useCallback(async (updatedData: Partial<Employee>) => {
         if (!firestore || !currentUser || !id || !employee || !tenantId) return;

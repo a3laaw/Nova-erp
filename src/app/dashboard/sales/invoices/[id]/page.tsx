@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { InventoryAdjustment, Client } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,12 +16,13 @@ export default function SalesInvoicePage() {
     const { firestore } = useFirebase();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
-    // الفاتورة هي في الأصل إذن صرف بضاعة مباعة
     const issueRef = useMemo(() => (firestore && id ? doc(firestore, 'inventoryAdjustments', id) : null), [firestore, id]);
-    const { data: issue, loading: issueLoading } = useDocument<InventoryAdjustment>(firestore, issueRef?.path || null);
+    const { data: issueData, loading: issueLoading } = useSubscription<InventoryAdjustment>(firestore, issueRef?.path || null);
+    const issue = useMemo(() => (issueData && issueData.length > 0) ? issueData[0] : null, [issueData]);
 
     const clientRef = useMemo(() => (firestore && issue?.clientId ? doc(firestore, 'clients', issue.clientId) : null), [firestore, issue?.clientId]);
-    const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientRef?.path || null);
+    const { data: clientData, loading: clientLoading } = useSubscription<Client>(firestore, clientRef?.path || null);
+    const client = useMemo(() => (clientData && clientData.length > 0) ? clientData[0] : null, [clientData]);
 
     const handlePrint = () => window.print();
 

@@ -1,114 +1,133 @@
 'use client';
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, Loader2, X, Search, User } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { doc, deleteDoc, collection, serverTimestamp, runTransaction, query, where, getDocs } from 'firebase/firestore';
-import { useFirebase } from '@/firebase/provider';
-import { useSubscription } from '@/hooks/use-subscription';
-import { useToast } from '@/hooks/use-toast';
+import { MoreHorizontal, Search, FileEdit, Eye, Trash2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useFirebase, useSubscription } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import type { Client, Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
-import { searchClients } from '@/lib/cache/fuse-search';
-import { ClientForm } from '@/components/clients/client-form';
-import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
-import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
-
-// ... (باقي التعريفات statusTranslations و statusColors كما هي في كودك الأصلي)
+import { getTenantPath } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { doc, deleteDoc } from 'firebase/firestore';
 
 export function RegisteredClientsList() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
-    const { toast } = useToast();
-    
-    const [searchQuery, setSearchQuery] = useState('');
-    const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [isFormOpen, setIsFormOpen] = useState(false);
-    const [isSavingClient, setIsSavingClient] = useState(false);
-    
     const tenantId = currentUser?.currentCompanyId;
-    
-    const { items: clients, loading: clientsLoading, loaderRef, loadingMore } = useInfiniteScroll<Client>('clients');
-    const { data: employees } = useSubscription<Employee>(firestore, 'employees');
-    
-    const loading = clientsLoading && clients.length === 0;
 
-    const augmentedClients = useMemo(() => {
-        const employeesMap = new Map<string, string>();
-        (employees || []).forEach(emp => { if (emp.id) employeesMap.set(emp.id, emp.fullName); });
-        return clients.map(client => ({
-            ...client,
-            assignedEngineerName: client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : undefined,
-        }));
-    }, [clients, employees]);
+    const [searchQuery, setSearchQuery] = useState('');
 
-    const filteredClients = useMemo(() => searchClients(augmentedClients, searchQuery), [augmentedClients, searchQuery]);
+    const clientsPath = useMemo(() => tenantId ? getTenantPath('clients', tenantId) : undefined, [tenantId]);
+    const employeesPath = useMemo(() => tenantId ? getTenantPath('employees', tenantId) : undefined, [tenantId]);
+
+    const { data: clients, loading: clientsLoading } = useSubscription<Client>(firestore, clientsPath);
+    const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, employeesPath);
+    
+    const loading = clientsLoading || employeesLoading;
+
+    const engineersMap = useMemo(() => {
+        const newMap = new Map<string, string>();
+        (employees || []).forEach(emp => { if (emp.id) newMap.set(emp.id, emp.fullName); });
+        return newMap;
+    }, [employees]);
+
+    const filteredClients = useMemo(() => {
+        if (!clients) return [];
+        return searchQuery
+            ? clients.filter(client => 
+                (client.nameAr && client.nameAr.toLowerCase().includes(searchQuery.toLowerCase())) || 
+                (client.fileNumber && client.fileNumber.toString().includes(searchQuery))
+              )
+            : clients;
+    }, [clients, searchQuery]);
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-[#F8F9FE] p-4 rounded-[2rem] border shadow-inner">
-                <Input placeholder="بحث..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-80" />
-                <Button onClick={() => setIsFormOpen(true)}><PlusCircle className="ml-2" /> إضافة عميل جديد</Button>
+        <div className="space-y-4">
+            <div className="flex justify-start">
+                 <div className="relative w-full md:w-80">
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                        placeholder="ابحث بالاسم أو رقم الملف..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pr-10 h-10 rounded-lg bg-white shadow-sm font-medium border"
+                    />
+                </div>
             </div>
 
-            <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
+            <div className="border rounded-lg overflow-hidden">
                 <Table>
-                    <TableHeader className="bg-[#F8F9FE]">
+                    <TableHeader className="bg-gray-50">
                         <TableRow>
                             <TableHead>رقم الملف</TableHead>
                             <TableHead>الاسم الكامل</TableHead>
                             <TableHead>المهندس المسؤول</TableHead>
-                            <TableHead className="text-center">إجراء</TableHead>
+                            <TableHead className="text-center">الإجراءات</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredClients.map((client) => (
-                            <TableRow key={client.id} className="hover:bg-[#F3E8FF]/20">
-                                <TableCell>{client.fileId}</TableCell>
-                                <TableCell>
-                                    <Link href={`/companies/${tenantId}/clients/${client.id}`} className="font-black text-gray-800 hover:underline">
-                                        {client.nameAr}
-                                    </Link>
-                                </TableCell>
-                                <TableCell>{client.assignedEngineerName}</TableCell>
-                                <TableCell className="text-center">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon"><MoreHorizontal /></Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" dir="rtl">
-                                            <DropdownMenuLabel>إجراءات الملف</DropdownMenuLabel>
-                                            {/* هنا الروابط المكتملة */}
-                                            <DropdownMenuItem asChild>
-                                                <Link href={`/companies/${tenantId}/clients/${client.id}`}>عرض الملف</Link>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem asChild>
-                                                <Link href={`/companies/${tenantId}/clients/${client.id}/edit`}>تعديل</Link>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem className="text-destructive" onClick={() => setClientToDelete(client)}>
-                                                <Trash2 className="ml-2 h-4 w-4" /> حذف نهائي
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                        {loading ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell>
+                                </TableRow>
+                            ))
+                        ) : filteredClients.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={4} className="h-32 text-center text-gray-500">
+                                    لا يوجد عملاء مسجلون حاليًا.
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        ) : (
+                            filteredClients.map((client) => (
+                                <TableRow key={client.id} className="hover:bg-gray-50">
+                                    <TableCell className="font-mono text-sm text-gray-600">{client.fileNumber}</TableCell>
+                                    <TableCell className="font-semibold">
+                                        <Link href={`/dashboard/clients/${client.id}`} className="hover:underline">
+                                            {client.nameAr}
+                                        </Link>
+                                    </TableCell>
+                                    <TableCell>{engineersMap.get(client.engineerId) || 'غير محدد'}</TableCell>
+                                    <TableCell className="text-center">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent dir="rtl" align="end">
+                                                <DropdownMenuLabel>إجراءات الملف</DropdownMenuLabel>
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/dashboard/clients/${client.id}`}><Eye className="ml-2 h-4 w-4"/>عرض الملف</Link>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/dashboard/clients/edit/${client.id}`}><FileEdit className="ml-2 h-4 w-4"/>تعديل البيانات</Link>
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
                     </TableBody>
                 </Table>
             </div>
-
-            {/* الحوارات (Dialog & AlertDialog) كما هي في كودك الأصلي تماماً */}
         </div>
     );
 }

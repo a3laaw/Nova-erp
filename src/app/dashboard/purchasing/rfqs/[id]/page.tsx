@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument, useSubscription } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { doc, collection, query, where, updateDoc, arrayUnion, orderBy, writeBatch, getDocs, deleteField } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation, PurchaseOrder } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -51,14 +50,12 @@ export default function RfqDetailsPage() {
     const [prospectiveName, setProspectiveName] = useState('');
     const [isAddingVendor, setIsAddingVendor] = useState(false);
 
-    // 1. اشتراك لحظي في وثيقة طلب التسعير
     const rfqRef = useMemo(() => (firestore && id ? doc(firestore, 'rfqs', id) : null), [firestore, id]);
-    const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef ? rfqRef.path : null);
+    const { data: rfqData, loading: rfqLoading } = useSubscription<RequestForQuotation>(firestore, rfqRef ? rfqRef.path : null);
+    const rfq = useMemo(() => (rfqData && rfqData.length > 0) ? rfqData[0] : null, [rfqData]);
 
-    // 2. اشتراك لحظي في جميع الموردين
     const { data: allSystemVendors, loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
 
-    // 3. اشتراك لحظي في عروض الأسعار
     const quotesQuery = useMemo(() => [where('rfqId', '==', id)], [id]);
     const { data: supplierQuotations } = useSubscription<SupplierQuotation>(firestore, 'supplierQuotations', quotesQuery);
 
@@ -193,7 +190,6 @@ export default function RfqDetailsPage() {
                                 </Button>
                             )}
                             
-                            {/* زر المقارنة الذكية - يظهر الآن بمجرد وجود أي عرض سعر */}
                             {hasQuotes && rfq.status !== 'draft' && (
                                 <Button asChild className="bg-gradient-to-r from-primary to-indigo-600 shadow-lg shadow-primary/20 gap-2 rounded-xl font-black text-base animate-in zoom-in-95">
                                     <Link href={`/dashboard/purchasing/rfqs/${id}/compare`}>

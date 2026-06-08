@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, serverTimestamp, getDocs, collection, query, where, deleteField, writeBatch } from 'firebase/firestore';
 import type { PurchaseOrder } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -62,7 +61,8 @@ export default function PurchaseOrderDetailPage() {
     const [isUpdating, setIsUpdating] = useState(false);
 
     const poRef = useMemo(() => (firestore && id ? doc(firestore, 'purchaseOrders', id) : null), [firestore, id]);
-    const { data: po, loading: poLoading } = useDocument<PurchaseOrder>(firestore, poRef?.path || null);
+    const { data: poData, loading: poLoading } = useSubscription<PurchaseOrder>(firestore, poRef?.path || null);
+    const po = useMemo(() => (poData && poData.length > 0) ? poData[0] : null, [poData]);
 
     const handlePrint = () => window.print();
 
