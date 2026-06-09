@@ -10,23 +10,21 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Search, FileEdit, Eye, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Search, FileEdit, Eye } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useFirebase, useSubscription } from '@/firebase';
+import { collection, query, where, orderBy } from 'firebase/firestore'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import type { Client, Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { getTenantPath } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
-import { doc, deleteDoc } from 'firebase/firestore';
 
 export function RegisteredClientsList() {
     const { firestore } = useFirebase();
@@ -38,7 +36,17 @@ export function RegisteredClientsList() {
     const clientsPath = useMemo(() => tenantId ? getTenantPath('clients', tenantId) : undefined, [tenantId]);
     const employeesPath = useMemo(() => tenantId ? getTenantPath('employees', tenantId) : undefined, [tenantId]);
 
-    const { data: clients, loading: clientsLoading } = useSubscription<Client>(firestore, clientsPath);
+    const clientsQuery = useMemo(() => 
+        clientsPath 
+            ? query(
+                collection(firestore!, clientsPath),
+                where('status', 'in', ['active', 'contracted', 'reContracted']),
+                orderBy('fileNumber', 'desc')
+              )
+            : undefined,
+    [clientsPath, firestore]);
+
+    const { data: clients, loading: clientsLoading } = useSubscription<Client>(firestore, clientsQuery);
     const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, employeesPath);
     
     const loading = clientsLoading || employeesLoading;
@@ -51,12 +59,12 @@ export function RegisteredClientsList() {
 
     const filteredClients = useMemo(() => {
         if (!clients) return [];
-        return searchQuery
-            ? clients.filter(client => 
-                (client.nameAr && client.nameAr.toLowerCase().includes(searchQuery.toLowerCase())) || 
-                (client.fileNumber && client.fileNumber.toString().includes(searchQuery))
-              )
-            : clients;
+        if (!searchQuery) return clients;
+
+        return clients.filter(client => 
+            (client.nameAr && client.nameAr.toLowerCase().includes(searchQuery.toLowerCase())) || 
+            (client.fileNumber && client.fileNumber.toString().includes(searchQuery))
+        );
     }, [clients, searchQuery]);
 
     return (
@@ -105,7 +113,7 @@ export function RegisteredClientsList() {
                                             {client.nameAr}
                                         </Link>
                                     </TableCell>
-                                    <TableCell>{engineersMap.get(client.engineerId) || 'غير محدد'}</TableCell>
+                                    <TableCell>{engineersMap.get((client as any).assignedEngineer) || 'غير محدد'}</TableCell>
                                     <TableCell className="text-center">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>

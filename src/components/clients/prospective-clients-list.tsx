@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { UserPlus, Calendar, MoreHorizontal, Loader2, Search, Users, Archive, ArchiveRestore } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
+// Re-importing query, where, orderBy
 import { collection, doc, updateDoc, serverTimestamp, query, where, orderBy, runTransaction } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Client, Employee } from '@/lib/types';
@@ -40,7 +41,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 
-
 export function ProspectiveClientsList() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -53,10 +53,11 @@ export function ProspectiveClientsList() {
   const [filter, setFilter] = useState<'prospective' | 'inactive'>('prospective');
 
   const clientsPath = useMemo(() => tenantId ? getTenantPath('clients', tenantId) : undefined, [tenantId]);
+  const employeesPath = useMemo(() => tenantId ? getTenantPath('employees', tenantId): undefined, [tenantId]);
 
+  // Using the new, efficient queries thanks to the index.
   const prospectiveQuery = useMemo(() => clientsPath ? query(collection(firestore!, clientsPath), where('status', '==', 'prospective'), orderBy('fileNumber', 'desc')) : undefined, [clientsPath, firestore]);
   const inactiveQuery = useMemo(() => clientsPath ? query(collection(firestore!, clientsPath), where('status', '==', 'inactive'), orderBy('fileNumber', 'desc')) : undefined, [clientsPath, firestore]);
-  const employeesPath = useMemo(() => tenantId ? getTenantPath('employees', tenantId): undefined, [tenantId]);
 
   const { data: prospectiveClients, loading: prospectiveLoading } = useSubscription<Client>(firestore, prospectiveQuery);
   const { data: inactiveClients, loading: inactiveLoading } = useSubscription<Client>(firestore, inactiveQuery);

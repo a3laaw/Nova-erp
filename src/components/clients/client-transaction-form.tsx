@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -14,14 +13,13 @@ import {
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, X, Workflow, Layers } from 'lucide-react';
+import { Loader2, Layers } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, orderBy, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, SubService, TransactionStage } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
-import { InlineSearchList } from '../ui/inline-search-list';
 
 interface ClientTransactionFormProps {
   isOpen: boolean;
@@ -31,6 +29,22 @@ interface ClientTransactionFormProps {
   fromAppointmentId?: string | null;
 }
 
+const SafeSelect = ({ value, onSelect, options, placeholder, disabled }: any) => (
+    <select
+        value={value}
+        onChange={(e) => onSelect(e.target.value)}
+        disabled={disabled}
+        className="w-full h-11 border border-gray-300 bg-white px-3 py-2 text-sm rounded-xl focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+        <option value="">{placeholder}</option>
+        {options.map((option: any) => (
+            <option key={option.value} value={option.value}>
+                {option.label}
+            </option>
+        ))}
+    </select>
+);
+
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -39,11 +53,11 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
     const [client, setClient] = useState<Client | null>(null);
     const [engineers, setEngineers] = useState<Employee[]>([]);
-    const [engineersLoading, setEngineersLoading] = useState(true);
+    const [engineersLoading, setEngineersLoading] = useState(false);
     const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
-    const [typesLoading, setTypesLoading] = useState(true);
+    const [typesLoading, setTypesLoading] = useState(false);
     
-    const [transactionTypeName, setTransactionTypeName] = useState('');
+    const [selectedTypeId, setSelectedTypeId] = useState('');
     const [selectedSubServiceId, setSelectedSubServiceId] = useState('');
     const [subServices, setSubServices] = useState<SubService[]>([]);
     const [subServicesLoading, setSubServicesLoading] = useState(false);
@@ -51,15 +65,23 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     const [description, setDescription] = useState('');
     const [assignedEngineerId, setAssignedEngineerId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const tenantId = currentUser?.currentCompanyId;
+    
+    const transactionTypeName = useMemo(() => 
+        transactionTypes.find(t => t.id === selectedTypeId)?.name || ''
+    , [selectedTypeId, transactionTypes]);
 
     useEffect(() => {
-        if (!firestore || !isOpen || !tenantId) return;
-        
-        const fetchAllData = async () => {
+        if (!isOpen || !firestore || !tenantId) return;
+
+        let isMounted = true;
+
+        const fetchInitialData = async () => {
             setEngineersLoading(true);
             setTypesLoading(true);
+            setError(null);
             try {
                 const clientRefPath = getTenantPath(`clients/${clientId}`, tenantId);
                 const empPath = getTenantPath('employees', tenantId);
@@ -71,55 +93,77 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                     getDocs(query(collection(firestore, typesPath!), orderBy('order')))
                 ]);
 
+                if (!isMounted) return;
+
                 if (clientSnap.exists()) setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
                 setEngineers(engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
                 setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
-
-            } catch (error) {
-                console.error("Reference data error:", error);
+            } catch (err: any) {
+                console.error("Error fetching initial data:", err);
+                if (isMounted) {
+                    setError('فشل تحميل البيانات الأولية. الرجاء المحاولة مرة أخرى.');
+                }
             } finally {
-                setEngineersLoading(false);
-                setTypesLoading(false);
+                if (isMounted) {
+                    setEngineersLoading(false);
+                    setTypesLoading(false);
+                }
             }
         };
 
-        fetchAllData();
-    }, [firestore, isOpen, tenantId, clientId]);
+        fetchInitialData();
+
+        return () => { isMounted = false; };
+    }, [isOpen, firestore, tenantId, clientId]);
 
     useEffect(() => {
-        if (!transactionTypeName || !firestore || !tenantId) {
+        if (!selectedTypeId || !firestore || !tenantId) {
             setSubServices([]);
-            setSelectedSubServiceId('');
             return;
         }
+        let isMounted = true;
 
         const fetchSubServices = async () => {
             setSubServicesLoading(true);
             try {
-                const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
-                if (!selectedType?.id) return;
-
-                const subsPath = getTenantPath(`transactionTypes/${selectedType.id}/subServices`, tenantId);
+                const subsPath = getTenantPath(`transactionTypes/${selectedTypeId}/subServices`, tenantId);
                 const snap = await getDocs(query(collection(firestore, subsPath!), orderBy('order')));
-                setSubServices(snap.docs.map(d => ({ id: d.id, ...d.data() } as SubService)));
+                if (isMounted) {
+                    setSubServices(snap.docs.map(d => ({ id: d.id, ...d.data() } as SubService)));
+                }
+            } catch (err: any) {
+                console.error("Error fetching sub-services:", err);
+                if (isMounted) {
+                    setError('فشل تحميل الخدمات الفرعية.');
+                }
             } finally {
-                setSubServicesLoading(false);
+                if (isMounted) {
+                    setSubServicesLoading(false);
+                }
             }
         };
 
         fetchSubServices();
-    }, [transactionTypeName, transactionTypes, firestore, tenantId]);
+        return () => { isMounted = false; };
+    }, [selectedTypeId, firestore, tenantId]);
+    
+    const handleTypeChange = useCallback((typeId: string) => {
+        setSelectedTypeId(typeId);
+        setSelectedSubServiceId('');
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !currentUser || !transactionTypeName || !tenantId) return;
+        if (!firestore || !currentUser || !selectedTypeId || !tenantId) return;
+        
+        const selectedSub = subServices.find(s => s.id === selectedSubServiceId);
+        if (subServices.length > 0 && !selectedSub) {
+             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد الخدمة التفصيلية.' });
+             return;
+        }
 
         setIsSaving(true);
         try {
-            const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
-            const selectedSub = subServices.find(s => s.id === selectedSubServiceId);
-
-            // 🛡️ التعديل السيادي (V101.0): استخدام الـ Flat Collection لضمان الرؤية المركزية 🛡️
             const txsPath = getTenantPath(`transactions`, tenantId);
             const existingSnap = await getDocs(query(collection(firestore, txsPath!), where('clientId', '==', clientId), where('transactionType', '>=', transactionTypeName), where('transactionType', '<=', transactionTypeName + '\uf8ff')));
             const sameTypeCount = existingSnap.docs.filter(d => d.data().transactionType.startsWith(transactionTypeName)).length;
@@ -129,10 +173,9 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 : transactionTypeName;
 
             let initialStages: any[] = [];
-            const stagesPath = getTenantPath(`transactionTypes/${selectedType?.id}/subServices/${selectedSubServiceId}/workStages`, tenantId);
-            
-            if (stagesPath) {
-                const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
+            if(selectedSubServiceId) {
+                const stagesPath = getTenantPath(`transactionTypes/${selectedTypeId}/subServices/${selectedSubServiceId}/workStages`, tenantId);
+                const stagesSnap = await getDocs(query(collection(firestore, stagesPath!), orderBy('order')));
                 initialStages = stagesSnap.docs.map(d => {
                     const data = d.data() as WorkStage;
                     return { 
@@ -149,8 +192,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             }
 
             const batch = writeBatch(firestore);
-            const clientPath = getTenantPath(`clients/${clientId}`, tenantId);
-            const clientRef = doc(firestore, clientPath!);
+            const clientRef = doc(firestore, getTenantPath(`clients/${clientId}`, tenantId)!);
             
             const newCounter = (client?.transactionCounter || 0) + 1;
             const transactionNumber = `CL${client?.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
@@ -172,7 +214,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 companyId: tenantId
             }));
 
-            // 🛡️ المزامنة اللغوية السيادية V101 🛡️
             const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
                 type: 'log', 
@@ -190,12 +231,13 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'خطأ', description: error.message });
+        } finally {
             setIsSaving(false);
         }
     };
 
     const transactionTypeOptions = useMemo(() => 
-        transactionTypes.map(t => ({ value: t.name, label: t.name })), 
+        transactionTypes.map(t => ({ value: t.id!, label: t.name })), 
     [transactionTypes]);
 
     const engineerOptions = useMemo(() => 
@@ -210,47 +252,51 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                         <DialogTitle className="text-xl font-black">فتح مسار معاملة جديدة</DialogTitle>
                         <DialogDescription className="font-bold text-slate-500">سيتم تحديد رقم تسلسلي آلياً في حال وجود معاملات مشابهة.</DialogDescription>
                     </DialogHeader>
-                    <div className="p-8 space-y-6">
-                        <div className="grid gap-2">
-                            <Label className="font-black">نوع الخدمة الرئيسية *</Label>
-                            <InlineSearchList 
-                                value={transactionTypeName} 
-                                onSelect={setTransactionTypeName} 
-                                options={transactionTypeOptions} 
-                                placeholder="اختر الخدمة..." 
-                                disabled={typesLoading || isSaving} 
-                            />
-                        </div>
-                        {subServices.length > 0 && (
-                            <div className="grid gap-2 animate-in slide-in-from-top-2">
-                                <Label className="font-black text-primary flex items-center gap-2"><Layers className="h-4 w-4" /> الخدمة التفصيلية *</Label>
-                                <InlineSearchList 
-                                    value={selectedSubServiceId} 
-                                    onSelect={setSelectedSubServiceId} 
-                                    options={subServices.map(s => ({ value: s.id!, label: s.name }))} 
-                                    placeholder="حدد النوع..." 
-                                    disabled={subServicesLoading || isSaving} 
+                    {error ? (
+                        <div className="p-8 text-center text-red-600 font-bold">{error}</div>
+                    ) : (
+                        <div className="p-8 space-y-6">
+                            <div className="grid gap-2">
+                                <Label className="font-black">نوع الخدمة الرئيسية *</Label>
+                                <SafeSelect 
+                                    value={selectedTypeId} 
+                                    onSelect={handleTypeChange} 
+                                    options={transactionTypeOptions} 
+                                    placeholder="اختر الخدمة..." 
+                                    disabled={typesLoading || isSaving} 
                                 />
                             </div>
-                        )}
-                        <div className="grid gap-2">
-                            <Label className="font-black">المهندس المسؤول</Label>
-                            <InlineSearchList 
-                                value={assignedEngineerId} 
-                                onSelect={setAssignedEngineerId} 
-                                options={engineers.map(e => ({ value: e.id!, label: e.fullName }))} 
-                                placeholder="اختر المهندس..." 
-                                disabled={engineersLoading || isSaving} 
-                            />
+                            {subServices.length > 0 && (
+                                <div className="grid gap-2 animate-in slide-in-from-top-2">
+                                    <Label className="font-black text-primary flex items-center gap-2"><Layers className="h-4 w-4" /> الخدمة التفصيلية *</Label>
+                                    <SafeSelect 
+                                        value={selectedSubServiceId} 
+                                        onSelect={setSelectedSubServiceId} 
+                                        options={subServices.map(s => ({ value: s.id!, label: s.name }))} 
+                                        placeholder="حدد النوع..." 
+                                        disabled={subServicesLoading || isSaving}
+                                    />
+                                </div>
+                            )}
+                            <div className="grid gap-2">
+                                <Label className="font-black">المهندس المسؤول</Label>
+                                <SafeSelect 
+                                    value={assignedEngineerId} 
+                                    onSelect={setAssignedEngineerId} 
+                                    options={engineerOptions} 
+                                    placeholder="اختر المهندس..." 
+                                    disabled={engineersLoading || isSaving} 
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="font-black">ملاحظات إضافية</Label>
+                                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="أدخل أي تفاصيل..." rows={2} className="rounded-2xl" />
+                            </div>
                         </div>
-                        <div className="grid gap-2">
-                            <Label className="font-black">ملاحظات إضافية</Label>
-                            <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="أدخل أي تفاصيل..." rows={2} className="rounded-2xl" />
-                        </div>
-                    </div>
+                    )}
                     <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || !transactionTypeName} className="font-black px-10 rounded-xl">
+                        <Button type="submit" disabled={isSaving || !selectedTypeId || error} className="font-black px-10 rounded-xl">
                             {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : 'بدء المسار'}
                         </Button>
                     </DialogFooter>

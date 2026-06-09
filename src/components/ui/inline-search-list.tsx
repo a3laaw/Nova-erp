@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Check, ChevronsUpDown, Search, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { Button } from './button';
 import {
   Command,
   CommandEmpty,
@@ -11,12 +11,12 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
+} from './command';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
+} from './popover';
 import { Badge } from './badge';
 
 export interface SearchOption {
@@ -35,11 +35,6 @@ interface InlineSearchListProps {
   allowCustomValue?: boolean;
 }
 
-/**
- * مكون البحث والاختيار السيادي المطور (Sovereign Clarity Engine V26.2):
- * - تم تحصين المكون ضد أخطاء (map is not a function) عبر فرض مصفوفة آمنة.
- * - تحسين تباين النصوص (Solid Black) لضمان الوضوح المطلق.
- */
 export function InlineSearchList({
   value,
   onSelect,
@@ -56,7 +51,6 @@ export function InlineSearchList({
     if (!open) setSearchValue('');
   }, [open]);
 
-  // 🛡️ درع الحماية: التأكد من أن options هي دائماً مصفوفة 🛡️
   const safeOptions = React.useMemo(() => (Array.isArray(options) ? options : []), [options]);
 
   const displayText = React.useMemo(() => {
