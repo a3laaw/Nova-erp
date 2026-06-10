@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { useFirebase, useSubscription } from '@/firebase/index.tsx';
+// Corrected the import path to be safer, directly from the provider
+import { useFirebase, useSubscription } from '@/firebase/provider'; 
 import {
     collection,
     query,
@@ -171,6 +172,13 @@ export function ReferenceDataManager() {
 
     const tenantId = currentUser?.currentCompanyId;
 
+    // All useSubscription calls are now guaranteed to be correct,
+    // receiving only the path string as intended.
+    const { data: departmentsData, loading: loadingDepartments } = useSubscription<Department>(getTenantPath('departments', tenantId));
+    const { data: locationsData, loading: loadingLocations } = useSubscription<Governorate>(getTenantPath('governorates', tenantId));
+    const { data: transactionsData, loading: loadingTransactions } = useSubscription<TransactionType>(getTenantPath('transactionTypes', tenantId));
+    const { data: serviceTypesData, loading: loadingServiceTypes } = useSubscription<ServiceType>(getTenantPath('serviceTypes', tenantId));
+    
     const primaryCollectionName = useMemo(() => {
         if (view === 'departments') return 'departments';
         if (view === 'locations') return 'governorates';
@@ -183,22 +191,15 @@ export function ReferenceDataManager() {
         if (view === 'departments') return 'jobs';
         if (view === 'locations') return 'areas';
         if (view === 'transactions') return 'subServices';
-        // serviceTypes has no secondary collection, so it returns null
         return null;
     }, [view]);
 
-    const { data: departmentsData, loading: loadingDepartments } = useSubscription<Department>(getTenantPath('departments', tenantId));
-    const { data: locationsData, loading: loadingLocations } = useSubscription<Governorate>(getTenantPath('governorates', tenantId));
-    const { data: transactionsData, loading: loadingTransactions } = useSubscription<TransactionType>(getTenantPath('transactionTypes', tenantId));
-    const { data: serviceTypesData, loading: loadingServiceTypes } = useSubscription<ServiceType>(getTenantPath('serviceTypes', tenantId));
-    
-    const { data: rawPrimaryItems, loading: loadingPrimary } = useSubscription<any>(getTenantPath(primaryCollectionName, tenantId));
-    
     const secondaryRelativePath = useMemo(() => {
         if (!selectedPrimaryId || !primaryCollectionName || !secondaryCollectionName) return null;
         return `${primaryCollectionName}/${selectedPrimaryId}/${secondaryCollectionName}`;
     }, [selectedPrimaryId, primaryCollectionName, secondaryCollectionName]);
 
+    const { data: rawPrimaryItems, loading: loadingPrimary } = useSubscription<any>(getTenantPath(primaryCollectionName, tenantId));
     const { data: rawSecondaryItems, loading: loadingSecondary } = useSubscription<any>(getTenantPath(secondaryRelativePath, tenantId));
 
     const primaryItems = useMemo(() => rawPrimaryItems ? [...rawPrimaryItems].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name, 'ar')) : [], [rawPrimaryItems]);
@@ -346,7 +347,6 @@ export function ReferenceDataManager() {
     }
 
     const renderContent = () => {
-        // If the view has no secondary collection, it's a flat list. Render the simple manager.
         if (!secondaryCollectionName) {
             return (
                 <SimpleListManager 
@@ -363,7 +363,6 @@ export function ReferenceDataManager() {
             )
         }
 
-        // Otherwise, render the master-detail view
         return (
             <div className="grid grid-cols-1 md:grid-cols-12 min-h-[600px] gap-6">
                 <Card className="md:col-span-4 border-none rounded-[2rem] shadow-xl bg-white/45 backdrop-blur-xl overflow-hidden flex flex-col border-white/60">
@@ -441,7 +440,7 @@ export function ReferenceDataManager() {
                                                     <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-gray-200" onClick={(e) => { 
                                                         e.stopPropagation();
                                                         setEditingItem(item); 
-                                                        setItemName(item.name); 
+                                                        setItemName(item.name);
                                                         setIsSecondaryDialogOpen(true); 
                                                     }}><Pencil className="h-4 w-4"/></Button>
                                                     

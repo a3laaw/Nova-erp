@@ -1,10 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useFirebase } from '@/firebase/index.tsx';
+// CORRECTED: The hook is now imported from the central provider
+import { useFirebase, useSubscription } from '@/firebase/provider'; 
 import { useAuth } from '@/context/auth-context';
 import { where, QueryConstraint, orderBy } from 'firebase/firestore'; 
-import { useSubscription } from '@/hooks/use-subscription';
 import type { Notification } from '@/lib/types';
 import { toFirestoreDate } from '@/services/date-converter';
 
@@ -13,40 +13,38 @@ import { toFirestoreDate } from '@/services/date-converter';
  * تم تحصين الفرز الزمني لضمان ظهور التنبيهات الجديدة في القمة آلياً.
  */
 export function useNotifications() {
-    const { firestore } = useFirebase();
     const { user, loading: authLoading } = useAuth();
 
-    // 🛡️ تصفية التنبيهات حسب معرّف المستخدم الحالي فقط 🛡️
-    const queryConstraints = useMemo<QueryConstraint[] | null>(() => {
-        if (authLoading || !user?.id) return null;
+    const constraints = useMemo(() => {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
         return [
-            where('userId', '==', user.id),
-            orderBy('createdAt', 'desc') 
-        ];
-    }, [user?.id, authLoading]);
-    
-    const { data: notifications, loading: notificationsLoading, error } = useSubscription<Notification>(
-        firestore, 
-        queryConstraints ? 'notifications' : null, 
-        queryConstraints || []
+            where('createdAt', '>=', toFirestoreDate(sevenDaysAgo)),
+            orderBy('createdAt', 'desc')
+        ] as QueryConstraint[];
+
+    }, []); // No dependencies, calculates once
+
+    // CORRECTED: No longer passes `firestore` as an argument.
+    const { 
+        data: notifications, 
+        loading: loadingNotifications, 
+        error 
+    } = useSubscription<Notification>(
+        'notifications', 
+        constraints,
+        true // isGroup query
     );
-    
-    // 🛡️ فرز إضافي لضمان ظهور غير المقروء أولاً ثم الأحدث 🛡️
-    const sortedNotifications = useMemo(() => {
-        if (!notifications) return [];
-        return [...notifications].sort((a, b) => {
-            if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
-            const timeA = toFirestoreDate(a.createdAt)?.getTime() || 0;
-            const timeB = toFirestoreDate(b.createdAt)?.getTime() || 0;
-            return timeB - timeA;
-        });
-    }, [notifications]);
-    
-    const loading = authLoading || (queryConstraints !== null && notificationsLoading);
-    
+
+    const unreadCount = useMemo(() => 
+        notifications.filter(n => !n.isRead).length
+    , [notifications]);
+
     return { 
-        notifications: sortedNotifications, 
-        loading, 
+        notifications, 
+        loadingNotifications: loadingNotifications || authLoading, 
+        unreadCount, 
         error 
     };
 }
