@@ -1,57 +1,53 @@
-
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, collection, query, getDocs, limit } from 'firebase/firestore';
+import { useAuth } from '@/context/auth-context';
+import { getTenantPath } from '@/lib/utils';
 import { TransactionContract } from '@/components/clients/transaction-contract';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Client, ClientTransaction } from '@/lib/types';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowRight } from 'lucide-react';
 import { useBranding } from '@/context/branding-context';
-
 
 export default function TransactionContractPage() {
   const params = useParams();
   const router = useRouter();
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const { branding, loading: brandingLoading } = useBranding();
   
-  const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
+  const clientId = params.id as string;
+  const transactionId = params.transactionId as string;
+  const tenantId = currentUser?.currentCompanyId;
 
-  const clientRef = useMemo(() => {
-      if (!firestore || !clientId) return null;
-      return doc(firestore, 'clients', clientId);
-  }, [firestore, clientId]);
-  
-  const transactionRef = useMemo(() => {
-      if (!firestore || !clientId || !transactionId) return null;
-      return doc(firestore, 'clients', clientId, 'transactions', transactionId);
-  }, [firestore, clientId, transactionId]);
+  // ✅ PATTERN: Use getTenantPath for tenant-aware data fetching
+  const clientPath = useMemo(() => 
+    (tenantId && clientId) ? getTenantPath(`clients/${clientId}`, tenantId) : null,
+    [tenantId, clientId]
+  );
 
-  const [clientSnap, clientLoading] = useDoc(clientRef);
-  const [transactionSnap, transactionLoading] = useDoc(transactionRef);
-  
-  const client = useMemo(() => {
-      if (clientSnap?.exists()) {
-          return { id: clientSnap.id, ...clientSnap.data() } as Client;
-      }
-      return null;
-  }, [clientSnap]);
+  // ✅ PATTERN: Find transaction in both nested and flat collections
+  const flatTxPath = useMemo(() => 
+    (tenantId && transactionId) ? getTenantPath(`transactions/${transactionId}`, tenantId) : null,
+    [tenantId, transactionId]
+  );
+  const nestedTxPath = useMemo(() => 
+    (tenantId && clientId && transactionId) ? getTenantPath(`clients/${clientId}/transactions/${transactionId}`, tenantId) : null,
+    [tenantId, clientId, transactionId]
+  );
 
-  const transaction = useMemo(() => {
-      if (transactionSnap?.exists()) {
-          return { id: transactionSnap.id, ...transactionSnap.data() } as ClientTransaction;
-      }
-      return null;
-  }, [transactionSnap]);
+  const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
+  const { data: flatTransaction, loading: flatTxLoading } = useDocument<ClientTransaction>(firestore, flatTxPath);
+  const { data: nestedTransaction, loading: nestedTxLoading } = useDocument<ClientTransaction>(firestore, nestedTxPath);
 
-  const isLoading = clientLoading || transactionLoading || brandingLoading;
-  
+  // Use the transaction data that is found
+  const transaction = flatTransaction || nestedTransaction;
+
+  const isLoading = clientLoading || flatTxLoading || nestedTxLoading || brandingLoading;
+
   const handlePrint = () => {
     window.print();
   };
@@ -60,20 +56,10 @@ export default function TransactionContractPage() {
       return (
           <div className="bg-white p-8 rounded-lg shadow-lg max-w-4xl mx-auto space-y-8">
               <header className="flex justify-between items-center pb-4 border-b">
-                  <div className="flex items-center gap-4">
-                      <Skeleton className="h-20 w-20 rounded-lg" />
-                      <div>
-                          <Skeleton className="h-6 w-72 mb-2" />
-                          <Skeleton className="h-4 w-64" />
-                      </div>
-                  </div>
-                  <div className="text-left">
-                      <Skeleton className="h-8 w-48 mb-2" />
-                      <Skeleton className="h-4 w-24" />
-                  </div>
+                  <div className="flex items-center gap-4"><Skeleton className="h-20 w-20 rounded-lg" /><div><Skeleton className="h-6 w-72 mb-2" /><Skeleton className="h-4 w-64" /></div></div>
+                  <div className="text-left"><Skeleton className="h-8 w-48 mb-2" /><Skeleton className="h-4 w-24" /></div>
               </header>
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-40 w-full" />
+              <Skeleton className="h-24 w-full" /><Skeleton className="h-40 w-full" />
           </div>
       );
   }
@@ -82,9 +68,7 @@ export default function TransactionContractPage() {
       return (
       <div className="bg-white p-8 rounded-lg shadow-lg max-w-4xl mx-auto text-center">
           <h2 className="text-xl font-bold text-destructive">خطأ في تحميل البيانات</h2>
-          <p className="text-muted-foreground mt-2">
-          لم يتم العثور على بيانات العميل أو المعاملة. يرجى التأكد من صحة الرابط.
-          </p>
+          <p className="text-muted-foreground mt-2">لم يتم العثور على بيانات العميل أو المعاملة. قد لا يكون لديك الصلاحية الكافية لعرض هذه البيانات.</p>
       </div>
       );
   }
@@ -102,5 +86,3 @@ export default function TransactionContractPage() {
     </div>
   );
 }
-
-    

@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
     DropdownMenu, 
@@ -24,18 +24,18 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sparkles, CheckCircle2, Bookmark, PlusCircle, Loader2, Calendar, Users, Send } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { ProductivityService } from '@/services/productivity-service';
 import { useToast } from '@/hooks/use-toast';
 import { DateInput } from '../ui/date-input';
 import { MultiSelect } from '../ui/multi-select';
 import type { UserProfile } from '@/lib/types';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query } from 'firebase/firestore';
 
 interface UniversalActionTriggerProps {
     title: string;
-    clientId: string; // 🛡️ فرض معرف العميل بشكل إلزامي لضمان التوثيق المتبادل
+    clientId: string; 
     sourceModule: string;
     sourceId: string;
     sourceSubId?: string;
@@ -56,10 +56,32 @@ export function UniversalActionTrigger({ title, clientId, sourceModule, sourceId
 
     const tenantId = currentUser?.currentCompanyId;
 
-    const { data: allUsers = [], loading: usersLoading } = useSubscription<UserProfile>(
-        firestore, 
-        tenantId ? 'users' : null
-    );
+    // ✅ FIX: Replace unstable useSubscription with a stable one-time fetch
+    const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+    const [usersLoading, setUsersLoading] = useState(true);
+
+    useEffect(() => {
+        if (!firestore || !tenantId) return;
+        let isMounted = true;
+        const usersPath = getTenantPath('users', tenantId);
+        
+        getDocs(query(collection(firestore, usersPath)))
+            .then(snap => {
+                if (isMounted) {
+                    const usersData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+                    setAllUsers(usersData);
+                }
+            })
+            .catch(console.error)
+            .finally(() => {
+                if (isMounted) {
+                    setUsersLoading(false);
+                }
+            });
+
+        return () => { isMounted = false; };
+    }, [firestore, tenantId]);
+    // --- End of Fix ---
 
     const userOptions = useMemo(() => 
         allUsers.filter(u => u.id !== currentUser?.id).map(u => ({ value: u.id!, label: u.fullName || u.username }))
@@ -72,7 +94,7 @@ export function UniversalActionTrigger({ title, clientId, sourceModule, sourceId
             const service = new ProductivityService(firestore, tenantId);
             await service.createItem({
                 userId: currentUser!.id,
-                clientId: clientId, // 🛡️ ربط العميل
+                clientId: clientId, 
                 entryType: 'bookmark',
                 title: subItemName ? `${title} - ${subItemName}` : title,
                 sourceModule,
@@ -91,10 +113,9 @@ export function UniversalActionTrigger({ title, clientId, sourceModule, sourceId
             const service = new ProductivityService(firestore, tenantId);
             const taskTitle = subItemName ? `${title} - ${subItemName}` : title;
             
-            // 1. إنشاء المهمة لنفسي
             await service.createItem({
                 userId: currentUser.id,
-                clientId: clientId, // 🛡️ حقن معرف العميل للتوثيق اللاحق
+                clientId: clientId,
                 entryType: 'task',
                 title: taskTitle,
                 actionType: actionType as any,
@@ -106,13 +127,12 @@ export function UniversalActionTrigger({ title, clientId, sourceModule, sourceId
                 sourceUrl: window.location.pathname,
             });
 
-            // 2. إذا تم اختيار زملاء، إنشاء مهام لهم وإرسال تنبيهات
             if (assignedUserIds.length > 0) {
-                const notifPath = getTenantPath('notifications', tenantId);
-                const taskPath = getTenantPath('userProductivity', tenantId);
+                const notifPath = getTenantPath('notifications', tenantId)!;
+                const taskPath = getTenantPath('userProductivity', tenantId)!;
 
                 for (const targetId of assignedUserIds) {
-                    await addDoc(collection(firestore, notifPath!), cleanFirestoreData({
+                    await addDoc(collection(firestore, notifPath), cleanFirestoreData({
                         userId: targetId,
                         title: '📍 مهمة عمل تشاركية',
                         body: `قام زميلك ${currentUser.fullName} بإسناد مهمة إليك: "${taskTitle}" للمتابعة.`,
@@ -122,9 +142,9 @@ export function UniversalActionTrigger({ title, clientId, sourceModule, sourceId
                         companyId: tenantId
                     }));
 
-                    await addDoc(collection(firestore, taskPath!), cleanFirestoreData({
+                    await addDoc(collection(firestore, taskPath), cleanFirestoreData({
                         userId: targetId,
-                        clientId: clientId, // 🛡️ حقن معرف العميل للزميل أيضاً
+                        clientId: clientId, 
                         entryType: 'task',
                         title: taskTitle,
                         actionType: actionType as any,

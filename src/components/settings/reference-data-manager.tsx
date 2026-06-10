@@ -187,19 +187,19 @@ export function ReferenceDataManager() {
         return null;
     }, [view]);
 
-    const { data: departmentsData, loading: loadingDepartments } = useSubscription<Department>(firestore, getTenantPath('departments', tenantId));
-    const { data: locationsData, loading: loadingLocations } = useSubscription<Governorate>(firestore, getTenantPath('governorates', tenantId));
-    const { data: transactionsData, loading: loadingTransactions } = useSubscription<TransactionType>(firestore, getTenantPath('transactionTypes', tenantId));
-    const { data: serviceTypesData, loading: loadingServiceTypes } = useSubscription<ServiceType>(firestore, getTenantPath('serviceTypes', tenantId));
+    const { data: departmentsData, loading: loadingDepartments } = useSubscription<Department>(getTenantPath('departments', tenantId));
+    const { data: locationsData, loading: loadingLocations } = useSubscription<Governorate>(getTenantPath('governorates', tenantId));
+    const { data: transactionsData, loading: loadingTransactions } = useSubscription<TransactionType>(getTenantPath('transactionTypes', tenantId));
+    const { data: serviceTypesData, loading: loadingServiceTypes } = useSubscription<ServiceType>(getTenantPath('serviceTypes', tenantId));
     
-    const { data: rawPrimaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, getTenantPath(primaryCollectionName, tenantId));
+    const { data: rawPrimaryItems, loading: loadingPrimary } = useSubscription<any>(getTenantPath(primaryCollectionName, tenantId));
     
     const secondaryRelativePath = useMemo(() => {
         if (!selectedPrimaryId || !primaryCollectionName || !secondaryCollectionName) return null;
         return `${primaryCollectionName}/${selectedPrimaryId}/${secondaryCollectionName}`;
     }, [selectedPrimaryId, primaryCollectionName, secondaryCollectionName]);
 
-    const { data: rawSecondaryItems, loading: loadingSecondary } = useSubscription<any>(firestore, getTenantPath(secondaryRelativePath, tenantId));
+    const { data: rawSecondaryItems, loading: loadingSecondary } = useSubscription<any>(getTenantPath(secondaryRelativePath, tenantId));
 
     const primaryItems = useMemo(() => rawPrimaryItems ? [...rawPrimaryItems].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name, 'ar')) : [], [rawPrimaryItems]);
     const secondaryItems: SubService[] = useMemo(() => rawSecondaryItems ? [...rawSecondaryItems].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name, 'ar')) : [], [rawSecondaryItems]);

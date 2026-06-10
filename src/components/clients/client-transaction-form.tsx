@@ -1,33 +1,28 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '../ui/button';
-import { Label } from '../ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Layers } from 'lucide-react';
+import { useRouter, useParams } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, serverTimestamp, doc, getDoc, orderBy, runTransaction } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, SubService, TransactionStage } from '@/lib/types';
+import type { Employee, Client, TransactionType, WorkStage, SubService } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
-import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
-
-interface ClientTransactionFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-  clientId: string;
-  clientName: string;
-  fromAppointmentId?: string | null;
-}
+import { getTenantPath } from '@/lib/utils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, Layers, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+  } from "@/components/ui/dialog"
 
 const SafeSelect = ({ value, onSelect, options, placeholder, disabled }: any) => (
     <select
@@ -45,13 +40,18 @@ const SafeSelect = ({ value, onSelect, options, placeholder, disabled }: any) =>
     </select>
 );
 
-export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
+interface ClientTransactionFormProps {
+    isOpen: boolean;
+    onClose: () => void;
+    clientId: string;
+    clientName: string;
+}
+
+export function ClientTransactionForm({ isOpen, onClose, clientId, clientName }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
-    const router = useRouter();
 
-    const [client, setClient] = useState<Client | null>(null);
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [engineersLoading, setEngineersLoading] = useState(false);
     const [transactionTypes, setTransactionTypes] = useState<TransactionType[]>([]);
@@ -68,55 +68,51 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     const [error, setError] = useState<string | null>(null);
 
     const tenantId = currentUser?.currentCompanyId;
-    
+
     const transactionTypeName = useMemo(() => 
         transactionTypes.find(t => t.id === selectedTypeId)?.name || ''
     , [selectedTypeId, transactionTypes]);
 
     useEffect(() => {
-        if (!isOpen || !firestore || !tenantId) return;
+        if (!firestore || !tenantId) return;
 
         let isMounted = true;
 
         const fetchInitialData = async () => {
-            setEngineersLoading(true);
             setTypesLoading(true);
+            setEngineersLoading(true);
             setError(null);
             try {
-                const clientRefPath = getTenantPath(`clients/${clientId}`, tenantId);
                 const empPath = getTenantPath('employees', tenantId);
                 const typesPath = getTenantPath('transactionTypes', tenantId);
 
-                const [clientSnap, engSnap, typesSnap] = await Promise.all([
-                    getDoc(doc(firestore, clientRefPath!)),
+                const [engSnap, typesSnap] = await Promise.all([
                     getDocs(query(collection(firestore, empPath!), where('status', '==', 'active'))),
                     getDocs(query(collection(firestore, typesPath!), orderBy('order')))
                 ]);
 
                 if (!isMounted) return;
 
-                if (clientSnap.exists()) setClient({ id: clientSnap.id, ...clientSnap.data() } as Client);
                 setEngineers(engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
                 setTransactionTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionType)));
+
             } catch (err: any) {
                 console.error("Error fetching initial data:", err);
-                if (isMounted) {
-                    setError('فشل تحميل البيانات الأولية. الرجاء المحاولة مرة أخرى.');
-                }
+                if (isMounted) setError('فشل تحميل البيانات الأساسية. لا يمكن إنشاء معاملة.');
             } finally {
                 if (isMounted) {
-                    setEngineersLoading(false);
                     setTypesLoading(false);
+                    setEngineersLoading(false);
                 }
             }
         };
 
         fetchInitialData();
-
         return () => { isMounted = false; };
-    }, [isOpen, firestore, tenantId, clientId]);
 
-    useEffect(() => {
+    }, [firestore, tenantId]);
+
+     useEffect(() => {
         if (!selectedTypeId || !firestore || !tenantId) {
             setSubServices([]);
             return;
@@ -133,20 +129,15 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 }
             } catch (err: any) {
                 console.error("Error fetching sub-services:", err);
-                if (isMounted) {
-                    setError('فشل تحميل الخدمات الفرعية.');
-                }
             } finally {
-                if (isMounted) {
-                    setSubServicesLoading(false);
-                }
+                if (isMounted) setSubServicesLoading(false);
             }
         };
 
         fetchSubServices();
         return () => { isMounted = false; };
     }, [selectedTypeId, firestore, tenantId]);
-    
+
     const handleTypeChange = useCallback((typeId: string) => {
         setSelectedTypeId(typeId);
         setSelectedSubServiceId('');
@@ -154,152 +145,128 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !currentUser || !selectedTypeId || !tenantId) return;
-        
+        if (!firestore || !currentUser || !selectedTypeId || !tenantId || !clientId) return;
+
         const selectedSub = subServices.find(s => s.id === selectedSubServiceId);
         if (subServices.length > 0 && !selectedSub) {
-             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد الخدمة التفصيلية.' });
-             return;
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد الخدمة التفصيلية.' });
+            return;
         }
 
         setIsSaving(true);
         try {
             const txsPath = getTenantPath(`transactions`, tenantId);
-            const existingSnap = await getDocs(query(collection(firestore, txsPath!), where('clientId', '==', clientId), where('transactionType', '>=', transactionTypeName), where('transactionType', '<=', transactionTypeName + '\uf8ff')));
-            const sameTypeCount = existingSnap.docs.filter(d => d.data().transactionType.startsWith(transactionTypeName)).length;
-            
-            const finalTypeName = sameTypeCount > 0 
-                ? `${transactionTypeName} - ${String(sameTypeCount + 1).padStart(3, '0')}`
-                : transactionTypeName;
-
-            let initialStages: any[] = [];
-            if(selectedSubServiceId) {
-                const stagesPath = getTenantPath(`transactionTypes/${selectedTypeId}/subServices/${selectedSubServiceId}/workStages`, tenantId);
-                const stagesSnap = await getDocs(query(collection(firestore, stagesPath!), orderBy('order')));
-                initialStages = stagesSnap.docs.map(d => {
-                    const data = d.data() as WorkStage;
-                    return { 
-                        stageId: d.id, 
-                        name: data.name, 
-                        status: 'pending' as const,
-                        order: data.order || 0,
-                        trackingType: data.trackingType || 'duration',
-                        expectedDurationDays: data.expectedDurationDays || null,
-                        maxOccurrences: data.maxOccurrences || null,
-                        nextStageIds: data.nextStageIds || []
-                    } satisfies TransactionStage;
-                });
-            }
-
-            const batch = writeBatch(firestore);
             const clientRef = doc(firestore, getTenantPath(`clients/${clientId}`, tenantId)!);
             
-            const newCounter = (client?.transactionCounter || 0) + 1;
-            const transactionNumber = `CL${client?.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
-            const newTransactionRef = doc(collection(firestore, txsPath!));
-            
-            batch.update(clientRef, { transactionCounter: newCounter });
+            await runTransaction(firestore, async (transaction) => {
+                const clientDoc = await transaction.get(clientRef);
+                if (!clientDoc.exists()) throw new Error("Client does not exist.");
 
-            batch.set(newTransactionRef, cleanFirestoreData({
-                transactionNumber, 
-                clientId, 
-                transactionType: finalTypeName,
-                subServiceName: selectedSub?.name || null,
-                description, 
-                status: 'new', 
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(), 
-                stages: initialStages,
-                assignedEngineerId: assignedEngineerId || client?.assignedEngineer || null,
-                companyId: tenantId
-            }));
+                const clientData = clientDoc.data();
 
-            const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
-            batch.set(timelineRef, {
-                type: 'log', 
-                content: `تم فتح المسار الفني للمنشأة: "${finalTypeName}".`,
-                userId: currentUser.id, 
-                userName: currentUser.fullName, 
-                createdAt: serverTimestamp(),
-                companyId: tenantId
+                const newCounter = (clientData.transactionCounter || 0) + 1;
+                const transactionNumber = `CL${clientData.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
+                const newTransactionRef = doc(collection(firestore, txsPath!));
+
+                transaction.update(clientRef, { transactionCounter: newCounter });
+
+                // **THE FIX**: Directly creating the object without the problematic cleaner function.
+                const transactionData = {
+                    transactionNumber, 
+                    clientId: clientId, 
+                    transactionType: transactionTypeName,
+                    subServiceName: selectedSub?.name || null,
+                    description, 
+                    status: 'new', 
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(), 
+                    stages: [],
+                    assignedEngineerId: assignedEngineerId || clientData.assignedEngineer || null,
+                    companyId: tenantId
+                };
+
+                transaction.set(newTransactionRef, transactionData);
+
+                const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
+                transaction.set(timelineRef, {
+                    type: 'log', 
+                    content: `تم فتح المسار الفني للمعاملة: "${transactionTypeName}".`,
+                    userId: currentUser.id, 
+                    userName: currentUser.fullName, 
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
+                });
             });
 
-            await batch.commit();
-            toast({ title: '✅ تم فتح المسار الفني' });
+            toast({ title: '✅ تم فتح المسار الفني بنجاح' });
             onClose();
-            router.refresh();
 
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'خطأ', description: error.message });
+        } catch (err: any) {
+            console.error(err);
+            toast({ variant: 'destructive', title: 'حدث خطأ فادح', description: err.message });
         } finally {
             setIsSaving(false);
         }
     };
 
-    const transactionTypeOptions = useMemo(() => 
-        transactionTypes.map(t => ({ value: t.id!, label: t.name })), 
-    [transactionTypes]);
-
-    const engineerOptions = useMemo(() => 
-        engineers.map(e => ({ value: e.id!, label: e.fullName })), 
-    [engineers]);
-
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
-            <DialogContent dir="rtl" className="max-w-lg rounded-[2.5rem] border-none shadow-2xl p-0 bg-white">
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader className="p-8 bg-primary/5 border-b">
-                        <DialogTitle className="text-xl font-black">فتح مسار معاملة جديدة</DialogTitle>
-                        <DialogDescription className="font-bold text-slate-500">سيتم تحديد رقم تسلسلي آلياً في حال وجود معاملات مشابهة.</DialogDescription>
-                    </DialogHeader>
+       <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-[425px]" dir="rtl">
+                <DialogHeader>
+                    <DialogTitle>فتح معاملة جديدة للعميل: {clientName}</DialogTitle>
+                    <DialogDescription>
+                        اختر نوع الخدمة وقدم التفاصيل اللازمة لبدء المسار الفني.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4 py-4">
                     {error ? (
-                        <div className="p-8 text-center text-red-600 font-bold">{error}</div>
+                        <div className="p-8 text-center text-red-600 font-bold bg-red-50 rounded-xl">{error}</div>
                     ) : (
-                        <div className="p-8 space-y-6">
+                        <>
                             <div className="grid gap-2">
                                 <Label className="font-black">نوع الخدمة الرئيسية *</Label>
                                 <SafeSelect 
                                     value={selectedTypeId} 
                                     onSelect={handleTypeChange} 
-                                    options={transactionTypeOptions} 
+                                    options={transactionTypes.map(t => ({ value: t.id!, label: t.name }))} 
                                     placeholder="اختر الخدمة..." 
-                                    disabled={typesLoading || isSaving} 
+                                    disabled={typesLoading || isSaving}
                                 />
                             </div>
-                            {subServices.length > 0 && (
+                            {(subServicesLoading || subServices.length > 0) && (
                                 <div className="grid gap-2 animate-in slide-in-from-top-2">
                                     <Label className="font-black text-primary flex items-center gap-2"><Layers className="h-4 w-4" /> الخدمة التفصيلية *</Label>
                                     <SafeSelect 
                                         value={selectedSubServiceId} 
                                         onSelect={setSelectedSubServiceId} 
                                         options={subServices.map(s => ({ value: s.id!, label: s.name }))} 
-                                        placeholder="حدد النوع..." 
+                                        placeholder={subServicesLoading ? 'جاري التحميل...' : 'حدد النوع الفرعي...'}
                                         disabled={subServicesLoading || isSaving}
                                     />
                                 </div>
                             )}
                             <div className="grid gap-2">
-                                <Label className="font-black">المهندس المسؤول</Label>
+                                <Label className="font-black">إسناد إلى مهندس</Label>
                                 <SafeSelect 
                                     value={assignedEngineerId} 
                                     onSelect={setAssignedEngineerId} 
-                                    options={engineerOptions} 
-                                    placeholder="اختر المهندس..." 
+                                    options={engineers.map(e => ({ value: e.id!, label: e.fullName }))} 
+                                    placeholder={engineersLoading ? 'جاري التحميل...' : 'اختياري (تلقائيًا للمهندس المسؤول)'}
                                     disabled={engineersLoading || isSaving} 
                                 />
                             </div>
                             <div className="grid gap-2">
                                 <Label className="font-black">ملاحظات إضافية</Label>
-                                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="أدخل أي تفاصيل..." rows={2} className="rounded-2xl" />
+                                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="(اختياري) أدخل أي تفاصيل إضافية عن هذه المعاملة..." rows={3} className="rounded-2xl" />
                             </div>
-                        </div>
+                        </>
                     )}
-                    <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
-                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || !selectedTypeId || error} className="font-black px-10 rounded-xl">
-                            {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : 'بدء المسار'}
+                     <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
+                        <Button type="submit" disabled={isSaving || !selectedTypeId || error} className="font-black px-10 rounded-xl min-w-[120px]">
+                            {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : 'حفظ وبدء المسار'}
                         </Button>
-                    </DialogFooter>
+                </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>

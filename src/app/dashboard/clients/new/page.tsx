@@ -50,32 +50,44 @@ function NewClientContent() {
             }
 
             await runTransaction(firestore, async (transaction) => {
-                const counterRef = doc(firestore, getTenantPath('counters/clientFiles', tenantId));
+                const counterRef = doc(firestore, getTenantPath('counters/clientFiles', tenantId)!);
                 const counterDoc = await transaction.get(counterRef);
                 
                 const currentYear = new Date().getFullYear().toString();
-                let nextFileNumber = 1;
-                if (counterDoc.exists()) {
-                    const counts = counterDoc.data()?.counts || {};
-                    nextFileNumber = (counts[currentYear] || 0) + 1;
-                }
+                const counts = counterDoc.data()?.counts || {};
+                const nextFileNumber = (counts[currentYear] || 0) + 1;
                 
                 transaction.set(counterRef, { counts: { [currentYear]: nextFileNumber } }, { merge: true });
                 const newFileNumberFormatted = `${nextFileNumber}/${currentYear}`;
 
+                const newClientRef = doc(collection(firestore, clientsCollectionPath));
+
                 const finalClientData = {
                   ...newClientData,
+                  id: newClientRef.id, // Make ID available for history path
                   fileNumber: newFileNumberFormatted,
                   status: 'active' as const,
                   createdAt: serverTimestamp(),
-                  companyId: tenantId
+                  companyId: tenantId,
+                  createdBy: currentUser.id,
                 };
 
-                const newClientRef = doc(collection(firestore, clientsCollectionPath));
                 transaction.set(newClientRef, cleanFirestoreData(finalClientData));
+
+                // ✅ PATTERN: Add initial history log entry
+                const historyRef = doc(collection(firestore, getTenantPath(`clients/${newClientRef.id}/history`, tenantId)!));
+                transaction.set(historyRef, {
+                    type: 'log',
+                    content: `تم إنشاء ملف العميل بواسطة ${currentUser.fullName}.`,
+                    createdAt: serverTimestamp(),
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userAvatar: currentUser.avatarUrl,
+                    companyId: tenantId
+                });
             });
 
-            toast({ title: 'نجاح', description: 'تم إنشاء ملف العميل الرسمي بنجاح.' });
+            toast({ title: '✅ نجاح', description: 'تم إنشاء ملف العميل الرسمي وتوثيقه في السجل.' });
             router.push(`/dashboard/clients`);
 
         } catch (error: any) {

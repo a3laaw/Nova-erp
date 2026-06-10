@@ -1,5 +1,6 @@
 'use client';
-import { useState, useCallback } from 'react';
+
+import { useState, useCallback, useRef } from 'react';
 
 export function useOptimistic<T extends { id?: string }>(
   initialData: T[],
@@ -8,66 +9,76 @@ export function useOptimistic<T extends { id?: string }>(
   const [data, setData] = useState<T[]>(initialData);
   const [isOptimistic, setIsOptimistic] = useState(false);
 
-  const addOptimistic = useCallback(async (item: T, tempId: string) => {
-    const originalData = data;
-    const optimisticItem = { ...item, id: tempId };
-    const newData = [optimisticItem, ...originalData];
+  // ✅ FIX: Make the update function stable by removing the `data` dependency
+  // and using the functional form of `setData` to access the latest state.
 
-    setData(newData);
+  const addOptimistic = useCallback(async (item: T, tempId: string) => {
+    const optimisticItem = { ...item, id: tempId };
+    let originalData: T[] | null = null;
+
+    setData(currentData => {
+      originalData = currentData;
+      return [optimisticItem, ...currentData];
+    });
+
     setIsOptimistic(true);
     
     try {
+      const newData = [optimisticItem, ...(originalData!)]
       await updateFn(newData);
       setIsOptimistic(false);
     } catch (error) {
-      setData(originalData); // Revert to original data
+      setData(originalData!); // Revert to original data
       setIsOptimistic(false);
       throw error;
     }
-  }, [data, updateFn]);
+  }, [updateFn]);
 
   const updateOptimistic = useCallback(async (id: string, updates: Partial<T>) => {
-    const originalData = data;
-    const newData = originalData.map(item => 
-      item.id === id ? { ...item, ...updates } as T : item
-    );
+    let originalData: T[] | null = null;
+
+    setData(currentData => {
+      originalData = currentData;
+      return currentData.map(item => 
+        item.id === id ? { ...item, ...updates } as T : item
+      );
+    });
     
-    setData(newData);
     setIsOptimistic(true);
     
     try {
+      const newData = originalData!.map(item => 
+        item.id === id ? { ...item, ...updates } as T : item
+      );
       await updateFn(newData);
       setIsOptimistic(false);
     } catch (error) {
-      setData(originalData); // Revert
+      setData(originalData!); // Revert
       setIsOptimistic(false);
       throw error;
     }
-  }, [data, updateFn]);
+  }, [updateFn]);
 
   const deleteOptimistic = useCallback(async (id: string) => {
-    const originalData = data;
-    const newData = originalData.filter(item => item.id !== id);
+    let originalData: T[] | null = null;
+    
+    setData(currentData => {
+        originalData = currentData;
+        return currentData.filter(item => item.id !== id);
+    });
 
-    setData(newData);
     setIsOptimistic(true);
     
     try {
+      const newData = originalData!.filter(item => item.id !== id);
       await updateFn(newData);
       setIsOptimistic(false);
     } catch (error) {
-      setData(originalData); // Revert
+      setData(originalData!); // Revert
       setIsOptimistic(false);
       throw error;
     }
-  }, [data, updateFn]);
+  }, [updateFn]);
 
-  return {
-    data,
-    setData, // Exposing setData to allow external updates from real-time listeners
-    isOptimistic,
-    addOptimistic,
-    updateOptimistic,
-    deleteOptimistic
-  };
+  return { data, isOptimistic, addOptimistic, updateOptimistic, deleteOptimistic };
 }

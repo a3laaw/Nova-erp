@@ -62,6 +62,8 @@ import { useBranding } from '@/context/branding-context';
 import { addWorkingDays } from '@/services/leave-calculator';
 import { Separator } from '@/components/ui/separator';
 import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 
 const stageStatusColors: Record<string, string> = {
   pending: 'bg-slate-100 text-slate-800 border-slate-200',
@@ -92,44 +94,50 @@ export default function TransactionDetailPage() {
   const { branding } = useBranding();
   const { toast } = useToast();
   
-  const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
+  const transactionId = params.id as string;
   const tenantId = currentUser?.currentCompanyId;
 
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionNote, setActionNote] = useState('');
-  const [transactionPath, setTransactionPath] = useState<string | null>(null);
-  
   const [activeAction, setActiveAction] = useState<{ stageId: string, type: 'start' | 'modify' | 'complete' } | null>(null);
+
+  // --- Data Fetching (Safe Pattern) ---
+  const transactionPath = useMemo(() => 
+    (tenantId && transactionId) ? getTenantPath(`transactions/${transactionId}`, tenantId) : null, 
+    [tenantId, transactionId]
+  );
+
+  const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(
+    transactionPath || 'dummy',
+    !transactionPath
+  );
+
+  const clientId = transaction?.clientId;
+
+  const clientPath = useMemo(() => 
+    (tenantId && clientId) ? getTenantPath(`clients/${clientId}`, tenantId) : null, 
+    [tenantId, clientId]
+  );
+
+  const { data: client, loading: clientLoading } = useDocument<Client>(
+    clientPath || 'dummy',
+    !clientPath
+  );
+
+  const { data: publicHolidays = [] } = useSubscription<Holiday>('holidays', !firestore);
+  // -------------------------------------
 
   const isPrivileged = useMemo(() => 
     ['Admin', 'HR', 'Secretary', 'Developer'].includes(currentUser?.role || '')
   , [currentUser?.role]);
 
-  useEffect(() => {
-      if (!firestore || !tenantId || !clientId || !transactionId) return;
-      const findCorrectPath = async () => {
-          const flatPath = getTenantPath(`transactions/${transactionId}`, tenantId)!;
-          const nestedPath = getTenantPath(`clients/${clientId}/transactions/${transactionId}`, tenantId)!;
-          try {
-              const flatSnap = await getDoc(doc(firestore, flatPath));
-              setTransactionPath(flatSnap.exists() ? flatPath : nestedPath);
-          } catch (e) { setTransactionPath(nestedPath); }
-      };
-      findCorrectPath();
-  }, [firestore, tenantId, clientId, transactionId]);
-
-  const { data: transaction, loading: transactionLoading } = useDocument<ClientTransaction>(firestore, transactionPath);
-  const clientPath = useMemo(() => (firestore && clientId && tenantId ? getTenantPath(`clients/${clientId}`, tenantId) : null), [firestore, clientId, tenantId]);
-  const { data: client, loading: clientLoading } = useDocument<Client>(firestore, clientPath);
-  const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
-
   const isLocked = transaction?.status === 'cancelled' || transaction?.status === 'on-hold';
 
   useEffect(() => {
     if (!firestore || !tenantId) return;
-    getDocs(query(collection(firestore, getTenantPath('employees', tenantId)!), where('status', '==', 'active'))).then(snap => {
+    const employeesPath = getTenantPath('employees', tenantId);
+    getDocs(query(collection(firestore, employeesPath), where('status', '==', 'active'))).then(snap => {
         const newMap = new Map<string, string>();
         snap.forEach(doc => newMap.set(doc.id, doc.data().fullName));
         setEmployeesMap(newMap);
@@ -169,8 +177,8 @@ export default function TransactionDetailPage() {
                 stage.endDate = Timestamp.fromDate(now);
                 logLabel = 'إتمام وإنجاز';
                 
-                const userPath = getTenantPath(`users/${currentUser.id}`, tenantId);
-                batch.update(doc(firestore, userPath!), { totalPoints: increment(10) });
+                const userPath = getTenantPath(`users/${currentUser.id}`, tenantId)!;
+                batch.update(doc(firestore, userPath), { totalPoints: increment(10) });
 
                 const nextStage = currentStages.find(s => s.order === stage.order + 1);
                 if (nextStage && nextStage.status === 'pending') {
@@ -185,8 +193,8 @@ export default function TransactionDetailPage() {
                         const targetClause = contract.clauses[clauseIndex];
                         const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
 
-                        const receiptsPath = getTenantPath('cashReceipts', tenantId);
-                        const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath!), where('projectId', '==', transaction.id)));
+                        const receiptsPath = getTenantPath('cashReceipts', tenantId)!;
+                        const receiptsSnap = await getDocs(query(collection(firestore, receiptsPath), where('projectId', '==', transaction.id)));
                         const totalCollected = receiptsSnap.docs.reduce((sum, d) => sum + (d.data().amount || 0), 0);
                         
                         const previousMilestonesAmount = contract.clauses
@@ -252,21 +260,15 @@ export default function TransactionDetailPage() {
             toast({ title: '✅ تم حفظ الإنجاز والمزامنة المالية' });
             setActionNote('');
             setActiveAction(null);
-        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الربط المالي' }); } finally { setIsProcessing(false); }
+        } catch (e) { console.error(e); toast({ variant: 'destructive', title: 'خطأ في الربط المالي' }); } finally { setIsProcessing(false); }
   };
 
-  /**
-   * 🛡️ محرك التراجع السيادي المتسلسل (Sovereign Sequential Rollback V142.0) 🛡️
-   * - تم تحصينه ليقوم بالتصفير القسري لكافة المراحل اللاحقة (Forced Cascade Reset).
-   * - تم دمج "المبلغ المفسر" في التعليق التوثيقي لبيان قيمة المطالبة الملغاة.
-   */
   const handleUndoStage = async (stageId: string) => {
     if (!firestore || !transaction || !transactionPath || !tenantId || isLocked) return;
     
     const currentStages: TransactionStage[] = JSON.parse(JSON.stringify(transaction.stages || []));
     const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
     
-    // 🛡️ درع التحقق من التسلسل العكسي 🛡️
     const hasLaterCompletedStage = currentStages.some((s, idx) => idx > stageIndex && s.status === 'completed');
     if (hasLaterCompletedStage) {
         toast({ 
@@ -281,7 +283,6 @@ export default function TransactionDetailPage() {
     try {
         const batch = writeBatch(firestore);
         
-        // 🛡️ التصفير القسري للمستقبل (The Cascade Eraser) 🛡️
         for (let i = stageIndex; i < currentStages.length; i++) {
             currentStages[i].status = i === stageIndex ? 'in-progress' : 'pending';
             currentStages[i].endDate = null;
@@ -293,7 +294,6 @@ export default function TransactionDetailPage() {
 
         const stage = currentStages[stageIndex];
         
-        // 💰 جلب مبلغ المطالبة لإدراجه في التعليق 💰
         let cancelledAmount = 0;
         const contract = transaction.contract;
         if (contract?.clauses) {
@@ -301,10 +301,9 @@ export default function TransactionDetailPage() {
             if (clause) cancelledAmount = clause.amount || 0;
         }
 
-        // 3. التراجع المالي والرقابي
-        const appsPath = getTenantPath('payment_applications', tenantId);
+        const appsPath = getTenantPath('payment_applications', tenantId)!;
         const appsQuery = query(
-            collection(firestore, appsPath!), 
+            collection(firestore, appsPath), 
             where('projectId', '==', transaction.id),
             where('currentMilestone', '==', stage.name),
             where('status', '==', 'draft') 
@@ -317,7 +316,6 @@ export default function TransactionDetailPage() {
             });
         });
 
-        // 4. تصفير حالة الدفعة في العقد
         if (contract?.clauses) {
             const updatedClauses = contract.clauses.map((c: any) => {
                 if (c.condition === stage.name) return { ...c, status: 'غير مستحقة' };
@@ -326,13 +324,11 @@ export default function TransactionDetailPage() {
             batch.update(doc(firestore, transactionPath), { 'contract.clauses': updatedClauses });
         }
 
-        // 5. تحديث مستند المعاملة النهائي
         batch.update(doc(firestore, transactionPath), { 
             stages: currentStages, 
             updatedAt: serverTimestamp() 
         });
 
-        // 6. توثيق التراجع في التايم لاين مع إدراج المبلغ الفعلي
         const timelineRef = doc(collection(firestore, `${transactionPath}/timelineEvents`));
         batch.set(timelineRef, {
             type: 'comment',
@@ -352,7 +348,7 @@ export default function TransactionDetailPage() {
     } finally { setIsProcessing(false); }
   };
 
-  if (transactionLoading || clientLoading || !transaction) return <div className="p-8 max-w-5xl mx-auto space-y-6"><Skeleton className="h-48 w-full rounded-[3rem]" /><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
+  if (transactionLoading || clientLoading || !transaction || !client) return <div className="p-8 max-w-5xl mx-auto space-y-6"><Skeleton className="h-48 w-full rounded-[3rem]" /><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
 
   return (
     <div className='space-y-6 max-w-6xl mx-auto pb-20' dir='rtl'>
@@ -373,7 +369,7 @@ export default function TransactionDetailPage() {
                             {!isLocked && (
                                 <UniversalActionTrigger 
                                     title={transaction.transactionType}
-                                    clientId={clientId} 
+                                    clientId={clientId!} 
                                     sourceModule="المعاملات"
                                     sourceId={transaction.id!}
                                 />
@@ -441,7 +437,7 @@ export default function TransactionDetailPage() {
                                                         <UniversalActionTrigger 
                                                             title={transaction.transactionType}
                                                             subItemName={stage.name}
-                                                            clientId={clientId} 
+                                                            clientId={clientId!}
                                                             sourceModule="مراحل العمل"
                                                             sourceId={transaction.id!}
                                                             sourceSubId={stage.stageId}
@@ -534,9 +530,9 @@ export default function TransactionDetailPage() {
                 </Card>
             </TabsContent>
 
-            <TabsContent value="comments"><TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="comment" showInput={!isLocked} title="الملاحظات الفنية" icon={<MessageSquare className='text-primary h-6 w-6'/>} client={client} transaction={transaction} /></TabsContent>
+            <TabsContent value="comments"><TransactionTimeline clientId={clientId!} transactionId={transactionId} filterType="comment" showInput={!isLocked} title="الملاحظات الفنية" icon={<MessageSquare className='text-primary h-6 w-6'/>} client={client!} transaction={transaction} /></TabsContent>
             <TabsContent value="boq"><Card className="rounded-[3rem] p-10">{transaction.boqId ? <LinkedBoqView boqId={transaction.boqId} /> : <p className="text-center opacity-30 italic font-black">لا توجد مقايسة مرتبطة.</p>}</Card></TabsContent>
-            <TabsContent value="history"><TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="log" showInput={false} title="سجل الأحداث" icon={<History className='text-primary h-6 w-6'/>} client={client} transaction={transaction} /></TabsContent>
+            <TabsContent value="history"><TransactionTimeline clientId={clientId!} transactionId={transactionId} filterType="log" showInput={false} title="سجل الأحداث" icon={<History className='text-primary h-6 w-6'/>} client={client!} transaction={transaction} /></TabsContent>
         </Tabs>
     </div>
   );
